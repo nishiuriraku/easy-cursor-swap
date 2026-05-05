@@ -71,7 +71,7 @@
         "https://github.com/cursorforge/cursor-forge/releases/latest/download/latest.json"
       ],
       "dialog": false,
-      "pubkey": "TAURI_SIGNING_PUBLIC_KEY_PLACEHOLDER"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdFOTEzM0YxRjc1OTlDMQpSV1RCbVhVZlB4UHBCd1o5enQvdzdvQ0JzMGV1K3RrS2lCYk1nZTMvOUV1ZGlTbHNnTkhxZVg3dQo="
     }
   }
 }

@@ -1,0 +1,86 @@
+name: Release
+
+# タグ push (v*.*.* 形式) をトリガーに MSI / NSIS を署名してリリース。
+# Tauri Updater の自動更新に必要な latest.json も生成する。
+#
+# 必要な GitHub Secrets:
+#   TAURI_SIGNING_PRIVATE_KEY       : src-tauri/signing/cursorforge の内容 (base64)
+#   TAURI_SIGNING_PRIVATE_KEY_PASSWORD: 鍵のパスフレーズ (パスなしなら設定不要)
+#
+# オプション (コードサイニング):
+#   WINDOWS_SIGNING_CERT_PFX_BASE64 : PFX 証明書 (base64)
+#   WINDOWS_SIGNING_CERT_PASSWORD   : PFX パスワード
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # -----------------------------------------------------------
+  # Windows x64 バンドル生成 + 署名
+  # -----------------------------------------------------------
+  build-windows:
+    name: Build Windows bundles
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cargo cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: npm ci
+        run: npm ci
+
+      - name: Tauri build (MSI + NSIS, Updater 署名付き)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'CursorForge ${{ github.ref_name }}'
+          releaseBody: |
+            ## CursorForge ${{ github.ref_name }}
+
+            ### インストール
+            - **MSI** (推奨): `CursorForge_*_x64_ja-JP.msi` または `*_en-US.msi`
+            - **NSIS**: `CursorForge_*_x64-setup.exe`
+
+            ### 自動アップデート
+            Tauri Updater により署名検証済みの差分更新が配信されます。
+
+            ### 動作要件
+            - Windows 10 22H2 以降 / Windows 11 (x64)
+            - WebView2 Evergreen Runtime
+
+            ### 既知の制限
+            - RDP / Citrix / RemoteApp は動作対象外
+            - Windows Server は動作対象外
+            - `.ani` の新規生成は未対応
+          releaseDraft: true
+          prerelease: false
+          includeUpdaterJson: true
+
+  # -----------------------------------------------------------
+  # (将来) SignPath.io / Microsoft Trusted Signing による EV 署名
+  # 現状は上記 tauri-action の self-signed でビルドのみ。
+  # -----------------------------------------------------------
