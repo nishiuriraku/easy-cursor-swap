@@ -541,11 +541,11 @@
 2. **✍️ EV/OV コードサイニング調達** — SignPath.io 等の OSS 無償署名サービス検討
 3. ~~**🪪 Tauri Updater 公開鍵発行**~~ ✅ 完了 (`tauri signer generate` + tauri.conf.json 更新 + release.yml + docs/signing.md)
 4. ~~**♿ WCAG AA 検証**~~ ✅ 完了 (ARIA / aria-current / aria-labelledby / aria-pressed / skip-to-content / prefers-reduced-motion)
-5. **🛡️ VirusTotal API 統合** — Marketplace CI のマルウェア DB 照合を実 API に置換
+5. ~~**🛡️ VirusTotal API 統合**~~ ✅ 完了 (validate.mjs を VT API v3 対応、429/ネットワーク障害は fail-open)
 6. **🧪 起動時間 / メモリ / 適用時間の実測ベンチ** — Phase 8-1 の数値目標を CI で検証
 7. **🪝 鍵ローテーション PR テンプレ** — `cursorforge/index` 側の `authors/{user}.json` 編集ガイド
-8. **🚀 v1→v2 メジャー跨ぎ判定 + 3 回連続失敗ロールバック** — Phase 8-4 残
-9. **🦠 SVG 以外の画像メタデータパージ** — PNG Exif / iTXt の除去強化 (Phase 6-1 残)
+8. ~~**🚀 v1→v2 メジャー跨ぎ判定 + 3 回連続失敗ロールバック**~~ ✅ 完了 (health.rs + main.rs Win32 ダイアログ + settings.vue 追加確認)
+9. ~~**🦠 SVG 以外の画像メタデータパージ**~~ ✅ 完了 (eXIf / iTXt / zTXt チャンク除去テスト追加 16 pass)
 10. ~~**🌐 設定セクション本文の i18n 残置換**~~ ✅ 完了 (288 キー / 8 セクション全文 + ダイアログ + ステータス)
 11. ~~**🆘 GUI 復旧フロー**~~ ✅ 完了 (`list_config_backups` / `restore_config_backup` + ConfigRecoveryPanel.vue)
 
@@ -557,9 +557,9 @@
 > 以下の領域は仕様書に記載があるが、まだ実装未着手 / 部分的のため重点的に扱う。
 
 1. **Phase 8-2/8-3: 配布基盤** — `.msi` / `.msix` インストーラー生成、WebView2 Bootstrapper 同梱、SmartScreen レピュテーション獲得
-2. **Phase 8-4: 自動アップデート** — Tauri Updater 設定 + メジャー跨ぎ (v1→v2) 手動誘導 + 3 回連続失敗ロールバック
-3. **Phase 9-2: テーマ提出フロー** — ブラウザ経由 PR テンプレ事前 URL + アプリ内「公式インデックスに提出」ボタン
-4. **Phase 9-3: マルウェアハッシュ実 DB** — VirusTotal API 統合 (現状は空のローカル DB)
+2. ~~**Phase 8-4: 自動アップデート**~~ ✅ 完了 — メジャー跨ぎ警告 + 3 回連続失敗ロールバック誘導 (GitHub Releases ブラウザ誘導)
+3. ~~**Phase 9-2: テーマ提出フロー**~~ ✅ 完了 — SubmitThemeDialog.vue + open_url IPC + GitHub ファイルエディタ自動 URL 生成
+4. ~~**Phase 9-3: マルウェアハッシュ実 DB**~~ ✅ 完了 — VirusTotal API v3 統合 + fail-open
 5. **Phase 7-2: AppUserModelID 登録** — トースト通知発信元の明示
 6. **Phase 4-7 残: アクセシビリティ競合検出** — `CursorIndicator` / `ContrastScheme` / `CursorBaseSize` 検出と警告ダイアログ
 7. **Phase 5-11: WCAG AA 準拠** — コントラスト 4.5:1 検証 / キーボードナビ / ARIA ラベル
