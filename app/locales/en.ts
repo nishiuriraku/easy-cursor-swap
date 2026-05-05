@@ -78,6 +78,10 @@ export default {
     rolesLabel: 'Roles',
     themeLabel: 'Theme',
     signedTag: 'SIGNED',
+    conflictTitle: 'Conflict with accessibility features',
+    conflictMouseSonar: 'Mouse Sonar (Ctrl-press indicator) is enabled. The Ctrl-press indicator will not change after applying.',
+    conflictHighContrast: 'High Contrast mode is enabled. The OS may override your theme with system cursors.',
+    conflictCursorBaseSize: 'Cursor size is enlarged to {size} (default 32). Your theme may render at a different size than intended.',
   },
   creator: {
     breadcrumb: 'Creator',

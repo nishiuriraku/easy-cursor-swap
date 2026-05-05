@@ -77,6 +77,10 @@ export default {
     rolesLabel: 'Roles',
     themeLabel: 'Theme',
     signedTag: 'SIGNED',
+    conflictTitle: 'アクセシビリティ機能との競合',
+    conflictMouseSonar: 'マウスソナー (Ctrl 押下でカーソル位置を表示) が有効です。テーマ適用後も Ctrl 押下時の表示は変わりません。',
+    conflictHighContrast: 'ハイコントラストモードが有効です。OS 既定のシステムカーソルに置き換えられる場合があります。',
+    conflictCursorBaseSize: 'カーソルサイズが {size} に拡大されています (既定 32)。テーマのデザイン意図と異なるサイズで表示される可能性があります。',
   },
   creator: {
     breadcrumb: 'Creator',

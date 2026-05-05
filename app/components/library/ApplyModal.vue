@@ -10,12 +10,42 @@
  *
  * 実際の IPC 呼び出しは親 (Library) で行う。当コンポーネントは emit のみ。
  */
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import type { ThemeCardData } from '~/types/theme'
 import { CURSOR_ROLES } from '~/components/icons/CursorIcons'
 import { useI18n } from '~/composables/useI18n'
+import { invokeTauri } from '~/composables/useTauri'
 
 const { t } = useI18n()
+
+interface AccessibilityConflicts {
+  mouse_sonar_enabled: boolean
+  high_contrast_enabled: boolean
+  cursor_base_size: number
+  has_conflicts: boolean
+}
+
+const conflicts = ref<AccessibilityConflicts | null>(null)
+
+const conflictMessages = computed(() => {
+  if (!conflicts.value || !conflicts.value.has_conflicts) return []
+  const out: string[] = []
+  if (conflicts.value.mouse_sonar_enabled) out.push(t('apply.conflictMouseSonar'))
+  if (conflicts.value.high_contrast_enabled) out.push(t('apply.conflictHighContrast'))
+  if (conflicts.value.cursor_base_size > 32) {
+    out.push(t('apply.conflictCursorBaseSize', { size: conflicts.value.cursor_base_size }))
+  }
+  return out
+})
+
+onMounted(async () => {
+  try {
+    conflicts.value = await invokeTauri<AccessibilityConflicts>('get_accessibility_conflicts')
+  } catch {
+    // 取得失敗時はバナー非表示 (フェイルセーフ)
+    conflicts.value = null
+  }
+})
 
 const props = defineProps<{
   theme: ThemeCardData
@@ -56,6 +86,17 @@ function onBackdropClick(e: MouseEvent) {
         <span v-if="signedKeyId" class="tag ok">
           <UiIcon name="Shield" :size="11" />{{ t('apply.signedTag') }}
         </span>
+      </div>
+
+      <!-- アクセシビリティ競合警告 -->
+      <div v-if="conflictMessages.length > 0" class="a11y-banner" role="alert">
+        <UiIcon name="AlertTriangle" :size="14" />
+        <div>
+          <strong>{{ t('apply.conflictTitle') }}</strong>
+          <ul>
+            <li v-for="(msg, i) in conflictMessages" :key="i">{{ msg }}</li>
+          </ul>
+        </div>
       </div>
 
       <!-- 本体 KV リスト -->
@@ -134,3 +175,31 @@ function onBackdropClick(e: MouseEvent) {
     </div>
   </div>
 </template>
+
+<style scoped>
+.a11y-banner {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 0 20px 12px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: var(--warning, #f59e0b);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.a11y-banner strong {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.a11y-banner ul {
+  margin: 0;
+  padding-left: 16px;
+  color: var(--fg);
+}
+</style>

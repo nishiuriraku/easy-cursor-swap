@@ -3,6 +3,7 @@
 //! フロントエンド (Nuxt) から呼び出し可能なコマンドを定義する。
 //! 各コマンドは Tauri の `#[tauri::command]` マクロで公開される。
 
+use crate::accessibility::AccessibilityConflicts;
 use crate::backup::{BackupManager, ProfileEnvelope};
 use crate::config::{AppConfig, BackupInfo, ConfigManager};
 use crate::health::is_major_bump;
@@ -521,6 +522,15 @@ pub fn open_url(url: String) -> Result<(), AppError> {
     Ok(())
 }
 
+/// アクセシビリティ機能との競合を検出する。
+///
+/// レジストリから MouseSonar / HighContrast / CursorBaseSize を読み取り、
+/// テーマ適用時にユーザーへ警告すべき状態かを返す。
+#[tauri::command]
+pub fn get_accessibility_conflicts() -> AccessibilityConflicts {
+    AccessibilityConflicts::detect()
+}
+
 /// 現行バージョンから新バージョンへの更新がメジャー跨ぎかどうかを返す。
 ///
 /// フロントエンドはアップデート確認時にこれを呼び出し、`true` の場合は
@@ -562,5 +572,6 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         restore_config_backup,
         check_update_is_major_jump,
         open_url,
+        get_accessibility_conflicts,
     ]
 }
