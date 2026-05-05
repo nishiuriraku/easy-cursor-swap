@@ -349,7 +349,10 @@
 - [x] `useNotify` composable — 起動時に `requestPermission` を一度だけ実行してキャッシュ
 - [x] capabilities/default.json に notification 権限追加
 - [x] ライブラリのテーマ適用成功 / インポート成功で Toast 表示
-- [ ] `AppUserModelID` の明示的登録 (現状は Tauri 既定値)
+- [x] **`AppUserModelID` の明示的登録** (`src-tauri/src/appusermodel.rs`)
+  - `SetCurrentProcessExplicitAppUserModelID("dev.cursorforge.app")` を main 起動時に呼出
+  - tauri.conf.json の identifier と整合 (Vendor.Product 形式)
+  - 通知センターで送信元アプリ名が CursorForge と表示される
 
 ### 7-3: 国際化 🔄 基盤完了
 - [x] **i18n キー管理 (`app/locales/ja.ts` + `en.ts`)** — `as const` で型導出

@@ -10,6 +10,7 @@
 //! - commands: Tauri IPC コマンド定義
 //! - errors: エラー型定義
 
+pub mod appusermodel;
 pub mod backup;
 pub mod commands;
 pub mod config;

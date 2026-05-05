@@ -5,6 +5,7 @@
 // リリースビルドではコンソールウィンドウを非表示にする
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use app_lib::appusermodel;
 use app_lib::commands;
 use app_lib::config::ConfigManager;
 use app_lib::cursor_watcher;
@@ -31,6 +32,9 @@ fn main() {
     };
 
     tracing::info!("CursorForge v{} を起動しています...", env!("CARGO_PKG_VERSION"));
+
+    // AppUserModelID を明示登録 (トースト発信元の見える化)
+    appusermodel::register_aumid();
 
     // 多重起動防止: Named Mutex を取得。既存インスタンスがあれば中断。
     // _instance_lock は drop 時にミューテックスを解放するので main の最後まで保持。
