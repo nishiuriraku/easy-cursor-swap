@@ -4,6 +4,7 @@
 //! 各コマンドは Tauri の `#[tauri::command]` マクロで公開される。
 
 use crate::accessibility::AccessibilityConflicts;
+use crate::autostart;
 use crate::backup::{BackupManager, ProfileEnvelope};
 use crate::config::{AppConfig, BackupInfo, ConfigManager};
 use crate::health::is_major_bump;
@@ -401,15 +402,31 @@ pub fn get_config(config: State<'_, ConfigManager>) -> Result<AppConfig, AppErro
     config.get()
 }
 
-/// アプリケーション設定を更新する
+/// アプリケーション設定を更新する。
+///
+/// 副作用として `general.auto_start` をレジストリ (HKCU\...\Run) に同期する。
+/// 同期に失敗してもログを出すのみで設定保存自体はエラーとしない (UI 操作の妨げを防ぐため)。
 #[tauri::command]
 pub fn update_config(
     config: State<'_, ConfigManager>,
     updates: AppConfig,
 ) -> Result<AppConfig, AppError> {
-    config.update(|c| {
+    let auto_start = updates.general.auto_start;
+    let saved = config.update(|c| {
         *c = updates;
-    })
+    })?;
+    if let Err(e) = autostart::set_enabled(auto_start) {
+        tracing::warn!("自動起動レジストリ同期失敗: {}", e);
+    }
+    Ok(saved)
+}
+
+/// 現在の自動起動 (HKCU Run) 登録状態を返す。
+///
+/// 設定 `general.auto_start` とレジストリ実態が乖離していないかの確認用。
+#[tauri::command]
+pub fn get_autostart_status() -> bool {
+    autostart::is_enabled()
 }
 
 /// アプリ情報を返す（バージョン等）
@@ -573,5 +590,6 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         check_update_is_major_jump,
         open_url,
         get_accessibility_conflicts,
+        get_autostart_status,
     ]
 }

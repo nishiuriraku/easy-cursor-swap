@@ -6,6 +6,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use app_lib::appusermodel;
+use app_lib::autostart;
 use app_lib::commands;
 use app_lib::config::ConfigManager;
 use app_lib::cursor_watcher;
@@ -166,6 +167,18 @@ fn main() {
             return;
         }
     };
+
+    // 自動起動レジストリ (HKCU\...\Run) を config に追従させる
+    // ユーザーが手動で削除していても起動のたびに復元される (config が Source of Truth)
+    {
+        let auto_start = config_manager
+            .get()
+            .map(|c| c.general.auto_start)
+            .unwrap_or(false);
+        if let Err(e) = autostart::set_enabled(auto_start) {
+            tracing::warn!("自動起動レジストリ同期失敗 (起動時): {}", e);
+        }
+    }
 
     // 初回起動時のスナップショット保存
     if let Err(e) = RegistryManager::save_initial_snapshot() {

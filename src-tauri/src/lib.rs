@@ -12,6 +12,7 @@
 
 pub mod accessibility;
 pub mod appusermodel;
+pub mod autostart;
 pub mod backup;
 pub mod commands;
 pub mod config;

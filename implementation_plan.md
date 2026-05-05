@@ -137,9 +137,16 @@
 - [x] main 起動時に取得失敗 → `tracing::warn` + プロセス終了
 - [ ] 既存インスタンスのトレイアイコンへのフォーカス移動 (CreateEvent シグナル方式、次回)
 
-### 4-5: OS 起動時自動起動
-- [ ] `HKCU\...\Run` へのレジストリ登録/解除
-- [ ] MSIX 環境では `<Extension Category="windows.startupTask">` を使い分け
+### 4-5: OS 起動時自動起動 ✅ 実装完了
+- [x] **`HKCU\...\Run` へのレジストリ登録/解除** (`src-tauri/src/autostart.rs`)
+  - `set_enabled(bool)` / `is_enabled()` 公開関数
+  - 値: `"<exe>" --autostart` (将来トレイ専用起動分岐の余地)
+  - HKCU のため UAC 不要
+  - 単体テスト 4 件 (PID 付きユニーク値名でユーザー実値と非衝突)
+- [x] `update_config` で `general.auto_start` をレジストリへ自動同期
+- [x] アプリ起動時にも config → レジストリの再同期を実行 (config が Source of Truth)
+- [x] IPC `get_autostart_status` でレジストリ実態の確認可能
+- [ ] MSIX 環境では `<Extension Category="windows.startupTask">` を使い分け (Phase 8-3 残)
 
 ### 4-6: グローバルホットキー ⬅️ NEW
 - [ ] `Ctrl+Alt+Shift+R` での強制リセット（Windows 既定カーソルに復旧）
