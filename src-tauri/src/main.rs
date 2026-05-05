@@ -10,11 +10,56 @@ use app_lib::commands;
 use app_lib::config::ConfigManager;
 use app_lib::cursor_watcher;
 use app_lib::darkmode;
-use app_lib::health::StartupCheck;
+use app_lib::health::{RollbackTarget, StartupCheck};
 use app_lib::logging;
 use app_lib::registry::RegistryManager;
 use app_lib::single_instance::SingleInstanceLock;
 use app_lib::tray;
+
+/// 連続起動失敗 3 回検出時のロールバック案内ダイアログ。
+/// ユーザーが「はい」を選んだ場合に前バージョンのリリースページを開く。
+#[cfg(windows)]
+fn show_rollback_dialog(target: &RollbackTarget) {
+    use windows::core::HSTRING;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        MessageBoxW, IDYES, MB_ICONWARNING, MB_TOPMOST, MB_YESNO,
+    };
+
+    let body = format!(
+        "CursorForge が 3 回連続して正常に起動できませんでした。\n\n\
+        前バージョン v{} にロールバックしますか?\n\n\
+        「はい」をクリックするとリリースページをブラウザで開きます。\n\
+        インストーラをダウンロードして再インストールしてください。",
+        target.version
+    );
+    let title = HSTRING::from("CursorForge — 起動失敗を検出");
+    let body_h = HSTRING::from(body);
+
+    let result = unsafe {
+        MessageBoxW(None, &body_h, &title, MB_YESNO | MB_ICONWARNING | MB_TOPMOST)
+    };
+    if result == IDYES {
+        // ShellExecute でブラウザを開く
+        use windows::core::PCWSTR;
+        use windows::Win32::UI::Shell::ShellExecuteW;
+        use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+
+        let url = HSTRING::from(target.releases_page_url.as_str());
+        unsafe {
+            ShellExecuteW(
+                None,
+                PCWSTR(HSTRING::from("open").as_ptr()),
+                PCWSTR(url.as_ptr()),
+                PCWSTR::null(),
+                PCWSTR::null(),
+                SW_SHOWNORMAL,
+            );
+        }
+    }
+}
+
+#[cfg(not(windows))]
+fn show_rollback_dialog(_target: &RollbackTarget) {}
 
 /// 設定マイグレーション失敗時の専用ダイアログ。
 /// Win32 MessageBox で「バックアップの場所」と「復旧手順」を表示する。
@@ -75,15 +120,20 @@ fn main() {
             None
         }
     };
-    if startup_check
-        .as_ref()
-        .is_some_and(|c| c.should_rollback)
-    {
-        tracing::warn!(
-            "前回起動時に正常完了マークが付いていません。アップデート後に問題があれば設定 → アップデートからロールバックを検討してください。"
-        );
-        // TODO: Tauri Updater の旧バージョン取得 + 自動置換は将来実装。
-        //       現状はカウンタ通知のみ。
+    if let Some(ref check) = startup_check {
+        if check.should_rollback {
+            tracing::warn!(
+                "連続起動失敗 3 回を検出。ロールバックダイアログを表示します。"
+            );
+            if let Some(target) = check.rollback_target() {
+                // Win32 ダイアログを表示し、ユーザーが「はい」の場合にリリースページを開く
+                show_rollback_dialog(&target);
+            } else {
+                tracing::warn!(
+                    "ロールバック先バージョンが不明です。設定 → アップデートから手動で対処してください。"
+                );
+            }
+        }
     }
 
     // AppUserModelID を明示登録 (トースト発信元の見える化)

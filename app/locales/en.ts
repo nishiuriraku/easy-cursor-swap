@@ -260,6 +260,8 @@ export default {
     updateRelaunchTitle: 'Update complete',
     updateRelaunchAsk: 'Relaunch the app to apply the new version?',
     updateAvailableLabel: 'Update to v{version}',
+    updateMajorJumpTitle: 'Major version update',
+    updateMajorJumpWarning: 'v{version} is a major version update. It may contain breaking changes. Do you want to continue?',
     // Config recovery
     groupRecovery: 'Config recovery',
     recoveryDesc: 'Backup files found. Select one to restore your configuration.',

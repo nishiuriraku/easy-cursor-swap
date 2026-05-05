@@ -88,10 +88,15 @@ const {
 } = useUpdater()
 const updaterMessage = ref<string | null>(null)
 
+// 利用可能なアップデート情報 (メジャー跨ぎ判定に使用)
+const pendingUpdateVersion = ref<string | null>(null)
+
 async function onCheckUpdate() {
   updaterMessage.value = null
+  pendingUpdateVersion.value = null
   const info = await checkForUpdate()
   if (info) {
+    pendingUpdateVersion.value = info.version
     updaterMessage.value = t('settings.updateNewVersion', {
       version: info.version,
       current: info.currentVersion,
@@ -103,6 +108,24 @@ async function onCheckUpdate() {
 
 async function onDownloadUpdate() {
   updaterMessage.value = null
+
+  // メジャーバージョン跨ぎ確認
+  if (pendingUpdateVersion.value) {
+    const appInfo = await invokeTauri<{ version: string }>('get_app_info')
+    const isMajorJump = await invokeTauri<boolean>('check_update_is_major_jump', {
+      currentVersion: appInfo.version,
+      newVersion: pendingUpdateVersion.value,
+    })
+    if (isMajorJump) {
+      const { ask } = await import('@tauri-apps/plugin-dialog')
+      const proceed = await ask(
+        t('settings.updateMajorJumpWarning', { version: pendingUpdateVersion.value }),
+        { title: t('settings.updateMajorJumpTitle'), kind: 'warning' },
+      )
+      if (!proceed) return
+    }
+  }
+
   const ok = await downloadUpdate()
   if (ok) {
     updaterMessage.value = t('settings.updateDownloadComplete')

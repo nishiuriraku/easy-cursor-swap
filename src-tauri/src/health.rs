@@ -1,4 +1,4 @@
-//! 起動ヘルスチェック (Phase 8-4 残)
+//! 起動ヘルスチェック (Phase 8-4)
 //!
 //! 仕様書「§5 自動アップデート」より:
 //!  > 新版起動失敗を 3 回連続検出した場合、旧バイナリへ自動ロールバックし、
@@ -6,16 +6,16 @@
 //!
 //! 実装方針:
 //!  1. 起動時に `%LOCALAPPDATA%\CursorForge\state\startup.json` を読み込む
-//!  2. `pending_failures` カウンタが 3 以上ならロールバック実施 (将来) +
-//!     カウンタを 0 にリセット
+//!  2. `pending_failures` カウンタが 3 以上ならロールバック判定 + カウンタを 0 にリセット
 //!  3. それ以外は `pending_failures += 1` してファイルに保存
 //!  4. アプリの初期化が完了して run() に入った後、
 //!     `mark_healthy()` を呼んでカウンタを 0 リセット
 //!  → クラッシュで run() に到達しなければカウンタは増えたまま残り、
 //!     次回起動時に検出される。
 //!
-//! Tauri Updater のロールバック機構と組み合わせる予定。
-//! 現状はカウンタ管理 + 検出ロジックのみで、実ロールバック呼出は将来。
+//! ロールバックはバイナリの自動置換ではなく GitHub Releases への誘導とする。
+//! `previous_version` を保持し、前バージョンのインストーラ URL を生成して
+//! ユーザーに再インストールを促す。
 
 use crate::errors::{AppError, AppResult};
 use serde::{Deserialize, Serialize};
@@ -23,6 +23,9 @@ use std::path::PathBuf;
 
 /// 連続失敗の閾値。これ以上で「ロールバック対象」と判定。
 const ROLLBACK_THRESHOLD: u32 = 3;
+
+/// GitHub リリースのベース URL (installer URL 生成に使用)
+const GITHUB_RELEASES_BASE: &str = "https://github.com/cursorforge/cursor-forge/releases";
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct StartupState {
@@ -35,6 +38,41 @@ pub struct StartupState {
     /// 最後に確認した現行アプリバージョン (バージョンが変わると pending_failures をリセット)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_seen_version: Option<String>,
+    /// バージョン変更直前の旧バージョン (ロールバック先として使用)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub previous_version: Option<String>,
+}
+
+/// 現行バージョン番号からメジャー番号を取得する。
+/// パース失敗時は `None`。
+fn major_of(version: &str) -> Option<u64> {
+    version.split('.').next()?.parse().ok()
+}
+
+/// `current` → `next` がメジャーバージョン跨ぎかどうかを判定する。
+///
+/// どちらかがパースできなければ `false` を返す (跨ぎなしと扱う)。
+pub fn is_major_bump(current: &str, next: &str) -> bool {
+    match (major_of(current), major_of(next)) {
+        (Some(c), Some(n)) => n > c,
+        _ => false,
+    }
+}
+
+/// 指定バージョンの NSIS インストーラの GitHub Releases ダウンロード URL を返す。
+/// アーキテクチャは x64 固定。
+pub fn installer_url_for(version: &str) -> String {
+    format!(
+        "{GITHUB_RELEASES_BASE}/download/v{version}/CursorForge_{version}_x64-setup.exe"
+    )
+}
+
+/// ロールバック先情報
+#[derive(Debug, Clone)]
+pub struct RollbackTarget {
+    pub version: String,
+    pub installer_url: String,
+    pub releases_page_url: String,
 }
 
 /// 起動ヘルスチェックの実行結果。
@@ -74,6 +112,8 @@ impl StartupCheck {
                 state.last_seen_version,
                 current_version
             );
+            // ロールバック用に旧バージョンを保存してからカウンタリセット
+            state.previous_version = state.last_seen_version.clone();
             state.pending_failures = 0;
         }
 
@@ -111,6 +151,17 @@ impl StartupCheck {
         tracing::debug!("startup health: marked healthy (v{})", current_version);
         Ok(())
     }
+
+    /// ロールバック先情報を返す。
+    /// `previous_version` が記録されている場合のみ `Some` を返す。
+    pub fn rollback_target(&self) -> Option<RollbackTarget> {
+        let version = self.state.previous_version.clone()?;
+        Some(RollbackTarget {
+            installer_url: installer_url_for(&version),
+            releases_page_url: format!("{GITHUB_RELEASES_BASE}/tag/v{version}"),
+            version,
+        })
+    }
 }
 
 #[cfg(test)]
@@ -128,14 +179,32 @@ mod tests {
         // 新バージョン検出ロジックを再現
         let new_version = "0.2.0";
         if state.last_seen_version.as_deref() != Some(new_version) {
+            state.previous_version = state.last_seen_version.clone();
             state.pending_failures = 0;
         }
         assert_eq!(state.pending_failures, 0);
+        assert_eq!(state.previous_version.as_deref(), Some("0.1.0"));
     }
 
     #[test]
     fn threshold_is_three() {
         // 仕様書「3 回連続起動失敗で旧バイナリへ自動ロールバック」を担保
         assert_eq!(ROLLBACK_THRESHOLD, 3);
+    }
+
+    #[test]
+    fn is_major_bump_detects_major_change() {
+        assert!(is_major_bump("1.9.9", "2.0.0"));
+        assert!(!is_major_bump("1.0.0", "1.5.0"));
+        assert!(!is_major_bump("2.1.0", "2.2.0"));
+        // パース失敗は false
+        assert!(!is_major_bump("invalid", "2.0.0"));
+    }
+
+    #[test]
+    fn installer_url_has_correct_format() {
+        let url = installer_url_for("1.2.3");
+        assert!(url.contains("/v1.2.3/"));
+        assert!(url.ends_with("_x64-setup.exe"));
     }
 }

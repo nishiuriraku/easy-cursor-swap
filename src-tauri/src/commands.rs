@@ -5,6 +5,7 @@
 
 use crate::backup::{BackupManager, ProfileEnvelope};
 use crate::config::{AppConfig, BackupInfo, ConfigManager};
+use crate::health::is_major_bump;
 use crate::cursor::{build_cur_from_png, clear_resize_cache, ResizeMethod};
 use sha2::Digest;
 use crate::darkmode;
@@ -475,6 +476,15 @@ pub fn restore_config_backup(
     config.restore_backup(&file_name)
 }
 
+/// 現行バージョンから新バージョンへの更新がメジャー跨ぎかどうかを返す。
+///
+/// フロントエンドはアップデート確認時にこれを呼び出し、`true` の場合は
+/// 追加の確認ダイアログをユーザーに表示すること。
+#[tauri::command]
+pub fn check_update_is_major_jump(current_version: String, new_version: String) -> bool {
+    is_major_bump(&current_version, &new_version)
+}
+
 /// Tauri Builder に全コマンドを登録するためのヘルパー
 pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
     tauri::generate_handler![
@@ -505,5 +515,6 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         get_app_info,
         list_config_backups,
         restore_config_backup,
+        check_update_is_major_jump,
     ]
 }
