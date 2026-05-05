@@ -102,6 +102,147 @@ impl Keystore {
         })
     }
 
+    /// 秘密鍵をパスフレーズ付きでエクスポートする。
+    ///
+    /// フォーマット (バージョン 1):
+    /// ```text
+    /// CFKEY1\n               (8 bytes magic + newline)
+    /// {salt: 16 bytes}{nonce: 24 bytes}{ciphertext: 32+16 bytes (AEAD tag 含む)}
+    /// ```
+    /// 暗号化:
+    ///  - KDF: Argon2id (m=64MiB, t=3, p=1) で salt + passphrase → 32 byte key
+    ///  - AEAD: XChaCha20-Poly1305 (24 byte nonce で乱数衝突耐性)
+    ///
+    /// パスフレーズが空文字列の場合は `Err` を返す。
+    pub fn export_private_key(passphrase: &str) -> AppResult<Vec<u8>> {
+        use crate::errors::AppError;
+
+        if passphrase.is_empty() {
+            return Err(AppError::Theme(
+                "パスフレーズを指定してください".to_string(),
+            ));
+        }
+
+        let priv_path = private_key_path()?;
+        if !priv_path.exists() {
+            return Err(AppError::Theme(
+                "鍵ペアが存在しません。先に生成してください".to_string(),
+            ));
+        }
+
+        // DPAPI から平文 32 バイト秘密鍵を取得
+        let encrypted = std::fs::read(&priv_path)?;
+        let raw = dpapi_decrypt(&encrypted)?;
+        if raw.len() != 32 {
+            return Err(AppError::Theme(format!(
+                "秘密鍵の長さが不正: {} bytes",
+                raw.len()
+            )));
+        }
+
+        // Salt と Nonce を生成
+        use rand::TryRngCore;
+        let mut salt = [0u8; 16];
+        let mut nonce = [0u8; 24];
+        rand::rngs::OsRng
+            .try_fill_bytes(&mut salt)
+            .map_err(|e| AppError::Theme(format!("CSPRNG salt 失敗: {}", e)))?;
+        rand::rngs::OsRng
+            .try_fill_bytes(&mut nonce)
+            .map_err(|e| AppError::Theme(format!("CSPRNG nonce 失敗: {}", e)))?;
+
+        // KDF: Argon2id でパスフレーズから 32 byte 鍵を導出
+        let key = derive_key_from_passphrase(passphrase, &salt)?;
+
+        // XChaCha20-Poly1305 で暗号化
+        use chacha20poly1305::aead::{Aead, KeyInit};
+        use chacha20poly1305::{XChaCha20Poly1305, XNonce};
+        let cipher = XChaCha20Poly1305::new(&key.into());
+        let xnonce = XNonce::from_slice(&nonce);
+        let ciphertext = cipher
+            .encrypt(xnonce, raw.as_slice())
+            .map_err(|e| AppError::Theme(format!("AEAD 暗号化失敗: {}", e)))?;
+
+        // フォーマット: magic + salt + nonce + ciphertext
+        let mut out = Vec::with_capacity(8 + 16 + 24 + ciphertext.len());
+        out.extend_from_slice(b"CFKEY1\n\0");
+        out.extend_from_slice(&salt);
+        out.extend_from_slice(&nonce);
+        out.extend_from_slice(&ciphertext);
+
+        tracing::info!("秘密鍵をエクスポートしました ({} bytes)", out.len());
+        Ok(out)
+    }
+
+    /// パスフレーズ付きエクスポートデータを読み込んで秘密鍵をインポートする。
+    /// 既存鍵があれば上書きする (UI 側で確認ダイアログを出すこと)。
+    pub fn import_private_key(blob: &[u8], passphrase: &str) -> AppResult<KeystoreInfo> {
+        use crate::errors::AppError;
+        use ed25519_dalek::SigningKey;
+
+        if passphrase.is_empty() {
+            return Err(AppError::Theme(
+                "パスフレーズを指定してください".to_string(),
+            ));
+        }
+        const MAGIC: &[u8] = b"CFKEY1\n\0";
+        if blob.len() < MAGIC.len() + 16 + 24 + 16 {
+            return Err(AppError::Theme(
+                "エクスポートデータが短すぎます".to_string(),
+            ));
+        }
+        if &blob[..MAGIC.len()] != MAGIC {
+            return Err(AppError::Theme(
+                "エクスポートデータの形式が不正です (magic 不一致)".to_string(),
+            ));
+        }
+
+        let body = &blob[MAGIC.len()..];
+        let salt = &body[..16];
+        let nonce = &body[16..40];
+        let ciphertext = &body[40..];
+
+        let key = derive_key_from_passphrase(passphrase, salt)?;
+
+        use chacha20poly1305::aead::{Aead, KeyInit};
+        use chacha20poly1305::{XChaCha20Poly1305, XNonce};
+        let cipher = XChaCha20Poly1305::new(&key.into());
+        let xnonce = XNonce::from_slice(nonce);
+        let plaintext = cipher
+            .decrypt(xnonce, ciphertext)
+            .map_err(|_| AppError::Theme("復号失敗 (パスフレーズが違います)".to_string()))?;
+
+        if plaintext.len() != 32 {
+            return Err(AppError::Theme(format!(
+                "復号結果の長さが不正: {} bytes",
+                plaintext.len()
+            )));
+        }
+        let mut sk_bytes = [0u8; 32];
+        sk_bytes.copy_from_slice(&plaintext);
+        let signing = SigningKey::from_bytes(&sk_bytes);
+        let verifying = signing.verifying_key();
+
+        // 保存先ディレクトリ確保
+        std::fs::create_dir_all(keys_dir()?)?;
+
+        // 秘密鍵を DPAPI 暗号化して保存
+        let dpapi_encrypted = dpapi_encrypt(&signing.to_bytes())?;
+        std::fs::write(private_key_path()?, &dpapi_encrypted)?;
+
+        // 公開鍵を Base64 平文保存
+        let pub_b64 = base64::engine::general_purpose::STANDARD.encode(verifying.to_bytes());
+        std::fs::write(public_key_path()?, &pub_b64)?;
+
+        let key_id = compute_key_id(&pub_b64)?;
+        tracing::info!("秘密鍵をインポートしました key_id={}", key_id);
+        Ok(KeystoreInfo {
+            has_keypair: true,
+            key_id: Some(key_id),
+            public_key_b64: Some(pub_b64),
+        })
+    }
+
     /// 鍵ペアを削除する。
     pub fn delete() -> AppResult<()> {
         let pub_path = public_key_path()?;
@@ -161,6 +302,22 @@ impl Keystore {
         use ed25519_dalek::Verifier;
         Ok(verifying.verify(message, &signature).is_ok())
     }
+}
+
+/// パスフレーズ + salt から Argon2id で 32 byte 鍵を導出する。
+/// パラメータ (m=64MiB, t=3, p=1) は OWASP 推奨の保守的な設定。
+fn derive_key_from_passphrase(passphrase: &str, salt: &[u8]) -> AppResult<[u8; 32]> {
+    use crate::errors::AppError;
+    use argon2::{Algorithm, Argon2, Params, Version};
+
+    let params = Params::new(64 * 1024, 3, 1, Some(32))
+        .map_err(|e| AppError::Theme(format!("Argon2 params 不正: {}", e)))?;
+    let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
+    let mut out = [0u8; 32];
+    argon2
+        .hash_password_into(passphrase.as_bytes(), salt, &mut out)
+        .map_err(|e| AppError::Theme(format!("Argon2 派生失敗: {}", e)))?;
+    Ok(out)
 }
 
 /// 公開鍵 Base64 → key_id (公開鍵 SHA-256 の先頭 16 文字)

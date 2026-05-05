@@ -94,6 +94,34 @@ pub fn keystore_delete() -> Result<(), AppError> {
     Keystore::delete()
 }
 
+/// 秘密鍵をパスフレーズ付きでエクスポートして指定パスに書き出す。
+/// XChaCha20-Poly1305 + Argon2id でフォーマット化された不透明バイト列を保存。
+#[tauri::command]
+pub fn keystore_export(passphrase: String, output_path: String) -> Result<u64, AppError> {
+    let blob = Keystore::export_private_key(&passphrase)?;
+    let path = std::path::PathBuf::from(&output_path);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(&path, &blob)?;
+    Ok(blob.len() as u64)
+}
+
+/// パスフレーズ付きエクスポートデータを読み込んで秘密鍵をインポート。
+/// 既存鍵があれば上書きする。
+#[tauri::command]
+pub fn keystore_import(
+    passphrase: String,
+    input_path: String,
+) -> Result<KeystoreInfo, AppError> {
+    let path = std::path::PathBuf::from(&input_path);
+    if !path.exists() {
+        return Err(AppError::Theme(format!("ファイルが見つかりません: {}", input_path)));
+    }
+    let blob = std::fs::read(&path)?;
+    Keystore::import_private_key(&blob, &passphrase)
+}
+
 /// クリエイターから渡された PNG バイト列を 6 サイズ .cur に変換し、
 /// 指定パスへ書き出す。`resample` は "lanczos" / "nearest" / "auto"。
 #[derive(Debug, Deserialize)]
@@ -430,6 +458,8 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         keystore_info,
         keystore_generate,
         keystore_delete,
+        keystore_export,
+        keystore_import,
         export_cursorpack,
         export_profile,
         import_profile,

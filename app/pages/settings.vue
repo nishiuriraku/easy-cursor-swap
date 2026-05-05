@@ -72,7 +72,11 @@ const security = ref({
   requireSignedThemes: false,
   warnUnsignedImport: true,
 })
-const { info: keystoreInfo, busy: keystoreBusy, lastError: keystoreError, refresh: refreshKeystore, generate: generateKeystore, remove: removeKeystore } = useKeystore()
+const { info: keystoreInfo, busy: keystoreBusy, lastError: keystoreError, refresh: refreshKeystore, generate: generateKeystore, remove: removeKeystore, exportPrivate: exportPrivateKey, importPrivate: importPrivateKey } = useKeystore()
+
+// パスフレーズプロンプト制御
+const passphrasePrompt = ref<{ mode: 'export' | 'import', open: boolean }>({ mode: 'export', open: false })
+const keystoreMessage = ref<string | null>(null)
 const logging = ref({
   logLevel: 'INFO' as 'TRACE' | 'DEBUG' | 'INFO' | 'WARN' | 'ERROR',
   retentionDays: 14,
@@ -199,6 +203,43 @@ async function onKeystoreRegenerate() {
   )
   if (proceed) await generateKeystore(true)
 }
+async function onPassphraseConfirm(passphrase: string) {
+  const mode = passphrasePrompt.value.mode
+  keystoreMessage.value = null
+  if (mode === 'export') {
+    const { save } = await import('@tauri-apps/plugin-dialog')
+    const today = new Date().toISOString().slice(0, 10)
+    const target = await save({
+      defaultPath: `cursorforge-key-${today}.cfkey`,
+      filters: [{ name: 'CursorForge Key', extensions: ['cfkey'] }],
+    })
+    if (!target) return
+    const written = await exportPrivateKey(passphrase, target)
+    if (written !== null) {
+      keystoreMessage.value = `秘密鍵をエクスポートしました (${written} bytes) → ${target}`
+    }
+  } else {
+    const { open } = await import('@tauri-apps/plugin-dialog')
+    const selected = await open({
+      multiple: false,
+      filters: [{ name: 'CursorForge Key', extensions: ['cfkey'] }],
+    })
+    if (!selected || Array.isArray(selected)) return
+    const result = await importPrivateKey(passphrase, selected)
+    if (result) {
+      keystoreMessage.value = `秘密鍵をインポートしました key_id=${result.key_id ?? '?'}`
+    }
+  }
+}
+
+function onKeystoreExport() {
+  passphrasePrompt.value = { mode: 'export', open: true }
+}
+
+function onKeystoreImport() {
+  passphrasePrompt.value = { mode: 'import', open: true }
+}
+
 async function onKeystoreDelete() {
   const { ask } = await import('@tauri-apps/plugin-dialog')
   const proceed = await ask(
@@ -453,6 +494,14 @@ function selectSection(id: SectionId) {
                   </span>
                 </SettingsRow>
                 <SettingsRow
+                  label="秘密鍵をエクスポート"
+                  desc="パスフレーズで暗号化したバックアップ (.cfkey)"
+                >
+                  <button class="btn" :disabled="keystoreBusy" @click="onKeystoreExport">
+                    <UiIcon name="Export" :size="13" />エクスポート
+                  </button>
+                </SettingsRow>
+                <SettingsRow
                   label="鍵を再生成"
                   desc="既存テーマの署名は検証不能になります"
                 >
@@ -480,7 +529,16 @@ function selectSection(id: SectionId) {
                     <UiIcon v-else name="Plus" :size="13" />鍵を生成
                   </button>
                 </SettingsRow>
+                <SettingsRow
+                  label="既存秘密鍵をインポート"
+                  desc="他 PC で生成した .cfkey ファイルをパスフレーズ付きで取り込み"
+                >
+                  <button class="btn" :disabled="keystoreBusy" @click="onKeystoreImport">
+                    <UiIcon name="Import" :size="13" />インポート
+                  </button>
+                </SettingsRow>
               </template>
+              <div v-if="keystoreMessage" class="profile-msg">{{ keystoreMessage }}</div>
               <div v-if="keystoreError" class="profile-msg" style="background: rgba(255,107,138,0.06); border-color: rgba(255,107,138,0.4); color: #ffb8c5;">
                 {{ keystoreError }}
               </div>
@@ -592,6 +650,13 @@ function selectSection(id: SectionId) {
         { text: dirty ? t('settings.unsavedChanges') : t('settings.saved') },
         ...(saveError ? [{ text: `エラー: ${saveError}` }] : []),
       ]"
+    />
+
+    <PassphrasePrompt
+      :open="passphrasePrompt.open"
+      :mode="passphrasePrompt.mode"
+      @update:open="passphrasePrompt.open = $event"
+      @confirm="onPassphraseConfirm"
     />
   </div>
 </template>

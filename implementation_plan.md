@@ -309,7 +309,10 @@
 - [x] **`key_id` 仕様** — 公開鍵 SHA-256 の先頭 16 文字 (`compute_key_id`)
 - [x] 設定画面の鍵管理 UI (`useKeystore` composable + 生成/再生成/削除/key_id 表示)
 - [x] **未署名テーマの警告ダイアログ** — `ApplyModal` で赤字メッセージ
-- [ ] 秘密鍵のエクスポート / インポート（PC 移行用、パスフレーズ付き）
+- [x] **秘密鍵のエクスポート / インポート (.cfkey 形式)** — XChaCha20-Poly1305 + Argon2id (m=64MiB, t=3, p=1)
+  - フォーマット: `CFKEY1\n\0` magic + 16 byte salt + 24 byte nonce + ciphertext
+  - `keystore_export(passphrase, path)` / `keystore_import(passphrase, path)` IPC
+  - `PassphrasePrompt.vue` (8 文字以上の弱バリデーション + 確認入力)
 - [ ] 鍵ローテーション（公開鍵差し替え PR、過去 `key_id` 検証維持）
 
 ### 6-4: `.cursorprofile` フルバックアップ ✅ 完了

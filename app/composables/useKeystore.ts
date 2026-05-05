@@ -49,6 +49,34 @@ async function generate(force = false): Promise<KeystoreInfo | null> {
   }
 }
 
+async function exportPrivate(passphrase: string, outputPath: string): Promise<number | null> {
+  busy.value = true
+  lastError.value = null
+  try {
+    return await invokeTauri<number>('keystore_export', { passphrase, outputPath })
+  } catch (err) {
+    lastError.value = err instanceof Error ? err.message : String(err)
+    return null
+  } finally {
+    busy.value = false
+  }
+}
+
+async function importPrivate(passphrase: string, inputPath: string): Promise<KeystoreInfo | null> {
+  busy.value = true
+  lastError.value = null
+  try {
+    const result = await invokeTauri<KeystoreInfo>('keystore_import', { passphrase, inputPath })
+    if (result) info.value = result
+    return result
+  } catch (err) {
+    lastError.value = err instanceof Error ? err.message : String(err)
+    return null
+  } finally {
+    busy.value = false
+  }
+}
+
 async function remove(): Promise<boolean> {
   busy.value = true
   lastError.value = null
@@ -65,5 +93,5 @@ async function remove(): Promise<boolean> {
 }
 
 export function useKeystore() {
-  return { info, busy, lastError, refresh, generate, remove }
+  return { info, busy, lastError, refresh, generate, remove, exportPrivate, importPrivate }
 }

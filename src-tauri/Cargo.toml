@@ -66,6 +66,8 @@ hex = "0.4"
 ed25519-dalek = "2"
 base64 = "0.22"
 rand = "0.9"
+argon2 = "0.5"
+chacha20poly1305 = "0.10"
 
 [dev-dependencies]
 criterion = { version = "0.5", default-features = false, features = ["html_reports"] }
