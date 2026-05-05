@@ -118,6 +118,60 @@ function pickImage() {
   fileInput.value?.click()
 }
 
+/** `.cur` / `.ico` ファイルを Tauri ダイアログで選び、Rust 側でパースして PNG を取得する。 */
+async function pickCursorFile() {
+  importBusy.value = true
+  importMessage.value = null
+  sanitizedRemovals.value = []
+  try {
+    const { open } = await import('@tauri-apps/plugin-dialog')
+    const picked = await open({
+      multiple: false,
+      filters: [{ name: 'Windows Cursor / Icon', extensions: ['cur', 'ico'] }],
+    })
+    if (!picked || typeof picked !== 'string') {
+      importMessage.value = null
+      return
+    }
+    const result = await invokeTauri<{
+      isCur: boolean
+      width: number
+      height: number
+      hotspotX: number
+      hotspotY: number
+      pngBytes: number[]
+      availableSizes: number[]
+    }>('import_cursor_file', { path: picked })
+    if (!result) throw new Error('IPC 結果が空でした')
+
+    const png = new Uint8Array(result.pngBytes)
+    importedPngBytes.value = png
+    const blob = new Blob([png], { type: 'image/png' })
+    if (importedPreviewUrl.value && importedPreviewUrl.value.startsWith('blob:')) {
+      URL.revokeObjectURL(importedPreviewUrl.value)
+    }
+    importedPreviewUrl.value = URL.createObjectURL(blob)
+    hotspotX.value = result.hotspotX
+    hotspotY.value = result.hotspotY
+
+    filledRoles.add(activeRoleId.value)
+    const map = filledSizesByRole.value[activeRoleId.value] ?? []
+    if (!map.includes(activeSize.value)) {
+      filledSizesByRole.value[activeRoleId.value] = [...map, activeSize.value]
+    }
+    assignedPng.value[activeRoleId.value] = png
+    assignedHotspot.value[activeRoleId.value] = { x: hotspotX.value, y: hotspotY.value }
+
+    const sizeList = result.availableSizes.length > 0 ? result.availableSizes.join('/') : '?'
+    const kind = result.isCur ? '.cur' : '.ico'
+    importMessage.value = `${kind} を取り込みました (${result.width}x${result.height}, 含解像度: ${sizeList})`
+  } catch (err) {
+    importMessage.value = `失敗: ${err instanceof Error ? err.message : String(err)}`
+  } finally {
+    importBusy.value = false
+  }
+}
+
 // --- ビルド & パッケージエクスポート ---
 const buildBusy = ref(false)
 const buildMessage = ref<string | null>(null)
@@ -498,6 +552,9 @@ async function onFileChange(e: Event) {
             <button class="btn ghost" :disabled="importBusy" @click="pickImage">
               <span v-if="importBusy" class="spinner" style="width: 13px; height: 13px" />
               <UiIcon v-else name="Import" :size="13" />{{ t('creator.addImage') }}
+            </button>
+            <button class="btn ghost" :disabled="importBusy" @click="pickCursorFile">
+              <UiIcon name="Pkg" :size="13" />{{ t('creator.importCursor') }}
             </button>
             <input
               ref="fileInput"

@@ -120,6 +120,7 @@
   - 単体テスト 4 件 (roundtrip / 不正ヘッダー / 不正種別 / 最大解像度ピック)
 - [x] **6 サイズスロットへの自動マッピング** — `pick_largest_as_png` で最大解像度を PNG 化、creator 側のリサイズパイプラインに乗せる設計
 - [x] **`import_cursor_file` IPC** — パス → `{ isCur, hotspotX/Y, width, height, pngBytes, availableSizes }`
+- [x] **クリエイター UI 配線** — `creator.vue` に `.cur/.ico を取込` ボタン追加。Tauri ダイアログでファイル選択後、IPC で取得した PNG をそのまま `assignedPng[role]` に登録、ホットスポットも反映
 
 ---
 

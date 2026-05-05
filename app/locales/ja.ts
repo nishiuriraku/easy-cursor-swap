@@ -93,6 +93,7 @@ export default {
     tabPublish: '公開',
     addImage: '画像追加',
     addImageBusy: '取込中...',
+    importCursor: '.cur/.ico を取込',
     importLoaded: '画像をインポートしました',
     importFailed: '失敗',
     buildExport: 'ビルド & 出力',

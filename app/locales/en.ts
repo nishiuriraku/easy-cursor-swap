@@ -94,6 +94,7 @@ export default {
     tabPublish: 'Publish',
     addImage: 'Add image',
     addImageBusy: 'Loading...',
+    importCursor: 'Import .cur/.ico',
     importLoaded: 'Image imported',
     importFailed: 'Failed',
     buildExport: 'Build & save',
