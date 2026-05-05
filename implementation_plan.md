@@ -147,7 +147,11 @@
 - [x] システムトレイアイコン設定
 - [x] トレイメニュー（設定 / パニックボタン / 終了）
 - [x] ダブルクリックでウィンドウ表示
-- [ ] WebView 破棄 & 再生成ロジック（メモリ最適化）
+- [x] **WebView 破棄 & 再生成ロジック**（メモリ最適化）
+  - `on_window_event` で `CloseRequested` を捕捉 → `prevent_close` + `window.destroy()` → WebView メモリ解放
+  - アプリ自体はトレイに常駐し続ける (last-window-close-exits 抑止)
+  - `tray::show_or_recreate_main_window(app)` 共通ヘルパーで再生成
+  - tray menu / トレイダブルクリック / 第二インスタンス通知 / グローバルホットキー の 4 経路すべてから呼出
 
 ### 4-2: ダークモード監視 ✅ 完全貫通
 - [x] `AppsUseLightTheme` レジストリ初期読込

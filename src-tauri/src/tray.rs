@@ -108,10 +108,42 @@ fn handle_tray_menu_event(app: &AppHandle, menu_id: &str) {
     }
 }
 
-/// メインウィンドウを表示する（非表示だった場合は再作成）
+/// メインウィンドウを表示する（破棄済みなら再生成）
 fn show_main_window(app: &AppHandle) {
+    show_or_recreate_main_window(app);
+}
+
+/// メインウィンドウが存在すれば前面化、破棄されていれば再生成する。
+///
+/// 「閉じるボタン押下時に WebView を破棄してメモリを解放、トレイから再オープン時に
+/// 復活」という Phase 4-1 のメモリ最適化フローに対応する共通ヘルパー。
+/// tray メニュー / 第二インスタンス通知 / グローバルホットキーから共有して呼ぶ。
+pub fn show_or_recreate_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
+        let _ = window.unminimize();
         let _ = window.set_focus();
+        return;
+    }
+
+    // 破棄済み → tauri.conf.json の "main" 定義から再生成
+    use tauri::{WebviewWindowBuilder, WebviewUrl};
+    match WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
+        .title("EasyCursorSwap")
+        .inner_size(1100.0, 750.0)
+        .min_inner_size(900.0, 600.0)
+        .resizable(true)
+        .center()
+        .decorations(true)
+        .build()
+    {
+        Ok(w) => {
+            let _ = w.show();
+            let _ = w.set_focus();
+            tracing::info!("メインウィンドウを再生成しました");
+        }
+        Err(e) => {
+            tracing::error!("メインウィンドウ再生成失敗: {}", e);
+        }
     }
 }

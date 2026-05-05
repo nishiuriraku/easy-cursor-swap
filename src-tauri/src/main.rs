@@ -239,6 +239,20 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .manage(config_manager)
+        // 閉じるボタン → WebView を破棄してメモリ解放 (Phase 4-1)
+        // アプリ自体はトレイに常駐し続ける。再表示時に tray::show_or_recreate_main_window が
+        // ウィンドウを再生成する。
+        .on_window_event(|window, event| {
+            if window.label() == "main" {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                    let _ = window.destroy();
+                    tracing::info!(
+                        "メインウィンドウを破棄しました (トレイ常駐 / メモリ解放)"
+                    );
+                }
+            }
+        })
         .invoke_handler(commands::get_command_handlers())
         .setup(move |app| {
             let handle = app.handle().clone();
@@ -251,15 +265,8 @@ fn main() {
             // 第二インスタンスからの「ウィンドウを表示せよ」シグナル待機
             let show_handle = handle.clone();
             if let Err(e) = single_instance::start_show_window_listener(move || {
-                use tauri::Manager;
-                if let Some(window) = show_handle.get_webview_window("main") {
-                    let _ = window.show();
-                    let _ = window.unminimize();
-                    let _ = window.set_focus();
-                    tracing::info!("第二インスタンス要求でメインウィンドウを前面化");
-                } else {
-                    tracing::warn!("show-window listener: main ウィンドウが見つからない");
-                }
+                tray::show_or_recreate_main_window(&show_handle);
+                tracing::info!("第二インスタンス要求でメインウィンドウを前面化");
             }) {
                 tracing::warn!("show-window listener の起動に失敗: {}", e);
             }
@@ -328,16 +335,12 @@ fn main() {
             let hotkey_handle = handle.clone();
             let spec = hotkey_spec.clone();
             if let Err(e) = hotkey::register_panic_hotkey(&spec, move || {
-                use tauri::{Emitter, Manager};
+                use tauri::Emitter;
                 tracing::info!("panic-hotkey イベントを発火");
+                // 破棄されていれば再生成してから前面化
+                tray::show_or_recreate_main_window(&hotkey_handle);
                 if let Err(err) = hotkey_handle.emit("panic-hotkey", ()) {
                     tracing::warn!("panic-hotkey emit 失敗: {}", err);
-                }
-                // ウィンドウが最小化/トレイ収納の場合は表に出す
-                if let Some(window) = hotkey_handle.get_webview_window("main") {
-                    let _ = window.show();
-                    let _ = window.unminimize();
-                    let _ = window.set_focus();
                 }
             }) {
                 tracing::warn!("パニックホットキー登録に失敗: {}", e);
