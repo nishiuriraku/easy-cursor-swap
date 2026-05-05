@@ -387,7 +387,11 @@
   - 32x32 の Nearest 経路もベンチ
   - performance.yml が `cargo bench --bench cursor_build` を実行し、bencher 形式で出力 → artifact 保存
 - [ ] 起動時間 / メモリ使用量の actual 測定
-- [ ] リサイズ結果のキャッシュ（102 枚生成の最適化）
+- [x] **リサイズ結果のキャッシュ** (`cursor.rs::RESIZE_CACHE`)
+  - キー: (元画像 SHA-256 12 文字, target_size, ResizeMethod) / 値: RgbaImage
+  - 容量 64 エントリの単純 FIFO 削除
+  - `clear_resize_cache()` + `clear_cursor_cache` IPC
+  - ベンチに cold/warm パスを追加して効果計測可能に
 
 ### 8-2: インストーラー & 署名
 - [ ] `.msi` インストーラー生成（x64）

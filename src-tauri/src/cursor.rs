@@ -5,12 +5,94 @@
 
 use crate::errors::{AppError, AppResult};
 use image::{imageops::FilterType, DynamicImage, RgbaImage};
+use sha2::{Digest, Sha256};
+use std::collections::HashMap;
+use std::sync::Mutex;
+
+/// リサイズ結果のグローバルキャッシュ。
+///
+/// キー: (元画像 SHA-256 12 文字, target_size, resample method)
+///   - 元画像をそのままキーにすると重いので 12 文字短縮 SHA で衝突確率を下げつつコンパクトに
+/// 値: リサイズ後の RGBA バッファ
+///
+/// 17 役割 × 6 サイズ = 102 枚を毎回 Lanczos でやり直すと CPU が無駄なので、
+/// 同セッション内で同一 (元画像 / サイズ / 方法) なら再利用する。
+/// 容量上限は単純な LRU/FIFO で 64 エントリ。
+static RESIZE_CACHE: Mutex<Option<ResizeCache>> = Mutex::new(None);
+
+const RESIZE_CACHE_CAPACITY: usize = 64;
+
+struct ResizeCache {
+    // (画像ハッシュ, target_size, method) → RgbaImage
+    map: HashMap<(String, u32, ResizeMethod), RgbaImage>,
+    /// FIFO 削除用の挿入順
+    order: Vec<(String, u32, ResizeMethod)>,
+}
+
+impl ResizeCache {
+    fn new() -> Self {
+        Self {
+            map: HashMap::with_capacity(RESIZE_CACHE_CAPACITY),
+            order: Vec::with_capacity(RESIZE_CACHE_CAPACITY),
+        }
+    }
+
+    fn get(&self, key: &(String, u32, ResizeMethod)) -> Option<RgbaImage> {
+        self.map.get(key).cloned()
+    }
+
+    fn put(&mut self, key: (String, u32, ResizeMethod), value: RgbaImage) {
+        if self.map.len() >= RESIZE_CACHE_CAPACITY && !self.map.contains_key(&key) {
+            // FIFO 削除
+            if let Some(oldest) = self.order.first().cloned() {
+                self.order.remove(0);
+                self.map.remove(&oldest);
+            }
+        }
+        self.map.insert(key.clone(), value);
+        self.order.retain(|k| k != &key);
+        self.order.push(key);
+    }
+}
+
+/// リサイズ結果キャッシュをクリア。テーマ切替時などに呼ぶ。
+pub fn clear_resize_cache() {
+    if let Ok(mut guard) = RESIZE_CACHE.lock() {
+        *guard = Some(ResizeCache::new());
+    }
+}
+
+/// (元画像バイト → 短縮 SHA) を計算
+fn image_short_hash(bytes: &[u8]) -> String {
+    hex::encode(Sha256::digest(bytes))[..12].to_string()
+}
+
+/// キャッシュ越しのリサイズ。同じ (画像, サイズ, method) なら再計算しない。
+fn resize_image_cached(
+    img: &DynamicImage,
+    src_hash: &str,
+    target_size: u32,
+    method: ResizeMethod,
+) -> RgbaImage {
+    let key = (src_hash.to_string(), target_size, method);
+    if let Ok(mut guard) = RESIZE_CACHE.lock() {
+        let cache = guard.get_or_insert_with(ResizeCache::new);
+        if let Some(cached) = cache.get(&key) {
+            return cached;
+        }
+        let resized = resize_image(img, target_size, method);
+        cache.put(key, resized.clone());
+        return resized;
+    }
+    // ロック失敗時は素直に再計算
+    resize_image(img, target_size, method)
+}
 
 /// .cur ファイルに格納するサイズ一覧
 pub const CURSOR_SIZES: &[u32] = &[32, 48, 64, 96, 128, 256];
 
 /// リサイズアルゴリズムの選択
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ResizeMethod {
     /// 滑らかな画像向け（Lanczos3）
     Lanczos,
@@ -134,9 +216,12 @@ pub fn build_cur_from_png(
     // ホットスポットは元画像が長辺なら長辺サイズに対する比率
     let original_size = original_width.max(original_height);
 
+    // 元画像のハッシュを 1 度だけ計算してキャッシュキーに使う
+    let src_hash = image_short_hash(png_bytes);
+
     let mut entries: Vec<(RgbaImage, u32, u32)> = Vec::with_capacity(CURSOR_SIZES.len());
     for &target in CURSOR_SIZES {
-        let resized = resize_image(&img, target, effective);
+        let resized = resize_image_cached(&img, &src_hash, target, effective);
         let (hx, hy) = scale_hotspot(hotspot_x, hotspot_y, original_size, target);
         entries.push((resized, hx, hy));
     }

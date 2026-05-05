@@ -7,7 +7,7 @@
 //! 走らせ方:
 //!   cargo bench --bench cursor_build --manifest-path src-tauri/Cargo.toml
 
-use app_lib::cursor::{build_cur_from_png, ResizeMethod};
+use app_lib::cursor::{build_cur_from_png, clear_resize_cache, ResizeMethod};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 /// ベンチ用 PNG (32×32 単色)。
@@ -33,15 +33,27 @@ fn bench_build_lanczos(c: &mut Criterion) {
     let png_64 = make_test_png(64);
     let png_256 = make_test_png(256);
 
-    c.bench_function("build_cur_from_png/64x64/lanczos", |b| {
+    // キャッシュをクリアして cold ベンチ
+    c.bench_function("build_cur_from_png/64x64/lanczos/cold", |b| {
+        b.iter(|| {
+            clear_resize_cache();
+            let _ = build_cur_from_png(black_box(&png_64), 0, 0, ResizeMethod::Lanczos)
+                .expect("build");
+        })
+    });
+
+    // キャッシュ温まった warm ベンチ (102 枚生成シナリオの 2 回目以降を模擬)
+    let _ = build_cur_from_png(&png_64, 0, 0, ResizeMethod::Lanczos);
+    c.bench_function("build_cur_from_png/64x64/lanczos/warm", |b| {
         b.iter(|| {
             let _ = build_cur_from_png(black_box(&png_64), 0, 0, ResizeMethod::Lanczos)
                 .expect("build");
         })
     });
 
-    c.bench_function("build_cur_from_png/256x256/lanczos", |b| {
+    c.bench_function("build_cur_from_png/256x256/lanczos/cold", |b| {
         b.iter(|| {
+            clear_resize_cache();
             let _ = build_cur_from_png(black_box(&png_256), 0, 0, ResizeMethod::Lanczos)
                 .expect("build");
         })

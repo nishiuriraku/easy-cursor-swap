@@ -5,7 +5,7 @@
 
 use crate::backup::{BackupManager, ProfileEnvelope};
 use crate::config::{AppConfig, ConfigManager};
-use crate::cursor::{build_cur_from_png, ResizeMethod};
+use crate::cursor::{build_cur_from_png, clear_resize_cache, ResizeMethod};
 use sha2::Digest;
 use crate::darkmode;
 use crate::environment::EnvironmentReport;
@@ -73,6 +73,14 @@ pub fn apply_theme(
         c.general.active_theme_id = Some(id);
     })?;
     Ok(())
+}
+
+/// リサイズ結果キャッシュをクリアする。
+/// クリエイターで素材を差し替えた直後など、明示的にメモリを開放したいときに使用。
+#[tauri::command]
+pub fn clear_cursor_cache() {
+    clear_resize_cache();
+    tracing::info!("リサイズキャッシュをクリアしました");
 }
 
 /// 鍵ペアの状態を返す。秘密鍵は DPAPI 暗号化されているので復号せずファイル存在のみ確認。
@@ -460,6 +468,7 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         keystore_delete,
         keystore_export,
         keystore_import,
+        clear_cursor_cache,
         export_cursorpack,
         export_profile,
         import_profile,
