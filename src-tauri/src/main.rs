@@ -15,6 +15,38 @@ use app_lib::registry::RegistryManager;
 use app_lib::single_instance::SingleInstanceLock;
 use app_lib::tray;
 
+/// 設定マイグレーション失敗時の専用ダイアログ。
+/// Win32 MessageBox で「バックアップの場所」と「復旧手順」を表示する。
+/// Tauri ランタイムを起動できる前のフェーズなので Tauri Dialog ではなく Win32 を直接呼ぶ。
+#[cfg(windows)]
+fn show_migration_failure_dialog(err: &str) {
+    use windows::core::HSTRING;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        MessageBoxW, MB_ICONERROR, MB_OK, MB_TOPMOST,
+    };
+
+    let config_dir = dirs::data_local_dir()
+        .map(|p| p.join("CursorForge").to_string_lossy().to_string())
+        .unwrap_or_else(|| "%LOCALAPPDATA%\\CursorForge".to_string());
+
+    let body = format!(
+        "CursorForge の設定ファイルを読み込めませんでした。\n\n\
+        理由: {err}\n\n\
+        バックアップ:\n  {config_dir}\\config.bak.v*.json\n  {config_dir}\\config.corrupt.*.json\n\n\
+        いずれかをリネームして config.json に戻すと前回状態に復旧できます。\n\
+        詳細はドキュメントを参照してください。"
+    );
+    let title = HSTRING::from("CursorForge — 設定読み込みエラー");
+    let body_h = HSTRING::from(body);
+
+    unsafe {
+        MessageBoxW(None, &body_h, &title, MB_OK | MB_ICONERROR | MB_TOPMOST);
+    }
+}
+
+#[cfg(not(windows))]
+fn show_migration_failure_dialog(_err: &str) {}
+
 fn main() {
     // ロギング初期化（日次ローテ + 14日保持 + 100MB上限 + PII redaction）
     // _guard は drop 時に未書き出しバッファを flush するため main の最後まで保持。
@@ -54,8 +86,11 @@ fn main() {
         Ok(cm) => cm,
         Err(e) => {
             tracing::error!("設定の初期化に失敗: {}", e);
-            // 設定読み込み失敗時はデフォルト設定で続行せず中断
-            // （仕様: マイグレーション失敗時はアプリ起動を中断）
+
+            // 仕様書に従いデフォルト強制起動はしない。
+            // 専用ダイアログでバックアップの場所を明示してユーザーに復旧を促す。
+            show_migration_failure_dialog(&e.to_string());
+
             eprintln!("設定の初期化に失敗しました: {}", e);
             return;
         }

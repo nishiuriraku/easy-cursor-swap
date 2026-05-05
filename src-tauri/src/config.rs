@@ -145,38 +145,40 @@ impl ConfigManager {
         Ok(local_data.join("CursorForge").join("config.json"))
     }
 
-    /// 設定マネージャーを初期化する
-    /// 既存の設定ファイルがあれば読み込み、なければデフォルト値で作成
+    /// 設定マネージャーを初期化する。
+    ///
+    /// 動作:
+    ///  1. ファイルなし → デフォルト設定で新規作成
+    ///  2. ファイルあり → パース成功 → schema_version 比較
+    ///     - 同じ → そのまま使用
+    ///     - 古い → 自動マイグレーション (現状はフィールド追加のみで透過的) + バックアップ作成
+    ///     - 新しい → アプリ更新が必要 → エラー (`Config(...)` を返し、main 側で専用画面表示)
+    ///  3. ファイルあり → パース失敗 → `config.corrupt.{ts}.json` に退避してデフォルトで再作成
     pub fn init() -> AppResult<Self> {
         let config_path = Self::config_file_path()?;
 
         let config = if config_path.exists() {
             let content = fs::read_to_string(&config_path)?;
-            let config: AppConfig = serde_json::from_str(&content).map_err(|e| {
-                AppError::Config(format!("設定ファイルの解析に失敗: {}", e))
-            })?;
-
-            // スキーマバージョンチェック（将来のマイグレーション用）
-            if config.schema_version > CURRENT_SCHEMA_VERSION {
-                return Err(AppError::Config(format!(
-                    "設定ファイルのバージョン({})が対応範囲外です。アプリの更新が必要です。",
-                    config.schema_version
-                )));
+            match serde_json::from_str::<AppConfig>(&content) {
+                Ok(parsed) => Self::handle_versioned(parsed, &config_path)?,
+                Err(e) => {
+                    // パース失敗 → 退避して新規作成
+                    Self::backup_corrupt(&config_path, &content, &e.to_string())?;
+                    let fresh = AppConfig::default();
+                    fs::write(&config_path, serde_json::to_string_pretty(&fresh)?)?;
+                    tracing::warn!("設定ファイルが破損していたためデフォルトで再作成しました");
+                    fresh
+                }
             }
-
-            config
         } else {
-            let config = AppConfig::default();
-            // ディレクトリがなければ作成
+            let fresh = AppConfig::default();
             if let Some(parent) = config_path.parent() {
                 fs::create_dir_all(parent)?;
             }
-            let content = serde_json::to_string_pretty(&config)?;
-            fs::write(&config_path, content)?;
-            config
+            fs::write(&config_path, serde_json::to_string_pretty(&fresh)?)?;
+            fresh
         };
 
-        // カーソル保存ディレクトリも事前に作成
         let cursors_dir = Self::cursors_dir()?;
         if !cursors_dir.exists() {
             fs::create_dir_all(&cursors_dir)?;
@@ -186,6 +188,66 @@ impl ConfigManager {
             config: RwLock::new(config),
             config_path,
         })
+    }
+
+    /// schema_version を検査し、古ければマイグレーション + バックアップ、
+    /// 新しければエラーを返す。
+    fn handle_versioned(config: AppConfig, config_path: &PathBuf) -> AppResult<AppConfig> {
+        if config.schema_version > CURRENT_SCHEMA_VERSION {
+            return Err(AppError::Config(format!(
+                "設定ファイルのバージョン ({}) はこのアプリ ({}) より新しいです。\nアプリの更新が必要です。",
+                config.schema_version, CURRENT_SCHEMA_VERSION
+            )));
+        }
+
+        if config.schema_version < CURRENT_SCHEMA_VERSION {
+            // 古いバージョン → バックアップ後にマイグレート
+            let from_version = config.schema_version;
+            Self::write_versioned_backup(config_path, from_version, &config)?;
+
+            // マイグレーション本体: 現状は serde の default で穴埋めされるので、
+            // schema_version を更新して書き戻すだけで OK。
+            let mut migrated = config;
+            migrated.schema_version = CURRENT_SCHEMA_VERSION;
+            fs::write(config_path, serde_json::to_string_pretty(&migrated)?)?;
+            tracing::info!(
+                "設定をマイグレーション: v{} → v{}",
+                from_version,
+                CURRENT_SCHEMA_VERSION
+            );
+            return Ok(migrated);
+        }
+
+        Ok(config)
+    }
+
+    /// `config.bak.v{N}.json` 形式でバージョン番号付きバックアップを作成する。
+    /// 同じバージョンのバックアップが既存なら上書きしない (最古を保護)。
+    fn write_versioned_backup(
+        config_path: &PathBuf,
+        from_version: u32,
+        config: &AppConfig,
+    ) -> AppResult<()> {
+        let bak = config_path.with_file_name(format!("config.bak.v{}.json", from_version));
+        if bak.exists() {
+            return Ok(());
+        }
+        fs::write(&bak, serde_json::to_string_pretty(config)?)?;
+        tracing::info!("バックアップを作成: {}", bak.display());
+        Ok(())
+    }
+
+    /// パース不可な設定ファイルを `config.corrupt.{epoch}.json` に退避する。
+    fn backup_corrupt(config_path: &PathBuf, raw: &str, reason: &str) -> AppResult<()> {
+        let ts = chrono::Utc::now().timestamp();
+        let bak = config_path.with_file_name(format!("config.corrupt.{}.json", ts));
+        fs::write(&bak, raw)?;
+        tracing::error!(
+            "設定ファイルが破損 ({}) → 退避: {}",
+            reason,
+            bak.display()
+        );
+        Ok(())
     }
 
     /// 現在の設定を取得する

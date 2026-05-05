@@ -28,9 +28,9 @@
 - [x] `config.json` スキーマ定義（`schema_version` 付き）
 - [x] Rust 側での設定読み書き（Source of Truth）
 - [x] RwLock によるスレッドセーフなアクセス
-- [ ] 設定マイグレーション機構
-- [ ] マイグレーション失敗時の専用エラー画面（デフォルト強制起動はしない）
-- [ ] `config.bak.v{N}.json` への退避
+- [x] **設定マイグレーション機構** — 古い schema_version は透過的に欠落フィールドを serde default で埋めて schema_version 更新 + バックアップ
+- [x] **マイグレーション失敗時の専用エラー画面** — Win32 MessageBox でバックアップ場所と復旧手順を提示 (デフォルト強制起動はしない)
+- [x] **`config.bak.v{N}.json` への退避** + `config.corrupt.{epoch}.json` 退避 (パース失敗時)
 
 ### 2-2: レジストリ操作 ✅
 - [x] `HKCU\Control Panel\Cursors` の読み書き
@@ -508,7 +508,7 @@
 5. **Phase 7-2: AppUserModelID 登録** — トースト通知発信元の明示
 6. **Phase 4-7 残: アクセシビリティ競合検出** — `CursorIndicator` / `ContrastScheme` / `CursorBaseSize` 検出と警告ダイアログ
 7. **Phase 5-11: WCAG AA 準拠** — コントラスト 4.5:1 検証 / キーボードナビ / ARIA ラベル
-8. **Phase 2-1 残: マイグレーション失敗専用エラー画面** + `config.bak.v{N}.json` 退避
+8. **Phase 2-1 残: ユーザー向けの復旧 UI** — 現状は MessageBox。GUI で「最新バックアップから復元」ボタンを提供する余地
 9. **Phase 6-1 残: `.cursorpack` 内画像メタデータパージ強化** — Exif / トラッキングデータの除去
 10. **README ja/en 整備** — v1.0 既知制約の明記、サポート OS / RDP 動作対象外の警告
 
