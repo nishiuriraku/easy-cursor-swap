@@ -1,0 +1,481 @@
+# 🖱️ CursorForge - 実装計画 v2
+
+## 技術スタック
+
+| レイヤー | 技術 | 役割 |
+|---|---|---|
+| Frontend | Nuxt 4 / Vue.js | UI描画、画像インポート、Canvas操作 |
+| Framework | Tauri v2 | デスクトップアプリケーションフレームワーク |
+| Backend | Rust + `windows-rs` + `winreg` | レジストリ操作、画像処理、ファイルI/O、常駐ロジック |
+| ビルド | `.msi` / `.msix` | 配布形態 |
+
+---
+
+## Phase 1: プロジェクト基盤構築 🏗️ ✅ 完了
+
+- [x] Nuxt 4 プロジェクト初期化（SPA モード）
+- [x] Tauri v2 統合（`tauri init`）
+- [x] Rust 依存クレートの追加
+- [x] `cargo check` 成功（エラー0, 警告0）
+- [x] ディレクトリ構成の整備
+- [x] CLAUDE.md / README.md / LICENSE の作成
+
+---
+
+## Phase 2: Rust コアロジック（基盤） 🦀 ✅ 完了
+
+### 2-1: 設定管理 ✅
+- [x] `config.json` スキーマ定義（`schema_version` 付き）
+- [x] Rust 側での設定読み書き（Source of Truth）
+- [x] RwLock によるスレッドセーフなアクセス
+- [ ] 設定マイグレーション機構
+- [ ] マイグレーション失敗時の専用エラー画面（デフォルト強制起動はしない）
+- [ ] `config.bak.v{N}.json` への退避
+
+### 2-2: レジストリ操作 ✅
+- [x] `HKCU\Control Panel\Cursors` の読み書き
+- [x] `Schemes` への登録
+- [x] `SystemParametersInfoW(SPI_SETCURSORS)` による即時反映
+- [x] `SystemParametersInfoW(SPI_SETCURSORSHADOW)` 制御
+- [x] 適用トランザクション（スナップショット + ロールバック）
+- [x] ディスク永続スナップショット（`_pending_apply.snapshot`）
+- [ ] `Schemes` の文字列フォーマット制約（セミコロン区切り、`,` 不可、`REG_EXPAND_SZ` 採用判断）
+- [ ] OS 設定の外部変更検知（`WM_SETTINGCHANGE` の `SPI_SETCURSORS` 系購読 → UI 同期）
+- [ ] 未指定役割（`SizeAll` 等）を「Windows 標準継承」とするレジストリ書き出し仕様
+- [ ] 孤児カーソル復旧（ヘルスチェック）— `~/.custom_cursors/` 手動削除時の自動標準復帰
+
+### 2-3: 初回スナップショット ✅
+- [x] 初回起動時に `_initial_snapshot.json` を自動保存
+- [x] パニックボタン復旧用のレジストリ復元
+
+### 2-4: カーソルファイル保存 ✅
+- [x] `~/.custom_cursors/<UUID>/` ディレクトリ管理
+- [x] ファイルパスのサニタイズ（テーマ名）
+
+---
+
+## Phase 3: 画像処理 & `.cur` 生成 🎨 ✅ 基盤完了
+
+### 3-1: 画像処理パイプライン ✅
+- [x] Lanczos / Nearest-Neighbor リサイズ（6サイズ自動生成）
+- [x] ドット絵自動判定ロジック（色数サンプリング）
+- [ ] PNG/SVG → RGBA バッファ変換（Nuxt側 Canvas）
+- [ ] RGBA バッファの IPC 転送
+- [ ] 画像メタデータのパージ
+- [ ] リサイズ結果のキャッシュ（17役割 × 6サイズ = 102枚の最適化）
+- [ ] 進捗表示・キャンセル機能（IPC ストリーム経由）
+
+### 3-2: `.cur` バイナリ生成 ✅
+- [x] ICO/CUR ヘッダー構造体定義
+- [x] 6サイズ（32/48/64/96/128/256px）のマルチ解像度パッキング
+- [x] ホットスポット座標の書き込みとスケーリング
+- [x] PNG エンコーディングによるデータ圧縮
+
+### 3-3: `.ani` パーサー
+- [ ] RIFF/ACON 構造解析
+- [ ] フレーム抽出 + JIFF タイミング情報取得
+- [ ] プレビュー用 PNG / アニメーション情報の返却
+
+### 3-4: ICO/CUR インポーター
+- [ ] 複数解像度内蔵構造の解析
+- [ ] 6サイズスロットへの自動マッピング
+
+---
+
+## Phase 4: システムトレイ & バックグラウンド 🔔 ✅ 基盤完了
+
+### 4-1: トレイ常駐 ✅
+- [x] システムトレイアイコン設定
+- [x] トレイメニュー（設定 / パニックボタン / 終了）
+- [x] ダブルクリックでウィンドウ表示
+- [ ] WebView 破棄 & 再生成ロジック（メモリ最適化）
+
+### 4-2: ダークモード監視 ✅ 完全貫通
+- [x] `AppsUseLightTheme` レジストリ初期読込
+- [x] `WM_SETTINGCHANGE` + `ImmersiveColorSet` メッセージ購読（不可視ウィンドウ）
+- [x] コールバック経由のテーマ切替通知
+- [x] **テーマ A/B 自動切替実行 (`main.rs` で配線)** — config の `dark_mode.enabled` を尊重、`light/dark_theme_id` を参照して `ThemeManager::apply_theme` 呼出 + `active_theme_id` 永続化
+
+### 4-3: クラッシュリカバリ ✅
+- [x] 起動時の pending スナップショット検出
+- [x] 自動復旧ロジック
+
+### 4-4: 多重起動防止
+- [ ] Named Mutex による排他制御
+
+### 4-5: OS 起動時自動起動
+- [ ] `HKCU\...\Run` へのレジストリ登録/解除
+- [ ] MSIX 環境では `<Extension Category="windows.startupTask">` を使い分け
+
+### 4-6: グローバルホットキー ⬅️ NEW
+- [ ] `Ctrl+Alt+Shift+R` での強制リセット（Windows 既定カーソルに復旧）
+
+### 4-7: Windows 11 統合・競合検出 ⬅️ NEW
+- [ ] アクセシビリティ機能との競合検出（`CursorIndicator` / `ContrastScheme` / `CursorBaseSize`）
+- [ ] 競合検出時の警告ダイアログ表示
+- [ ] 動作環境マトリクス — RDP / Citrix / Server を起動時検出して警告ダイアログ
+
+---
+
+## Phase 5: Frontend UI 実装 🎭 ✅ 5-1〜5-9 完了（全画面の Hi-Fi 移植が完了）
+
+> [!IMPORTANT]
+> Hi-Fi デザインシステム（`design/` ディレクトリ）が完成済み。
+> React JSX + Vanilla CSS で作成された 7 画面のプロトタイプを Nuxt 4 / Vue 3 に移植する。
+
+### 5-0: デザインシステム概要（`design/` ディレクトリ）✅ 作成済み
+
+デザインの **Source of Truth** となるファイル群:
+
+| ファイル | 内容 | 移植先 |
+|---|---|---|
+| `styles.css` (955行) | デザイントークン + 全コンポーネントCSS | `app/assets/css/global.css` |
+| `shell.jsx` | Titlebar / Sidebar / Statusbar / CursorMatrix | Vue コンポーネント群 |
+| `icons.jsx` | 全SVGアイコンセット（17カーソル役割 + UI用） | `app/components/icons/` |
+| `library.jsx` | 01 テーマライブラリ画面 | `app/pages/index.vue` |
+| `screens.jsx` | 02 適用確認モーダル | `app/components/ApplyModal.vue` |
+| `creator.jsx` | 03 クリエイターモード | `app/pages/creator.vue` |
+| `screens.jsx` | 04 公式インデックス | `app/pages/marketplace.vue` |
+| `general-settings.jsx` | 05 一般設定（8セクション） | `app/pages/settings.vue` |
+| `settings.jsx` | 06 外観 / ダークモード連動ペアリング | `app/pages/appearance.vue` |
+| `panic.jsx` | 07 パニック復旧フロー | `app/components/PanicFlow.vue` |
+| `design-canvas.jsx` | デザインプレビュー用キャンバス | 移植不要（開発ツール用） |
+
+### 5-1: デザイントークン移行 ✅ 完了
+- [x] `design/styles.css` (954 行) を `app/assets/css/global.css` に完全移植
+- [x] カラー / ボーダー / テキスト / シャドウ / 角丸 / フォントトークン
+- [x] Win11 風ウィンドウクロム（`.win`, `.titlebar`, ambient gradient bloom）
+- [x] ガラスモーフィズム `backdrop-filter: blur()` の統一
+- [x] アニメーション（`@keyframes pulse`, `fade-in`, `slide-in-right`, `spin`）
+
+### 5-2: 共通コンポーネント変換（JSX → Vue SFC） ✅ 完了
+- [x] `AppTitlebar.vue` — Tauri ウィンドウ API 連携（最小化/最大化/閉じる）
+- [x] `AppSidebar.vue` — Workspace/System ナビ + パニックボタン + セッション表示
+- [x] `AppStatusbar.vue` — items 配列駆動の動的ステータスバー
+- [x] `CursorMatrix.vue` — 17役割の 6×3 グリッド（filled/empty）
+- [x] `ThemeCard.vue` — プレビュー + メタ + カバレッジ + アクション、`apply`/`toggleFavorite`/`showDetails` emit
+- [x] `UiIcon.vue` / `CursorIcon.vue` — render function 方式（v-html 禁止に対応）
+- [x] アイコンセット — `UI_ICONS` (25 種) + `CURSOR_ICONS` (17 種) を `.ts` 化
+- [x] `app/types/theme.ts` — `ThemeCardData` 型を分離
+- [x] `nuxt.config.ts` — `pathPrefix: false` でファイル名そのまま自動インポート
+
+### 5-3: 画面 01 — テーマライブラリ（リデザイン） ✅ 完了 + IPC 接続
+- [x] `design/library.jsx` 準拠 UI (ツールバー / ヘッダー / chips / ソート / グリッド / オーバーレイ / 空状態 / スケルトン)
+- [x] `app/layouts/default.vue` — Win11 シェル + ルート連動ナビ
+- [x] **`get_themes` IPC バインド** — Tauri 接続時は実テーマ、未接続時はデモ
+- [x] **Tauri v2 ウィンドウ drag-drop イベント購読** — ブラウザ DragEvent ではなく `getCurrentWindow().onDragDropEvent` から実ファイルパスを取得
+- [x] **「インポート」ボタン → `@tauri-apps/plugin-dialog` でファイル選択** → `import_cursorpack` IPC
+- [x] **「新規作成」→ `/creator` への NuxtLink 遷移**
+- [x] インポート失敗時のエラーバナー
+
+### 5-4: 画面 02 — 適用確認モーダル ✅ 完了
+- [x] `ApplyModal.vue` 作成 (KV リスト / 17 ミニカーソル行 / カバレッジバーペア / 署名フッター)
+- [x] バックドロップクリックでキャンセル、busy 時はキャンセル抑止
+- [x] 未署名テーマは赤字警告メッセージに切替
+- [x] `useTauri` composable — `invokeTauri` IPC ラッパー (Web 開発時はフォールバック)
+- [x] テーマ適用 E2E フロー: カードの「適用」→ ApplyModal → `invoke('apply_theme')` → Rust → レジストリ書き込み
+- [x] `ThemeManager::apply_theme(id: Uuid)` — テーマディレクトリ走査 + cursor_paths 構築 + RegistryManager::apply_cursors
+- [x] `RegistryManager::set_cursor_shadow` — `SPI_SETCURSORSHADOW` で `requires_os_shadow` を反映
+- [x] エラー時はトースト風バナーで通知
+- [x] Tauri コマンド `apply_theme(theme_id: String)` を `commands.rs` に登録
+- [x] `cargo check` 成功
+
+### 5-5: 画面 03 — クリエイターモード ✅ `.cursorpack` 出力まで貫通
+- [x] `app/pages/creator.vue` — 3 カラムレイアウト + タブバー (割り当て/メタデータ/プレビュー/公開)
+- [x] `RoleListItem.vue` / `SizeStrip.vue`
+- [x] ビッグプレビュー — インポート画像があれば `<img>`、なければ役割アイコン
+- [x] リサンプル切替 (Lanczos/Nearest/Auto) 含む btn-group
+- [x] 右プロパティ: Hotspot 座標入力 / per-size トグル / アセット情報 / Validation パネル (実値反映)
+- [x] Arrow 必須バリデーション表示
+- [x] 画像インポート (PNG / SVG / Magic Byte / sanitize / 10MB 上限)
+- [x] SVG → Canvas → PNG ラスタライズ
+- [x] 単体ビルド (`build_cursor_file` IPC + `cursor::build_cur_from_png`)
+- [x] **メタデータタブ** — 名前(ja/en) / 作者 / バージョン / 説明 / OS 影トグル + 割り当て状況サマリー
+- [x] **`.cursorpack` 出力フロー** — 全ロールの一時 `.cur` を作成 → `export_cursorpack` IPC → 保存ダイアログ
+- [x] **Ed25519 署名 & エクスポート** — keystore 状態に応じて「署名 & エクスポート」ボタンを切替表示
+- [x] keystore 未登録時は「未署名」赤タグ + 通常エクスポートのみ可能
+- [x] エクスポート結果バナー (バイト数 + 署名状況 + 保存先パス)
+
+### 5-6: 画面 04 — 公式インデックス（マーケットプレイス） ✅ 完了
+- [x] `app/pages/marketplace.vue` — `design/screens.jsx::CFMarketplace` を Vue 化
+- [x] `FeaturedCard.vue` — 横並びレイアウト + ハイライトラベル + ダウンロードボタン
+- [x] `MarketplaceCard.vue` — グリッドカード (署名済バッジ常時表示, downloadCount, インポートボタン)
+- [x] chips フィルタ (All / Pixel / Minimal / Animated / Dark) + 検索 + GitHub リンク
+- [x] `app/types/marketplace.ts` — `MarketplaceEntry` / `MarketplaceTag` 型契約
+- [x] Rust 側 `src-tauri/src/marketplace.rs` 新設:
+  - `MarketplaceIndex` / `MarketplaceEntry` / `MarketplaceInstallRequest` 型
+  - `MarketplaceClient::fetch_index` / `install` (Phase 9 までスタブ)
+- [x] Tauri コマンド: `marketplace_fetch_index` / `marketplace_install` を `commands.rs` に登録
+- [x] `cargo check` 成功
+- [x] **実 HTTP 取得 (rustls-tls) + SHA-256 + Ed25519 署名検証** — Phase 9 一部前倒し
+- [x] 著者公開鍵レコード (`authors/{github}.json`) 取得 + key_id 一致確認 + ローテーション対応
+- [x] サイズ上限 (50MB) 付きダウンロード (Zip 爆弾対策の入口)
+- [ ] ZIP 展開を `~/.custom_cursors/<UUID>/` へ統合 (Phase 9 残タスク)
+
+### 5-7: 画面 05 — 一般設定（8セクション） ✅ 完了 + IPC 接続
+- [x] `app/pages/settings.vue` — 8 セクション切替 (一般 / 起動 / ライブラリ / セキュリティ / 鍵 / ログ / 更新 / About)
+- [x] `SettingsRow.vue` / `SettingsToggle.vue` — 汎用行 + トグル v-model 互換
+- [x] 各セクションにトグル / select / 数値入力 / ボタンの組み合わせを実装
+- [x] `.cursorprofile` エクスポート / インポートボタン (UI のみ)
+- [x] 鍵ペア管理セクション — 生成 / インポート / エクスポート / key_id 表示
+- [x] ログセクション — レベル / 保持日数 / 上限 MB / フォルダー開く
+- [x] About — ホームページ / Issues / OSS ライセンス
+- [x] **`get_config` で初期化、`update_config` で永続化** (`useAppConfig` composable で全画面共有)
+- [x] dirty フラグ + 「変更を破棄 / 保存」ボタンの活性制御 + 保存中スピナー
+- [x] `app/types/config.ts` — Rust `AppConfig` と対応する型定義
+
+### 5-8: 画面 06 — 外観 / ダークモード連動ペアリング ✅ 完了 + IPC 接続
+- [x] `app/pages/appearance.vue` — OS 状態インスペクター + ペアリング + Detection
+- [x] `ModeIndicator.vue` / `PairingSlot.vue`
+- [x] Auto Switch 中央セパレーター + Detection 3 トグル
+- [x] 起動時 `get_dark_mode_status` IPC で初期状態取得
+- [x] **`useAppConfig` で `dark_mode.{enabled, light_theme_id, dark_theme_id}` を永続化**
+- [x] **`ThemePickerModal.vue`** — change ボタン → モーダルでテーマ選択 (検索 + クリア)
+- [x] dirty / 保存 / 変更を破棄 ボタン制御
+- [x] `useThemes` composable — テーマ一覧の共有リアクティブシングルトン
+
+### 5-9: 画面 07 — パニック復旧フロー ✅ 完了
+- [x] `PanicFlow.vue` — 全画面オーバーレイ実装 (idle → running → done/error)
+- [x] 2 段階ステージ選択カード (Stage 1: Windows 既定 / Stage 2: 初回スナップショット)
+- [x] ライブログ表示 + プログレスバー + 17 ロールグリッド (done/running/pending 色分け)
+- [x] 残時間推定 + auto-rollback armed 表示
+- [x] グローバルホットキー `Ctrl+Alt+Shift+R` を `default.vue` で購読
+- [x] サイドバーのパニックボタン押下でも起動
+- [x] 実 IPC: `reset_to_default` / `reset_to_initial` を呼び出し
+
+### 5-10: IPC コマンド定義 ✅
+- [x] 全 21 エンドポイント定義済み:
+  - `get_cursor_roles` / `get_current_cursors` / `get_themes` / `apply_theme`
+  - `inspect_cursorpack` / `import_cursorpack` / `build_cursor_file` / **`export_cursorpack`**
+  - `export_profile` / `import_profile`
+  - **`keystore_info` / `keystore_generate` / `keystore_delete`**
+  - `marketplace_fetch_index` / `marketplace_install`
+  - `reset_to_default` / `reset_to_initial`
+  - `get_dark_mode_status` / `get_config` / `update_config` / `get_app_info`
+- [x] `apply_theme` は config の `active_theme_id` を成功時に永続化
+- [x] `get_themes` は `is_active` を `active_theme_id` から判定して返却
+- [x] `import_cursorpack` / `marketplace_install` は展開後の UUID を文字列で返却
+- [x] `import_profile` は `ProfileEnvelope` を返却
+- [x] `inspect_cursorpack` は theme.json のみ読んで既存テーマとの衝突情報を返却
+- [x] `build_cursor_file` は PNG → 6 サイズ .cur をビルドして指定パスへ書き出し、書込みバイト数を返却
+
+### 5-11: アクセシビリティ
+- [ ] WCAG AA 準拠（コントラスト比 4.5:1 以上）
+- [ ] キーボードナビゲーション対応
+- [ ] スクリーンリーダー対応（ARIA ラベル）
+
+---
+
+## Phase 6: テーマパッケージ & セキュリティ 📦 🔄 解凍 + 多層防御 完了
+
+### 6-1: `.cursorpack` 形式 ✅ 完了
+- [x] `theme.json` スキーマ定義（多言語対応含む）
+- [x] **Zip 解凍 (`ThemeManager::import_cursorpack_bytes` / `import_cursorpack_file`)**
+- [x] バリデーション（スキーマパース、ID/cursors マップ）
+- [x] **同名テーマ再インポート時のバージョン比較ダイアログ** — `inspect_cursorpack` IPC + `ImportConflictDialog.vue` で newer/older/same を判定
+- [x] **パッケージ「作成」** (`ThemeManager::export_cursorpack` + `export_cursorpack` IPC)
+- [x] 自動 UUID 採番 + theme.json 自動構築 (cursors[role].file = `cursors/<role>.cur` に正規化)
+- [x] 署名オプション (`sign: true` で id|version|sorted_roles の SHA-256 hex を Ed25519 署名)
+
+### 6-2: セキュリティ多層防御 ✅ 完了
+- [x] **Magic Byte 検証** (theme.json 先頭 `{` チェック + クリエイターで PNG ヘッダー検証)
+- [x] **パストラバーサル対策** (`sanitize_archive_path` ヘルパー + 単体テスト 4 件)
+- [x] **Zip 爆弾対策** (圧縮 50MB / 展開後 200MB / 個別 10MB の三段階逐次チェック)
+- [x] **シンボリックリンク攻撃拒否** (`unix_mode` の `S_IFLNK` で弾く)
+- [x] レジストリ・インジェクション防止（テーマ名サニタイズ）
+- [x] **SVG サニタイズ** (`composables/sanitizeSvg.ts` 自前実装) — `<script>`/`<foreignObject>`/`href`/`on*`/`javascript:`/`data:` を除去 + 削除ログ表示
+
+### 6-2a: セキュリティ閾値（具体数値） ⬅️ NEW
+
+> [!IMPORTANT]
+> 仕様書で定義済みの閾値を計画に明記
+
+| 対象 | 上限値 |
+|---|---|
+| `.cursorpack` ファイル | 50 MB |
+| 展開後合計 | 200 MB |
+| 個別画像ファイル | 10 MB |
+| 全テーマ合計（`~/.custom_cursors/`） | 1 GB（警告ダイアログ） |
+
+### 6-3: Ed25519 署名 ✅ コア完成
+- [x] **鍵ペア生成** (`Keystore::generate`) — OsRng で 32 バイト乱数、SigningKey/VerifyingKey 構築
+- [x] **DPAPI 暗号化保存** (`CryptProtectData` / `CryptUnprotectData`) — 秘密鍵はユーザーアカウント紐付き
+- [x] **テーマ署名 / 検証** — `Keystore::sign` / `Keystore::verify` + `export_cursorpack` で `signature` 埋め込み
+- [x] **`key_id` 仕様** — 公開鍵 SHA-256 の先頭 16 文字 (`compute_key_id`)
+- [x] 設定画面の鍵管理 UI (`useKeystore` composable + 生成/再生成/削除/key_id 表示)
+- [x] **未署名テーマの警告ダイアログ** — `ApplyModal` で赤字メッセージ
+- [ ] 秘密鍵のエクスポート / インポート（PC 移行用、パスフレーズ付き）
+- [ ] 鍵ローテーション（公開鍵差し替え PR、過去 `key_id` 検証維持）
+
+### 6-4: `.cursorprofile` フルバックアップ ✅ 完了
+- [x] `.cursorprofile` 形式設計 — Zip 構造 (`profile.json` + `cursors/<UUID>/`)
+- [x] `.cursorpack` との使い分け明確化（テーマ単体 vs 環境まるごと）
+- [x] `BackupManager::export` / `import(path, merge)` 実装 (`src-tauri/src/backup.rs`)
+- [x] `ProfileEnvelope` スキーマ (schema_version + exported_at + app_version + config スナップショット)
+- [x] インポート時の path traversal / シンボリックリンク / サイズ防御 (theme.rs と共通の `sanitize_archive_path_pub` 再利用)
+- [x] Tauri コマンド `export_profile(path)` / `import_profile(path, merge)` を IPC 公開
+- [x] `settings.vue` の「.cursorprofile バックアップ」セクションに `@tauri-apps/plugin-dialog` 経由のファイル保存/選択を配線
+- [x] インポート時 `ask` ダイアログで「上書き or マージ」を確認
+
+---
+
+## Phase 7: 通知・ロギング・国際化 📋 🔲 未着手
+
+### 7-1: ロギング ✅ PII フィルタ適用完了
+- [x] `tracing` + `tracing-subscriber` 導入
+- [x] **`tracing-appender` 日次ローテーション** (`%LOCALAPPDATA%\CursorForge\logs\app-YYYY-MM-DD.log`)
+- [x] **14 日経過ログの自動削除** + **合計 100MB 上限の古い順削除** (`logging::cleanup_old_logs`)
+- [x] PII 除外ヘルパー: `logging::redact_path` (ホーム下を `~/...` に置換) + `logging::short_hash` (SHA-256 12 文字短縮)
+- [x] `WorkerGuard` を main で保持して非同期書き出しの flush を保証
+- [x] デバッグビルドは標準出力にも色付きで出力
+- [x] **既存 `tracing!` のパス出力箇所に `redact_path` 適用** (theme/backup/commands)
+- [ ] クラッシュレポート オプトイン送信 (Phase 7-2 と統合)
+
+### 7-2: 通知システム
+- [ ] 3 層通知の設計と振り分けルール:
+  - **無通知**: バックグラウンドの自動適用成功
+  - **Win32 COM 経由 Toast**: ダークモード切替完了、更新通知
+  - **モーダル**: パニックリセット確認、署名検証失敗、競合検出
+- [ ] `AppUserModelID` 登録（トースト発信元の明示）
+
+### 7-3: 国際化 🔄 基盤完了
+- [x] **i18n キー管理 (`app/locales/ja.ts` + `en.ts`)** — `as const` で型導出
+- [x] **`useI18n` composable** — `t(key, params)` + プレースホルダ展開 + フォールバック
+- [x] OS ロケール自動判定 (`navigator.language` 経由) + `general.language` 設定での上書き
+- [x] `default.vue` で起動時に config 同期 + watch で動的更新
+- [x] サイドバーをサンプルとして i18n 配線
+- [x] `theme.json` の多言語フィールド対応（`LocalizedString`）
+- [ ] 全画面の文字列を `t()` 経由に置換 (現状はサイドバーのみ)
+- [ ] 未翻訳キーの CI 自動検出（スナップショットテスト）
+
+---
+
+## Phase 8: リリース準備 & 配布 🚀 🔲 未着手
+
+### 8-1: パフォーマンス 🔄 雛形整備
+- [x] **`.github/workflows/performance.yml`** — release ビルドのバイナリサイズ計測 + 30MB 警告
+- [x] **`.github/workflows/ci.yml`** — `cargo fmt --check` + `clippy -D warnings` + `cargo test` + `vue-tsc --noEmit` + i18n キー差分
+- [x] **`.github/workflows/marketplace-validate.yml`** — Phase 9 連携用雛形
+
+> [!IMPORTANT]
+> CI 自動測定の目標値と回帰検出
+
+| 指標 | 目標 |
+|---|---|
+| 常駐メモリ | ≤ 15 MB |
+| 起動時間 | ≤ 1.5 秒 |
+| テーマ適用 | ≤ 3 秒 |
+| `.msi` パッケージサイズ | ≤ 30 MB |
+
+- [ ] criterion 等のマイクロベンチ導入 (現状は `cargo test --release`)
+- [ ] 起動時間 / メモリ使用量の actual 測定
+- [ ] リサイズ結果のキャッシュ（102 枚生成の最適化）
+
+### 8-2: インストーラー & 署名
+- [ ] `.msi` インストーラー生成（x64）
+- [ ] ARM64 ビルドの独立した扱い
+- [ ] WebView2 Evergreen Bootstrapper の `.msi` 同梱戦略
+- [ ] EV/OV コードサイニング調達方針（SignPath.io 等の OSS 無償署名）
+- [ ] SmartScreen レピュテーション獲得の検証
+
+### 8-3: MSIX / Microsoft Store 対応 ⬅️ NEW
+- [ ] `runFullTrust` capability の設定
+- [ ] Packaged Win32 App 構成
+- [ ] `<Extension Category="windows.startupTask">` による自動起動
+- [ ] Microsoft Store 配布の検討と足場
+
+### 8-4: 自動アップデート
+- [ ] Tauri Updater 設定
+- [ ] メジャーバージョン跨ぎ（v1 → v2）は自動更新しない方針
+- [ ] 3 回連続起動失敗で旧バイナリへ自動ロールバック
+
+### 8-5: CI/CD & ドキュメント
+- [ ] CI/CD パイプライン構築
+- [x] README / LICENSE 整備
+- [ ] v1.0 の既知制約を README に明記:
+  - `.ani` 新規生成不可
+  - ライブプレビューなし
+  - Undo なし
+  - 自動切替はダークモード連動のみ
+  - UAC Secure Desktop / ロック画面 / マルチユーザーの制限
+  - RDP 環境は動作対象外
+
+---
+
+## Phase 9: 公式インデックス連携 🌐 🔄 着手中（クライアント実装の半分完了）
+
+### 9-1: GitHub メタデータインデックス ✅ 設計完了
+- [x] テーマメタデータスキーマ Rust 側型定義 (`MarketplaceIndex` / `MarketplaceEntry` / `AuthorRecord`)
+- [x] `index.json` URL 定義 (`raw.githubusercontent.com/cursorforge/index/main/index.json`)
+- [ ] 公式リポジトリの実体構築 (`cursorforge/index` リポジトリ作成)
+
+### 9-2: テーマ提出フロー
+- [ ] ブラウザ経由の PR 提出フロー（事前 URL パラメータでテンプレ埋め）
+- [ ] アプリ内の「公式インデックスに提出」ボタン
+
+### 9-3: クライアント側検証 ✅ 実装完了
+- [x] `reqwest` (rustls-tls) ベースの HTTPS 取得
+- [x] SHA-256 整合性チェック (`sha2`)
+- [x] Ed25519 署名検証 (`ed25519-dalek`)
+- [x] Base64 デコード (`base64`)
+- [x] サイズ上限 (50MB) 付きダウンロード = Zip 爆弾対策の入口
+- [x] 著者公開鍵レコード取得 + key_id 一致確認
+- [x] 鍵ローテーション対応 (`historical_keys` マップで過去 key_id を検証可能)
+- [x] **ZIP 展開を `~/.custom_cursors/<UUID>/` へ統合** (`ThemeManager::import_cursorpack_bytes`)
+- [x] パストラバーサル / Zip 爆弾 / シンボリックリンク防御をローカル経路と共有
+
+### 9-4: CI 自動検証（GitHub Actions） ✅ 主要検証実装完了
+- [x] **`.github/workflows/marketplace-validate.yml`** — `cursorforge/index` 用ワークフロー雛形
+- [x] **`scripts/marketplace/validate.mjs`** 本体実装:
+  - JSON スキーマ検証 (必須フィールド + UUID + SHA-256 hex 形式 + Arrow ロール必須)
+  - **SHA-256 整合性照合** — `themes/<id>.cursorpack` ファイルと entry.sha256 を比較
+  - **Ed25519 署名検証** — Node.js `crypto.verify` + Ed25519 SPKI DER 構築 + 公開鍵レコード参照
+  - **key_id 一致確認** + ローテーション対応 (`historical_keys` から過去鍵参照)
+  - **サイズ閾値チェック** (50MB)
+  - **マルウェアハッシュ DB 照合** (`scripts/marketplace/malware-hashes.txt` の SHA-256 リスト)
+- [ ] VirusTotal API 経由のリアルタイムマルウェアスキャン (将来)
+
+### 9-5: 公開鍵管理
+- [x] Rust 側で `authors/{github_username}.json` の取得 / パース実装
+- [ ] PR ベースでの公開鍵登録ガイドの整備
+
+---
+
+## 既知の問題 / 制限事項
+
+> [!WARNING]
+> - Nuxt 4.4.4 では `ssr: false` が IPC エラーを引き起こすため `routeRules` で回避
+> - `npm run dev` 実行時に `Set-Location` が必要なケースあり
+> - `zip` クレート v2.6.x は yanked（v2 で範囲指定）
+
+---
+
+## 次回セッションでの優先タスク
+
+1. **🌐 全画面の i18n 配線** — library/creator/settings/appearance/marketplace/panic を `t()` 化
+2. **🔔 通知システム** — Win32 COM Toast (Phase 7-2) + AppUserModelID 登録
+3. **🔑 秘密鍵エクスポート/インポート** — パスフレーズ付き Argon2 + ChaCha20Poly1305
+4. **📊 criterion ベンチ導入** — リサイズ / .cur ビルドの実測ベンチ
+5. **🔒 多重起動防止 (Phase 4-4)** — Named Mutex
+6. **🪟 RDP / Server / マルチユーザー検出と警告ダイアログ** (Phase 4-7)
+7. **🧹 cursor のクリエイター プレビュー / 公開タブ実装** — 残り 2 タブ
+8. **🛟 OS 設定の外部変更検知** — `WM_SETTINGCHANGE` の `SPI_SETCURSORS` 系購読 → UI 同期
+2. **⚙️ 一般設定画面** — `app/pages/settings.vue`（8 セクション切替 + `.cursorprofile` エクスポート/インポート UI）
+3. **🌗 外観/ダークモード連動ペアリング画面** — `app/pages/appearance.vue`
+4. **🚨 パニック復旧フロー** — `PanicFlow.vue`（2 段階リセット + ライブトレース表示）
+5. **🔧 Rust 側補完** — `is_active` を config 連動、apply 後 ThemeSummary の更新
+6. **🛡️ Phase 9 実装着手** — reqwest 追加、SHA-256/Ed25519 検証、安全な ZIP 展開
+
+---
+
+## 優先度の高いギャップ（要注意領域）
+
+> [!CAUTION]
+> 以下の領域は仕様書に詳細な記述があるが、実装は完全に未着手。
+
+1. **Phase 5: デザインシステム反映** — 7 画面の Hi-Fi プロトタイプが完成済みだが Nuxt/Vue への移植が未着手
+2. **Phase 9: 公式インデックス連携** — PR 提出フロー、CI 検証、公開鍵管理
+3. **Phase 8-3: MSIX / 署名運用** — `runFullTrust`、startupTask、EV/OV 調達
+4. **Phase 8-1: パフォーマンス CI** — 自動測定と回帰検出
+5. **Phase 6-4: `.cursorprofile`** — フルバックアップ機構
+6. **Phase 4-7: Windows 11 競合検出** — アクセシビリティ・RDP 環境の警告

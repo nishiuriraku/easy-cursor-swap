@@ -1,0 +1,73 @@
+[package]
+name = "cursor-forge"
+version = "0.1.0"
+description = "次世代マウスカーソル管理ツール (Windows専用)"
+authors = ["nishiuriraku"]
+license = "MIT"
+repository = ""
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+name = "app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.0", features = [] }
+
+[dependencies]
+# --- Tauri コア ---
+tauri = { version = "2.11.0", features = ["tray-icon"] }
+tauri-plugin-log = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-shell = "2"
+
+# --- シリアライズ ---
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# --- ログ ---
+log = "0.4"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-appender = "0.2"
+
+# --- 画像処理 ---
+image = { version = "0.25", features = ["png", "ico"] }
+
+# --- Windows API ---
+winreg = "0.55"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.61", features = [
+  "Win32_UI_WindowsAndMessaging",
+  "Win32_System_SystemInformation",
+  "Win32_Foundation",
+  "Win32_UI_Shell",
+  "Win32_Security_Cryptography",
+] }
+
+# --- ユーティリティ ---
+uuid = { version = "1", features = ["v4", "serde"] }
+zip = "2"
+chrono = { version = "0.4", features = ["serde"] }
+dirs = "6.0"
+thiserror = "2"
+anyhow = "1"
+tokio = { version = "1", features = ["full"] }
+
+# --- Phase 9: Marketplace / セキュリティ ---
+# rustls 経由で OS のネイティブ TLS スタックを回避し、依存ツリーを軽量化。
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+sha2 = "0.10"
+hex = "0.4"
+ed25519-dalek = "2"
+base64 = "0.22"
+rand = "0.9"
+
+[profile.release]
+# リリースビルドの最適化
+strip = true        # デバッグシンボルを除去
+lto = true          # リンク時最適化で実行ファイルを小さく
+codegen-units = 1   # シングルCGUでより積極的な最適化
+opt-level = "s"     # サイズ最適化

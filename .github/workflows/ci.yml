@@ -1,0 +1,90 @@
+name: CI
+
+# プルリクエストごとに Rust + フロントエンドのビルド/テストを回す。
+# Phase 8-1 (パフォーマンス CI) と Phase 9 (CI 自動検証) の土台。
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  # -------------------------------------------------------------
+  # Rust 側: フォーマット / clippy / cargo test (Windows ターゲット)
+  # -------------------------------------------------------------
+  rust:
+    name: Rust check (windows-latest)
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cargo cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: cargo fmt --check
+        working-directory: src-tauri
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy
+        working-directory: src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: cargo test
+        working-directory: src-tauri
+        run: cargo test --lib
+
+  # -------------------------------------------------------------
+  # フロントエンド: 型生成 + 型チェック
+  # -------------------------------------------------------------
+  frontend:
+    name: Nuxt typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: npm ci
+        run: npm ci
+
+      - name: Nuxt prepare (型生成)
+        run: npx nuxi prepare
+
+      - name: Vue type check
+        run: npx vue-tsc --noEmit
+
+  # -------------------------------------------------------------
+  # i18n キー差分検出 (ja/en の漏れを検出)
+  # -------------------------------------------------------------
+  i18n:
+    name: i18n key parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - name: Compare ja/en keys
+        run: node scripts/check-i18n.mjs

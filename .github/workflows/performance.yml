@@ -1,0 +1,53 @@
+name: Performance Benchmarks
+
+# Phase 8-1: パフォーマンス CI の雛形。
+# 目標値:
+#  - 常駐メモリ ≤ 15 MB
+#  - 起動時間 ≤ 1.5 秒
+#  - テーマ適用 ≤ 3 秒
+#  - .msi パッケージサイズ ≤ 30 MB
+#
+# まずは `cargo test --release` でユニットベンチを動かし、
+# tauri-build による .msi の最終サイズを記録するところから始める。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'src-tauri/**'
+      - 'app/**'
+      - 'package.json'
+      - '.github/workflows/performance.yml'
+
+jobs:
+  bench:
+    name: Bench (release)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: cargo bench (placeholder)
+        working-directory: src-tauri
+        run: cargo test --release --lib -- --nocapture
+
+      - name: Measure release binary size
+        shell: pwsh
+        run: |
+          cargo build --release --manifest-path src-tauri/Cargo.toml
+          $bin = Get-ChildItem -Path src-tauri/target/release -Filter "cursor-forge.exe" -Recurse | Select-Object -First 1
+          if ($bin) {
+            $sizeMB = [math]::Round($bin.Length / 1MB, 2)
+            Write-Host "release_exe_size_mb=$sizeMB"
+            "release_exe_size_mb=$sizeMB" | Out-File -Append $env:GITHUB_STEP_SUMMARY
+            if ($sizeMB -gt 30) {
+              Write-Host "::warning::Release exe size $sizeMB MB exceeds 30 MB target"
+            }
+          }

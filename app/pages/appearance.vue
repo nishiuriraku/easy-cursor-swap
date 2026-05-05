@@ -1,0 +1,332 @@
+<script setup lang="ts">
+/**
+ * 外観 / ダークモード連動ペアリング (Phase 5-8)
+ *
+ * design/settings.jsx の外観セクションを Vue 化したもの。
+ * `useAppConfig` / `useThemes` / `ThemePickerModal` と連携して
+ * Light/Dark のテーマペアリングを config に永続化する。
+ */
+import { computed, onMounted, ref, watch } from 'vue'
+import type { ThemeCardData } from '~/types/theme'
+import { invokeTauri } from '~/composables/useTauri'
+import { useAppConfig } from '~/composables/useAppConfig'
+import { useThemes } from '~/composables/useThemes'
+
+const isDark = ref(true)
+
+const { config: appConfig, load: loadConfig, update: persistConfig } = useAppConfig()
+const { themes, refresh: refreshThemes } = useThemes()
+
+// UI ローカル状態 — config が来たら同期する
+const detection = ref({
+  enabled: true,
+  showToast: true,
+  perPairShadow: false,
+})
+const lightThemeId = ref<string | null>(null)
+const darkThemeId = ref<string | null>(null)
+
+// テーマ選択モーダル
+const pickerOpen = ref<'light' | 'dark' | null>(null)
+const pickerSelected = ref<string | null>(null)
+
+const dirty = ref(false)
+const saving = ref(false)
+
+const fallbackTheme: ThemeCardData = {
+  id: '',
+  name: '未指定',
+  author: null,
+  version: '—',
+  date: '',
+  applyCount: 0,
+  isFavorite: false,
+  isActive: false,
+  includedRoles: [],
+}
+
+function findTheme(id: string | null): ThemeCardData {
+  if (!id) return fallbackTheme
+  return themes.value.find((t) => t.id === id) ?? { ...fallbackTheme, name: '(未インストール)' }
+}
+
+const lightTheme = computed(() => findTheme(lightThemeId.value))
+const darkTheme = computed(() => findTheme(darkThemeId.value))
+
+const activePair = computed(() => `${lightTheme.value.name} ⇄ ${darkTheme.value.name}`)
+
+function applyConfigToLocal() {
+  const c = appConfig.value
+  if (!c) return
+  detection.value.enabled = c.dark_mode.enabled
+  lightThemeId.value = c.dark_mode.light_theme_id
+  darkThemeId.value = c.dark_mode.dark_theme_id
+  dirty.value = false
+}
+
+async function save() {
+  saving.value = true
+  try {
+    await persistConfig((draft) => {
+      draft.dark_mode.enabled = detection.value.enabled
+      draft.dark_mode.light_theme_id = lightThemeId.value
+      draft.dark_mode.dark_theme_id = darkThemeId.value
+    })
+    dirty.value = false
+  } finally {
+    saving.value = false
+  }
+}
+
+function discard() {
+  applyConfigToLocal()
+}
+
+function openPicker(side: 'light' | 'dark') {
+  pickerSelected.value = side === 'light' ? lightThemeId.value : darkThemeId.value
+  pickerOpen.value = side
+}
+
+function onPickerUpdate(id: string | null) {
+  if (pickerOpen.value === 'light') lightThemeId.value = id
+  else if (pickerOpen.value === 'dark') darkThemeId.value = id
+}
+
+onMounted(async () => {
+  await Promise.all([loadConfig(), refreshThemes()])
+  applyConfigToLocal()
+  watch(appConfig, applyConfigToLocal)
+  try {
+    const dark = await invokeTauri<boolean>('get_dark_mode_status')
+    if (dark !== null) isDark.value = dark
+  } catch {
+    // 無視
+  }
+})
+
+// dirty 検出
+watch(
+  [detection, lightThemeId, darkThemeId],
+  () => {
+    if (appConfig.value) dirty.value = true
+  },
+  { deep: true },
+)
+</script>
+
+<template>
+  <div class="appearance-host">
+    <div class="toolbar">
+      <div class="bcrumb">
+        <span class="crumb">設定</span>
+        <span class="sep">/</span>
+        <span class="crumb active">外観 · ダークモード連動</span>
+      </div>
+      <div />
+      <div class="tb-actions">
+        <button class="btn ghost" :disabled="!dirty || saving" @click="discard">
+          変更を破棄
+        </button>
+        <button class="btn primary" :disabled="!dirty || saving" @click="save">
+          <span v-if="saving" class="spinner" style="width: 13px; height: 13px" />
+          <UiIcon v-else name="Check" :size="13" />
+          {{ saving ? '保存中...' : '保存' }}
+        </button>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="page-head">
+        <div>
+          <h1>外観 · ダークモード連動</h1>
+          <p>OS のライト／ダークモード切替に応じて、自動でカーソルテーマをペアリングします。</p>
+        </div>
+        <div class="right">
+          <span class="tag ok">
+            <span class="watch-dot" />{{ detection.enabled ? '監視中' : '停止中' }}
+          </span>
+        </div>
+      </div>
+
+      <!-- OS 状態インスペクター -->
+      <div class="prop-section os-state">
+        <div class="prop-head">
+          Current OS State
+          <span class="head-hint">HKCU\…\Personalize\AppsUseLightTheme</span>
+        </div>
+        <div class="indicator-row">
+          <ModeIndicator side="light" :active="!isDark" />
+          <ModeIndicator side="dark" :active="isDark" />
+        </div>
+      </div>
+
+      <h6 class="section-title">Theme Pairing</h6>
+
+      <div class="pairing-grid">
+        <PairingSlot
+          label="Light Mode"
+          sub="AppsUseLightTheme = 1"
+          accent="#f5c26b"
+          :theme="lightTheme"
+          :current="!isDark"
+          @change="openPicker('light')"
+        />
+        <div class="auto-switch">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 7h12M11 3l4 4-4 4M17 13H5M9 17l-4-4 4-4" />
+          </svg>
+          <span>Auto Switch</span>
+        </div>
+        <PairingSlot
+          label="Dark Mode"
+          sub="AppsUseLightTheme = 0"
+          accent="#7cf2d4"
+          :theme="darkTheme"
+          :current="isDark"
+          @change="openPicker('dark')"
+        />
+      </div>
+
+      <!-- Detection -->
+      <div class="prop-section">
+        <div class="prop-head">Detection</div>
+        <div class="prop-body">
+          <SettingsRow
+            label="OS ダークモード自動切替を有効化"
+            desc="WM_SETTINGCHANGE の ImmersiveColorSet を購読し、即時テーマを切替"
+          >
+            <SettingsToggle v-model="detection.enabled" />
+          </SettingsRow>
+          <SettingsRow
+            label="切替時に通知トーストを表示"
+            desc="Windows トースト通知 (層 2) で適用結果を告知"
+          >
+            <SettingsToggle v-model="detection.showToast" />
+          </SettingsRow>
+          <SettingsRow
+            label="切替時にペア毎の OS 標準ポインター影制御"
+            desc="requires_os_shadow に従い SPI_SETCURSORSHADOW を呼び出す"
+          >
+            <SettingsToggle v-model="detection.perPairShadow" />
+          </SettingsRow>
+        </div>
+      </div>
+    </div>
+
+    <AppStatusbar
+      :items="[
+        { dot: true, text: `OS: ${isDark ? 'Dark Mode' : 'Light Mode'}` },
+        { text: `Active pair: ${activePair}` },
+        { text: dirty ? '未保存の変更あり' : 'Panic ready · snapshot OK' },
+      ]"
+    />
+
+    <!-- テーマ選択モーダル -->
+    <Transition name="fade">
+      <ThemePickerModal
+        v-if="pickerOpen"
+        :themes="themes"
+        :model-value="pickerSelected"
+        :title="pickerOpen === 'light' ? 'Light Mode のテーマを選択' : 'Dark Mode のテーマを選択'"
+        :sub="pickerOpen === 'light' ? 'OS が Light の時に自動適用' : 'OS が Dark の時に自動適用'"
+        :accent="pickerOpen === 'light' ? '#f5c26b' : '#7cf2d4'"
+        @update:model-value="onPickerUpdate"
+        @cancel="pickerOpen = null"
+      />
+    </Transition>
+  </div>
+</template>
+
+<style scoped>
+.appearance-host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.content {
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 28px 32px;
+}
+
+.page-head h1 {
+  font-size: 22px;
+}
+
+.head-hint {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fg-mute);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+
+.os-state {
+  margin-bottom: 20px;
+}
+.indicator-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.section-title {
+  margin: 0 0 12px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--fg-mute);
+  font-weight: 500;
+}
+
+.pairing-grid {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 16px;
+  align-items: stretch;
+  margin-bottom: 24px;
+}
+@media (max-width: 800px) {
+  .pairing-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.auto-switch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--fg-mute);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.watch-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+  margin-right: 6px;
+  display: inline-block;
+}
+
+.prop-body {
+  padding: 4px 16px !important;
+}
+
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.18s ease;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+}
+</style>
