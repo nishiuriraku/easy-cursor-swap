@@ -8,9 +8,11 @@ name: Marketplace Theme Validate
 #  1. メタデータ JSON のスキーマ
 #  2. `.cursorpack` の SHA-256 が宣言値と一致
 #  3. Ed25519 署名検証 (`authors/{github_username}.json` の公開鍵で)
-#  4. サイズ閾値 (50 MB / 200 MB / 10 MB)
-#  5. マルウェアハッシュ DB との照合 (clamav or VirusTotal API)
+#  4. サイズ閾値 (50MB)
+#  5. マルウェアチェック: VIRUSTOTAL_API_KEY が設定されていれば VT API v3、
+#     未設定時は malware-hashes.txt ローカル DB にフォールバック
 #
+# secrets.VIRUSTOTAL_API_KEY を index リポジトリに登録しておくことを推奨。
 # scripts/marketplace/validate.mjs に検証ロジックを集約する設計。
 
 on:
@@ -46,20 +48,10 @@ jobs:
           git diff --name-only "$BASE" "$HEAD" -- entries/ themes/ authors/ >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
 
-      - name: Schema + SHA-256 + signature validation
+      - name: Schema + SHA-256 + signature + malware validation
         run: node scripts/marketplace/validate.mjs
         env:
           CHANGED_FILES: ${{ steps.changes.outputs.list }}
-
-      - name: Size thresholds
-        run: |
-          for f in $(git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" -- 'themes/*.cursorpack'); do
-            size=$(wc -c < "$f")
-            if [ "$size" -gt 52428800 ]; then
-              echo "::error file=$f::cursorpack size $size exceeds 50MB limit"
-              exit 1
-            fi
-          done
-
-      - name: Malware hash DB check (placeholder)
-        run: echo "TODO: integrate VirusTotal API or clamav"
+          # VIRUSTOTAL_API_KEY が設定されていれば VT API v3 でハッシュ照合する。
+          # 未設定でも malware-hashes.txt ローカル DB にフォールバックするため必須ではない。
+          VIRUSTOTAL_API_KEY: ${{ secrets.VIRUSTOTAL_API_KEY }}

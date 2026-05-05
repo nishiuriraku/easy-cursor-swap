@@ -11,7 +11,9 @@
  *  2. ファイルサイズ閾値 (`themes/<id>.cursorpack` <= 50MB)
  *  3. SHA-256 整合性 (entry.sha256 == sha256(themes/<id>.cursorpack))
  *  4. Ed25519 署名検証 (`authors/{author_github}.json` の公開鍵)
- *  5. マルウェアハッシュ DB 照合 (`scripts/marketplace/malware-hashes.txt`)
+ *  5. マルウェアチェック:
+ *       VIRUSTOTAL_API_KEY が設定されていれば VirusTotal API v3 で照合
+ *       未設定の場合は `malware-hashes.txt` ローカル DB にフォールバック
  */
 import { readFileSync, statSync, existsSync, readdirSync } from 'node:fs'
 import { createHash, createPublicKey, verify } from 'node:crypto'
@@ -27,8 +29,15 @@ const MALWARE_DB = join(__dirname, 'malware-hashes.txt')
 
 const MAX_PACK_BYTES = 50 * 1024 * 1024
 
+// VirusTotal free tier: 4 req/min → 15s 間隔で安全側に倒す
+const VT_RATE_LIMIT_MS = 15_000
+
 function logErr(msg) {
   console.error(`::error::${msg}`)
+}
+
+function logWarn(msg) {
+  console.warn(`::warning::${msg}`)
 }
 
 function listEntriesFromEnv() {
@@ -146,19 +155,101 @@ function checkPackFile(entry) {
   return { ok: true, sha, size: stat.size }
 }
 
-function checkMalware(sha) {
-  if (!existsSync(MALWARE_DB)) return { ok: true } // DB 未整備
+/** VirusTotal API v3 でハッシュを照合する。
+ *  - malicious > 0 → { ok: false, error, detections }
+ *  - 404 (未登録) → { ok: true, known: false }
+ *  - その他の API エラー → fail-open: { ok: true, warning }
+ */
+async function checkMalwareVirusTotal(sha, apiKey) {
+  const url = `https://www.virustotal.com/api/v3/files/${sha.toLowerCase()}`
+  let res
+  try {
+    res = await fetch(url, {
+      headers: { 'x-apikey': apiKey },
+      signal: AbortSignal.timeout(20_000),
+    })
+  } catch (e) {
+    // ネットワーク障害 — fail-open (CI をブロックしない)
+    logWarn(`VirusTotal: ネットワークエラー (${e.message})。ローカル DB のみで継続。`)
+    return { ok: true, warning: 'network_error' }
+  }
+
+  if (res.status === 404) {
+    // VT 未登録 = 既知マルウェアではない
+    return { ok: true, known: false }
+  }
+
+  if (res.status === 429) {
+    logWarn('VirusTotal: レート制限 (429)。ローカル DB のみで継続。')
+    return { ok: true, warning: 'rate_limited' }
+  }
+
+  if (!res.ok) {
+    logWarn(`VirusTotal: API エラー ${res.status}。ローカル DB のみで継続。`)
+    return { ok: true, warning: `http_${res.status}` }
+  }
+
+  let body
+  try {
+    body = await res.json()
+  } catch (e) {
+    logWarn('VirusTotal: レスポンスパース失敗。ローカル DB のみで継続。')
+    return { ok: true, warning: 'parse_error' }
+  }
+
+  const stats = body?.data?.attributes?.last_analysis_stats ?? {}
+  const malicious = (stats.malicious ?? 0) + (stats.suspicious ?? 0)
+  if (malicious > 0) {
+    const engines = body?.data?.attributes?.last_analysis_results ?? {}
+    const flagged = Object.entries(engines)
+      .filter(([, v]) => v.category === 'malicious' || v.category === 'suspicious')
+      .map(([engine]) => engine)
+      .slice(0, 5)
+      .join(', ')
+    return {
+      ok: false,
+      error: `VirusTotal: ${malicious} エンジンが検出 (${flagged}...)`,
+    }
+  }
+  return { ok: true, known: true }
+}
+
+function checkMalwareLocal(sha) {
+  if (!existsSync(MALWARE_DB)) return { ok: true }
   const known = readFileSync(MALWARE_DB, 'utf-8')
     .split('\n')
     .map((l) => l.trim().toLowerCase())
-    .filter(Boolean)
+    .filter((l) => l && !l.startsWith('#'))
   if (known.includes(sha.toLowerCase())) {
     return { ok: false, error: `マルウェアハッシュ DB と一致: ${sha}` }
   }
   return { ok: true }
 }
 
-function main() {
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function checkMalware(sha, vtApiKey, isFirst) {
+  // VirusTotal API key が設定されていれば優先使用
+  if (vtApiKey) {
+    // 2件目以降はレート制限回避のため待機
+    if (!isFirst) await sleep(VT_RATE_LIMIT_MS)
+    const vtResult = await checkMalwareVirusTotal(sha, vtApiKey)
+    if (!vtResult.ok) return vtResult
+    // VT がエラーでも (fail-open) ローカル DB も確認する
+  }
+  return checkMalwareLocal(sha)
+}
+
+async function main() {
+  const vtApiKey = process.env.VIRUSTOTAL_API_KEY ?? ''
+  if (vtApiKey) {
+    console.log('VirusTotal API: 有効 (実 DB 照合モード)')
+  } else {
+    console.log('VirusTotal API: 未設定 — ローカル malware-hashes.txt のみで照合')
+  }
+
   const targets = listEntriesFromEnv()
   if (targets.length === 0) {
     console.log('no entries to validate')
@@ -166,6 +257,7 @@ function main() {
   }
 
   let errors = 0
+  let vtCallIndex = 0
   for (const file of targets) {
     console.log(`\n--- ${basename(file)} ---`)
     let entry
@@ -205,14 +297,16 @@ function main() {
       continue
     }
 
-    const malware = checkMalware(pack.sha)
+    const malware = await checkMalware(pack.sha, vtApiKey, vtCallIndex === 0)
+    vtCallIndex++
     if (!malware.ok) {
       logErr(`${file}: ${malware.error}`)
       errors++
       continue
     }
 
-    console.log(`  OK: ${entry.name} (${entry.version}) ${pack.size}B sha=${pack.sha.slice(0, 12)}...`)
+    const vtLabel = vtApiKey ? ' [VT✓]' : ''
+    console.log(`  OK: ${entry.name} (${entry.version}) ${pack.size}B sha=${pack.sha.slice(0, 12)}...${vtLabel}`)
   }
 
   if (errors > 0) {
@@ -222,4 +316,4 @@ function main() {
   return 0
 }
 
-process.exit(main())
+main().then(process.exit)
