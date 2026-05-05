@@ -194,9 +194,11 @@ impl MarketplaceClient {
             .verify(actual_sha256.as_bytes(), &signature)
             .map_err(|e| AppError::Theme(format!("Ed25519 署名検証に失敗: {}", e)))?;
 
+        // url は短縮ハッシュにして、フィッシング先の追跡経路を直接残さない。
+        // sha256 は前段で本物と確認済みなので 16 文字短縮版を残す。
         tracing::info!(
-            "marketplace install verified: url={} sha256={} key_id={}",
-            req.download_url,
+            "marketplace install verified: url_hash={} sha256_short={} key_id={}",
+            crate::logging::short_hash(req.download_url.as_bytes()),
             &actual_sha256[..16],
             req.author_pubkey_id,
         );

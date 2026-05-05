@@ -233,7 +233,10 @@ impl ConfigManager {
             return Ok(());
         }
         fs::write(&bak, serde_json::to_string_pretty(config)?)?;
-        tracing::info!("バックアップを作成: {}", bak.display());
+        tracing::info!(
+            "バックアップを作成: {}",
+            crate::logging::redact_path(&bak)
+        );
         Ok(())
     }
 
@@ -245,7 +248,7 @@ impl ConfigManager {
         tracing::error!(
             "設定ファイルが破損 ({}) → 退避: {}",
             reason,
-            bak.display()
+            crate::logging::redact_path(&bak)
         );
         Ok(())
     }

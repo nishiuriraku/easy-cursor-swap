@@ -336,7 +336,8 @@
 - [x] PII 除外ヘルパー: `logging::redact_path` (ホーム下を `~/...` に置換) + `logging::short_hash` (SHA-256 12 文字短縮)
 - [x] `WorkerGuard` を main で保持して非同期書き出しの flush を保証
 - [x] デバッグビルドは標準出力にも色付きで出力
-- [x] **既存 `tracing!` のパス出力箇所に `redact_path` 適用** (theme/backup/commands)
+- [x] **既存 `tracing!` のパス出力箇所に `redact_path` 適用** (theme/backup/commands/config)
+- [x] **Marketplace の URL ログを `short_hash` で短縮**してフィッシング先追跡を防ぐ
 - [ ] クラッシュレポート オプトイン送信 (Phase 7-2 と統合)
 
 ### 7-2: 通知システム ✅ 実装完了 (層 1/2/3 すべて)
@@ -491,17 +492,17 @@
 > ダーク自動切替 / 多重起動防止 / 通知 / 環境検出) はすべて完了。
 > ここからは仕上げと「v1.0 リリース DOD」に向けた残タスク。
 
-1. **🪟 残画面の i18n 配線** — creator / panic / apply モーダル / settings 内本文を `t()` 化
-2. **🪪 AppUserModelID 明示登録** — トースト発信元の見える化 (Phase 7-2 残タスク)
-3. **📦 MSIX / `runFullTrust` capability** — Phase 8-3 着手 (Microsoft Store 配布の足場)
-4. **✍️ EV/OV コードサイニング調達** — SignPath.io 等の OSS 無償署名サービス検討
-5. **🧪 起動時間 / メモリ / 適用時間の実測ベンチ** — Phase 8-1 の数値目標を CI で検証
-6. **🪝 鍵ローテーション PR テンプレ** — `cursorforge/index` 側の `authors/{user}.json` 編集ガイド
-7. **🛡️ VirusTotal API 統合** — Marketplace CI のマルウェア DB 照合を実 API に置換
-8. **📜 既存 `tracing!` の `short_hash` 適用** — レジストリ RAW 値を `short_hash` で記録
-9. **🪟 マイグレーション失敗時の専用エラー画面** — config schema_version 不一致時 (Phase 2-1 残)
-10. **♿ WCAG AA 検証** — コントラスト比 / キーボードナビ / ARIA ラベルの自動チェック
-11. **🚀 Tauri Updater 設定** — 自動アップデート + 3 回連続失敗ロールバック (Phase 8-4)
+1. **📦 MSIX / `runFullTrust` capability** — Phase 8-3 着手 (Microsoft Store 配布の足場)
+2. **✍️ EV/OV コードサイニング調達** — SignPath.io 等の OSS 無償署名サービス検討
+3. **🪪 Tauri Updater 公開鍵発行** — `tauri signer generate` で署名鍵を生成、tauri.conf.json に pubkey 投入
+4. **♿ WCAG AA 検証** — コントラスト比 / キーボードナビ / ARIA ラベルの自動チェック
+5. **🛡️ VirusTotal API 統合** — Marketplace CI のマルウェア DB 照合を実 API に置換
+6. **🧪 起動時間 / メモリ / 適用時間の実測ベンチ** — Phase 8-1 の数値目標を CI で検証
+7. **🪝 鍵ローテーション PR テンプレ** — `cursorforge/index` 側の `authors/{user}.json` 編集ガイド
+8. **🚀 v1→v2 メジャー跨ぎ判定 + 3 回連続失敗ロールバック** — Phase 8-4 残
+9. **🦠 SVG 以外の画像メタデータパージ** — PNG Exif / iTXt の除去強化 (Phase 6-1 残)
+10. **🌐 設定セクション本文の i18n 残置換** — 各セクション説明文 (現状は dynamic な短い説明のみ)
+11. **🆘 GUI 復旧フロー** — config マイグレーション失敗時に「最新バックアップから復元」ボタン提供
 
 ---
 
@@ -530,9 +531,10 @@
 | Phase 6-1/6-2 | ✅ .cursorpack 入出力 / 多層セキュリティ防御 (path traversal / Zip 爆弾 / symlink / Magic Byte / SVG sanitize) |
 | Phase 6-3 | ✅ Ed25519 鍵管理 (DPAPI + パスフレーズ export/import) |
 | Phase 6-4 | ✅ .cursorprofile フルバックアップ |
-| Phase 7-1 | ✅ ロギング (日次ローテ / 14 日保持 / 100MB 上限 / PII redaction) |
-| Phase 7-2 | 🔄 通知 3 層配線 (AppUserModelID 登録のみ残) |
-| Phase 7-3 | 🔄 i18n 基盤 + 主要 4 画面配線 (残: creator/panic/apply モーダル) |
+| Phase 7-1 | ✅ ロギング (日次ローテ / 14 日保持 / 100MB 上限 / PII redaction + URL short_hash) |
+| Phase 7-2 | ✅ 通知 3 層配線 + AppUserModelID 登録 |
+| Phase 7-3 | ✅ i18n 基盤 + 全画面配線 (177 キー / ja-en parity) |
 | Phase 8-1 | 🔄 CI 雛形 + criterion ベンチ + リサイズキャッシュ (実測値の数値目標検証は残) |
+| Phase 8-4 | 🔄 Tauri Updater 配線完了 (公開鍵発行 + ロールバック検出は残) |
 | Phase 9-1/9-3 | ✅ クライアント側検証 (HTTPS / SHA-256 / Ed25519 / ZIP 展開) |
 | Phase 9-4 | ✅ CI ワークフロー + scripts/marketplace/validate.mjs |
