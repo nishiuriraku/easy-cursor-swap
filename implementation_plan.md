@@ -537,17 +537,17 @@
 > ダーク自動切替 / 多重起動防止 / 通知 / 環境検出) はすべて完了。
 > ここからは仕上げと「v1.0 リリース DOD」に向けた残タスク。
 
-1. **📦 MSIX / `runFullTrust` capability** — Phase 8-3 着手 (Microsoft Store 配布の足場)
+1. ~~**📦 MSIX / `runFullTrust` capability**~~ ✅ 完了 (Phase 8-3 — AppxManifest.xml + distribution.md)
 2. **✍️ EV/OV コードサイニング調達** — SignPath.io 等の OSS 無償署名サービス検討
-3. **🪪 Tauri Updater 公開鍵発行** — `tauri signer generate` で署名鍵を生成、tauri.conf.json に pubkey 投入
-4. **♿ WCAG AA 検証** — コントラスト比 / キーボードナビ / ARIA ラベルの自動チェック
+3. ~~**🪪 Tauri Updater 公開鍵発行**~~ ✅ 完了 (`tauri signer generate` + tauri.conf.json 更新 + release.yml + docs/signing.md)
+4. ~~**♿ WCAG AA 検証**~~ ✅ 完了 (ARIA / aria-current / aria-labelledby / aria-pressed / skip-to-content / prefers-reduced-motion)
 5. **🛡️ VirusTotal API 統合** — Marketplace CI のマルウェア DB 照合を実 API に置換
 6. **🧪 起動時間 / メモリ / 適用時間の実測ベンチ** — Phase 8-1 の数値目標を CI で検証
 7. **🪝 鍵ローテーション PR テンプレ** — `cursorforge/index` 側の `authors/{user}.json` 編集ガイド
 8. **🚀 v1→v2 メジャー跨ぎ判定 + 3 回連続失敗ロールバック** — Phase 8-4 残
 9. **🦠 SVG 以外の画像メタデータパージ** — PNG Exif / iTXt の除去強化 (Phase 6-1 残)
-10. ~~**🌐 設定セクション本文の i18n 残置換**~~ ✅ 完了 (98 キー追加 / 8 セクション全文 + ダイアログ + ステータス)
-11. ~~**🆘 GUI 復旧フロー**~~ ✅ 完了 (`list_config_backups` / `restore_config_backup` コマンド + ConfigRecoveryPanel.vue + settings General セクションに統合)
+10. ~~**🌐 設定セクション本文の i18n 残置換**~~ ✅ 完了 (288 キー / 8 セクション全文 + ダイアログ + ステータス)
+11. ~~**🆘 GUI 復旧フロー**~~ ✅ 完了 (`list_config_backups` / `restore_config_backup` + ConfigRecoveryPanel.vue)
 
 ---
 
