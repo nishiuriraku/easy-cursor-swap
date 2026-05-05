@@ -12,6 +12,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { ThemeCardData } from '~/types/theme'
 import { invokeTauri } from '~/composables/useTauri'
+import { notify } from '~/composables/useNotify'
 // UiIcon / ThemeCard / ApplyModal / AppStatusbar は Nuxt の自動インポートで解決される。
 
 type FilterChip = 'all' | 'favorites' | 'recent' | 'unsigned'
@@ -179,7 +180,15 @@ async function confirmApply(id: string) {
     await invokeTauri<void>('apply_theme', { themeId: id })
     // 成功 → アクティブフラグを更新
     themes.value.forEach((t) => (t.isActive = t.id === id))
+    const applied = themes.value.find((t) => t.id === id)
     pendingTheme.value = null
+    if (applied) {
+      void notify({
+        title: 'CursorForge',
+        body: `「${applied.name}」を適用しました`,
+        level: 'success',
+      })
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     applyError.value = msg
@@ -253,6 +262,14 @@ async function actuallyImport(path: string) {
   if (id) {
     console.info('[Library] imported', id, 'from', path)
     await loadThemes()
+    const imported = themes.value.find((t) => t.id === id)
+    void notify({
+      title: 'CursorForge',
+      body: imported
+        ? `「${imported.name}」をライブラリに追加しました`
+        : 'テーマをインポートしました',
+      level: 'success',
+    })
   }
 }
 

@@ -336,12 +336,17 @@
 - [x] **既存 `tracing!` のパス出力箇所に `redact_path` 適用** (theme/backup/commands)
 - [ ] クラッシュレポート オプトイン送信 (Phase 7-2 と統合)
 
-### 7-2: 通知システム
-- [ ] 3 層通知の設計と振り分けルール:
-  - **無通知**: バックグラウンドの自動適用成功
-  - **Win32 COM 経由 Toast**: ダークモード切替完了、更新通知
-  - **モーダル**: パニックリセット確認、署名検証失敗、競合検出
-- [ ] `AppUserModelID` 登録（トースト発信元の明示）
+### 7-2: 通知システム ✅ 実装完了 (層 1/2/3 すべて)
+- [x] 3 層通知の設計と振り分け:
+  - **層 1 無通知**: バックグラウンドの自動適用成功 (ダークモード自動切替も無通知)
+  - **層 2 Toast**: テーマ適用完了 / インポート成功 — `tauri-plugin-notification` 経由
+  - **層 3 モーダル**: パニックリセット確認 (`PanicFlow`) / 署名検証失敗 / 衝突検出 (`ImportConflictDialog`)
+- [x] `tauri-plugin-notification` を Cargo.toml + main.rs プラグインに追加
+- [x] `@tauri-apps/plugin-notification` フロント JS パッケージ追加
+- [x] `useNotify` composable — 起動時に `requestPermission` を一度だけ実行してキャッシュ
+- [x] capabilities/default.json に notification 権限追加
+- [x] ライブラリのテーマ適用成功 / インポート成功で Toast 表示
+- [ ] `AppUserModelID` の明示的登録 (現状は Tauri 既定値)
 
 ### 7-3: 国際化 🔄 基盤完了
 - [x] **i18n キー管理 (`app/locales/ja.ts` + `en.ts`)** — `as const` で型導出

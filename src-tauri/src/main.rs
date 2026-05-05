@@ -87,6 +87,7 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_notification::init())
         .manage(config_manager)
         .invoke_handler(commands::get_command_handlers())
         .setup(|app| {
