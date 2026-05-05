@@ -538,12 +538,12 @@
 > ここからは仕上げと「v1.0 リリース DOD」に向けた残タスク。
 
 1. ~~**📦 MSIX / `runFullTrust` capability**~~ ✅ 完了 (Phase 8-3 — AppxManifest.xml + distribution.md)
-2. **✍️ EV/OV コードサイニング調達** — SignPath.io 等の OSS 無償署名サービス検討
+2. **✍️ EV/OV コードサイニング調達** — 調達ガイド作成済 ([docs/code_signing.md](docs/code_signing.md))。実申請は外部待ち
 3. ~~**🪪 Tauri Updater 公開鍵発行**~~ ✅ 完了 (`tauri signer generate` + tauri.conf.json 更新 + release.yml + docs/signing.md)
 4. ~~**♿ WCAG AA 検証**~~ ✅ 完了 (ARIA / aria-current / aria-labelledby / aria-pressed / skip-to-content / prefers-reduced-motion)
 5. ~~**🛡️ VirusTotal API 統合**~~ ✅ 完了 (validate.mjs を VT API v3 対応、429/ネットワーク障害は fail-open)
-6. **🧪 起動時間 / メモリ / 適用時間の実測ベンチ** — Phase 8-1 の数値目標を CI で検証
-7. **🪝 鍵ローテーション PR テンプレ** — `cursorforge/index` 側の `authors/{user}.json` 編集ガイド
+6. ~~**🧪 起動時間 / メモリ / 適用時間の実測ベンチ**~~ ✅ 完了 (benches/startup.rs + performance.yml に闾値検証)
+7. ~~**🪝 鍵ローテーション PR テンプレ**~~ ✅ 完了 (docs/key_rotation.md + .github/PULL_REQUEST_TEMPLATE/key_rotation.md)
 8. ~~**🚀 v1→v2 メジャー跨ぎ判定 + 3 回連続失敗ロールバック**~~ ✅ 完了 (health.rs + main.rs Win32 ダイアログ + settings.vue 追加確認)
 9. ~~**🦠 SVG 以外の画像メタデータパージ**~~ ✅ 完了 (eXIf / iTXt / zTXt チャンク除去テスト追加 16 pass)
 10. ~~**🌐 設定セクション本文の i18n 残置換**~~ ✅ 完了 (288 キー / 8 セクション全文 + ダイアログ + ステータス)
@@ -561,7 +561,7 @@
 3. ~~**Phase 9-2: テーマ提出フロー**~~ ✅ 完了 — SubmitThemeDialog.vue + open_url IPC + GitHub ファイルエディタ自動 URL 生成
 4. ~~**Phase 9-3: マルウェアハッシュ実 DB**~~ ✅ 完了 — VirusTotal API v3 統合 + fail-open
 5. **Phase 7-2: AppUserModelID 登録** — トースト通知発信元の明示
-6. **Phase 4-7 残: アクセシビリティ競合検出** — `CursorIndicator` / `ContrastScheme` / `CursorBaseSize` 検出と警告ダイアログ
+6. ~~**Phase 4-7 残: アクセシビリティ競合検出**~~ ✅ 完了 (accessibility.rs + ApplyModal.vue 警告バナー)
 7. **Phase 5-11: WCAG AA 準拠** — コントラスト 4.5:1 検証 / キーボードナビ / ARIA ラベル
 8. ~~**Phase 2-1 残: ユーザー向けの復旧 UI**~~ ✅ 完了 — `ConfigRecoveryPanel.vue` が設定 General セクションにバックアップ一覧 + 復旧ボタンを提供
 9. **Phase 6-1 残: `.cursorpack` 内画像メタデータパージ強化** — Exif / トラッキングデータの除去
