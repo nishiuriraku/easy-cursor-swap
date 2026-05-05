@@ -40,7 +40,7 @@
 - [x] 適用トランザクション（スナップショット + ロールバック）
 - [x] ディスク永続スナップショット（`_pending_apply.snapshot`）
 - [ ] `Schemes` の文字列フォーマット制約（セミコロン区切り、`,` 不可、`REG_EXPAND_SZ` 採用判断）
-- [ ] OS 設定の外部変更検知（`WM_SETTINGCHANGE` の `SPI_SETCURSORS` 系購読 → UI 同期）
+- [x] **OS 設定の外部変更検知** — `cursor_watcher.rs` で `WM_SETTINGCHANGE` の `SPI_SETCURSORS` を購読、`cursor-changed` Tauri イベントを発火、ライブラリ画面が `loadThemes()` で再読込
 - [ ] 未指定役割（`SizeAll` 等）を「Windows 標準継承」とするレジストリ書き出し仕様
 - [ ] 孤児カーソル復旧（ヘルスチェック）— `~/.custom_cursors/` 手動削除時の自動標準復帰
 

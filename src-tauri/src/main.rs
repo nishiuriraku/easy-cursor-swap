@@ -7,6 +7,7 @@
 
 use app_lib::commands;
 use app_lib::config::ConfigManager;
+use app_lib::cursor_watcher;
 use app_lib::darkmode;
 use app_lib::logging;
 use app_lib::registry::RegistryManager;
@@ -153,6 +154,18 @@ fn main() {
                 }
             }) {
                 tracing::warn!("ダークモード監視の開始に失敗: {}", e);
+            }
+
+            // 外部カーソル変更監視 — コントロールパネル等で書き換えられたら UI を再読込
+            let cursor_handle = handle.clone();
+            if let Err(e) = cursor_watcher::start_cursor_watcher(move || {
+                use tauri::Emitter;
+                tracing::info!("外部カーソル変更を検知 → cursor-changed イベント発火");
+                if let Err(err) = cursor_handle.emit("cursor-changed", ()) {
+                    tracing::warn!("cursor-changed イベント発火失敗: {}", err);
+                }
+            }) {
+                tracing::warn!("カーソル監視の開始に失敗: {}", e);
             }
 
             tracing::info!("CursorForge が正常に起動しました");

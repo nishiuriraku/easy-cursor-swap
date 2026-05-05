@@ -14,6 +14,7 @@ pub mod backup;
 pub mod commands;
 pub mod config;
 pub mod cursor;
+pub mod cursor_watcher;
 pub mod darkmode;
 pub mod errors;
 pub mod keystore;

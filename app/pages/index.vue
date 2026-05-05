@@ -337,6 +337,20 @@ async function loadThemes() {
   }
 }
 
+// 外部カーソル変更検知 — Rust 側で SPI_SETCURSORS を購読し、変更があれば UI 更新
+let unlistenCursorChange: (() => void) | null = null
+async function setupCursorChangeListener() {
+  try {
+    const { listen } = await import('@tauri-apps/api/event')
+    unlistenCursorChange = await listen('cursor-changed', () => {
+      console.info('[Library] cursor-changed event received → reload')
+      void loadThemes()
+    })
+  } catch (err) {
+    console.warn('[Library] cursor-changed listener unavailable:', err)
+  }
+}
+
 // --- Tauri v2 ウィンドウドラッグ&ドロップイベント購読 ---
 async function setupTauriDrop() {
   try {
@@ -368,12 +382,17 @@ async function setupTauriDrop() {
 onMounted(async () => {
   await loadThemes()
   await setupTauriDrop()
+  await setupCursorChangeListener()
 })
 
 onUnmounted(() => {
   if (unlistenDrop) {
     unlistenDrop()
     unlistenDrop = null
+  }
+  if (unlistenCursorChange) {
+    unlistenCursorChange()
+    unlistenCursorChange = null
   }
 })
 </script>
