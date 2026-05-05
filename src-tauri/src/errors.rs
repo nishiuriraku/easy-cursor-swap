@@ -34,6 +34,14 @@ pub enum AppError {
     /// Zipアーカイブエラー
     #[error("Zipエラー: {0}")]
     Zip(#[from] zip::result::ZipError),
+
+    /// 不正な入力 (URL スキーム違反など)
+    #[error("入力エラー: {0}")]
+    InvalidInput(String),
+
+    /// その他のエラー
+    #[error("{0}")]
+    Other(String),
 }
 
 /// Tauri IPC 向けのシリアライズ可能エラー

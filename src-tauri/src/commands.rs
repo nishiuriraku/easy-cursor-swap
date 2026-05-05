@@ -476,6 +476,51 @@ pub fn restore_config_backup(
     config.restore_backup(&file_name)
 }
 
+/// 指定 URL をシステムのデフォルトブラウザで開く。
+///
+/// URL は `https://` または `http://` で始まる必要がある。
+/// それ以外は `AppError::InvalidInput` を返す。
+///
+/// Windows 専用実装: Win32 ShellExecuteW を直接呼ぶ。
+#[tauri::command]
+pub fn open_url(url: String) -> Result<(), AppError> {
+    if !url.starts_with("https://") && !url.starts_with("http://") {
+        return Err(AppError::InvalidInput(format!(
+            "不正な URL スキーム: {}",
+            url
+        )));
+    }
+    #[cfg(windows)]
+    {
+        use windows::core::{HSTRING, PCWSTR};
+        use windows::Win32::UI::Shell::ShellExecuteW;
+        use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+
+        let url_h = HSTRING::from(url.as_str());
+        let result = unsafe {
+            ShellExecuteW(
+                None,
+                PCWSTR(HSTRING::from("open").as_ptr()),
+                PCWSTR(url_h.as_ptr()),
+                PCWSTR::null(),
+                PCWSTR::null(),
+                SW_SHOWNORMAL,
+            )
+        };
+        // ShellExecuteW は HINSTANCE を返す; ポインタ値が 32 より大きければ成功
+        if (result.0 as usize) <= 32 {
+            return Err(AppError::Other(
+                "ShellExecuteW が失敗しました".to_string(),
+            ));
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        return Err(AppError::Other("open_url は Windows 専用です".to_string()));
+    }
+    Ok(())
+}
+
 /// 現行バージョンから新バージョンへの更新がメジャー跨ぎかどうかを返す。
 ///
 /// フロントエンドはアップデート確認時にこれを呼び出し、`true` の場合は
@@ -516,5 +561,6 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         list_config_backups,
         restore_config_backup,
         check_update_is_major_jump,
+        open_url,
     ]
 }

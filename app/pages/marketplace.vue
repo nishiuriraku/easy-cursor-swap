@@ -18,6 +18,8 @@ import { useI18n } from '~/composables/useI18n'
 
 const { t } = useI18n()
 
+const submitOpen = ref(false)
+
 const entries = ref<MarketplaceEntry[]>([])
 const isLoading = ref(true)
 const filter = ref<MarketplaceTag>('all')
@@ -156,6 +158,9 @@ onMounted(async () => {
         <button class="btn ghost" @click="openGithub">
           <UiIcon name="Globe" :size="14" />{{ t('marketplace.openGithub') }}
         </button>
+        <button class="btn ghost" @click="submitOpen = true">
+          <UiIcon name="Upload" :size="14" />{{ t('marketplace.submitBtn') }}
+        </button>
       </div>
     </div>
 
@@ -226,6 +231,9 @@ onMounted(async () => {
         { text: 'schema v3.2' },
       ]"
     />
+
+    <!-- テーマ提出ダイアログ -->
+    <SubmitThemeDialog v-model:open="submitOpen" />
   </div>
 </template>
 
