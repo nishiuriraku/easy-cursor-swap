@@ -294,6 +294,54 @@ impl RegistryManager {
         Ok(())
     }
 
+    /// 適用したテーマを `Control Panel\Cursors\Schemes\<scheme_name>` に登録する。
+    ///
+    /// これにより Windows のコントロールパネル
+    /// (マウスのプロパティ → ポインター → 配色) のドロップダウンに
+    /// 自分のテーマが表示されるようになる。
+    ///
+    /// 値は `REG_EXPAND_SZ` で書き込み、17 役割を scheme_index 順にカンマ区切りする。
+    /// 失敗してもユーザー体験への影響は限定的なので、tracing::warn で記録するのみで
+    /// 上位層に伝播させる呼び出し元 / 静かに無視する呼び出し元を選べるよう Result を返す。
+    pub fn register_scheme(
+        scheme_name: &str,
+        cursor_paths: &HashMap<String, PathBuf>,
+    ) -> AppResult<()> {
+        use winreg::enums::*;
+        use winreg::RegKey;
+        use winreg::RegValue;
+
+        let safe_name = sanitize_scheme_name(scheme_name);
+        if safe_name.is_empty() {
+            return Err(AppError::Registry(
+                "scheme_name が空です (制御文字のみ等)".to_string(),
+            ));
+        }
+
+        let value_str = build_scheme_value(cursor_paths);
+        let bytes = encode_utf16_with_nul(&value_str);
+
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let (schemes_key, _disp) = hkcu
+            .create_subkey("Control Panel\\Cursors\\Schemes")
+            .map_err(|e| AppError::Registry(format!("Schemes キー作成失敗: {}", e)))?;
+
+        let reg_value = RegValue {
+            bytes,
+            vtype: REG_EXPAND_SZ,
+        };
+        schemes_key
+            .set_raw_value(&safe_name, &reg_value)
+            .map_err(|e| AppError::Registry(format!("Schemes 書き込み失敗: {}", e)))?;
+
+        tracing::info!(
+            "Schemes に '{}' を登録しました (REG_EXPAND_SZ, 上書き役割={})",
+            safe_name,
+            cursor_paths.len()
+        );
+        Ok(())
+    }
+
     /// Windows 既定カーソルにリセットする（パニックボタン）
     pub fn reset_to_windows_default() -> AppResult<()> {
         use winreg::enums::*;
@@ -476,6 +524,54 @@ fn compute_apply_values(
         .collect()
 }
 
+/// `Schemes` レジストリ値文字列を構築する。
+///
+/// 仕様 (Windows コントロールパネル準拠):
+///   - 17 役割を `scheme_index` 順に並べる
+///   - 区切り文字は **カンマ** `,` (Windows 既定スキームの慣例)
+///   - 未指定役割は空文字列を入れる (= 該当役割は OS 既定継承)
+///
+/// 戻り値の文字列は `REG_EXPAND_SZ` で書き込むことを前提とし、
+/// `%SystemRoot%` 等の環境変数展開を許容する。
+fn build_scheme_value(cursor_paths: &HashMap<String, PathBuf>) -> String {
+    let mut roles: Vec<&CursorRole> = CursorRole::all().iter().collect();
+    roles.sort_by_key(|r| r.scheme_index());
+    roles
+        .iter()
+        .map(|role| {
+            cursor_paths
+                .get(role.registry_name())
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_default()
+        })
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+/// Schemes 値名 (= スキーム名) のサニタイズ。
+///
+/// レジストリ値名は最大 16383 文字だが、UI 整合のため 255 字までに切る。
+/// 制御文字 / バックスラッシュ / スラッシュは除去 (キーパス区切りとの混同回避)。
+fn sanitize_scheme_name(name: &str) -> String {
+    name.chars()
+        .filter(|c| !c.is_control() && *c != '\\' && *c != '/')
+        .take(255)
+        .collect::<String>()
+        .trim()
+        .to_string()
+}
+
+/// 文字列を NUL 終端付き UTF-16 LE バイト列にエンコードする。
+/// REG_EXPAND_SZ / REG_SZ の生バイト書き込み用。
+fn encode_utf16_with_nul(s: &str) -> Vec<u8> {
+    let units: Vec<u16> = s.encode_utf16().chain(std::iter::once(0u16)).collect();
+    let mut out = Vec::with_capacity(units.len() * 2);
+    for w in units {
+        out.extend_from_slice(&w.to_le_bytes());
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -518,5 +614,62 @@ mod tests {
         let entries = compute_apply_values(&map);
         assert_eq!(entries.len(), 17);
         assert!(entries.iter().all(|(_, v)| v.is_empty()));
+    }
+
+    #[test]
+    fn build_scheme_value_emits_17_comma_separated_slots_in_index_order() {
+        let mut map: HashMap<String, PathBuf> = HashMap::new();
+        map.insert("Arrow".to_string(), PathBuf::from("C:\\a.cur"));
+        map.insert("IBeam".to_string(), PathBuf::from("C:\\i.cur"));
+        map.insert("Person".to_string(), PathBuf::from("C:\\p.cur"));
+
+        let value = build_scheme_value(&map);
+        let parts: Vec<&str> = value.split(',').collect();
+        assert_eq!(parts.len(), 17, "全 17 スロットが必要");
+        // scheme_index: Arrow=0, Help=1, AppStarting=2, Wait=3, Crosshair=4, IBeam=5, ..., Person=16
+        assert_eq!(parts[0], "C:\\a.cur");
+        assert_eq!(parts[5], "C:\\i.cur");
+        assert_eq!(parts[16], "C:\\p.cur");
+        // 未指定スロットは空文字列
+        assert_eq!(parts[1], "");
+        assert_eq!(parts[12], ""); // SizeAll
+    }
+
+    #[test]
+    fn build_scheme_value_all_empty_for_empty_map() {
+        let map: HashMap<String, PathBuf> = HashMap::new();
+        let value = build_scheme_value(&map);
+        // 16 個のカンマ + 0 個のパス = ",,,,,,,,,,,,,,,,"
+        assert_eq!(value.matches(',').count(), 16);
+        assert!(value.split(',').all(|s| s.is_empty()));
+    }
+
+    #[test]
+    fn sanitize_scheme_name_strips_control_and_path_separators() {
+        assert_eq!(sanitize_scheme_name("My Theme"), "My Theme");
+        assert_eq!(sanitize_scheme_name("Foo\\Bar"), "FooBar");
+        assert_eq!(sanitize_scheme_name("a/b"), "ab");
+        assert_eq!(sanitize_scheme_name("with\nnewline"), "withnewline");
+        assert_eq!(sanitize_scheme_name("   trim me   "), "trim me");
+    }
+
+    #[test]
+    fn sanitize_scheme_name_caps_at_255_chars() {
+        let huge = "x".repeat(1000);
+        let s = sanitize_scheme_name(&huge);
+        assert_eq!(s.len(), 255);
+    }
+
+    #[test]
+    fn encode_utf16_with_nul_appends_null_terminator() {
+        let bytes = encode_utf16_with_nul("Hi");
+        // UTF-16 LE: 'H'=0x0048, 'i'=0x0069, NUL=0x0000
+        assert_eq!(bytes, vec![0x48, 0x00, 0x69, 0x00, 0x00, 0x00]);
+    }
+
+    #[test]
+    fn encode_utf16_with_nul_handles_japanese() {
+        let bytes = encode_utf16_with_nul("あ"); // U+3042
+        assert_eq!(bytes, vec![0x42, 0x30, 0x00, 0x00]);
     }
 }

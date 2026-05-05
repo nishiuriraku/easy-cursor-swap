@@ -68,7 +68,12 @@
 - [x] `SystemParametersInfoW(SPI_SETCURSORSHADOW)` 制御
 - [x] 適用トランザクション（スナップショット + ロールバック）
 - [x] ディスク永続スナップショット（`_pending_apply.snapshot`）
-- [ ] `Schemes` の文字列フォーマット制約（セミコロン区切り、`,` 不可、`REG_EXPAND_SZ` 採用判断）
+- [x] **`Schemes` の文字列フォーマット + 値型 = REG_EXPAND_SZ で確定**
+  - Windows コントロールパネル準拠で **カンマ** `,` 区切り (17 役割) を採用
+  - 値型 `REG_EXPAND_SZ` で `%SystemRoot%` 等の環境変数展開に対応
+  - `RegistryManager::register_scheme(name, paths)` を追加
+  - `theme.rs::apply_theme` から成功時に呼び出し → コントロールパネルのドロップダウンに表示
+  - `build_scheme_value` / `sanitize_scheme_name` / `encode_utf16_with_nul` を純粋関数化、単体テスト 6 件 PASS
 - [x] **OS 設定の外部変更検知** — `cursor_watcher.rs` で `WM_SETTINGCHANGE` の `SPI_SETCURSORS` を購読、`cursor-changed` Tauri イベントを発火、ライブラリ画面が `loadThemes()` で再読込
 - [x] **未指定役割を「Windows 標準継承」とするレジストリ書き出し仕様**
   - `apply_cursors` を「全 17 役割を毎回書き換え」に変更

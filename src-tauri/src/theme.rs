@@ -673,6 +673,13 @@ impl ThemeManager {
 
         RegistryManager::apply_cursors(&cursor_paths)?;
 
+        // Windows のコントロールパネルから参照可能なよう Schemes にも登録する。
+        // 失敗しても適用自体は成功扱い (UX への影響は最小限)
+        let scheme_name = format!("EasyCursorSwap - {}", metadata.name.get("ja"));
+        if let Err(e) = RegistryManager::register_scheme(&scheme_name, &cursor_paths) {
+            tracing::warn!("Schemes 登録に失敗 (適用自体は成功): {}", e);
+        }
+
         // OS 標準ポインターの影制御
         if let Err(e) = RegistryManager::set_cursor_shadow(metadata.requires_os_shadow) {
             tracing::warn!("ポインター影設定の更新に失敗: {}", e);
