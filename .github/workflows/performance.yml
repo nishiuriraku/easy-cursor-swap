@@ -34,9 +34,16 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - name: cargo bench (placeholder)
+      - name: cargo bench (criterion)
         working-directory: src-tauri
-        run: cargo test --release --lib -- --nocapture
+        run: cargo bench --bench cursor_build -- --output-format bencher | tee bench-output.txt
+
+      - name: Upload benchmark output
+        uses: actions/upload-artifact@v4
+        with:
+          name: cursor-build-bench
+          path: src-tauri/bench-output.txt
+          retention-days: 30
 
       - name: Measure release binary size
         shell: pwsh

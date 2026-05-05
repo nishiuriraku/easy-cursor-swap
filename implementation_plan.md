@@ -377,7 +377,10 @@
 | テーマ適用 | ≤ 3 秒 |
 | `.msi` パッケージサイズ | ≤ 30 MB |
 
-- [ ] criterion 等のマイクロベンチ導入 (現状は `cargo test --release`)
+- [x] **criterion マイクロベンチ導入** (`src-tauri/benches/cursor_build.rs`)
+  - 64x64 / 256x256 の Lanczos リサイズ + 6 サイズ .cur ビルドを計測
+  - 32x32 の Nearest 経路もベンチ
+  - performance.yml が `cargo bench --bench cursor_build` を実行し、bencher 形式で出力 → artifact 保存
 - [ ] 起動時間 / メモリ使用量の actual 測定
 - [ ] リサイズ結果のキャッシュ（102 枚生成の最適化）
 
