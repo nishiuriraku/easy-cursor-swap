@@ -472,7 +472,7 @@
 ### 8-5: CI/CD & ドキュメント
 - [ ] CI/CD パイプライン構築
 - [x] README / LICENSE 整備
-- [ ] v1.0 の既知制約を README に明記:
+- [x] v1.0 の既知制約を README に明記 (README.md + README.ja.md):
   - `.ani` 新規生成不可
   - ライブプレビューなし
   - Undo なし
@@ -565,7 +565,7 @@
 7. **Phase 5-11: WCAG AA 準拠** — コントラスト 4.5:1 検証 / キーボードナビ / ARIA ラベル
 8. ~~**Phase 2-1 残: ユーザー向けの復旧 UI**~~ ✅ 完了 — `ConfigRecoveryPanel.vue` が設定 General セクションにバックアップ一覧 + 復旧ボタンを提供
 9. **Phase 6-1 残: `.cursorpack` 内画像メタデータパージ強化** — Exif / トラッキングデータの除去
-10. **README ja/en 整備** — v1.0 既知制約の明記、サポート OS / RDP 動作対象外の警告
+10. ~~**README ja/en 整備**~~ ✅ 完了 — README.md (英語) + README.ja.md (日本語)、v1.0 既知制約・RDP 警告・セキュリティモデル・サブミットフロー明記
 
 ### 完了済み主要マイルストーン (記録)
 

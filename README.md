@@ -1,52 +1,193 @@
-# 🖱️ CursorForge
+# CursorForge
 
-**次世代マウスカーソル管理ツール** - Windows 専用
+**Next-generation mouse cursor manager for Windows**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%2022H2%2B-blue)](https://github.com/cursorforge/cursor-forge)
+[![Tauri](https://img.shields.io/badge/Tauri-v2-orange)](https://tauri.app)
 
-## ✨ 特徴
+[日本語版 README はこちら](README.ja.md)
 
-- 🎨 **簡単なカーソル管理** - .cursorpack をドラッグ＆ドロップするだけ
-- 🔄 **ダークモード自動切替** - テーマ A/B のペアリングで自動対応
-- 📐 **高DPI完全対応** - 6サイズ自動生成でピクセルパーフェクト
-- 🎯 **全17役割サポート** - Windows の全カーソル種類に対応
-- 🔒 **セキュリティ多層防御** - Ed25519署名、Magic Byte検証
-- 🚨 **パニックボタン** - いつでも Windows 既定に戻せる安心設計
-- 💾 **アンインストール耐性** - カーソルは削除されません
+---
 
-## 🚀 クイックスタート
+CursorForge is a Windows-only desktop application for managing custom mouse cursor themes.
+It lets you import, create, and switch cursor themes as `.cursorpack` files, with full support
+for all 17 Windows cursor roles, 6 DPI sizes, Ed25519-signed theme distribution, and automatic
+dark/light mode switching.
 
-### 必要なもの
-- Windows 10 22H2 以降 / Windows 11
-- [Rust](https://rustup.rs/) (最新安定版)
+## Features
+
+- **Theme library** — Import `.cursorpack` files by drag-and-drop or file dialog; browse, filter, and sort your collection
+- **One-click apply** — Writes all 17 cursor slots × 6 resolutions to the registry with atomic snapshot/rollback
+- **Creator mode** — Build cursor themes from PNG/SVG images; assign hotspots; export signed `.cursorpack` files
+- **Dark mode auto-switch** — Pair two themes with OS light/dark state; switches automatically without user action
+- **Official index** — Browse and install Ed25519-verified themes from the curated community index
+- **Panic button** — One-click restore to Windows default or the pre-install snapshot, at any time
+- **Tray resident** — Runs silently in the system tray; optional silent launch on OS startup
+- **Security hardened** — Ed25519 signatures, ZIP bomb protection, magic byte validation, path traversal prevention, SVG sanitisation, PNG metadata stripping
+- **Auto-update** — Background update delivery via signed Tauri Updater; major-version jumps require manual confirmation
+
+## System Requirements
+
+| Requirement | Minimum |
+|---|---|
+| OS | Windows 10 22H2 (build 19045) or Windows 11 |
+| Architecture | x64 (ARM64 planned) |
+| WebView2 | Evergreen runtime (built-in on Windows 11; auto-installed on Windows 10) |
+| Disk space | ~30 MB for the installer; ~100 MB typical for a theme library |
+
+> **Not supported:** Remote Desktop (RDP), Citrix, Windows Server, UAC Secure Desktop,
+> lock screen, and multi-user simultaneous sessions.
+
+## Installation
+
+Download the latest installer from the
+[Releases page](https://github.com/cursorforge/cursor-forge/releases):
+
+| File | Description |
+|---|---|
+| `CursorForge_x64-setup.exe` | NSIS installer (per-user, no admin required) |
+| `CursorForge_x64_en-US.msi` | MSI installer |
+
+Both are signed with a minisign key (verified by the built-in updater).
+See [docs/signing.md](docs/signing.md) for signature verification instructions.
+
+> **SmartScreen notice:** Until the installer accumulates enough download reputation,
+> Windows SmartScreen may show an "Unknown publisher" warning.
+> Click **More info → Run anyway** to proceed.
+> The app is distributed from a verified publisher via
+> [SignPath.io Foundation](https://about.signpath.io/foundation).
+
+## Development Setup
+
+### Prerequisites
+
+- [Rust](https://rustup.rs/) (stable, 1.77.2+)
 - [Node.js](https://nodejs.org/) 20+
-- WebView2 (Windows 11 は標準搭載)
+- [WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) (Windows 11 includes this)
 
-### 開発環境セットアップ
+### Quick start
 
 ```bash
-# リポジトリのクローン
-git clone https://github.com/your-username/cursor-forge.git
+git clone https://github.com/cursorforge/cursor-forge.git
 cd cursor-forge
-
-# 依存関係のインストール
 npm install
 
-# 開発サーバー起動
+# Run in development mode (Tauri dev window + Nuxt HMR)
 npx tauri dev
+
+# Type-check Rust only
+cargo check --manifest-path src-tauri/Cargo.toml
+
+# Run Rust tests
+cargo test --manifest-path src-tauri/Cargo.toml
+
+# Production build → generates .msi + .exe in src-tauri/target/release/bundle/
+npx tauri build
 ```
 
-## 📖 ドキュメント
+### Project structure
 
-詳細な仕様は [開発仕様書](docs/SPEC.md) を参照してください。
+```
+cursor-forge/
+├── app/                        # Nuxt 4 frontend (SPA mode)
+│   ├── assets/css/             # Design tokens + global CSS
+│   ├── components/             # Vue SFCs (Composition API + <script setup>)
+│   ├── composables/            # Shared reactive logic (useThemes, useAppConfig, …)
+│   ├── locales/                # i18n keys: ja.ts / en.ts (must stay in parity)
+│   ├── pages/                  # Route pages (index, creator, marketplace, settings, …)
+│   └── types/                  # TypeScript interfaces for IPC payloads
+├── src-tauri/                  # Tauri + Rust backend
+│   ├── src/
+│   │   ├── main.rs             # Entry point: tray, dark-mode watcher, health check
+│   │   ├── lib.rs              # Module declarations
+│   │   ├── commands.rs         # Tauri IPC command handlers (~25 endpoints)
+│   │   ├── config.rs           # Config manager (RwLock, schema migration, backups)
+│   │   ├── cursor.rs           # PNG → .cur binary generation (6 sizes, hotspot)
+│   │   ├── registry.rs         # HKCU registry read/write, SPI_SETCURSORS
+│   │   ├── theme.rs            # Theme manager (.cursorpack import/export)
+│   │   ├── marketplace.rs      # HTTP index fetch, SHA-256 + Ed25519 verification
+│   │   ├── keystore.rs         # Ed25519 key generation, DPAPI encryption
+│   │   ├── health.rs           # Startup failure counter, rollback detection
+│   │   └── …                   # darkmode, tray, logging, backup, accessibility, …
+│   ├── benches/                # Criterion micro-benchmarks
+│   ├── Cargo.toml
+│   └── tauri.conf.json
+├── docs/                       # Architecture, security, distribution, signing docs
+├── scripts/marketplace/        # validate.mjs — CI validation for index submissions
+└── .github/workflows/          # ci.yml / performance.yml / marketplace-validate.yml
+```
 
-## ⚠️ 既知の制限事項
+## Architecture
 
-- **UAC Secure Desktop** (昇格ダイアログ表示中) では Windows 標準カーソルに戻ります
-- **ロックスクリーン / サインイン画面** でも Windows 標準カーソルとなります
-- **マルチユーザー環境** ではユーザーごとに独立した設定になります
-- **リモートデスクトップ (RDP)** 環境は動作対象外です
+CursorForge uses a layered architecture where **Rust is the single source of truth** for all
+system state:
 
-## 📜 ライセンス
+```
+Vue (UI) ──IPC──▶ Tauri commands ──▶ Rust modules ──▶ Windows registry / filesystem
+```
 
-MIT License - 詳細は [LICENSE](LICENSE) を参照してください。
+- The frontend communicates exclusively through typed IPC commands (`invoke()`).
+- All registry writes are transactional: a snapshot is saved before each apply, and
+  automatically rolled back on crash (detected on next startup via a pending-snapshot file).
+- Cursor files live in `%USERPROFILE%\.custom_cursors\` and survive uninstallation.
+
+See [docs/02_architecture_and_core.md](docs/02_architecture_and_core.md) for details.
+
+## Security Model
+
+| Layer | Mechanism |
+|---|---|
+| Theme integrity | Ed25519 signatures (ed25519-dalek), key_id = SHA-256[:16] of public key |
+| Private key storage | Windows DPAPI (`CryptProtectData`) — tied to the user account |
+| Key export | XChaCha20-Poly1305 + Argon2id passphrase encryption (`.cfkey` format) |
+| Download safety | SHA-256 hash check + 50 MB / 200 MB / 10 MB three-stage size limits |
+| Archive safety | Path traversal prevention, symlink rejection, ZIP bomb detection |
+| Image safety | PNG metadata stripping (eXIf, iTXt, zTXt), SVG sanitisation |
+| Transport | rustls-tls (no OS TLS stack dependency) |
+
+See [docs/03_security_and_ecosystem.md](docs/03_security_and_ecosystem.md) for the full model.
+
+## Submitting Themes to the Official Index
+
+1. Create a cursor theme in Creator mode and export a signed `.cursorpack`.
+2. Upload the file to a GitHub Release (or any stable CDN URL).
+3. In CursorForge, go to **Index → Submit to Index**, fill in your GitHub username and the
+   download URL, preview the entry JSON, then click **Open GitHub PR**.
+4. The app opens GitHub's web editor pre-filled with your `entries/{id}.json`.
+5. After the PR is merged, the CI pipeline validates the signature, SHA-256 hash, and
+   VirusTotal scan before the entry appears in the public index.
+
+See [docs/key_rotation.md](docs/key_rotation.md) if you need to rotate your signing key.
+
+## Known Limitations (v1.0)
+
+| Limitation | Notes |
+|---|---|
+| No `.ani` authoring | Animated cursors can be imported but not created |
+| No live preview | Changes are applied immediately to the registry; no preview mode |
+| No undo | Apply is intentionally one-way; use the panic button to restore |
+| Dark mode only for auto-switch | Auto-switch is tied to the OS dark/light toggle only |
+| UAC Secure Desktop | Shows Windows built-in cursors during elevated dialogs |
+| Lock screen / sign-in screen | Shows Windows built-in cursors |
+| Multi-user sessions | Each Windows user account has independent cursor settings |
+| Remote Desktop (RDP) | Not supported; cursor rendering is controlled by the RDP host |
+| ARM64 | Not yet tested; x64 binary runs via emulation on ARM64 Windows |
+
+## Contributing
+
+Pull requests are welcome. Before submitting:
+
+1. Run the verification gate: `cargo check` + `cargo test` + `npx tauri build`
+2. Keep i18n keys in parity: run `node scripts/check-i18n.mjs` (must exit 0)
+3. Follow the coding conventions in [CLAUDE.md](CLAUDE.md):
+   - Rust comments in Japanese
+   - Vue: Composition API + `<script setup>`
+   - CSS: Vanilla CSS (no Tailwind)
+   - No `v-html` (XSS prevention)
+
+See [docs/04_implementation_guide.md](docs/04_implementation_guide.md) for the full development workflow.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
