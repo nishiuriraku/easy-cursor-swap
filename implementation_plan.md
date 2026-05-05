@@ -1,5 +1,34 @@
 # 🖱️ CursorForge - 実装計画 v2
 
+---
+
+## 🛠️ 実装手順 (毎回厳守)
+
+> [!IMPORTANT]
+> 1 機能 = 1 コミット。下記の検証ゲートを **すべて** 通過するまでコミットしない。
+
+### ステップ
+1. **タスク選定**: 「次回セッションでの優先タスク」または「優先度の高いギャップ」から 1 つ選択
+2. **実装**: コードを編集 (Rust / Vue / 設定ファイル等)
+3. **検証ゲート (全部 PASS 必須)**:
+    - `cargo check --manifest-path src-tauri/Cargo.toml` → エラー0
+    - `cargo test --manifest-path src-tauri/Cargo.toml` → 全テスト PASS
+    - `npm run tauri:build` → MSI/NSIS バンドルまで成功
+       - ※ コード署名鍵が無いため `WARN skipping code signing` は許容
+       - ※ フロントエンドのみの変更でも `tauri:build` で最終確認
+4. **計画更新**: `implementation_plan.md` の該当 Phase / 「次回セッションでの優先タスク」/ 「優先度の高いギャップ」を更新
+5. **コミット**: 日本語コミットメッセージ。`feat:` / `fix:` / `perf:` / `chore:` 等の prefix。
+6. **次タスクへ**: 1 に戻る
+
+### コーディング規約
+- Rust コードのコメントは日本語
+- Vue は Composition API + `<script setup>`
+- CSS は Vanilla CSS (Tailwind 不使用)
+- `v-html` 禁止 (XSS 対策、render 関数 + `h('svg', { innerHTML })` で代替)
+- i18n キー: `ja.ts` / `en.ts` 完全一致 (parity check スクリプトで検証)
+
+---
+
 ## 技術スタック
 
 | レイヤー | 技術 | 役割 |
@@ -517,7 +546,7 @@
 7. **🪝 鍵ローテーション PR テンプレ** — `cursorforge/index` 側の `authors/{user}.json` 編集ガイド
 8. **🚀 v1→v2 メジャー跨ぎ判定 + 3 回連続失敗ロールバック** — Phase 8-4 残
 9. **🦠 SVG 以外の画像メタデータパージ** — PNG Exif / iTXt の除去強化 (Phase 6-1 残)
-10. **🌐 設定セクション本文の i18n 残置換** — 各セクション説明文 (現状は dynamic な短い説明のみ)
+10. ~~**🌐 設定セクション本文の i18n 残置換**~~ ✅ 完了 (98 キー追加 / 8 セクション全文 + ダイアログ + ステータス)
 11. **🆘 GUI 復旧フロー** — config マイグレーション失敗時に「最新バックアップから復元」ボタン提供
 
 ---
@@ -549,7 +578,7 @@
 | Phase 6-4 | ✅ .cursorprofile フルバックアップ |
 | Phase 7-1 | ✅ ロギング (日次ローテ / 14 日保持 / 100MB 上限 / PII redaction + URL short_hash) |
 | Phase 7-2 | ✅ 通知 3 層配線 + AppUserModelID 登録 |
-| Phase 7-3 | ✅ i18n 基盤 + 全画面配線 (177 キー / ja-en parity) |
+| Phase 7-3 | ✅ i18n 基盤 + 全画面配線 (275 キー / ja-en parity / 設定 8 セクション全文配線) |
 | Phase 8-1 | 🔄 CI 雛形 + criterion ベンチ + リサイズキャッシュ (実測値の数値目標検証は残) |
 | Phase 8-4 | 🔄 Tauri Updater 配線完了 (公開鍵発行 + ロールバック検出は残) |
 | Phase 9-1/9-3 | ✅ クライアント側検証 (HTTPS / SHA-256 / Ed25519 / ZIP 展開) |

@@ -7,7 +7,7 @@
 //!  - `.cursorprofile` = 個人バックアップ (設定 + 全テーマ)
 //!
 //! 構造:
-//! ```
+//! ```text
 //! profile.json            ← AppConfig 全体 + schema_version
 //! cursors/<UUID>/...      ← ~/.custom_cursors/<UUID>/ をそのまま
 //! ```

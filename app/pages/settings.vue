@@ -30,19 +30,19 @@ type SectionId =
 
 interface SectionDef {
   id: SectionId
-  label: string
+  labelKey: string
   icon: string
 }
 
 const SECTIONS: SectionDef[] = [
-  { id: 'general', label: '一般', icon: 'Settings' },
-  { id: 'startup', label: '起動・常駐', icon: 'Logo' },
-  { id: 'library', label: 'テーマライブラリ', icon: 'Library' },
-  { id: 'security', label: 'セキュリティ', icon: 'Shield' },
-  { id: 'keys', label: '署名鍵 (Ed25519)', icon: 'Pkg' },
-  { id: 'logging', label: 'ログ・診断', icon: 'Sort' },
-  { id: 'updates', label: 'アップデート', icon: 'Import' },
-  { id: 'about', label: 'About', icon: 'Globe' },
+  { id: 'general', labelKey: 'settings.sectionGeneral', icon: 'Settings' },
+  { id: 'startup', labelKey: 'settings.sectionStartup', icon: 'Logo' },
+  { id: 'library', labelKey: 'settings.sectionLibrary', icon: 'Library' },
+  { id: 'security', labelKey: 'settings.sectionSecurity', icon: 'Shield' },
+  { id: 'keys', labelKey: 'settings.sectionKeys', icon: 'Pkg' },
+  { id: 'logging', labelKey: 'settings.sectionLogging', icon: 'Sort' },
+  { id: 'updates', labelKey: 'settings.sectionUpdates', icon: 'Import' },
+  { id: 'about', labelKey: 'settings.sectionAbout', icon: 'Globe' },
 ]
 
 const section = ref<SectionId>('general')
@@ -92,9 +92,12 @@ async function onCheckUpdate() {
   updaterMessage.value = null
   const info = await checkForUpdate()
   if (info) {
-    updaterMessage.value = `新しいバージョン v${info.version} が利用可能です (現在: v${info.currentVersion})`
+    updaterMessage.value = t('settings.updateNewVersion', {
+      version: info.version,
+      current: info.currentVersion,
+    })
   } else {
-    updaterMessage.value = '最新バージョンを使用中です'
+    updaterMessage.value = t('settings.updateUpToDate')
   }
 }
 
@@ -102,10 +105,10 @@ async function onDownloadUpdate() {
   updaterMessage.value = null
   const ok = await downloadUpdate()
   if (ok) {
-    updaterMessage.value = 'ダウンロード完了。再起動して反映します。'
+    updaterMessage.value = t('settings.updateDownloadComplete')
     const { ask } = await import('@tauri-apps/plugin-dialog')
-    const restart = await ask('アプリを再起動して新バージョンを適用しますか？', {
-      title: 'アップデート完了',
+    const restart = await ask(t('settings.updateRelaunchAsk'), {
+      title: t('settings.updateRelaunchTitle'),
       kind: 'info',
     })
     if (restart) await relaunchApp()
@@ -195,9 +198,11 @@ async function exportProfile() {
     })
     if (!target) return
     await invokeTauri<void>('export_profile', { path: target })
-    profileMessage.value = `エクスポート完了: ${target}`
+    profileMessage.value = t('settings.profileExportSuccess', { target })
   } catch (err) {
-    profileMessage.value = `エクスポート失敗: ${err instanceof Error ? err.message : String(err)}`
+    profileMessage.value = t('settings.profileExportFail', {
+      error: err instanceof Error ? err.message : String(err),
+    })
   } finally {
     profileBusy.value = false
   }
@@ -213,17 +218,19 @@ async function importProfile() {
       filters: [{ name: 'CursorForge Profile', extensions: ['cursorprofile'] }],
     })
     if (!selected || Array.isArray(selected)) return
-    const overwrite = await ask(
-      '既存テーマを完全に上書きしますか？\n「いいえ」でマージモード (新規分のみ反映) になります。',
-      { title: 'プロファイル復元モード', kind: 'warning' },
-    )
+    const overwrite = await ask(t('settings.profileImportAskMsg'), {
+      title: t('settings.profileImportAskTitle'),
+      kind: 'warning',
+    })
     await invokeTauri<unknown>('import_profile', { path: selected, merge: !overwrite })
-    profileMessage.value = `インポート完了: ${selected}`
+    profileMessage.value = t('settings.profileImportSuccess', { target: selected })
     // 設定の再読み込み
     await loadConfig()
     applyConfigToLocal()
   } catch (err) {
-    profileMessage.value = `インポート失敗: ${err instanceof Error ? err.message : String(err)}`
+    profileMessage.value = t('settings.profileImportFail', {
+      error: err instanceof Error ? err.message : String(err),
+    })
   } finally {
     profileBusy.value = false
   }
@@ -235,10 +242,10 @@ async function onKeystoreGenerate() {
 async function onKeystoreRegenerate() {
   // 既存鍵を上書き再生成。ユーザーには事前に dialog::ask で確認。
   const { ask } = await import('@tauri-apps/plugin-dialog')
-  const proceed = await ask(
-    '既存の鍵ペアを破棄して新しい鍵を生成します。\n既存の署名済みテーマは検証できなくなる可能性があります。',
-    { title: '鍵を再生成', kind: 'warning' },
-  )
+  const proceed = await ask(t('settings.askRegenerateMsg'), {
+    title: t('settings.askRegenerateTitle'),
+    kind: 'warning',
+  })
   if (proceed) await generateKeystore(true)
 }
 async function onPassphraseConfirm(passphrase: string) {
@@ -254,7 +261,7 @@ async function onPassphraseConfirm(passphrase: string) {
     if (!target) return
     const written = await exportPrivateKey(passphrase, target)
     if (written !== null) {
-      keystoreMessage.value = `秘密鍵をエクスポートしました (${written} bytes) → ${target}`
+      keystoreMessage.value = t('settings.keyExportSuccess', { size: written, target })
     }
   } else {
     const { open } = await import('@tauri-apps/plugin-dialog')
@@ -265,7 +272,7 @@ async function onPassphraseConfirm(passphrase: string) {
     if (!selected || Array.isArray(selected)) return
     const result = await importPrivateKey(passphrase, selected)
     if (result) {
-      keystoreMessage.value = `秘密鍵をインポートしました key_id=${result.key_id ?? '?'}`
+      keystoreMessage.value = t('settings.keyImportSuccess', { keyId: result.key_id ?? '?' })
     }
   }
 }
@@ -280,10 +287,10 @@ function onKeystoreImport() {
 
 async function onKeystoreDelete() {
   const { ask } = await import('@tauri-apps/plugin-dialog')
-  const proceed = await ask(
-    '鍵ペアを削除します。署名機能は利用できなくなります。',
-    { title: '鍵を削除', kind: 'warning' },
-  )
+  const proceed = await ask(t('settings.askDeleteMsg'), {
+    title: t('settings.askDeleteTitle'),
+    kind: 'warning',
+  })
   if (proceed) await removeKeystore()
 }
 
@@ -320,7 +327,7 @@ function selectSection(id: SectionId) {
       <div class="bcrumb">
         <span class="crumb">{{ t('settings.breadcrumb') }}</span>
         <span class="sep">/</span>
-        <span class="crumb active">{{ currentSection.label }}</span>
+        <span class="crumb active">{{ t(currentSection.labelKey) }}</span>
       </div>
       <div class="search" style="max-width: 280px">
         <UiIcon name="Search" :size="14" style="color: var(--fg-mute)" />
@@ -341,7 +348,7 @@ function selectSection(id: SectionId) {
     <!-- 2 カラム: 設定サイドナビ + コンテンツ -->
     <div class="settings-grid">
       <nav class="settings-sidenav">
-        <h6 class="nav-title">Preferences</h6>
+        <h6 class="nav-title">{{ t('settings.navTitle') }}</h6>
         <button
           v-for="s in SECTIONS"
           :key="s.id"
@@ -349,7 +356,7 @@ function selectSection(id: SectionId) {
           @click="selectSection(s.id)"
         >
           <UiIcon :name="s.icon" />
-          <span>{{ s.label }}</span>
+          <span>{{ t(s.labelKey) }}</span>
         </button>
       </nav>
 
@@ -357,15 +364,15 @@ function selectSection(id: SectionId) {
         <!-- 一般 -->
         <section v-if="section === 'general'">
           <header class="section-head">
-            <h1>一般</h1>
-            <p>言語、通知、起動時の挙動など、アプリ全体の基本設定。</p>
+            <h1>{{ t('settings.sectionGeneral') }}</h1>
+            <p>{{ t('settings.descGeneral') }}</p>
           </header>
           <div class="prop-section">
-            <div class="prop-head">表示言語</div>
+            <div class="prop-head">{{ t('settings.groupDisplayLanguage') }}</div>
             <div class="prop-body">
               <SettingsRow
-                label="UI 言語"
-                desc="OS のロケールから自動判定。手動で固定可能。"
+                :label="t('settings.languageLabel')"
+                :desc="t('settings.languageDesc')"
               >
                 <select v-model="general.language" class="input" style="width: 140px; height: 32px">
                   <option value="ja">日本語</option>
@@ -376,17 +383,17 @@ function selectSection(id: SectionId) {
           </div>
 
           <div class="prop-section">
-            <div class="prop-head">通知</div>
+            <div class="prop-head">{{ t('settings.groupNotifications') }}</div>
             <div class="prop-body">
               <SettingsRow
-                label="適用結果のトースト表示"
-                desc="Win32 COM 経由の Windows トーストで適用成功/失敗を告知"
+                :label="t('settings.showApplyToastLabel')"
+                :desc="t('settings.showApplyToastDesc')"
               >
                 <SettingsToggle v-model="general.showApplyToast" />
               </SettingsRow>
               <SettingsRow
-                label="OS 標準ポインター影を制御"
-                desc="テーマの requires_os_shadow に従い SPI_SETCURSORSHADOW を呼び出す"
+                :label="t('settings.applyShadowControlLabel')"
+                :desc="t('settings.applyShadowControlDesc')"
               >
                 <SettingsToggle v-model="general.applyShadowControl" />
               </SettingsRow>
@@ -397,24 +404,24 @@ function selectSection(id: SectionId) {
         <!-- 起動・常駐 -->
         <section v-else-if="section === 'startup'">
           <header class="section-head">
-            <h1>起動・常駐</h1>
-            <p>OS 起動時の自動実行とトレイ常駐の挙動。</p>
+            <h1>{{ t('settings.sectionStartup') }}</h1>
+            <p>{{ t('settings.descStartup') }}</p>
           </header>
           <div class="prop-section">
             <div class="prop-head">
-              自動起動
-              <span class="head-hint">HKCU\…\Run</span>
+              {{ t('settings.groupAutoStart') }}
+              <span class="head-hint">{{ t('settings.autoStartHint') }}</span>
             </div>
             <div class="prop-body">
               <SettingsRow
-                label="OS 起動時にサイレントで起動"
-                desc="メイン画面は出さず、トレイのみで常駐 (ダークモード自動切替を有効化)"
+                :label="t('settings.autoStartLabel')"
+                :desc="t('settings.autoStartDesc')"
               >
                 <SettingsToggle v-model="startup.autoStart" />
               </SettingsRow>
               <SettingsRow
-                label="メイン画面を最小化で起動"
-                desc="ユーザー起動時もウィンドウを表示せずトレイへ"
+                :label="t('settings.startMinimizedLabel')"
+                :desc="t('settings.startMinimizedDesc')"
               >
                 <SettingsToggle v-model="startup.startMinimized" />
               </SettingsRow>
@@ -425,15 +432,15 @@ function selectSection(id: SectionId) {
         <!-- ライブラリ -->
         <section v-else-if="section === 'library'">
           <header class="section-head">
-            <h1>テーマライブラリ</h1>
-            <p>~/.custom_cursors/ のストレージ警告と .cursorprofile バックアップ。</p>
+            <h1>{{ t('settings.sectionLibrary') }}</h1>
+            <p>{{ t('settings.descLibrary') }}</p>
           </header>
           <div class="prop-section">
-            <div class="prop-head">ストレージ警告</div>
+            <div class="prop-head">{{ t('settings.groupStorageWarning') }}</div>
             <div class="prop-body">
               <SettingsRow
-                label="合計サイズの警告閾値"
-                desc="超過時にトレイ通知でテーマ削除 UI へ誘導 (強制削除はしません)"
+                :label="t('settings.storageThresholdLabel')"
+                :desc="t('settings.storageThresholdDesc')"
               >
                 <select v-model.number="library.totalLimitWarnGb" class="input" style="width: 100px; height: 32px">
                   <option :value="0.5">0.5 GB</option>
@@ -443,8 +450,8 @@ function selectSection(id: SectionId) {
                 </select>
               </SettingsRow>
               <SettingsRow
-                label="警告を有効化"
-                desc="OFF にすると合計サイズの監視が停止します"
+                :label="t('settings.storageWarnEnabledLabel')"
+                :desc="t('settings.storageWarnEnabledDesc')"
               >
                 <SettingsToggle v-model="library.storageWarnEnabled" />
               </SettingsRow>
@@ -453,26 +460,26 @@ function selectSection(id: SectionId) {
 
           <div class="prop-section">
             <div class="prop-head">
-              .cursorprofile バックアップ
-              <span class="head-hint">設定 + 全テーマの Zip</span>
+              {{ t('settings.groupProfileBackup') }}
+              <span class="head-hint">{{ t('settings.profileBackupHint') }}</span>
             </div>
             <div class="prop-body">
               <SettingsRow
-                label="現在の設定とテーマを書き出し"
-                desc="PC 移行 / OS 再インストール時の復元用 Zip を生成"
+                :label="t('settings.profileExportLabel')"
+                :desc="t('settings.profileExportDesc')"
               >
                 <button class="btn" :disabled="profileBusy" @click="exportProfile">
                   <span v-if="profileBusy" class="spinner" style="width: 13px; height: 13px" />
-                  <UiIcon v-else name="Export" :size="13" />エクスポート
+                  <UiIcon v-else name="Export" :size="13" />{{ t('common.export') }}
                 </button>
               </SettingsRow>
               <SettingsRow
-                label="バックアップから復元"
-                desc=".cursorprofile ファイルを読み込んで設定とテーマをマージ / 上書き"
+                :label="t('settings.profileImportLabel')"
+                :desc="t('settings.profileImportDesc')"
               >
                 <button class="btn" :disabled="profileBusy" @click="importProfile">
                   <span v-if="profileBusy" class="spinner" style="width: 13px; height: 13px" />
-                  <UiIcon v-else name="Import" :size="13" />インポート
+                  <UiIcon v-else name="Import" :size="13" />{{ t('common.import') }}
                 </button>
               </SettingsRow>
               <div v-if="profileMessage" class="profile-msg">{{ profileMessage }}</div>
@@ -483,21 +490,21 @@ function selectSection(id: SectionId) {
         <!-- セキュリティ -->
         <section v-else-if="section === 'security'">
           <header class="section-head">
-            <h1>セキュリティ</h1>
-            <p>署名検証、未署名テーマの扱い、検証閾値。</p>
+            <h1>{{ t('settings.sectionSecurity') }}</h1>
+            <p>{{ t('settings.descSecurity') }}</p>
           </header>
           <div class="prop-section">
-            <div class="prop-head">テーマ検証</div>
+            <div class="prop-head">{{ t('settings.groupThemeVerify') }}</div>
             <div class="prop-body">
               <SettingsRow
-                label="署名済みテーマのみインポート許可"
-                desc="未署名 .cursorpack を完全にブロック (公式インデックス由来のみ許可)"
+                :label="t('settings.requireSignedLabel')"
+                :desc="t('settings.requireSignedDesc')"
               >
                 <SettingsToggle v-model="security.requireSignedThemes" />
               </SettingsRow>
               <SettingsRow
-                label="未署名テーマのインポート時に警告"
-                desc="ローカルファイルから取り込む際に強警告ダイアログを表示"
+                :label="t('settings.warnUnsignedLabel')"
+                :desc="t('settings.warnUnsignedDesc')"
               >
                 <SettingsToggle v-model="security.warnUnsignedImport" />
               </SettingsRow>
@@ -508,23 +515,23 @@ function selectSection(id: SectionId) {
         <!-- 署名鍵 -->
         <section v-else-if="section === 'keys'">
           <header class="section-head">
-            <h1>署名鍵 (Ed25519)</h1>
-            <p>クリエイターとしてテーマに署名する Ed25519 鍵の管理。秘密鍵は DPAPI 暗号化で保存。</p>
+            <h1>{{ t('settings.sectionKeys') }}</h1>
+            <p>{{ t('settings.descKeys') }}</p>
           </header>
           <div class="prop-section">
             <div class="prop-head">
-              鍵ペア
-              <span class="head-hint">~/.custom_cursors/_keys/</span>
+              {{ t('settings.groupKeyPair') }}
+              <span class="head-hint">{{ t('settings.keyPairHint') }}</span>
             </div>
             <div class="prop-body">
               <template v-if="keystoreInfo.has_keypair">
-                <SettingsRow label="key_id (公開鍵 SHA-256 先頭 16 文字)" mono>
+                <SettingsRow :label="t('settings.keyIdLabel')" mono>
                   <span class="tag ok">{{ keystoreInfo.key_id ?? '—' }}</span>
                 </SettingsRow>
                 <SettingsRow
                   v-if="keystoreInfo.public_key_b64"
-                  label="公開鍵 (Base64)"
-                  desc="Marketplace の authors/{user}.json に登録する値"
+                  :label="t('settings.publicKeyLabel')"
+                  :desc="t('settings.publicKeyDesc')"
                   mono
                 >
                   <span class="tag" style="max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block;">
@@ -532,47 +539,47 @@ function selectSection(id: SectionId) {
                   </span>
                 </SettingsRow>
                 <SettingsRow
-                  label="秘密鍵をエクスポート"
-                  desc="パスフレーズで暗号化したバックアップ (.cfkey)"
+                  :label="t('settings.exportPrivateLabel')"
+                  :desc="t('settings.exportPrivateDesc')"
                 >
                   <button class="btn" :disabled="keystoreBusy" @click="onKeystoreExport">
-                    <UiIcon name="Export" :size="13" />エクスポート
+                    <UiIcon name="Export" :size="13" />{{ t('common.export') }}
                   </button>
                 </SettingsRow>
                 <SettingsRow
-                  label="鍵を再生成"
-                  desc="既存テーマの署名は検証不能になります"
+                  :label="t('settings.regenerateLabel')"
+                  :desc="t('settings.regenerateDesc')"
                 >
                   <button class="btn danger" :disabled="keystoreBusy" @click="onKeystoreRegenerate">
                     <span v-if="keystoreBusy" class="spinner" style="width: 13px; height: 13px" />
-                    <UiIcon v-else name="Alert" :size="13" />再生成
+                    <UiIcon v-else name="Alert" :size="13" />{{ t('settings.btnRegenerate') }}
                   </button>
                 </SettingsRow>
                 <SettingsRow
-                  label="鍵ペアを削除"
-                  desc="署名機能を停止。再度生成すれば key_id は変わります"
+                  :label="t('settings.deleteKeyLabel')"
+                  :desc="t('settings.deleteKeyDesc')"
                 >
                   <button class="btn danger" :disabled="keystoreBusy" @click="onKeystoreDelete">
-                    <UiIcon name="X" :size="13" />削除
+                    <UiIcon name="X" :size="13" />{{ t('common.delete') }}
                   </button>
                 </SettingsRow>
               </template>
               <template v-else>
                 <SettingsRow
-                  label="鍵ペアを生成"
-                  desc="Ed25519 鍵ペアを生成し、秘密鍵を DPAPI で暗号化保存"
+                  :label="t('settings.generateLabel')"
+                  :desc="t('settings.generateDesc')"
                 >
                   <button class="btn primary" :disabled="keystoreBusy" @click="onKeystoreGenerate">
                     <span v-if="keystoreBusy" class="spinner" style="width: 13px; height: 13px" />
-                    <UiIcon v-else name="Plus" :size="13" />鍵を生成
+                    <UiIcon v-else name="Plus" :size="13" />{{ t('settings.btnGenerate') }}
                   </button>
                 </SettingsRow>
                 <SettingsRow
-                  label="既存秘密鍵をインポート"
-                  desc="他 PC で生成した .cfkey ファイルをパスフレーズ付きで取り込み"
+                  :label="t('settings.importExistingLabel')"
+                  :desc="t('settings.importExistingDesc')"
                 >
                   <button class="btn" :disabled="keystoreBusy" @click="onKeystoreImport">
-                    <UiIcon name="Import" :size="13" />インポート
+                    <UiIcon name="Import" :size="13" />{{ t('common.import') }}
                   </button>
                 </SettingsRow>
               </template>
@@ -587,13 +594,13 @@ function selectSection(id: SectionId) {
         <!-- ログ -->
         <section v-else-if="section === 'logging'">
           <header class="section-head">
-            <h1>ログ・診断</h1>
-            <p>%LOCALAPPDATA%\CursorForge\logs\ に保存されるログの保持と粒度。</p>
+            <h1>{{ t('settings.sectionLogging') }}</h1>
+            <p>{{ t('settings.descLogging') }}</p>
           </header>
           <div class="prop-section">
-            <div class="prop-head">ログ出力</div>
+            <div class="prop-head">{{ t('settings.groupLogOutput') }}</div>
             <div class="prop-body">
-              <SettingsRow label="ログレベル" desc="リリース版は INFO 推奨。トラブル時は DEBUG へ">
+              <SettingsRow :label="t('settings.logLevelLabel')" :desc="t('settings.logLevelDesc')">
                 <select v-model="logging.logLevel" class="input" style="width: 140px; height: 32px">
                   <option>TRACE</option>
                   <option>DEBUG</option>
@@ -602,18 +609,18 @@ function selectSection(id: SectionId) {
                   <option>ERROR</option>
                 </select>
               </SettingsRow>
-              <SettingsRow label="保持期間 (日)" desc="超過したログファイルは自動削除">
+              <SettingsRow :label="t('settings.retentionLabel')" :desc="t('settings.retentionDesc')">
                 <input v-model.number="logging.retentionDays" type="number" class="input" min="1" max="365" style="width: 80px" />
               </SettingsRow>
-              <SettingsRow label="合計上限サイズ (MB)" desc="超過時は古いものから削除">
+              <SettingsRow :label="t('settings.maxSizeLabel')" :desc="t('settings.maxSizeDesc')">
                 <input v-model.number="logging.maxSizeMb" type="number" class="input" min="10" max="2048" style="width: 80px" />
               </SettingsRow>
               <SettingsRow
-                label="現在のログフォルダーを開く"
-                desc="エクスプローラーで `%LOCALAPPDATA%\CursorForge\logs\` を開く"
+                :label="t('settings.openLogFolderLabel')"
+                :desc="t('settings.openLogFolderDesc')"
               >
                 <button class="btn">
-                  <UiIcon name="Globe" :size="13" />開く
+                  <UiIcon name="Globe" :size="13" />{{ t('settings.btnOpen') }}
                 </button>
               </SettingsRow>
             </div>
@@ -623,42 +630,42 @@ function selectSection(id: SectionId) {
         <!-- アップデート -->
         <section v-else-if="section === 'updates'">
           <header class="section-head">
-            <h1>アップデート</h1>
-            <p>自動アップデートの有効化と更新チャンネル。メジャーバージョン跨ぎは常に手動。</p>
+            <h1>{{ t('settings.sectionUpdates') }}</h1>
+            <p>{{ t('settings.descUpdates') }}</p>
           </header>
           <div class="prop-section">
-            <div class="prop-head">自動アップデート</div>
+            <div class="prop-head">{{ t('settings.groupAutoUpdate') }}</div>
             <div class="prop-body">
               <SettingsRow
-                label="バックグラウンド更新を有効化"
-                desc="Tauri Updater で署名検証付きの差分更新を取得"
+                :label="t('settings.autoUpdateLabel')"
+                :desc="t('settings.autoUpdateDesc')"
               >
                 <SettingsToggle v-model="updates.autoUpdate" />
               </SettingsRow>
-              <SettingsRow label="チャンネル" desc="beta は実験機能を含む可能性があります">
+              <SettingsRow :label="t('settings.channelLabel')" :desc="t('settings.channelDesc')">
                 <select v-model="updates.channel" class="input" style="width: 140px; height: 32px">
                   <option value="stable">stable</option>
                   <option value="beta">beta</option>
                 </select>
               </SettingsRow>
-              <SettingsRow label="今すぐ確認">
+              <SettingsRow :label="t('settings.checkNowLabel')">
                 <button class="btn" :disabled="updaterChecking || updaterDownloading" @click="onCheckUpdate">
                   <span v-if="updaterChecking" class="spinner" style="width: 13px; height: 13px" />
                   <UiIcon v-else name="Import" :size="13" />
-                  {{ updaterChecking ? '確認中...' : '更新を確認' }}
+                  {{ updaterChecking ? t('settings.btnChecking') : t('settings.btnCheckUpdate') }}
                 </button>
               </SettingsRow>
               <SettingsRow
                 v-if="updaterAvailable"
-                :label="`v${updaterAvailable.version} へ更新`"
+                :label="t('settings.updateAvailableLabel', { version: updaterAvailable.version })"
                 :desc="updaterAvailable.body ?? ''"
               >
                 <button class="btn primary" :disabled="updaterDownloading" @click="onDownloadUpdate">
                   <span v-if="updaterDownloading" class="spinner" style="width: 13px; height: 13px" />
                   <UiIcon v-else name="Import" :size="13" />
                   {{ updaterDownloading
-                    ? `DL中 ${updaterTotal > 0 ? Math.round((updaterProgress / updaterTotal) * 100) : 0}%`
-                    : 'ダウンロード & インストール' }}
+                    ? t('settings.btnDownloading', { percent: updaterTotal > 0 ? Math.round((updaterProgress / updaterTotal) * 100) : 0 })
+                    : t('settings.btnDownloadInstall') }}
                 </button>
               </SettingsRow>
               <div v-if="updaterMessage" class="profile-msg">{{ updaterMessage }}</div>
@@ -672,27 +679,27 @@ function selectSection(id: SectionId) {
         <!-- About -->
         <section v-else>
           <header class="section-head">
-            <h1>About</h1>
-            <p>バージョン、ライセンス、システム情報。</p>
+            <h1>{{ t('settings.sectionAbout') }}</h1>
+            <p>{{ t('settings.descAbout') }}</p>
           </header>
           <div class="prop-section">
             <div class="prop-head">
-              CursorForge
-              <span class="head-hint">v1.0.0 · MIT License</span>
+              {{ t('app.name') }}
+              <span class="head-hint">{{ t('settings.aboutAppHint', { version: '1.0.0' }) }}</span>
             </div>
             <div class="prop-body">
-              <SettingsRow label="ホームページ" mono>
+              <SettingsRow :label="t('settings.homepageLabel')" mono>
                 <a class="btn ghost" href="https://github.com/cursorforge" target="_blank" rel="noopener">
                   <UiIcon name="Globe" :size="13" />github.com/cursorforge
                 </a>
               </SettingsRow>
-              <SettingsRow label="Issue / バグ報告" mono>
+              <SettingsRow :label="t('settings.issuesLabel')" mono>
                 <a class="btn ghost" href="https://github.com/cursorforge/cursor-forge/issues" target="_blank" rel="noopener">
                   <UiIcon name="Alert" :size="13" />Issues
                 </a>
               </SettingsRow>
-              <SettingsRow label="OSS ライセンス一覧">
-                <button class="btn">表示</button>
+              <SettingsRow :label="t('settings.ossLicenseLabel')">
+                <button class="btn">{{ t('settings.btnView') }}</button>
               </SettingsRow>
             </div>
           </div>
@@ -702,10 +709,10 @@ function selectSection(id: SectionId) {
 
     <AppStatusbar
       :items="[
-        { dot: true, text: `Settings · ${currentSection.label}` },
-        { text: 'config.json schema v3.2' },
+        { dot: true, text: `Settings · ${t(currentSection.labelKey)}` },
+        { text: t('settings.schemaInfo') },
         { text: dirty ? t('settings.unsavedChanges') : t('settings.saved') },
-        ...(saveError ? [{ text: `エラー: ${saveError}` }] : []),
+        ...(saveError ? [{ text: t('settings.statusError', { message: saveError }) }] : []),
       ]"
     />
 
