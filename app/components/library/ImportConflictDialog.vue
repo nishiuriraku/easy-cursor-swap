@@ -85,14 +85,14 @@ function onBackdrop(e: MouseEvent) {
 </script>
 
 <template>
-  <div class="modal-page" role="dialog" aria-modal="true" @click="onBackdrop">
+  <div class="modal-page" role="dialog" aria-modal="true" aria-labelledby="conflict-modal-title" @click="onBackdrop">
     <div class="modal conflict-modal" @click.stop>
       <div class="modal-head">
-        <div class="modal-icon" :style="{ borderColor: `${headerAccent}59`, color: headerAccent, background: `${headerAccent}1f` }">
+        <div class="modal-icon" aria-hidden="true" :style="{ borderColor: `${headerAccent}59`, color: headerAccent, background: `${headerAccent}1f` }">
           <UiIcon name="Alert" :size="20" />
         </div>
         <div style="flex: 1; min-width: 0">
-          <h2>{{ headerLabel }}</h2>
+          <h2 id="conflict-modal-title">{{ headerLabel }}</h2>
           <p>{{ headerDesc }}</p>
         </div>
       </div>

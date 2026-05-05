@@ -353,15 +353,16 @@ function selectSection(id: SectionId) {
 
     <!-- 2 カラム: 設定サイドナビ + コンテンツ -->
     <div class="settings-grid">
-      <nav class="settings-sidenav">
-        <h6 class="nav-title">{{ t('settings.navTitle') }}</h6>
+      <nav class="settings-sidenav" :aria-label="t('settings.navTitle')">
+        <h6 class="nav-title" aria-hidden="true">{{ t('settings.navTitle') }}</h6>
         <button
           v-for="s in SECTIONS"
           :key="s.id"
           :class="['nav-item', { active: section === s.id }]"
+          :aria-current="section === s.id ? 'page' : undefined"
           @click="selectSection(s.id)"
         >
-          <UiIcon :name="s.icon" />
+          <UiIcon :name="s.icon" aria-hidden="true" />
           <span>{{ t(s.labelKey) }}</span>
         </button>
       </nav>

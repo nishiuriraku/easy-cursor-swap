@@ -44,13 +44,13 @@ function onBackdropClick(e: MouseEvent) {
 </script>
 
 <template>
-  <div class="modal-page" role="dialog" aria-modal="true" @click="onBackdropClick">
+  <div class="modal-page" role="dialog" aria-modal="true" aria-labelledby="apply-modal-title" @click="onBackdropClick">
     <div class="modal" @click.stop>
       <!-- ヘッダー -->
       <div class="modal-head">
-        <div class="modal-icon"><UiIcon name="Pkg" :size="20" /></div>
+        <div class="modal-icon" aria-hidden="true"><UiIcon name="Pkg" :size="20" /></div>
         <div style="flex: 1; min-width: 0">
-          <h2>{{ t('apply.title', { name: theme.name }) }}</h2>
+          <h2 id="apply-modal-title">{{ t('apply.title', { name: theme.name }) }}</h2>
           <p>{{ t('apply.description') }}</p>
         </div>
         <span v-if="signedKeyId" class="tag ok">

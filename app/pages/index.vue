@@ -473,39 +473,43 @@ onUnmounted(() => {
       </div>
 
       <!-- フィルタチップ -->
-      <div class="filters">
-        <div class="chips">
+      <div class="filters" role="group" :aria-label="t('common.search')">
+        <div class="chips" role="group" aria-label="フィルター">
           <button
             :class="['chip', { active: filter === 'all' }]"
+            :aria-pressed="filter === 'all'"
             @click="filter = 'all'"
           >
-            {{ t('library.filterAll') }}<span class="num">{{ counts.all }}</span>
+            {{ t('library.filterAll') }}<span class="num" aria-hidden="true">{{ counts.all }}</span>
           </button>
           <button
             :class="['chip', { active: filter === 'favorites' }]"
+            :aria-pressed="filter === 'favorites'"
             @click="filter = 'favorites'"
           >
-            <UiIcon name="Star" :size="11" />{{ t('library.filterFavorites') }}<span class="num">{{ counts.favorites }}</span>
+            <UiIcon name="Star" :size="11" aria-hidden="true" />{{ t('library.filterFavorites') }}<span class="num" aria-hidden="true">{{ counts.favorites }}</span>
           </button>
           <button
             :class="['chip', { active: filter === 'recent' }]"
+            :aria-pressed="filter === 'recent'"
             @click="filter = 'recent'"
           >
-            {{ t('library.filterRecent') }}<span class="num">{{ counts.recent }}</span>
+            {{ t('library.filterRecent') }}<span class="num" aria-hidden="true">{{ counts.recent }}</span>
           </button>
           <button
             :class="['chip', { active: filter === 'unsigned' }]"
+            :aria-pressed="filter === 'unsigned'"
             @click="filter = 'unsigned'"
           >
-            {{ t('library.filterUnsigned') }}<span class="num">{{ counts.unsigned }}</span>
+            {{ t('library.filterUnsigned') }}<span class="num" aria-hidden="true">{{ counts.unsigned }}</span>
           </button>
         </div>
         <div class="spacer-x" />
         <div class="sort">
-          <span class="lbl">{{ t('library.sort') }}</span>
-          <button class="btn ghost" style="height: 28px" @click="cycleSort">
-            <UiIcon name="Sort" :size="13" />{{ sortLabel }}
-            <UiIcon name="ChevD" :size="11" />
+          <span class="lbl" aria-hidden="true">{{ t('library.sort') }}</span>
+          <button class="btn ghost" style="height: 28px" :aria-label="`${t('library.sort')}: ${sortLabel}`" @click="cycleSort">
+            <UiIcon name="Sort" :size="13" aria-hidden="true" />{{ sortLabel }}
+            <UiIcon name="ChevD" :size="11" aria-hidden="true" />
           </button>
         </div>
       </div>

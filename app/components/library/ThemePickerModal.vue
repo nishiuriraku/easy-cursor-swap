@@ -56,17 +56,18 @@ function onBackdrop(e: MouseEvent) {
 </script>
 
 <template>
-  <div class="modal-page" role="dialog" aria-modal="true" @click="onBackdrop">
+  <div class="modal-page" role="dialog" aria-modal="true" aria-labelledby="picker-modal-title" @click="onBackdrop">
     <div class="modal picker-modal" @click.stop>
       <div class="modal-head">
         <div
           class="modal-icon"
+          aria-hidden="true"
           :style="accent ? { background: `${accent}1f`, borderColor: `${accent}59`, color: accent } : {}"
         >
           <UiIcon name="Library" :size="20" />
         </div>
         <div style="flex: 1; min-width: 0">
-          <h2>{{ title ?? 'テーマを選択' }}</h2>
+          <h2 id="picker-modal-title">{{ title ?? 'テーマを選択' }}</h2>
           <p v-if="sub">{{ sub }}</p>
         </div>
         <button class="btn icon" aria-label="閉じる" @click="emit('cancel')">

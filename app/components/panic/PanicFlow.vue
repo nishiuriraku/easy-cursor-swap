@@ -136,14 +136,14 @@ function logMark(s: LogEntry['status']): string {
 
 <template>
   <Transition name="fade">
-    <div v-if="open" class="panic-overlay" role="dialog" aria-modal="true">
+    <div v-if="open" class="panic-overlay" role="dialog" aria-modal="true" aria-labelledby="panic-dialog-title">
       <div class="panic-card">
         <header class="panic-head">
-          <div class="panic-icon">
+          <div class="panic-icon" aria-hidden="true">
             <UiIcon name="Alert" :size="22" />
           </div>
           <div class="panic-title-block">
-            <h2>{{ t('panic.title') }}</h2>
+            <h2 id="panic-dialog-title">{{ t('panic.title') }}</h2>
             <p>{{ t('panic.description') }}</p>
           </div>
           <span class="hotkey">⌃⌥⇧R</span>

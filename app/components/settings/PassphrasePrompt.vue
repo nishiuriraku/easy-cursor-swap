@@ -58,12 +58,12 @@ function confirm() {
 
 <template>
   <Transition name="fade">
-    <div v-if="open" class="modal-page" role="dialog" aria-modal="true" @click.self="close">
+    <div v-if="open" class="modal-page" role="dialog" aria-modal="true" aria-labelledby="passphrase-modal-title" @click.self="close">
       <div class="modal pp-modal">
         <div class="modal-head">
-          <div class="modal-icon"><UiIcon name="Shield" :size="20" /></div>
+          <div class="modal-icon" aria-hidden="true"><UiIcon name="Shield" :size="20" /></div>
           <div style="flex: 1; min-width: 0">
-            <h2>{{ mode === 'export' ? '秘密鍵をエクスポート' : '秘密鍵をインポート' }}</h2>
+            <h2 id="passphrase-modal-title">{{ mode === 'export' ? '秘密鍵をエクスポート' : '秘密鍵をインポート' }}</h2>
             <p>
               {{ mode === 'export'
                 ? 'パスフレーズで暗号化したバックアップを生成します。'

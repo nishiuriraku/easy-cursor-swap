@@ -68,6 +68,9 @@ onUnmounted(() => {
 
 <template>
   <div class="win">
+    <!-- スキップナビゲーション: キーボード / スクリーンリーダー用 -->
+    <a href="#main-content" class="skip-to-content">メインコンテンツへスキップ</a>
+
     <AppTitlebar />
     <EnvironmentBanner />
     <div class="body">
@@ -78,7 +81,7 @@ onUnmounted(() => {
         @update:active="onNavigate"
         @panic="onPanic"
       />
-      <main class="main">
+      <main id="main-content" class="main" tabindex="-1">
         <slot />
       </main>
     </div>

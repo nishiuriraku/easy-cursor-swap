@@ -6,7 +6,9 @@
  */
 import { computed } from 'vue'
 import type { ThemeCardData } from '~/types/theme'
-// UiIcon / CursorMatrix は Nuxt の自動インポートで解決される
+import { useI18n } from '~/composables/useI18n'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   theme: ThemeCardData
@@ -30,12 +32,12 @@ const displayDate = computed(() => {
 </script>
 
 <template>
-  <div :class="['card', { active: theme.isActive }]">
+  <article :class="['card', { active: theme.isActive }]" :aria-label="theme.name">
     <div class="card-preview">
       <div v-if="theme.isActive" class="card-active-tag">
-        <span class="pulse" />ACTIVE
+        <span class="pulse" aria-hidden="true" />{{ t('library.activeTag') }}
       </div>
-      <CursorMatrix :included="theme.includedRoles" />
+      <CursorMatrix :included="theme.includedRoles" :aria-label="t('library.coverage', { filled: theme.includedRoles.length })" />
     </div>
     <div class="card-body">
       <div class="card-row">
@@ -45,37 +47,50 @@ const displayDate = computed(() => {
         </div>
         <button
           :class="['star', { on: theme.isFavorite }]"
-          :aria-label="theme.isFavorite ? 'お気に入り解除' : 'お気に入りに追加'"
+          :aria-label="theme.isFavorite
+            ? t('library.filterFavorites') + 'から削除'
+            : t('library.filterFavorites') + 'に追加'"
+          :aria-pressed="theme.isFavorite"
           @click="emit('toggleFavorite', theme.id)"
         >
-          <UiIcon :name="theme.isFavorite ? 'Star' : 'StarO'" :size="13" />
+          <UiIcon :name="theme.isFavorite ? 'Star' : 'StarO'" :size="13" aria-hidden="true" />
         </button>
       </div>
-      <div class="meta-row">
-        <span class="m"><b>v</b>{{ theme.version }}</span>
-        <span class="m">{{ displayDate }}</span>
-        <span class="m">×{{ theme.applyCount }}</span>
+      <div class="meta-row" aria-label="`${theme.name} v${theme.version}, ${displayDate}`">
+        <span class="m" aria-hidden="true"><b>v</b>{{ theme.version }}</span>
+        <span class="m" aria-hidden="true">{{ displayDate }}</span>
+        <span class="m" aria-hidden="true">×{{ theme.applyCount }}</span>
       </div>
-      <div class="coverage">
-        <div class="bar"><i :style="{ width: coveragePct + '%' }" /></div>
-        <span class="num">{{ theme.includedRoles.length }}/17</span>
+      <div class="coverage" aria-label="カバレッジ {{ theme.includedRoles.length }}/17">
+        <div class="bar" aria-hidden="true"><i :style="{ width: coveragePct + '%' }" /></div>
+        <span class="num" aria-hidden="true">{{ theme.includedRoles.length }}/17</span>
       </div>
       <div class="card-actions">
         <button
           v-if="theme.isActive"
           class="btn"
           disabled
+          :aria-label="`${theme.name} — ${t('common.apply')}済み`"
           style="opacity: 0.6; cursor: default;"
         >
-          <UiIcon name="Check" :size="13" />適用中
+          <UiIcon name="Check" :size="13" aria-hidden="true" />{{ t('common.apply') }}済み
         </button>
-        <button v-else class="btn primary" @click="emit('apply', theme.id)">
-          適用
+        <button
+          v-else
+          class="btn primary"
+          :aria-label="`${theme.name} を${t('common.apply')}`"
+          @click="emit('apply', theme.id)"
+        >
+          {{ t('common.apply') }}
         </button>
-        <button class="btn icon" aria-label="詳細" @click="emit('showDetails', theme.id)">
-          <UiIcon name="ChevD" :size="13" />
+        <button
+          class="btn icon"
+          :aria-label="`${theme.name} の詳細`"
+          @click="emit('showDetails', theme.id)"
+        >
+          <UiIcon name="ChevD" :size="13" aria-hidden="true" />
         </button>
       </div>
     </div>
-  </div>
+  </article>
 </template>

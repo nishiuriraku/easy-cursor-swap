@@ -49,8 +49,8 @@ function navigate(id: string) {
 </script>
 
 <template>
-  <aside class="sidebar">
-    <div class="brand">
+  <aside class="sidebar" :aria-label="t('nav.workspace')">
+    <div class="brand" aria-hidden="true">
       <div class="brand-mark"><UiIcon name="Logo" :size="18" /></div>
       <div class="brand-name">
         {{ t('app.name') }}
@@ -58,42 +58,49 @@ function navigate(id: string) {
       </div>
     </div>
 
-    <div class="nav-section">
-      <h6>{{ t('nav.workspace') }}</h6>
+    <nav :aria-label="t('nav.workspace')">
+      <h6 aria-hidden="true">{{ t('nav.workspace') }}</h6>
       <button
         v-for="it in workspace"
         :key="it.id"
         :class="['nav-item', { active: active === it.id }]"
+        :aria-current="active === it.id ? 'page' : undefined"
         @click="navigate(it.id)"
       >
-        <UiIcon :name="it.icon" />
+        <UiIcon :name="it.icon" aria-hidden="true" />
         <span>{{ it.label }}</span>
-        <span v-if="it.count !== null && it.count !== undefined" class="nav-count">{{ it.count }}</span>
+        <span v-if="it.count !== null && it.count !== undefined" class="nav-count" :aria-label="`${it.count}件`">{{ it.count }}</span>
       </button>
-    </div>
+    </nav>
 
-    <div class="nav-section">
-      <h6>{{ t('nav.system') }}</h6>
+    <nav :aria-label="t('nav.system')">
+      <h6 aria-hidden="true">{{ t('nav.system') }}</h6>
       <button
         v-for="it in system"
         :key="it.id"
         :class="['nav-item', { active: active === it.id }]"
+        :aria-current="active === it.id ? 'page' : undefined"
         @click="navigate(it.id)"
       >
-        <UiIcon :name="it.icon" />
+        <UiIcon :name="it.icon" aria-hidden="true" />
         <span>{{ it.label }}</span>
       </button>
-    </div>
+    </nav>
 
     <div class="sidebar-foot">
-      <button class="panic" title="Ctrl+Alt+Shift+R" @click="emit('panic')">
-        <UiIcon name="Alert" :size="14" />
-        <span>パニックリセット</span>
-        <span class="kbd">⌃⌥⇧R</span>
+      <button
+        class="panic"
+        :aria-label="t('common.panic') + ' (Ctrl+Alt+Shift+R)'"
+        title="Ctrl+Alt+Shift+R"
+        @click="emit('panic')"
+      >
+        <UiIcon name="Alert" :size="14" aria-hidden="true" />
+        <span>{{ t('common.panic') }}</span>
+        <span class="kbd" aria-hidden="true">⌃⌥⇧R</span>
       </button>
-      <div class="session">
-        <span class="dot" />
-        <span>トレイ常駐 · {{ trayMemoryMb.toFixed(1) }} MB</span>
+      <div class="session" aria-live="polite" aria-atomic="true">
+        <span class="dot" aria-hidden="true" />
+        <span>{{ t('common.trayResident') }} · {{ trayMemoryMb.toFixed(1) }} MB</span>
       </div>
     </div>
   </aside>
