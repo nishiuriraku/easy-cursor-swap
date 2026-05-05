@@ -13,6 +13,9 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { ThemeCardData } from '~/types/theme'
 import { invokeTauri } from '~/composables/useTauri'
 import { notify } from '~/composables/useNotify'
+import { useI18n } from '~/composables/useI18n'
+
+const { t } = useI18n()
 // UiIcon / ThemeCard / ApplyModal / AppStatusbar は Nuxt の自動インポートで解決される。
 
 type FilterChip = 'all' | 'favorites' | 'recent' | 'unsigned'
@@ -185,7 +188,7 @@ async function confirmApply(id: string) {
     if (applied) {
       void notify({
         title: 'CursorForge',
-        body: `「${applied.name}」を適用しました`,
+        body: t('library.notifyApplied', { name: applied.name }),
         level: 'success',
       })
     }
@@ -266,8 +269,8 @@ async function actuallyImport(path: string) {
     void notify({
       title: 'CursorForge',
       body: imported
-        ? `「${imported.name}」をライブラリに追加しました`
-        : 'テーマをインポートしました',
+        ? t('library.notifyImported', { name: imported.name })
+        : t('library.notifyImportedFallback'),
       level: 'success',
     })
   }
@@ -301,9 +304,9 @@ async function openImportDialog() {
 }
 
 const sortLabel = computed(() => ({
-  name: '名前順',
-  updated: '更新日順',
-  applied: '適用回数順',
+  name: t('library.sortName'),
+  updated: t('library.sortUpdated'),
+  applied: t('library.sortApplied'),
 }[sortKey.value]))
 
 function cycleSort() {
@@ -385,7 +388,7 @@ async function setupTauriDrop() {
           path.toLowerCase().endsWith('.cursorpack'),
         )
         if (paths.length === 0) {
-          applyError.value = '.cursorpack 以外のファイルはインポートできません'
+          applyError.value = t('library.importNotPack')
           return
         }
         for (const path of paths) void importByPath(path)
@@ -419,25 +422,25 @@ onUnmounted(() => {
     <!-- ツールバー -->
     <div class="toolbar">
       <div class="bcrumb">
-        <span class="crumb">Workspace</span>
+        <span class="crumb">{{ t('library.breadcrumbWorkspace') }}</span>
         <span class="sep">/</span>
-        <span class="crumb active">テーマライブラリ</span>
+        <span class="crumb active">{{ t('library.title') }}</span>
       </div>
       <div class="search">
         <UiIcon name="Search" :size="14" style="color: var(--fg-mute)" />
         <input
           v-model="searchQuery"
-          placeholder="テーマ名・作者名で検索..."
-          aria-label="検索"
+          :placeholder="t('library.searchPlaceholder')"
+          :aria-label="t('common.search')"
         />
         <span class="kbd">⌘K</span>
       </div>
       <div class="tb-actions">
         <button class="btn ghost" @click="openImportDialog">
-          <UiIcon name="Import" :size="14" />インポート
+          <UiIcon name="Import" :size="14" />{{ t('common.import') }}
         </button>
         <NuxtLink class="btn primary" to="/creator">
-          <UiIcon name="Plus" :size="14" />新規作成
+          <UiIcon name="Plus" :size="14" />{{ t('library.new') }}
         </NuxtLink>
       </div>
     </div>
@@ -446,26 +449,21 @@ onUnmounted(() => {
     <div class="content">
       <div class="page-head">
         <div>
-          <h1>テーマライブラリ</h1>
-          <p>
-            ローカルに保存された
-            <b style="color: var(--fg)">{{ themes.length }}</b>
-            件のカーソルテーマ。ドラッグ＆ドロップで
-            <code>.cursorpack</code> を追加できます。
-          </p>
+          <h1>{{ t('library.title') }}</h1>
+          <p>{{ t('library.description', { count: themes.length }) }}</p>
         </div>
         <div class="right">
           <div class="btn-group">
             <button
               :class="['btn', { active: viewMode === 'grid' }]"
-              aria-label="グリッド表示"
+              aria-label="grid"
               @click="viewMode = 'grid'"
             >
               <UiIcon name="Grid" :size="14" />
             </button>
             <button
               :class="['btn', { active: viewMode === 'list' }]"
-              aria-label="リスト表示"
+              aria-label="list"
               @click="viewMode = 'list'"
             >
               <UiIcon name="List" :size="14" />
@@ -481,30 +479,30 @@ onUnmounted(() => {
             :class="['chip', { active: filter === 'all' }]"
             @click="filter = 'all'"
           >
-            すべて<span class="num">{{ counts.all }}</span>
+            {{ t('library.filterAll') }}<span class="num">{{ counts.all }}</span>
           </button>
           <button
             :class="['chip', { active: filter === 'favorites' }]"
             @click="filter = 'favorites'"
           >
-            <UiIcon name="Star" :size="11" />お気に入り<span class="num">{{ counts.favorites }}</span>
+            <UiIcon name="Star" :size="11" />{{ t('library.filterFavorites') }}<span class="num">{{ counts.favorites }}</span>
           </button>
           <button
             :class="['chip', { active: filter === 'recent' }]"
             @click="filter = 'recent'"
           >
-            最近使用<span class="num">{{ counts.recent }}</span>
+            {{ t('library.filterRecent') }}<span class="num">{{ counts.recent }}</span>
           </button>
           <button
             :class="['chip', { active: filter === 'unsigned' }]"
             @click="filter = 'unsigned'"
           >
-            未署名<span class="num">{{ counts.unsigned }}</span>
+            {{ t('library.filterUnsigned') }}<span class="num">{{ counts.unsigned }}</span>
           </button>
         </div>
         <div class="spacer-x" />
         <div class="sort">
-          <span class="lbl">Sort</span>
+          <span class="lbl">{{ t('library.sort') }}</span>
           <button class="btn ghost" style="height: 28px" @click="cycleSort">
             <UiIcon name="Sort" :size="13" />{{ sortLabel }}
             <UiIcon name="ChevD" :size="11" />
@@ -520,11 +518,8 @@ onUnmounted(() => {
       <!-- 空状態 -->
       <div v-else-if="filteredThemes.length === 0" class="empty-state">
         <UiIcon name="Pkg" :size="48" />
-        <h3>{{ searchQuery ? '該当するテーマが見つかりません' : 'テーマがありません' }}</h3>
-        <p v-if="searchQuery">「{{ searchQuery }}」に一致するテーマはありませんでした</p>
-        <p v-else>
-          <code>.cursorpack</code> をドラッグ＆ドロップしてインポートしましょう
-        </p>
+        <h3>{{ searchQuery ? t('library.emptySearch') : t('library.emptyTitle') }}</h3>
+        <p v-if="!searchQuery">{{ t('library.emptySubText') }}</p>
       </div>
 
       <!-- テーマグリッド -->
@@ -588,8 +583,8 @@ onUnmounted(() => {
       <div v-if="showDrop" class="drop">
         <div class="drop-inner">
           <UiIcon name="Pkg" :size="56" class="ghost-icon" />
-          <h3>.cursorpack をドロップ</h3>
-          <p>テーマをライブラリにインポートします</p>
+          <h3>{{ t('library.drop') }}</h3>
+          <p>{{ t('library.dropSub') }}</p>
         </div>
       </div>
     </Transition>

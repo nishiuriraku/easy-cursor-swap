@@ -11,6 +11,9 @@ import type { ThemeCardData } from '~/types/theme'
 import { invokeTauri } from '~/composables/useTauri'
 import { useAppConfig } from '~/composables/useAppConfig'
 import { useThemes } from '~/composables/useThemes'
+import { useI18n } from '~/composables/useI18n'
+
+const { t } = useI18n()
 
 const isDark = ref(true)
 
@@ -118,19 +121,19 @@ watch(
   <div class="appearance-host">
     <div class="toolbar">
       <div class="bcrumb">
-        <span class="crumb">設定</span>
+        <span class="crumb">{{ t('settings.breadcrumb') }}</span>
         <span class="sep">/</span>
-        <span class="crumb active">外観 · ダークモード連動</span>
+        <span class="crumb active">{{ t('appearance.breadcrumb') }}</span>
       </div>
       <div />
       <div class="tb-actions">
         <button class="btn ghost" :disabled="!dirty || saving" @click="discard">
-          変更を破棄
+          {{ t('common.discard') }}
         </button>
         <button class="btn primary" :disabled="!dirty || saving" @click="save">
           <span v-if="saving" class="spinner" style="width: 13px; height: 13px" />
           <UiIcon v-else name="Check" :size="13" />
-          {{ saving ? '保存中...' : '保存' }}
+          {{ saving ? t('common.saving') : t('common.save') }}
         </button>
       </div>
     </div>
@@ -138,12 +141,12 @@ watch(
     <div class="content">
       <div class="page-head">
         <div>
-          <h1>外観 · ダークモード連動</h1>
-          <p>OS のライト／ダークモード切替に応じて、自動でカーソルテーマをペアリングします。</p>
+          <h1>{{ t('appearance.title') }}</h1>
+          <p>{{ t('appearance.description') }}</p>
         </div>
         <div class="right">
           <span class="tag ok">
-            <span class="watch-dot" />{{ detection.enabled ? '監視中' : '停止中' }}
+            <span class="watch-dot" />{{ detection.enabled ? t('appearance.monitoring') : t('appearance.paused') }}
           </span>
         </div>
       </div>

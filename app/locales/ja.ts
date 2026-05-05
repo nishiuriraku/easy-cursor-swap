@@ -1,5 +1,5 @@
 /**
- * 日本語リソース。`en.ts` とキー構造を完全一致させる (CI で差分検出予定)。
+ * 日本語リソース。`en.ts` とキー構造を完全一致させる (CI で差分検出)。
  */
 export default {
   app: {
@@ -30,10 +30,12 @@ export default {
     search: '検索',
     error: 'エラー',
     success: '成功',
+    panic: 'パニックリセット',
+    trayResident: 'トレイ常駐',
   },
   library: {
     title: 'テーマライブラリ',
-    description: 'ローカルに保存された {count} 件のカーソルテーマ。',
+    description: 'ローカルに保存された {count} 件のカーソルテーマ。ドラッグ＆ドロップで .cursorpack を追加できます。',
     new: '新規作成',
     drop: '.cursorpack をドロップ',
     dropSub: 'テーマをライブラリにインポートします',
@@ -48,7 +50,15 @@ export default {
     sortApplied: '適用回数順',
     emptyTitle: 'テーマがありません',
     emptySearch: '該当するテーマが見つかりません',
+    emptySubText: '.cursorpack をドラッグ＆ドロップしてインポートしましょう',
     coverage: '{filled}/17',
+    searchPlaceholder: 'テーマ名・作者名で検索...',
+    breadcrumbWorkspace: 'Workspace',
+    importFailed: 'インポートに失敗',
+    importNotPack: '.cursorpack 以外のファイルはインポートできません',
+    notifyApplied: '「{name}」を適用しました',
+    notifyImported: '「{name}」をライブラリに追加しました',
+    notifyImportedFallback: 'テーマをインポートしました',
   },
   apply: {
     title: '「{name}」をシステムに適用',
@@ -76,6 +86,39 @@ export default {
     sectionAbout: 'About',
     languageLabel: 'UI 言語',
     languageDesc: 'OS のロケールから自動判定。手動で固定可能。',
+    breadcrumb: '設定',
+    searchPlaceholder: '設定を検索...',
+    resetDefaults: '既定に戻す',
+    saved: '保存済み',
+    unsavedChanges: '未保存の変更あり',
+    schemaInfo: 'config.json schema v3.2',
+  },
+  appearance: {
+    breadcrumb: '外観 · ダークモード連動',
+    title: '外観 · ダークモード連動',
+    description: 'OS のライト／ダークモード切替に応じて、自動でカーソルテーマをペアリングします。',
+    monitoring: '監視中',
+    paused: '停止中',
+    osStateTitle: 'Current OS State',
+    pairingTitle: 'Theme Pairing',
+    detectionTitle: 'Detection',
+    autoSwitch: 'Auto Switch',
+    lightMode: 'Light Mode',
+    darkMode: 'Dark Mode',
+    pickLight: 'Light Mode のテーマを選択',
+    pickDark: 'Dark Mode のテーマを選択',
+    pickLightSub: 'OS が Light の時に自動適用',
+    pickDarkSub: 'OS が Dark の時に自動適用',
+  },
+  marketplace: {
+    breadcrumbCategory: '公式インデックス',
+    breadcrumbCurrent: 'テーマを探す',
+    title: 'Curated Index',
+    description: 'Ed25519 で署名された {count} 件のテーマ。CI で自動検証されたものだけが掲載されます。',
+    openGithub: 'GitHub で開く',
+    searchPlaceholder: '{count}件のテーマから検索...',
+    emptyTitle: '該当するテーマが見つかりません',
+    emptyDesc: 'フィルタや検索条件を変更してください',
   },
   conflict: {
     headerNewer: '新しいバージョンへの更新',

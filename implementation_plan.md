@@ -355,8 +355,10 @@
 - [x] `default.vue` で起動時に config 同期 + watch で動的更新
 - [x] サイドバーをサンプルとして i18n 配線
 - [x] `theme.json` の多言語フィールド対応（`LocalizedString`）
-- [ ] 全画面の文字列を `t()` 経由に置換 (現状はサイドバーのみ)
-- [ ] 未翻訳キーの CI 自動検出（スナップショットテスト）
+- [x] **library / settings / appearance / marketplace の文字列を `t()` 化** (108 キー / ja-en parity)
+- [x] 通知メッセージ (`library.notifyApplied` / `notifyImported`) も多言語化
+- [x] CI で `scripts/check-i18n.mjs` がキー差分を検出 (現在 ja=en=108)
+- [ ] 残: creator / panic / apply モーダルの文字列置換 (次回)
 
 ---
 

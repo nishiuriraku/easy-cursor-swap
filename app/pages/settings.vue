@@ -13,6 +13,9 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useAppConfig } from '~/composables/useAppConfig'
 import { useKeystore } from '~/composables/useKeystore'
 import { invokeTauri } from '~/composables/useTauri'
+import { useI18n } from '~/composables/useI18n'
+
+const { t } = useI18n()
 
 type SectionId =
   | 'general'
@@ -236,22 +239,22 @@ function selectSection(id: SectionId) {
     <!-- ツールバー -->
     <div class="toolbar">
       <div class="bcrumb">
-        <span class="crumb">設定</span>
+        <span class="crumb">{{ t('settings.breadcrumb') }}</span>
         <span class="sep">/</span>
         <span class="crumb active">{{ currentSection.label }}</span>
       </div>
       <div class="search" style="max-width: 280px">
         <UiIcon name="Search" :size="14" style="color: var(--fg-mute)" />
-        <input v-model="searchQuery" placeholder="設定を検索..." aria-label="設定検索" />
+        <input v-model="searchQuery" :placeholder="t('settings.searchPlaceholder')" :aria-label="t('common.search')" />
       </div>
       <div class="tb-actions">
         <button class="btn ghost" :disabled="!dirty || saving" @click="discardChanges">
-          変更を破棄
+          {{ t('common.discard') }}
         </button>
         <button class="btn primary" :disabled="!dirty || saving" @click="save">
           <span v-if="saving" class="spinner" style="width: 13px; height: 13px" />
           <UiIcon v-else name="Check" :size="13" />
-          {{ saving ? '保存中...' : '保存' }}
+          {{ saving ? t('common.saving') : t('common.save') }}
         </button>
       </div>
     </div>
@@ -586,7 +589,7 @@ function selectSection(id: SectionId) {
       :items="[
         { dot: true, text: `Settings · ${currentSection.label}` },
         { text: 'config.json schema v3.2' },
-        { text: dirty ? '未保存の変更あり' : '保存済み' },
+        { text: dirty ? t('settings.unsavedChanges') : t('settings.saved') },
         ...(saveError ? [{ text: `エラー: ${saveError}` }] : []),
       ]"
     />

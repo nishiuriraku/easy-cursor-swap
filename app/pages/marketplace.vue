@@ -14,6 +14,9 @@ import { computed, onMounted, ref } from 'vue'
 import type { MarketplaceEntry, MarketplaceTag } from '~/types/marketplace'
 import { CURSOR_ROLES } from '~/components/icons/CursorIcons'
 import { invokeTauri } from '~/composables/useTauri'
+import { useI18n } from '~/composables/useI18n'
+
+const { t } = useI18n()
 
 const entries = ref<MarketplaceEntry[]>([])
 const isLoading = ref(true)
@@ -136,22 +139,22 @@ onMounted(async () => {
     <!-- ツールバー -->
     <div class="toolbar">
       <div class="bcrumb">
-        <span class="crumb">公式インデックス</span>
+        <span class="crumb">{{ t('marketplace.breadcrumbCategory') }}</span>
         <span class="sep">/</span>
-        <span class="crumb active">テーマを探す</span>
+        <span class="crumb active">{{ t('marketplace.breadcrumbCurrent') }}</span>
       </div>
       <div class="search">
         <UiIcon name="Search" :size="14" style="color: var(--fg-mute)" />
         <input
           v-model="searchQuery"
-          :placeholder="`${entries.length}件のテーマから検索...`"
-          aria-label="検索"
+          :placeholder="t('marketplace.searchPlaceholder', { count: entries.length })"
+          :aria-label="t('common.search')"
         />
         <span class="kbd">⌘K</span>
       </div>
       <div class="tb-actions">
         <button class="btn ghost" @click="openGithub">
-          <UiIcon name="Globe" :size="14" />GitHub で開く
+          <UiIcon name="Globe" :size="14" />{{ t('marketplace.openGithub') }}
         </button>
       </div>
     </div>
@@ -161,13 +164,10 @@ onMounted(async () => {
       <div class="page-head">
         <div>
           <h1>
-            Curated Index
+            {{ t('marketplace.title') }}
             <span class="repo-link">github.com/cursorforge/index</span>
           </h1>
-          <p>
-            Ed25519 で署名された <b style="color: var(--fg)">{{ entries.length }}</b> 件のテーマ。
-            CI で自動検証されたものだけが掲載されます。
-          </p>
+          <p>{{ t('marketplace.description', { count: entries.length }) }}</p>
         </div>
         <div class="right">
           <div class="chips">
@@ -212,8 +212,8 @@ onMounted(async () => {
         <!-- 空状態 -->
         <div v-else class="empty-state">
           <UiIcon name="Search" :size="48" />
-          <h3>該当するテーマが見つかりません</h3>
-          <p>フィルタや検索条件を変更してください</p>
+          <h3>{{ t('marketplace.emptyTitle') }}</h3>
+          <p>{{ t('marketplace.emptyDesc') }}</p>
         </div>
       </template>
     </div>
