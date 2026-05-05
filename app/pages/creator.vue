@@ -15,6 +15,9 @@ import { CURSOR_ROLES, type CursorRoleDef } from '~/components/icons/CursorIcons
 import { sanitizeSvg } from '~/composables/sanitizeSvg'
 import { invokeTauri } from '~/composables/useTauri'
 import { useKeystore } from '~/composables/useKeystore'
+import { useI18n } from '~/composables/useI18n'
+
+const { t } = useI18n()
 
 const { info: keystoreInfo, refresh: refreshKeystore } = useKeystore()
 const hasKeystoreSigning = computed(() => keystoreInfo.value.has_keypair)
@@ -71,10 +74,10 @@ function statusOf(id: string): RoleStatus {
 
 const filledCount = computed(() => filledRoles.size)
 const tabs = computed<Array<{ id: TabId, label: string, count?: string }>>(() => [
-  { id: 'assign', label: '割り当て', count: `${filledCount.value}/17` },
-  { id: 'metadata', label: 'メタデータ' },
-  { id: 'preview', label: 'プレビュー' },
-  { id: 'publish', label: '公開' },
+  { id: 'assign', label: t('creator.tabAssign'), count: `${filledCount.value}/17` },
+  { id: 'metadata', label: t('creator.tabMetadata') },
+  { id: 'preview', label: t('creator.tabPreview') },
+  { id: 'publish', label: t('creator.tabPublish') },
 ])
 const filledSizes = computed(
   () => filledSizesByRole.value[activeRoleId.value] ?? [],
@@ -331,30 +334,30 @@ async function onFileChange(e: Event) {
     <!-- ツールバー -->
     <div class="toolbar">
       <div class="bcrumb">
-        <span class="crumb">Creator</span>
+        <span class="crumb">{{ t('creator.breadcrumb') }}</span>
         <span class="sep">/</span>
         <span class="crumb active">
-          Neon Glow
-          <span class="draft-tag">v1.2.0 · draft</span>
+          {{ metaName || 'Untitled' }}
+          <span class="draft-tag">v{{ metaVersion }} · {{ t('creator.draft') }}</span>
         </span>
       </div>
       <div />
       <div class="tb-actions">
         <span v-if="hasKeystoreSigning" class="tag ok">
-          <UiIcon name="Shield" :size="11" />SIGNED · ed25519
+          <UiIcon name="Shield" :size="11" />{{ t('creator.signedTag') }}
         </span>
         <span v-else class="tag" style="color: var(--rose); border-color: rgba(255,107,138,0.3);">
-          <UiIcon name="Alert" :size="11" />未署名
+          <UiIcon name="Alert" :size="11" />{{ t('creator.unsignedTag') }}
         </span>
         <button
           class="btn ghost"
           :disabled="exportBusy || !arrowAssigned"
-          title=".cursorpack を出力"
+          title=".cursorpack"
           @click="exportCursorpack({ sign: false })"
         >
           <span v-if="exportBusy" class="spinner" style="width: 13px; height: 13px" />
           <UiIcon v-else name="Export" :size="14" />
-          {{ exportBusy ? '書き出し中...' : 'エクスポート' }}
+          {{ exportBusy ? t('creator.exportBusy') : t('creator.exportPack') }}
         </button>
         <button
           v-if="hasKeystoreSigning"
@@ -362,7 +365,7 @@ async function onFileChange(e: Event) {
           :disabled="exportBusy || !arrowAssigned"
           @click="exportCursorpack({ sign: true })"
         >
-          <UiIcon name="Shield" :size="14" />署名 & エクスポート
+          <UiIcon name="Shield" :size="14" />{{ t('creator.exportSign') }}
         </button>
         <button
           v-else
@@ -372,7 +375,7 @@ async function onFileChange(e: Event) {
         >
           <span v-if="buildBusy" class="spinner" style="width: 13px; height: 13px" />
           <UiIcon v-else name="Check" :size="14" />
-          {{ buildBusy ? 'ビルド中...' : 'ビルド & 出力' }}
+          {{ buildBusy ? t('creator.buildBusy') : t('creator.buildExport') }}
         </button>
       </div>
     </div>
@@ -394,48 +397,48 @@ async function onFileChange(e: Event) {
     <div v-if="activeTab === 'metadata'" class="metadata-pane">
       <div class="metadata-grid">
         <div class="prop-section">
-          <div class="prop-head">テーマ情報</div>
+          <div class="prop-head">{{ t('creator.metaTitle') }}</div>
           <div class="prop-body" style="padding: 4px 16px;">
-            <SettingsRow label="名前 (日本語)" desc="必須。設定アプリやライブラリで表示されます">
+            <SettingsRow :label="t('creator.metaNameJa')" :desc="t('creator.metaNameJaDesc')">
               <input v-model="metaName" class="input" style="width: 280px" placeholder="Neon Glow" />
             </SettingsRow>
-            <SettingsRow label="名前 (英語)" desc="任意。OS ロケールに応じて表示を切替">
+            <SettingsRow :label="t('creator.metaNameEn')" :desc="t('creator.metaNameEnDesc')">
               <input v-model="metaNameEn" class="input" style="width: 280px" placeholder="Neon Glow" />
             </SettingsRow>
-            <SettingsRow label="作者" desc="GitHub username 推奨 (公式インデックス連携時に key_id 照合)">
+            <SettingsRow :label="t('creator.metaAuthor')" :desc="t('creator.metaAuthorDesc')">
               <input v-model="metaAuthor" class="input" style="width: 280px" placeholder="@username" />
             </SettingsRow>
-            <SettingsRow label="バージョン" desc="SemVer (例: 1.2.0)">
+            <SettingsRow :label="t('creator.metaVersion')" :desc="t('creator.metaVersionDesc')">
               <input v-model="metaVersion" class="input mono" style="width: 140px" placeholder="1.0.0" />
             </SettingsRow>
-            <SettingsRow label="OS 標準ポインター影を使用" desc="OFF にすると requires_os_shadow = false 相当 (画像に影が焼き込まれる場合)">
+            <SettingsRow :label="t('creator.metaShadow')" :desc="t('creator.metaShadowDesc')">
               <SettingsToggle v-model="shadowEnabled" />
             </SettingsRow>
           </div>
         </div>
 
         <div class="prop-section">
-          <div class="prop-head">説明</div>
+          <div class="prop-head">{{ t('creator.metaDescTitle') }}</div>
           <div class="prop-body" style="padding: 12px 16px;">
             <textarea
               v-model="metaDescription"
               class="input"
               rows="6"
               style="width: 100%; font-family: var(--font-body); resize: vertical;"
-              placeholder="このテーマの特徴 / 推奨環境 / クレジット表記など"
+              :placeholder="t('creator.metaDescPlaceholder')"
             />
           </div>
         </div>
 
         <div class="prop-section">
-          <div class="prop-head">エクスポート状況</div>
+          <div class="prop-head">{{ t('creator.metaExportStatus') }}</div>
           <div class="prop-body" style="padding: 4px 16px;">
-            <SettingsRow label="割り当て済みロール数">
+            <SettingsRow :label="t('creator.metaAssignedRoles')">
               <span class="tag" :class="{ ok: arrowAssigned }">{{ assignedRoleCount }} / 17</span>
             </SettingsRow>
-            <SettingsRow label="Arrow ロール (必須)">
+            <SettingsRow :label="t('creator.metaArrowRequired')">
               <span class="tag" :class="arrowAssigned ? 'ok' : ''">
-                {{ arrowAssigned ? '割り当て済み' : '未割り当て' }}
+                {{ arrowAssigned ? t('creator.metaAssigned') : t('creator.metaUnassigned') }}
               </span>
             </SettingsRow>
           </div>
@@ -458,7 +461,7 @@ async function onFileChange(e: Event) {
       <!-- 左: 役割リスト -->
       <div class="cpane left">
         <div class="pane-head">
-          <h6>17 Roles</h6>
+          <h6>{{ t('creator.rolesPaneTitle') }}</h6>
           <span class="tag">{{ filledCount }} / 17</span>
         </div>
         <div class="role-list">
@@ -484,17 +487,17 @@ async function onFileChange(e: Event) {
             </h2>
             <div class="desc">
               <template v-if="isRequired(activeRole.id)">
-                Windows のメイン操作カーソル。<b style="color: var(--accent)">必須</b>。解像度ごとに独立した画像を割り当て可能。
+                {{ t('creator.requiredRoleNote', { required: '' }).split('{required}')[0] }}<b style="color: var(--accent)">{{ t('creator.requiredMark') }}</b>{{ t('creator.requiredRoleNote', { required: '' }).split('{required}')[1] }}
               </template>
               <template v-else>
-                {{ activeRole.en }}。任意。未指定時は Windows 既定を継承します。
+                {{ t('creator.optionalRoleNote', { en: activeRole.en }) }}
               </template>
             </div>
           </div>
           <div style="display: flex; gap: 6px">
             <button class="btn ghost" :disabled="importBusy" @click="pickImage">
               <span v-if="importBusy" class="spinner" style="width: 13px; height: 13px" />
-              <UiIcon v-else name="Import" :size="13" />画像追加
+              <UiIcon v-else name="Import" :size="13" />{{ t('creator.addImage') }}
             </button>
             <input
               ref="fileInput"
@@ -584,7 +587,7 @@ async function onFileChange(e: Event) {
         <!-- Hotspot -->
         <div class="prop-section">
           <div class="prop-head">
-            Hotspot
+            {{ t('creator.propsHotspot') }}
             <span class="tag ok">px</span>
           </div>
           <div class="prop-body">
@@ -611,7 +614,7 @@ async function onFileChange(e: Event) {
 
         <!-- アセット -->
         <div class="prop-section">
-          <div class="prop-head">アセット</div>
+          <div class="prop-head">{{ t('creator.propsAsset') }}</div>
           <div class="prop-body">
             <div class="prop-row">
               <label>形式</label>
@@ -641,7 +644,7 @@ async function onFileChange(e: Event) {
         <!-- Validation -->
         <div class="prop-section">
           <div class="prop-head">
-            Validation
+            {{ t('creator.propsValidation') }}
             <span class="tag ok"><UiIcon name="Check" :size="10" />pass</span>
           </div>
           <div class="prop-body validation-body">

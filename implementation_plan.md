@@ -358,10 +358,10 @@
 - [x] `default.vue` で起動時に config 同期 + watch で動的更新
 - [x] サイドバーをサンプルとして i18n 配線
 - [x] `theme.json` の多言語フィールド対応（`LocalizedString`）
-- [x] **library / settings / appearance / marketplace の文字列を `t()` 化** (108 キー / ja-en parity)
+- [x] **library / settings / appearance / marketplace / creator / ApplyModal の文字列を `t()` 化** (158 キー / ja-en parity)
 - [x] 通知メッセージ (`library.notifyApplied` / `notifyImported`) も多言語化
-- [x] CI で `scripts/check-i18n.mjs` がキー差分を検出 (現在 ja=en=108)
-- [ ] 残: creator / panic / apply モーダルの文字列置換 (次回)
+- [x] CI で `scripts/check-i18n.mjs` がキー差分を検出 (現在 ja=en=158)
+- [ ] 残: PanicFlow / ImportConflictDialog / SettingsRow ラベル類 (次回)
 
 ---
 
@@ -474,30 +474,53 @@
 
 ## 次回セッションでの優先タスク
 
-1. **🌐 全画面の i18n 配線** — library/creator/settings/appearance/marketplace/panic を `t()` 化
-2. **🔔 通知システム** — Win32 COM Toast (Phase 7-2) + AppUserModelID 登録
-3. **🔑 秘密鍵エクスポート/インポート** — パスフレーズ付き Argon2 + ChaCha20Poly1305
-4. **📊 criterion ベンチ導入** — リサイズ / .cur ビルドの実測ベンチ
-5. **🔒 多重起動防止 (Phase 4-4)** — Named Mutex
-6. **🪟 RDP / Server / マルチユーザー検出と警告ダイアログ** (Phase 4-7)
-7. **🧹 cursor のクリエイター プレビュー / 公開タブ実装** — 残り 2 タブ
-8. **🛟 OS 設定の外部変更検知** — `WM_SETTINGCHANGE` の `SPI_SETCURSORS` 系購読 → UI 同期
-2. **⚙️ 一般設定画面** — `app/pages/settings.vue`（8 セクション切替 + `.cursorprofile` エクスポート/インポート UI）
-3. **🌗 外観/ダークモード連動ペアリング画面** — `app/pages/appearance.vue`
-4. **🚨 パニック復旧フロー** — `PanicFlow.vue`（2 段階リセット + ライブトレース表示）
-5. **🔧 Rust 側補完** — `is_active` を config 連動、apply 後 ThemeSummary の更新
-6. **🛡️ Phase 9 実装着手** — reqwest 追加、SHA-256/Ed25519 検証、安全な ZIP 展開
+> [!NOTE]
+> 直近 6 セッションで主要機能 (UI 7 画面 / Marketplace / 鍵管理 / .cursorpack 入出力 /
+> ダーク自動切替 / 多重起動防止 / 通知 / 環境検出) はすべて完了。
+> ここからは仕上げと「v1.0 リリース DOD」に向けた残タスク。
+
+1. **🪟 残画面の i18n 配線** — creator / panic / apply モーダル / settings 内本文を `t()` 化
+2. **🪪 AppUserModelID 明示登録** — トースト発信元の見える化 (Phase 7-2 残タスク)
+3. **📦 MSIX / `runFullTrust` capability** — Phase 8-3 着手 (Microsoft Store 配布の足場)
+4. **✍️ EV/OV コードサイニング調達** — SignPath.io 等の OSS 無償署名サービス検討
+5. **🧪 起動時間 / メモリ / 適用時間の実測ベンチ** — Phase 8-1 の数値目標を CI で検証
+6. **🪝 鍵ローテーション PR テンプレ** — `cursorforge/index` 側の `authors/{user}.json` 編集ガイド
+7. **🛡️ VirusTotal API 統合** — Marketplace CI のマルウェア DB 照合を実 API に置換
+8. **📜 既存 `tracing!` の `short_hash` 適用** — レジストリ RAW 値を `short_hash` で記録
+9. **🪟 マイグレーション失敗時の専用エラー画面** — config schema_version 不一致時 (Phase 2-1 残)
+10. **♿ WCAG AA 検証** — コントラスト比 / キーボードナビ / ARIA ラベルの自動チェック
+11. **🚀 Tauri Updater 設定** — 自動アップデート + 3 回連続失敗ロールバック (Phase 8-4)
 
 ---
 
 ## 優先度の高いギャップ（要注意領域）
 
 > [!CAUTION]
-> 以下の領域は仕様書に詳細な記述があるが、実装は完全に未着手。
+> 以下の領域は仕様書に記載があるが、まだ実装未着手 / 部分的のため重点的に扱う。
 
-1. **Phase 5: デザインシステム反映** — 7 画面の Hi-Fi プロトタイプが完成済みだが Nuxt/Vue への移植が未着手
-2. **Phase 9: 公式インデックス連携** — PR 提出フロー、CI 検証、公開鍵管理
-3. **Phase 8-3: MSIX / 署名運用** — `runFullTrust`、startupTask、EV/OV 調達
-4. **Phase 8-1: パフォーマンス CI** — 自動測定と回帰検出
-5. **Phase 6-4: `.cursorprofile`** — フルバックアップ機構
-6. **Phase 4-7: Windows 11 競合検出** — アクセシビリティ・RDP 環境の警告
+1. **Phase 8-2/8-3: 配布基盤** — `.msi` / `.msix` インストーラー生成、WebView2 Bootstrapper 同梱、SmartScreen レピュテーション獲得
+2. **Phase 8-4: 自動アップデート** — Tauri Updater 設定 + メジャー跨ぎ (v1→v2) 手動誘導 + 3 回連続失敗ロールバック
+3. **Phase 9-2: テーマ提出フロー** — ブラウザ経由 PR テンプレ事前 URL + アプリ内「公式インデックスに提出」ボタン
+4. **Phase 9-3: マルウェアハッシュ実 DB** — VirusTotal API 統合 (現状は空のローカル DB)
+5. **Phase 7-2: AppUserModelID 登録** — トースト通知発信元の明示
+6. **Phase 4-7 残: アクセシビリティ競合検出** — `CursorIndicator` / `ContrastScheme` / `CursorBaseSize` 検出と警告ダイアログ
+7. **Phase 5-11: WCAG AA 準拠** — コントラスト 4.5:1 検証 / キーボードナビ / ARIA ラベル
+8. **Phase 2-1 残: マイグレーション失敗専用エラー画面** + `config.bak.v{N}.json` 退避
+9. **Phase 6-1 残: `.cursorpack` 内画像メタデータパージ強化** — Exif / トラッキングデータの除去
+10. **README ja/en 整備** — v1.0 既知制約の明記、サポート OS / RDP 動作対象外の警告
+
+### 完了済み主要マイルストーン (記録)
+
+| Phase | 状態 |
+|---|---|
+| Phase 1-4 | ✅ プロジェクト基盤 / Rust コア / 画像 + .cur / トレイ + ダーク / 多重起動 / 環境検出 |
+| Phase 5 (UI) | ✅ 7 画面 + i18n 主要 4 画面 + 17 コンポーネント |
+| Phase 6-1/6-2 | ✅ .cursorpack 入出力 / 多層セキュリティ防御 (path traversal / Zip 爆弾 / symlink / Magic Byte / SVG sanitize) |
+| Phase 6-3 | ✅ Ed25519 鍵管理 (DPAPI + パスフレーズ export/import) |
+| Phase 6-4 | ✅ .cursorprofile フルバックアップ |
+| Phase 7-1 | ✅ ロギング (日次ローテ / 14 日保持 / 100MB 上限 / PII redaction) |
+| Phase 7-2 | 🔄 通知 3 層配線 (AppUserModelID 登録のみ残) |
+| Phase 7-3 | 🔄 i18n 基盤 + 主要 4 画面配線 (残: creator/panic/apply モーダル) |
+| Phase 8-1 | 🔄 CI 雛形 + criterion ベンチ + リサイズキャッシュ (実測値の数値目標検証は残) |
+| Phase 9-1/9-3 | ✅ クライアント側検証 (HTTPS / SHA-256 / Ed25519 / ZIP 展開) |
+| Phase 9-4 | ✅ CI ワークフロー + scripts/marketplace/validate.mjs |

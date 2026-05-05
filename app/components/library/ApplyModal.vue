@@ -13,6 +13,9 @@
 import { computed } from 'vue'
 import type { ThemeCardData } from '~/types/theme'
 import { CURSOR_ROLES } from '~/components/icons/CursorIcons'
+import { useI18n } from '~/composables/useI18n'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   theme: ThemeCardData
@@ -47,11 +50,11 @@ function onBackdropClick(e: MouseEvent) {
       <div class="modal-head">
         <div class="modal-icon"><UiIcon name="Pkg" :size="20" /></div>
         <div style="flex: 1; min-width: 0">
-          <h2>「{{ theme.name }}」をシステムに適用</h2>
-          <p>17 スロット × 6 解像度のレジストリ書き換えを実行します。失敗時は自動ロールバック。</p>
+          <h2>{{ t('apply.title', { name: theme.name }) }}</h2>
+          <p>{{ t('apply.description') }}</p>
         </div>
         <span v-if="signedKeyId" class="tag ok">
-          <UiIcon name="Shield" :size="11" />SIGNED
+          <UiIcon name="Shield" :size="11" />{{ t('apply.signedTag') }}
         </span>
       </div>
 
@@ -59,7 +62,7 @@ function onBackdropClick(e: MouseEvent) {
       <div class="modal-body">
         <div class="kvlist">
           <div class="kv">
-            <label>Theme</label>
+            <label>{{ t('apply.themeLabel') }}</label>
             <div class="val">
               {{ theme.name }}
               <span class="sub">v{{ theme.version }} · @{{ theme.author ?? 'unknown' }}</span>
@@ -67,21 +70,21 @@ function onBackdropClick(e: MouseEvent) {
           </div>
 
           <div class="kv">
-            <label>Coverage</label>
+            <label>{{ t('apply.coverage') }}</label>
             <div class="val" style="display: flex; align-items: center; gap: 10px">
               <div class="bar-pair" style="flex: 1; max-width: 180px">
                 <i class="a" :style="{ width: overridesPct + '%' }" />
                 <i class="b" :style="{ width: inheritPct + '%' }" />
               </div>
               <span style="font-family: var(--font-mono); font-size: 11px; color: var(--fg-dim)">
-                <span style="color: var(--accent)">{{ overridesCount }}</span> overrides ·
-                <span style="color: var(--violet)">{{ inheritCount }}</span> inherit
+                <span style="color: var(--accent)">{{ overridesCount }}</span> {{ t('apply.overrides') }} ·
+                <span style="color: var(--violet)">{{ inheritCount }}</span> {{ t('apply.inherit') }}
               </span>
             </div>
           </div>
 
           <div class="kv">
-            <label>Roles</label>
+            <label>{{ t('apply.rolesLabel') }}</label>
             <div class="val">
               <div class="mini-row">
                 <div
@@ -102,7 +105,7 @@ function onBackdropClick(e: MouseEvent) {
           </div>
 
           <div class="kv">
-            <label>Snapshot</label>
+            <label>{{ t('apply.snapshot') }}</label>
             <div class="val" style="font-family: var(--font-mono); font-size: 12px; color: var(--fg-dim)">
               ~/.custom_cursors/_pending_apply.snapshot
             </div>
@@ -114,17 +117,17 @@ function onBackdropClick(e: MouseEvent) {
       <div class="modal-foot">
         <div class="left-note">
           <UiIcon name="Shield" :size="12" style="color: var(--accent)" />
-          <span v-if="signedKeyId">Ed25519 検証済 · key_id {{ signedKeyId }}</span>
-          <span v-else style="color: var(--rose)">未署名テーマ — 自己責任でご利用ください</span>
+          <span v-if="signedKeyId">{{ t('apply.signedNotice', { keyId: signedKeyId }) }}</span>
+          <span v-else style="color: var(--rose)">{{ t('apply.unsignedNotice') }}</span>
         </div>
         <div class="actions">
           <button class="btn ghost" :disabled="busy" @click="emit('cancel')">
-            キャンセル
+            {{ t('common.cancel') }}
           </button>
           <button class="btn primary" :disabled="busy" @click="emit('confirm', theme.id)">
             <span v-if="busy" class="spinner" style="width: 13px; height: 13px" />
             <UiIcon v-else name="Check" :size="13" />
-            {{ busy ? '適用中...' : '適用する' }}
+            {{ busy ? t('apply.confirming') : t('apply.confirm') }}
           </button>
         </div>
       </div>
