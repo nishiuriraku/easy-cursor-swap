@@ -402,14 +402,21 @@
 - [ ] `.msi` インストーラー生成（x64）
 - [ ] ARM64 ビルドの独立した扱い
 - [ ] WebView2 Evergreen Bootstrapper の `.msi` 同梱戦略
+- [x] **NSIS バンドルターゲット追加** (perUser インストール、ja/en 言語セレクタ)
+- [x] **MSI バンドル設定強化** (publisher / homepage / wix language)
+- [ ] WebView2 Evergreen Bootstrapper の `.msi` 同梱戦略
 - [ ] EV/OV コードサイニング調達方針（SignPath.io 等の OSS 無償署名）
 - [ ] SmartScreen レピュテーション獲得の検証
 
-### 8-3: MSIX / Microsoft Store 対応 ⬅️ NEW
-- [ ] `runFullTrust` capability の設定
-- [ ] Packaged Win32 App 構成
-- [ ] `<Extension Category="windows.startupTask">` による自動起動
-- [ ] Microsoft Store 配布の検討と足場
+### 8-3: MSIX / Microsoft Store 対応 🔄 雛形完成
+- [x] **`runFullTrust` capability の設定** ([distribution/msix/AppxManifest.xml](distribution/msix/AppxManifest.xml))
+- [x] **Packaged Win32 App 構成** (`Windows.FullTrustApplication` EntryPoint)
+- [x] **`<Extension Category="windows.startupTask">`** による自動起動宣言 (Enabled=false 初期値)
+- [x] [docs/distribution.md](docs/distribution.md) に変換手順を整備
+  - MSIX Packaging Tool (GUI) 経由 / `makeappx` + `signtool` (CLI) 経由
+  - SignPath.io / Microsoft Trusted Signing 比較
+  - SmartScreen 緩和策
+- [ ] Microsoft Store 申請審査 (`runFullTrust` は Restricted Capability)
 
 ### 8-4: 自動アップデート 🔄 基盤完了
 - [x] **Tauri Updater 設定** (`tauri-plugin-updater` + `tauri-plugin-process`)

@@ -36,7 +36,12 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["msi"],
+    "targets": ["msi", "nsis"],
+    "publisher": "CursorForge",
+    "homepage": "https://github.com/cursorforge/cursor-forge",
+    "category": "Utility",
+    "shortDescription": "Win11 cursor manager",
+    "longDescription": "Next-generation Windows mouse cursor manager with Ed25519 signed theme distribution.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -46,7 +51,17 @@
     ],
     "windows": {
       "wix": {
-        "language": ["ja-JP", "en-US"]
+        "language": ["ja-JP", "en-US"],
+        "fragmentPaths": [],
+        "componentRefs": [],
+        "featureRefs": [],
+        "mergeRefs": []
+      },
+      "nsis": {
+        "displayLanguageSelector": true,
+        "languages": ["Japanese", "English"],
+        "installerIcon": "icons/icon.ico",
+        "installMode": "currentUser"
       }
     }
   },

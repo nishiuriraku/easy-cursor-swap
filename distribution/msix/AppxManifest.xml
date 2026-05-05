@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MSIX マニフェストテンプレート (Phase 8-3)
+
+  生成手順:
+   1. tauri build で `.msi` を生成
+   2. MSIX Packaging Tool もしくは `makeappx pack` で MSIX に変換
+   3. このマニフェストを ZIP のルートに配置 (Tauri の出力 manifest を上書き)
+
+  仕様書「§3 MSIX 互換ファイルセーフ設計」要件:
+   - runFullTrust capability: HKCU\Control Panel\Cursors への書込みを Package Family
+     仮想化から逃がす
+   - windows.startupTask: HKCU\...\Run の代わりに使う MSIX 流自動起動宣言
+   - PublisherDisplayName / DisplayName を i18n リソースから引かず固定 (ストア配布要件)
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  IgnorableNamespaces="uap uap5 rescap desktop">
+
+  <Identity
+    Name="dev.cursorforge.app"
+    Publisher="CN=CursorForge, O=CursorForge, C=JP"
+    Version="1.0.0.0"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>CursorForge</DisplayName>
+    <PublisherDisplayName>CursorForge</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop"
+      MinVersion="10.0.19041.0"
+      MaxVersionTested="10.0.22621.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="ja-JP" />
+    <Resource Language="en-US" />
+  </Resources>
+
+  <Applications>
+    <Application Id="App" Executable="cursor-forge.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="CursorForge"
+        Description="Win11 cursor manager"
+        BackgroundColor="#0a0b0f"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile
+          ShortName="CursorForge"
+          Square71x71Logo="Assets\Square71x71Logo.png"
+          Square310x310Logo="Assets\Square310x310Logo.png"
+          Wide310x150Logo="Assets\Square310x150Logo.png" />
+        <uap:SplashScreen Image="Assets\SplashScreen.png" />
+      </uap:VisualElements>
+
+      <Extensions>
+        <!--
+          サイレント自動起動。HKCU\Software\Microsoft\Windows\CurrentVersion\Run の
+          MSIX 版代替。
+          Enabled="false" にしておき、ユーザーが「設定 → 起動・常駐」で ON にしたら
+          PowerShell でフラグを反転させる設計を想定。
+        -->
+        <desktop:Extension Category="windows.startupTask">
+          <desktop:StartupTask
+            TaskId="CursorForgeStartup"
+            Enabled="false"
+            DisplayName="CursorForge" />
+        </desktop:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!--
+      runFullTrust:
+       Win32 API (CryptProtectData, SystemParametersInfoW, レジストリ HKCU 直書込み等)
+       を MSIX サンドボックス越えに使う。Microsoft Store 配布時は Restricted Capability
+       のため申請審査が必要。
+    -->
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>
