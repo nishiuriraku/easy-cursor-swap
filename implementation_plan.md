@@ -422,7 +422,14 @@
   - 「ダウンロード & インストール」ボタン → 進捗 % 表示 → 完了後 ask ダイアログで再起動
 - [ ] 公開鍵 (`pubkey`) の発行 — `tauri signer generate` でリリース署名鍵を生成
 - [ ] メジャーバージョン跨ぎ (v1 → v2) は自動更新しない方針 (現状はチェック側で判定なし)
-- [ ] 3 回連続起動失敗で旧バイナリへ自動ロールバック (アプリ起動カウンタ実装が必要)
+- [x] **3 回連続起動失敗の検出機構** — `src-tauri/src/health.rs`
+  - `%LOCALAPPDATA%\CursorForge\state\startup.json` に `pending_failures` を保存
+  - main 起動時に `StartupCheck::begin` でインクリメント
+  - setup 完了後に `mark_healthy()` で 0 リセット
+  - panic/クラッシュで mark_healthy に到達しなければカウンタが残る
+  - バージョン変更を検知したらカウンタを自動リセット
+  - 単体テスト 2 件 PASS
+- [ ] 検出時の Tauri Updater 旧バージョン取得 + 自動置換 (現状はカウンタ管理 + 警告ログのみ)
 
 ### 8-5: CI/CD & ドキュメント
 - [ ] CI/CD パイプライン構築

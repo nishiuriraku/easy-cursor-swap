@@ -10,6 +10,7 @@ use app_lib::commands;
 use app_lib::config::ConfigManager;
 use app_lib::cursor_watcher;
 use app_lib::darkmode;
+use app_lib::health::StartupCheck;
 use app_lib::logging;
 use app_lib::registry::RegistryManager;
 use app_lib::single_instance::SingleInstanceLock;
@@ -64,6 +65,26 @@ fn main() {
     };
 
     tracing::info!("CursorForge v{} を起動しています...", env!("CARGO_PKG_VERSION"));
+
+    // 起動ヘルスチェック: 連続失敗を検出
+    let app_version = env!("CARGO_PKG_VERSION").to_string();
+    let startup_check = match StartupCheck::begin(&app_version) {
+        Ok(c) => Some(c),
+        Err(e) => {
+            tracing::warn!("startup health check の初期化に失敗: {}", e);
+            None
+        }
+    };
+    if startup_check
+        .as_ref()
+        .is_some_and(|c| c.should_rollback)
+    {
+        tracing::warn!(
+            "前回起動時に正常完了マークが付いていません。アップデート後に問題があれば設定 → アップデートからロールバックを検討してください。"
+        );
+        // TODO: Tauri Updater の旧バージョン取得 + 自動置換は将来実装。
+        //       現状はカウンタ通知のみ。
+    }
 
     // AppUserModelID を明示登録 (トースト発信元の見える化)
     appusermodel::register_aumid();
@@ -131,7 +152,7 @@ fn main() {
         .plugin(tauri_plugin_process::init())
         .manage(config_manager)
         .invoke_handler(commands::get_command_handlers())
-        .setup(|app| {
+        .setup(move |app| {
             let handle = app.handle().clone();
 
             // システムトレイの初期化
@@ -208,6 +229,14 @@ fn main() {
                 }
             }) {
                 tracing::warn!("カーソル監視の開始に失敗: {}", e);
+            }
+
+            // 全初期化に成功 → 起動ヘルスチェックを「正常」と記録
+            // (この行に到達できない = panic/異常終了 → pending_failures がインクリメントされたまま)
+            if let Some(ref check) = startup_check {
+                if let Err(e) = check.mark_healthy(&app_version) {
+                    tracing::warn!("startup health: mark_healthy 失敗: {}", e);
+                }
             }
 
             tracing::info!("CursorForge が正常に起動しました");
