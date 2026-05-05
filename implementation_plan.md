@@ -100,8 +100,11 @@
 - [x] 起動時の pending スナップショット検出
 - [x] 自動復旧ロジック
 
-### 4-4: 多重起動防止
-- [ ] Named Mutex による排他制御
+### 4-4: 多重起動防止 ✅ 実装完了
+- [x] Named Mutex (`Local\CursorForge.SingleInstance.<UUID>`) による排他制御
+- [x] `SingleInstanceLock` RAII 型 — drop 時に `ReleaseMutex` + `CloseHandle`
+- [x] main 起動時に取得失敗 → `tracing::warn` + プロセス終了
+- [ ] 既存インスタンスのトレイアイコンへのフォーカス移動 (CreateEvent シグナル方式、次回)
 
 ### 4-5: OS 起動時自動起動
 - [ ] `HKCU\...\Run` へのレジストリ登録/解除

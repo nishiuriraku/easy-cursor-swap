@@ -10,6 +10,7 @@ use app_lib::config::ConfigManager;
 use app_lib::darkmode;
 use app_lib::logging;
 use app_lib::registry::RegistryManager;
+use app_lib::single_instance::SingleInstanceLock;
 use app_lib::tray;
 
 fn main() {
@@ -29,6 +30,19 @@ fn main() {
     };
 
     tracing::info!("CursorForge v{} を起動しています...", env!("CARGO_PKG_VERSION"));
+
+    // 多重起動防止: Named Mutex を取得。既存インスタンスがあれば中断。
+    // _instance_lock は drop 時にミューテックスを解放するので main の最後まで保持。
+    let _instance_lock = match SingleInstanceLock::acquire() {
+        Ok(lock) => lock,
+        Err(e) => {
+            tracing::warn!("多重起動を検出: {}", e);
+            // TODO: 既存インスタンスのトレイアイコンへフォーカスを移す
+            //       (CreateEvent 経由のシグナル + 既存側で待機)
+            eprintln!("CursorForge は既に起動しています");
+            return;
+        }
+    };
 
     // 設定マネージャー初期化
     let config_manager = match ConfigManager::init() {
