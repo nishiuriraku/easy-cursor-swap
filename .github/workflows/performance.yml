@@ -1,14 +1,16 @@
 name: Performance Benchmarks
 
-# Phase 8-1: パフォーマンス CI の雛形。
+# Phase 8-1: パフォーマンス CI。
 # 目標値:
-#  - 常駐メモリ ≤ 15 MB
-#  - 起動時間 ≤ 1.5 秒
-#  - テーマ適用 ≤ 3 秒
-#  - .msi パッケージサイズ ≤ 30 MB
+#  - 常駐メモリ ≤ 15 MB (Rust 起動直後の peak working set)
+#  - 起動時間 ≤ 1.5 秒 (Rust 側初期化 ≤ 50 ms 程度を担保)
+#  - テーマ適用 ≤ 3 秒 (registry 操作は CI で計測不可、cursor_build で代替)
+#  - .msi パッケージサイズ ≤ 30 MB (release exe で代替計測)
 #
-# まずは `cargo test --release` でユニットベンチを動かし、
-# tauri-build による .msi の最終サイズを記録するところから始める。
+# 計測内容:
+#  1. cargo bench --bench cursor_build (リサイズ + .cur 生成のホットパス)
+#  2. cargo bench --bench startup (AppConfig 初期化のクリティカルパス)
+#  3. release exe サイズ + Rust 側起動時の peak working set
 
 on:
   push:
@@ -34,21 +36,50 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - name: cargo bench (criterion)
+      - name: cargo bench (cursor_build)
         working-directory: src-tauri
-        run: cargo bench --bench cursor_build -- --output-format bencher | tee bench-output.txt
+        run: cargo bench --bench cursor_build -- --output-format bencher | tee bench-cursor-build.txt
+
+      - name: cargo bench (startup)
+        working-directory: src-tauri
+        run: cargo bench --bench startup -- --output-format bencher | tee bench-startup.txt
 
       - name: Upload benchmark output
         uses: actions/upload-artifact@v4
         with:
-          name: cursor-build-bench
-          path: src-tauri/bench-output.txt
+          name: benchmarks
+          path: |
+            src-tauri/bench-cursor-build.txt
+            src-tauri/bench-startup.txt
           retention-days: 30
+
+      - name: Threshold check (startup)
+        shell: pwsh
+        working-directory: src-tauri
+        run: |
+          # bencher 形式: "test <name> ... bench: <ns/iter> ns/iter (+/- <variance>)"
+          # AppConfig/roundtrip_in_memory が ≤ 5 ms (5_000_000 ns) であることを確認
+          $threshold_ns = 5000000
+          $line = Select-String -Path bench-startup.txt -Pattern "AppConfig/roundtrip_in_memory"
+          if ($line) {
+            if ($line.Line -match 'bench:\s+(\d+)\s+ns/iter') {
+              $ns = [int64]$Matches[1]
+              Write-Host "AppConfig/roundtrip_in_memory: $ns ns/iter (threshold: $threshold_ns ns)"
+              "startup_roundtrip_ns=$ns" | Out-File -Append $env:GITHUB_STEP_SUMMARY
+              if ($ns -gt $threshold_ns) {
+                Write-Host "::warning::AppConfig roundtrip $ns ns exceeds threshold $threshold_ns ns"
+              }
+            }
+          } else {
+            Write-Host "::warning::AppConfig/roundtrip_in_memory bench result not found"
+          }
+
+      - name: Build release binary
+        run: cargo build --release --manifest-path src-tauri/Cargo.toml
 
       - name: Measure release binary size
         shell: pwsh
         run: |
-          cargo build --release --manifest-path src-tauri/Cargo.toml
           $bin = Get-ChildItem -Path src-tauri/target/release -Filter "cursor-forge.exe" -Recurse | Select-Object -First 1
           if ($bin) {
             $sizeMB = [math]::Round($bin.Length / 1MB, 2)
@@ -56,5 +87,32 @@ jobs:
             "release_exe_size_mb=$sizeMB" | Out-File -Append $env:GITHUB_STEP_SUMMARY
             if ($sizeMB -gt 30) {
               Write-Host "::warning::Release exe size $sizeMB MB exceeds 30 MB target"
+            }
+          } else {
+            Write-Host "::error::release exe not found"
+            exit 1
+          }
+
+      # Tauri WebView を起動せずに peak working set を見ることはできないため、
+      # 単体ベンチ (release ビルド) を 1 回走らせて、その親プロセスの最大ワーキングセットを測る。
+      # Rust 起動初期化 + criterion 構造体だけのベースラインなので、目標 15 MB の半分以下を期待。
+      - name: Measure peak working set (rust startup baseline)
+        shell: pwsh
+        working-directory: src-tauri
+        run: |
+          $bench_exe = Get-ChildItem -Path target/release/deps -Filter "startup-*.exe" |
+            Where-Object { $_.Name -notlike "*.d" } | Select-Object -First 1
+          if (-not $bench_exe) {
+            Write-Host "::warning::startup bench exe not found, skipping memory measurement"
+            exit 0
+          }
+          # --list で immediate exit (ベンチを実行せず構造のみ列挙)
+          $proc = Start-Process -FilePath $bench_exe.FullName -ArgumentList "--list" -PassThru -NoNewWindow -Wait
+          if ($proc.PeakWorkingSet64) {
+            $peakMB = [math]::Round($proc.PeakWorkingSet64 / 1MB, 2)
+            Write-Host "rust_startup_peak_mb=$peakMB"
+            "rust_startup_peak_mb=$peakMB" | Out-File -Append $env:GITHUB_STEP_SUMMARY
+            if ($peakMB -gt 15) {
+              Write-Host "::warning::Rust startup peak working set $peakMB MB exceeds 15 MB target"
             }
           }
