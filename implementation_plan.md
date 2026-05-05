@@ -71,7 +71,11 @@
 - [ ] `Schemes` の文字列フォーマット制約（セミコロン区切り、`,` 不可、`REG_EXPAND_SZ` 採用判断）
 - [x] **OS 設定の外部変更検知** — `cursor_watcher.rs` で `WM_SETTINGCHANGE` の `SPI_SETCURSORS` を購読、`cursor-changed` Tauri イベントを発火、ライブラリ画面が `loadThemes()` で再読込
 - [ ] 未指定役割（`SizeAll` 等）を「Windows 標準継承」とするレジストリ書き出し仕様
-- [ ] 孤児カーソル復旧（ヘルスチェック）— `~/.custom_cursors/` 手動削除時の自動標準復帰
+- [x] **孤児カーソル復旧（ヘルスチェック）** — `~/.custom_cursors/` 手動削除時の自動標準復帰
+  - `ThemeManager::theme_exists(id)` / `cleanup_orphan_references(&config)` を追加
+  - 起動時に `active_theme_id` / `dark_mode.{light,dark}_theme_id` を全件チェック
+  - `active_theme_id` が孤児: `RegistryManager::reset_to_windows_default()` + config クリア
+  - dark_mode 側が孤児: 該当フィールドを `None` に戻す (適用済みでなければレジストリは触らない)
 
 ### 2-3: 初回スナップショット ✅
 - [x] 初回起動時に `_initial_snapshot.json` を自動保存

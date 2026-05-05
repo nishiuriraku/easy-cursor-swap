@@ -169,6 +169,85 @@ pub struct ThemeSummary {
 pub struct ThemeManager;
 
 impl ThemeManager {
+    /// 指定 ID のテーマがディスク上に存在するかを確認する。
+    /// `~/.custom_cursors/<UUID>/theme.json` の存在のみで判定する (中身は検証しない)。
+    pub fn theme_exists(id: Uuid) -> bool {
+        use crate::config::ConfigManager;
+        let cursors_dir = match ConfigManager::cursors_dir() {
+            Ok(d) => d,
+            Err(_) => return false,
+        };
+        cursors_dir.join(id.to_string()).join("theme.json").is_file()
+    }
+
+    /// 起動時の孤児カーソル復旧チェック。
+    ///
+    /// config が指すテーマ ID (`active_theme_id` / `dark_mode.{light,dark}_theme_id`) が
+    /// ディスク上に存在しない場合、以下を実行する:
+    ///  - `active_theme_id` が孤児: レジストリを Windows 既定に戻し、`active_theme_id = None`
+    ///  - dark_mode 側の孤児: 該当フィールドを `None` に戻す (適用済みでなければレジストリは触らない)
+    ///
+    /// 何もする必要がなければ `Ok(false)` を返す。復旧した場合は `Ok(true)`。
+    pub fn cleanup_orphan_references(
+        config: &crate::config::ConfigManager,
+    ) -> AppResult<bool> {
+        use crate::registry::RegistryManager;
+
+        let cfg = config.get()?;
+        let active_orphan = cfg
+            .general
+            .active_theme_id
+            .is_some_and(|id| !Self::theme_exists(id));
+        let dark_orphan = cfg
+            .dark_mode
+            .dark_theme_id
+            .is_some_and(|id| !Self::theme_exists(id));
+        let light_orphan = cfg
+            .dark_mode
+            .light_theme_id
+            .is_some_and(|id| !Self::theme_exists(id));
+
+        if !active_orphan && !dark_orphan && !light_orphan {
+            return Ok(false);
+        }
+
+        if active_orphan {
+            tracing::warn!(
+                "孤児カーソル検出: active_theme_id={:?} のディレクトリが消失 → Windows 既定へ復元",
+                cfg.general.active_theme_id
+            );
+            // 失敗してもベストエフォートで config 側は修正する
+            if let Err(e) = RegistryManager::reset_to_windows_default() {
+                tracing::warn!("孤児復旧時の Windows 既定への戻し失敗: {}", e);
+            }
+        }
+        if dark_orphan {
+            tracing::warn!(
+                "孤児カーソル検出: dark_mode.dark_theme_id={:?} のディレクトリが消失",
+                cfg.dark_mode.dark_theme_id
+            );
+        }
+        if light_orphan {
+            tracing::warn!(
+                "孤児カーソル検出: dark_mode.light_theme_id={:?} のディレクトリが消失",
+                cfg.dark_mode.light_theme_id
+            );
+        }
+
+        config.update(|c| {
+            if active_orphan {
+                c.general.active_theme_id = None;
+            }
+            if dark_orphan {
+                c.dark_mode.dark_theme_id = None;
+            }
+            if light_orphan {
+                c.dark_mode.light_theme_id = None;
+            }
+        })?;
+        Ok(true)
+    }
+
     /// インストール済みテーマの一覧を取得する。
     /// `active_id` (config.general.active_theme_id) と一致するテーマだけ
     /// `is_active = true` で返却する。
@@ -702,5 +781,12 @@ mod tests {
     #[test]
     fn rejects_nul_byte() {
         assert!(sanitize_archive_path("foo\0bar").is_err());
+    }
+
+    #[test]
+    fn theme_exists_returns_false_for_random_uuid() {
+        // ~/.custom_cursors/<random-uuid>/theme.json はまず存在しないので false
+        let id = uuid::Uuid::new_v4();
+        assert!(!super::ThemeManager::theme_exists(id));
     }
 }
