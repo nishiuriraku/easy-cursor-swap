@@ -116,10 +116,17 @@
 - [x] ホットスポット座標の書き込みとスケーリング
 - [x] PNG エンコーディングによるデータ圧縮
 
-### 3-3: `.ani` パーサー
-- [ ] RIFF/ACON 構造解析
-- [ ] フレーム抽出 + JIFF タイミング情報取得
-- [ ] プレビュー用 PNG / アニメーション情報の返却
+### 3-3: `.ani` パーサー ✅ 実装完了 (検査専用)
+- [x] **RIFF/ACON 構造解析** (`cursor::parse_ani`)
+  - 'anih' ヘッダー (36 byte ANIHEADER) パース
+  - 'rate' 配列 (省略時は anih.jifRate を均一展開)
+  - 'seq ' 配列 (省略時は `0..num_frames`)
+  - 'LIST' 'fram' 内の連続 'icon' チャンク (各々完全な CUR ファイル)
+- [x] **フレーム抽出 + JIFF タイミング情報取得** — `ParsedAni::total_duration_ms()` で整数除算誤差を回避
+- [x] **プレビュー用 PNG / アニメーション情報の返却** — `inspect_ani_file` IPC
+  - 戻り値: `{ numFrames, numSteps, defaultRateJiffies, perStepDurationsMs, sequence, totalDurationMs, framePngs[], width, height, hotspotX/Y }`
+- [x] 単体テスト 4 件 (合成 ANI roundtrip / 非 RIFF 拒否 / WAVE 拒否 / rate チャンク使用)
+- [ ] v1 では検査・プレビューのみ。.ani 新規生成は対応外 (既知制限事項)
 
 ### 3-4: ICO/CUR インポーター ✅ 実装完了
 - [x] **複数解像度内蔵構造の解析** (`cursor::parse_ico_cur`)

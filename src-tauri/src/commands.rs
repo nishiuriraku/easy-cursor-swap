@@ -9,7 +9,8 @@ use crate::backup::{BackupManager, ProfileEnvelope};
 use crate::config::{AppConfig, BackupInfo, ConfigManager};
 use crate::health::is_major_bump;
 use crate::cursor::{
-    build_cur_from_png, clear_resize_cache, parse_ico_cur, pick_largest_as_png, ResizeMethod,
+    build_cur_from_png, clear_resize_cache, parse_ani, parse_ico_cur, pick_largest_as_png,
+    ResizeMethod,
 };
 use sha2::Digest;
 use crate::darkmode;
@@ -473,6 +474,91 @@ pub fn import_cursor_file(path: String) -> Result<ImportedCursorFile, AppError> 
     })
 }
 
+/// `.ani` ファイル検査結果。クリエイター UI のプレビュー / 情報表示用。
+///
+/// `framePngs` は再生順 (= sequence インデックスを展開した順) ではなく、
+/// 格納順 (フレーム 0..num_frames-1) に並ぶ。UI 側で `sequence` と
+/// `perStepDurationsMs` を見ながら setInterval / requestAnimationFrame で
+/// アニメーション再生する。
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AniInspection {
+    pub num_frames: u32,
+    pub num_steps: u32,
+    pub default_rate_jiffies: u32,
+    pub per_step_durations_ms: Vec<u32>,
+    pub sequence: Vec<u32>,
+    pub total_duration_ms: u64,
+    /// 各フレームの最大解像度 PNG バイト列
+    pub frame_pngs: Vec<Vec<u8>>,
+    pub width: u32,
+    pub height: u32,
+    pub hotspot_x: u32,
+    pub hotspot_y: u32,
+}
+
+/// `.ani` ファイルを読み込み、フレームごとの PNG とアニメーション情報を返す。
+#[tauri::command]
+pub fn inspect_ani_file(path: String) -> Result<AniInspection, AppError> {
+    let bytes = std::fs::read(&path).map_err(|e| {
+        AppError::ImageProcessing(format!(
+            "ファイル読込失敗 ({}): {}",
+            crate::logging::redact_path(std::path::Path::new(&path)),
+            e
+        ))
+    })?;
+    let parsed = parse_ani(&bytes)?;
+
+    let mut frame_pngs: Vec<Vec<u8>> = Vec::with_capacity(parsed.frames.len());
+    for entry in &parsed.frames {
+        let mut png = Vec::new();
+        let encoder = image::codecs::png::PngEncoder::new(&mut png);
+        image::ImageEncoder::write_image(
+            encoder,
+            entry.image.as_raw(),
+            entry.image.width(),
+            entry.image.height(),
+            image::ExtendedColorType::Rgba8,
+        )
+        .map_err(|e| AppError::ImageProcessing(format!("PNG エンコード失敗: {}", e)))?;
+        frame_pngs.push(png);
+    }
+
+    let per_step_durations_ms: Vec<u32> = parsed
+        .per_step_rate_jiffies
+        .iter()
+        .map(|j| ((*j as u64 * 1000) / 60) as u32)
+        .collect();
+    let total_duration_ms = parsed.total_duration_ms();
+
+    let (width, height, hotspot_x, hotspot_y) = parsed
+        .frames
+        .first()
+        .map(|f| (f.width, f.height, f.hotspot_x, f.hotspot_y))
+        .unwrap_or((0, 0, 0, 0));
+
+    tracing::info!(
+        "inspect_ani_file: frames={} steps={} total={}ms",
+        parsed.num_frames,
+        parsed.num_steps,
+        total_duration_ms
+    );
+
+    Ok(AniInspection {
+        num_frames: parsed.num_frames,
+        num_steps: parsed.num_steps,
+        default_rate_jiffies: parsed.default_rate_jiffies,
+        per_step_durations_ms,
+        sequence: parsed.sequence,
+        total_duration_ms,
+        frame_pngs,
+        width,
+        height,
+        hotspot_x,
+        hotspot_y,
+    })
+}
+
 /// 現在の自動起動 (HKCU Run) 登録状態を返す。
 ///
 /// 設定 `general.auto_start` とレジストリ実態が乖離していないかの確認用。
@@ -644,5 +730,6 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         get_accessibility_conflicts,
         get_autostart_status,
         import_cursor_file,
+        inspect_ani_file,
     ]
 }
