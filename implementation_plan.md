@@ -111,9 +111,15 @@
 - [ ] フレーム抽出 + JIFF タイミング情報取得
 - [ ] プレビュー用 PNG / アニメーション情報の返却
 
-### 3-4: ICO/CUR インポーター
-- [ ] 複数解像度内蔵構造の解析
-- [ ] 6サイズスロットへの自動マッピング
+### 3-4: ICO/CUR インポーター ✅ 実装完了
+- [x] **複数解像度内蔵構造の解析** (`cursor::parse_ico_cur`)
+  - ICONDIR + ICONDIRENTRY × N をパース
+  - PNG エンコード済みエントリ (Vista 以降の 256px) に対応
+  - 32bpp BMP DIB エントリ (BITMAPINFOHEADER + XOR mask) に対応
+  - CUR (Type 2) はホットスポット情報も抽出
+  - 単体テスト 4 件 (roundtrip / 不正ヘッダー / 不正種別 / 最大解像度ピック)
+- [x] **6 サイズスロットへの自動マッピング** — `pick_largest_as_png` で最大解像度を PNG 化、creator 側のリサイズパイプラインに乗せる設計
+- [x] **`import_cursor_file` IPC** — パス → `{ isCur, hotspotX/Y, width, height, pngBytes, availableSizes }`
 
 ---
 

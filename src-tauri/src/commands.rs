@@ -8,7 +8,9 @@ use crate::autostart;
 use crate::backup::{BackupManager, ProfileEnvelope};
 use crate::config::{AppConfig, BackupInfo, ConfigManager};
 use crate::health::is_major_bump;
-use crate::cursor::{build_cur_from_png, clear_resize_cache, ResizeMethod};
+use crate::cursor::{
+    build_cur_from_png, clear_resize_cache, parse_ico_cur, pick_largest_as_png, ResizeMethod,
+};
 use sha2::Digest;
 use crate::darkmode;
 use crate::environment::EnvironmentReport;
@@ -421,6 +423,56 @@ pub fn update_config(
     Ok(saved)
 }
 
+/// `.ico` / `.cur` をクリエイターモードへ取り込むときの戻り値。
+///
+/// `pngBytes` が最大解像度のラスタ画像 (RGBA PNG)。
+/// `availableSizes` は元ファイルに含まれていた全エントリの幅 (= 高さ前提)。
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportedCursorFile {
+    pub is_cur: bool,
+    pub width: u32,
+    pub height: u32,
+    pub hotspot_x: u32,
+    pub hotspot_y: u32,
+    pub png_bytes: Vec<u8>,
+    pub available_sizes: Vec<u32>,
+}
+
+/// `.ico` / `.cur` ファイルを読み込み、最大解像度を PNG 化して返す。
+///
+/// クリエイターモードで「既存の Windows カーソルを取り込む」用途。
+/// 全解像度を返すと IPC ペイロードが膨らむため、最大サイズのみを返却する設計。
+#[tauri::command]
+pub fn import_cursor_file(path: String) -> Result<ImportedCursorFile, AppError> {
+    let bytes = std::fs::read(&path).map_err(|e| {
+        AppError::ImageProcessing(format!(
+            "ファイル読込失敗 ({}): {}",
+            crate::logging::redact_path(std::path::Path::new(&path)),
+            e
+        ))
+    })?;
+    let parsed = parse_ico_cur(&bytes)?;
+    let available_sizes = parsed.entries.iter().map(|e| e.width).collect();
+    let (largest, png_bytes) = pick_largest_as_png(&parsed)?;
+    tracing::info!(
+        "import_cursor_file: is_cur={} entries={} largest={}x{}",
+        parsed.is_cur,
+        parsed.entries.len(),
+        largest.width,
+        largest.height
+    );
+    Ok(ImportedCursorFile {
+        is_cur: parsed.is_cur,
+        width: largest.width,
+        height: largest.height,
+        hotspot_x: largest.hotspot_x,
+        hotspot_y: largest.hotspot_y,
+        png_bytes,
+        available_sizes,
+    })
+}
+
 /// 現在の自動起動 (HKCU Run) 登録状態を返す。
 ///
 /// 設定 `general.auto_start` とレジストリ実態が乖離していないかの確認用。
@@ -591,5 +643,6 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         open_url,
         get_accessibility_conflicts,
         get_autostart_status,
+        import_cursor_file,
     ]
 }
