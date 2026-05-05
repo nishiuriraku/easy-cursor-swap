@@ -245,6 +245,13 @@ impl RegistryManager {
 
     /// カーソル設定をレジストリに書き込み、即時反映する
     /// トランザクション保護付き
+    ///
+    /// **17 役割すべて**を書き換える:
+    ///   - `cursor_paths` に含まれる役割: そのパスを書き込み
+    ///   - 含まれない役割: 空文字列を書き込み (Windows 既定にフォールバック)
+    ///
+    /// この方針により、前回適用テーマのパスが空きスロットに残留して
+    /// 次のテーマと混在する不具合を防ぐ。
     pub fn apply_cursors(cursor_paths: &HashMap<String, PathBuf>) -> AppResult<()> {
         use winreg::enums::*;
         use winreg::RegKey;
@@ -259,9 +266,9 @@ impl RegistryManager {
             .open_subkey_with_flags("Control Panel\\Cursors", KEY_WRITE)
             .map_err(|e| AppError::Registry(format!("Cursors キーを開けません: {}", e)))?;
 
-        for (name, path) in cursor_paths {
-            let path_str = path.to_string_lossy().to_string();
-            if let Err(e) = cursors_key.set_value(name, &path_str) {
+        let entries = compute_apply_values(cursor_paths);
+        for (name, value) in &entries {
+            if let Err(e) = cursors_key.set_value(name, value) {
                 // 書き込み失敗時はスナップショットから復元
                 tracing::error!("レジストリ書き込み失敗 ({}): {}", name, e);
                 let _ = Self::restore_from_snapshot(&current_values);
@@ -279,7 +286,11 @@ impl RegistryManager {
         // 4. スナップショット削除（成功）
         Self::remove_pending_snapshot()?;
 
-        tracing::info!("カーソル設定を適用しました");
+        tracing::info!(
+            "カーソル設定を適用しました (上書き={} / 既定継承={})",
+            cursor_paths.len(),
+            17 - cursor_paths.len()
+        );
         Ok(())
     }
 
@@ -440,5 +451,72 @@ impl RegistryManager {
 
         tracing::info!("初回スナップショットからカーソル設定を復元しました");
         Ok(())
+    }
+}
+
+/// 17 役割それぞれに書き込むレジストリ値を計算する。
+///
+/// `cursor_paths` に含まれる役割は絶対パス、含まれない役割は空文字列を返す。
+/// 空文字列は Windows のレジストリにおいて「既定カーソルへフォールバック」を意味する。
+///
+/// `apply_cursors` から切り出した純粋関数。レジストリに依存しないので単体テスト可能。
+fn compute_apply_values(
+    cursor_paths: &HashMap<String, PathBuf>,
+) -> Vec<(&'static str, String)> {
+    CursorRole::all()
+        .iter()
+        .map(|role| {
+            let name = role.registry_name();
+            let value = cursor_paths
+                .get(name)
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_default();
+            (name, value)
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn compute_apply_values_returns_all_17_roles() {
+        let map: HashMap<String, PathBuf> = HashMap::new();
+        let entries = compute_apply_values(&map);
+        assert_eq!(entries.len(), 17);
+        // 全部空文字列のはず
+        assert!(entries.iter().all(|(_, v)| v.is_empty()));
+    }
+
+    #[test]
+    fn compute_apply_values_writes_specified_paths_and_empty_for_others() {
+        let mut map: HashMap<String, PathBuf> = HashMap::new();
+        map.insert("Arrow".to_string(), PathBuf::from("C:\\cursors\\arrow.cur"));
+        map.insert("IBeam".to_string(), PathBuf::from("C:\\cursors\\ibeam.cur"));
+
+        let entries = compute_apply_values(&map);
+        let by_name: HashMap<&str, &str> = entries
+            .iter()
+            .map(|(k, v)| (*k, v.as_str()))
+            .collect();
+
+        // 指定した役割は書き込み値あり
+        assert_eq!(by_name["Arrow"], "C:\\cursors\\arrow.cur");
+        assert_eq!(by_name["IBeam"], "C:\\cursors\\ibeam.cur");
+        // 指定していない役割は空文字列 (Windows 既定継承)
+        assert_eq!(by_name["SizeAll"], "");
+        assert_eq!(by_name["Wait"], "");
+        assert_eq!(by_name["Hand"], "");
+    }
+
+    #[test]
+    fn compute_apply_values_ignores_unknown_role_names() {
+        // 未知のキーは 17 役割の出力に影響しない
+        let mut map: HashMap<String, PathBuf> = HashMap::new();
+        map.insert("UnknownRole".to_string(), PathBuf::from("C:\\foo.cur"));
+        let entries = compute_apply_values(&map);
+        assert_eq!(entries.len(), 17);
+        assert!(entries.iter().all(|(_, v)| v.is_empty()));
     }
 }
