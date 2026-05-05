@@ -15,6 +15,9 @@
 import { computed, ref, watch } from 'vue'
 import { CURSOR_ROLES } from '~/components/icons/CursorIcons'
 import { invokeTauri } from '~/composables/useTauri'
+import { useI18n } from '~/composables/useI18n'
+
+const { t } = useI18n()
 
 interface LogEntry {
   /** 経過時間 (ms 文字列) */
@@ -38,7 +41,9 @@ const completedRoles = ref(0)
 const logs = ref<LogEntry[]>([])
 const startedAt = ref(0)
 
-const stageLabel = computed(() => stage.value === 1 ? 'Windows 既定' : 'スナップショット')
+const stageLabel = computed(() =>
+  stage.value === 1 ? t('panic.stage1Label') : t('panic.stage2Label'),
+)
 const progressPct = computed(() =>
   Math.round((completedRoles.value / CURSOR_ROLES.length) * 100),
 )
@@ -138,8 +143,8 @@ function logMark(s: LogEntry['status']): string {
             <UiIcon name="Alert" :size="22" />
           </div>
           <div class="panic-title-block">
-            <h2>パニックリセットを実行</h2>
-            <p>現在のカーソル設定を破棄し、選択した状態へ強制復元します。</p>
+            <h2>{{ t('panic.title') }}</h2>
+            <p>{{ t('panic.description') }}</p>
           </div>
           <span class="hotkey">⌃⌥⇧R</span>
         </header>
@@ -152,11 +157,11 @@ function logMark(s: LogEntry['status']): string {
             @click="selectStage(1)"
           >
             <div class="stage-meta">
-              <span class="step">STEP 01</span>
-              <span class="badge danger">Stage 1</span>
+              <span class="step">{{ t('panic.step01') }}</span>
+              <span class="badge danger">{{ t('panic.badgeStage1') }}</span>
             </div>
-            <h3>Windows 既定に戻す</h3>
-            <p>OS 出荷時のシステムスキームへ強制リセット。最終救済として常にアクセス可能。</p>
+            <h3>{{ t('panic.stage1Title') }}</h3>
+            <p>{{ t('panic.stage1Desc') }}</p>
           </button>
 
           <button
@@ -165,11 +170,11 @@ function logMark(s: LogEntry['status']): string {
             @click="selectStage(2)"
           >
             <div class="stage-meta">
-              <span class="step">STEP 02</span>
-              <span class="badge">Stage 2</span>
+              <span class="step">{{ t('panic.step02') }}</span>
+              <span class="badge">{{ t('panic.badgeStage2') }}</span>
             </div>
-            <h3>インストール前の状態に戻す</h3>
-            <p>初回起動時に取得した _initial_snapshot から復元。CursorFX 等の旧設定を保護。</p>
+            <h3>{{ t('panic.stage2Title') }}</h3>
+            <p>{{ t('panic.stage2Desc') }}</p>
           </button>
         </div>
 
@@ -178,11 +183,11 @@ function logMark(s: LogEntry['status']): string {
           <div class="trace-head">
             <span :class="['phase-dot', phase]" />
             <span class="phase-label">
-              {{ phase === 'running' ? `Restoring · Stage ${stage} — ${stageLabel}`
-                 : phase === 'done' ? `Recovery complete — Stage ${stage}`
-                 : 'Recovery error' }}
+              {{ phase === 'running' ? t('panic.restoringLabel', { n: stage, label: stageLabel })
+                 : phase === 'done' ? t('panic.completeLabel', { n: stage })
+                 : t('panic.errorLabel') }}
             </span>
-            <span class="role-count">{{ completedRoles }} / {{ CURSOR_ROLES.length }} keys</span>
+            <span class="role-count">{{ t('panic.keys', { done: completedRoles, total: CURSOR_ROLES.length }) }}</span>
           </div>
 
           <div class="progress-track">
@@ -216,28 +221,28 @@ function logMark(s: LogEntry['status']): string {
         <footer class="panic-foot">
           <span class="foot-note">
             <template v-if="phase === 'running' && remainingMs !== null">
-              est. {{ (remainingMs / 1000).toFixed(1) }}s remaining · auto-rollback armed
+              {{ t('panic.estRemaining', { seconds: (remainingMs / 1000).toFixed(1) }) }}
             </template>
             <template v-else-if="phase === 'idle'">
-              選択した段階で 17 個のレジストリ値を書き換えます
+              {{ t('panic.idleHint') }}
             </template>
             <template v-else-if="phase === 'done'">
-              snapshot retained at ~/.custom_cursors/_initial_snapshot.json
+              {{ t('panic.doneHint') }}
             </template>
             <template v-else>
-              復旧に失敗しました。ログを確認してください。
+              {{ t('panic.errorHint') }}
             </template>
           </span>
           <div class="foot-actions">
             <button v-if="phase === 'idle'" class="btn ghost" @click="close">
-              キャンセル
+              {{ t('common.cancel') }}
             </button>
             <button
               v-if="phase === 'idle'"
               class="btn danger"
               @click="execute"
             >
-              <UiIcon name="Alert" :size="13" />Stage {{ stage }} を実行
+              <UiIcon name="Alert" :size="13" />{{ t('panic.runStage', { n: stage }) }}
             </button>
             <button
               v-else-if="phase === 'running'"
@@ -245,10 +250,10 @@ function logMark(s: LogEntry['status']): string {
               disabled
             >
               <span class="spinner" style="width: 13px; height: 13px" />
-              実行中...
+              {{ t('panic.running') }}
             </button>
             <button v-else class="btn primary" @click="close">
-              <UiIcon name="Check" :size="13" />閉じる
+              <UiIcon name="Check" :size="13" />{{ t('common.close') }}
             </button>
           </div>
         </footer>

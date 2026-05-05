@@ -361,10 +361,11 @@
 - [x] `default.vue` で起動時に config 同期 + watch で動的更新
 - [x] サイドバーをサンプルとして i18n 配線
 - [x] `theme.json` の多言語フィールド対応（`LocalizedString`）
-- [x] **library / settings / appearance / marketplace / creator / ApplyModal の文字列を `t()` 化** (158 キー / ja-en parity)
+- [x] **全画面 + 全モーダルの文字列を `t()` 化** (177 キー / ja-en parity)
 - [x] 通知メッセージ (`library.notifyApplied` / `notifyImported`) も多言語化
-- [x] CI で `scripts/check-i18n.mjs` がキー差分を検出 (現在 ja=en=158)
-- [ ] 残: PanicFlow / ImportConflictDialog / SettingsRow ラベル類 (次回)
+- [x] CI で `scripts/check-i18n.mjs` がキー差分を検出 (現在 ja=en=177)
+- [x] PanicFlow / ImportConflictDialog も完了
+- [ ] 残: 設定画面の各セクション本文 (現状は dynamic な短い説明のみ)
 
 ---
 

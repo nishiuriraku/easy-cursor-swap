@@ -7,6 +7,9 @@
  * 既存テーマの theme.json を並べて表示。
  */
 import { computed } from 'vue'
+import { useI18n } from '~/composables/useI18n'
+
+const { t } = useI18n()
 
 export interface ConflictInfo {
   id: string
@@ -53,22 +56,22 @@ const compareResult = computed(() => {
 const headerLabel = computed(() => {
   switch (compareResult.value) {
     case 'newer':
-      return '新しいバージョンへの更新'
+      return t('conflict.headerNewer')
     case 'older':
-      return '古いバージョンへのダウングレード'
+      return t('conflict.headerOlder')
     default:
-      return '同一バージョンの再インポート'
+      return t('conflict.headerSame')
   }
 })
 
 const headerDesc = computed(() => {
   switch (compareResult.value) {
     case 'newer':
-      return '既存テーマを最新版で上書きします。'
+      return t('conflict.descNewer')
     case 'older':
-      return '既存より古いテーマで上書きしようとしています。意図した操作か確認してください。'
+      return t('conflict.descOlder')
     default:
-      return '同じバージョンを再インポートします (差分があれば反映されます)。'
+      return t('conflict.descSame')
   }
 })
 
@@ -97,7 +100,7 @@ function onBackdrop(e: MouseEvent) {
       <div class="modal-body">
         <div class="diff-grid">
           <div class="col">
-            <div class="col-head">既存</div>
+            <div class="col-head">{{ t('conflict.colExisting') }}</div>
             <div class="diff-name">{{ info.existing.name }}</div>
             <div class="diff-meta">
               <span class="m">v{{ info.existing.version }}</span>
@@ -113,7 +116,7 @@ function onBackdrop(e: MouseEvent) {
           </div>
 
           <div class="col" :style="{ borderColor: headerAccent }">
-            <div class="col-head" :style="{ color: headerAccent }">インポート対象</div>
+            <div class="col-head" :style="{ color: headerAccent }">{{ t('conflict.colImport') }}</div>
             <div class="diff-name">{{ info.name }}</div>
             <div class="diff-meta">
               <span class="m" :style="{ color: headerAccent }">v{{ info.version }}</span>
@@ -133,16 +136,16 @@ function onBackdrop(e: MouseEvent) {
       <div class="modal-foot">
         <div class="left-note">
           <UiIcon name="Shield" :size="12" style="color: var(--accent)" />
-          上書き後も `_initial_snapshot.json` は保持されます
+          {{ t('conflict.snapshotNote') }}
         </div>
         <div class="actions">
-          <button class="btn ghost" @click="emit('cancel')">キャンセル</button>
+          <button class="btn ghost" @click="emit('cancel')">{{ t('common.cancel') }}</button>
           <button
             :class="['btn', compareResult === 'older' ? 'danger' : 'primary']"
             @click="emit('overwrite')"
           >
             <UiIcon name="Check" :size="13" />
-            {{ compareResult === 'older' ? 'ダウングレードして上書き' : '上書きインポート' }}
+            {{ compareResult === 'older' ? t('conflict.downgrade') : t('conflict.overwrite') }}
           </button>
         </div>
       </div>
