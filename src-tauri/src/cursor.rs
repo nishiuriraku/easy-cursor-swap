@@ -171,6 +171,35 @@ pub fn scale_hotspot(
     (new_x.min(target_size - 1), new_y.min(target_size - 1))
 }
 
+/// PNG バイト列を再エンコードして tEXt / iTXt / zTXt / eXIf 等の
+/// 補助チャンクを完全除去する。
+///
+/// 仕様書 §「セキュリティ」より:
+///  > PNG 画像に隠された不正コードやトラッキングデータ (Exif等) を排除するため、
+///  > Rust での画像処理時に純粋なピクセルデータのみを抽出し、元のメタデータは
+///  > 全て破棄して .cur を生成する。
+///
+/// `image` クレートの `PngEncoder` は IHDR/IDAT/IEND のみを書き出す仕様なので、
+/// `DynamicImage` 経由のラウンドトリップでメタデータは自動的に剥がれる。
+/// この関数はその性質を明示的に活用するヘルパー。
+pub fn strip_png_metadata(png_bytes: &[u8]) -> AppResult<Vec<u8>> {
+    let img = image::load_from_memory_with_format(png_bytes, image::ImageFormat::Png)
+        .map_err(|e| AppError::ImageProcessing(format!("PNG デコード失敗: {}", e)))?;
+    let rgba = img.to_rgba8();
+
+    let mut buf = Vec::new();
+    let encoder = image::codecs::png::PngEncoder::new(&mut buf);
+    image::ImageEncoder::write_image(
+        encoder,
+        rgba.as_raw(),
+        rgba.width(),
+        rgba.height(),
+        image::ExtendedColorType::Rgba8,
+    )
+    .map_err(|e| AppError::ImageProcessing(format!("PNG 再エンコード失敗: {}", e)))?;
+    Ok(buf)
+}
+
 /// PNG バイト列から .cur ファイルバイナリを生成する。
 /// 6 サイズ全てに自動リサイズ + ホットスポットのスケーリングを行う。
 ///
@@ -178,6 +207,9 @@ pub fn scale_hotspot(
 ///  - `png_bytes`: 元画像 (PNG)
 ///  - `hotspot_x` / `hotspot_y`: 元画像での座標 (px)
 ///  - `resample`: リサイズアルゴリズム
+///
+/// メタデータ (tEXt/iTXt/zTXt/eXIf) は内部の DynamicImage 経由で自動剥離されるため、
+/// 出力 .cur には元 PNG の補助チャンクは残らない。
 pub fn build_cur_from_png(
     png_bytes: &[u8],
     hotspot_x: u32,
@@ -335,5 +367,109 @@ mod tests {
         assert_eq!(ResizeMethod::from_str("pixel"), ResizeMethod::Nearest);
         assert_eq!(ResizeMethod::from_str("lanczos"), ResizeMethod::Lanczos);
         assert_eq!(ResizeMethod::from_str("unknown"), ResizeMethod::Lanczos);
+    }
+
+    /// tEXt チャンクを含む PNG を作成し、strip_png_metadata が剥離することを確認する。
+    #[test]
+    fn test_strip_png_metadata_removes_text_chunk() {
+        // 32x32 のダミー画像を PngEncoder で生成 (これ自体は metadata-free)
+        let img = RgbaImage::from_pixel(32, 32, image::Rgba([0, 128, 255, 255]));
+        let mut clean_png = Vec::new();
+        let encoder = image::codecs::png::PngEncoder::new(&mut clean_png);
+        image::ImageEncoder::write_image(
+            encoder,
+            img.as_raw(),
+            32,
+            32,
+            image::ExtendedColorType::Rgba8,
+        )
+        .unwrap();
+
+        // 手動で tEXt チャンクを IEND の直前に挿入 (PII / トラッキングを模擬)
+        let dirty_png = inject_text_chunk(&clean_png, b"Author", b"private@example.com");
+
+        // tEXt チャンクが入っていることを確認 (前提条件)
+        assert!(
+            find_chunk(&dirty_png, b"tEXt").is_some(),
+            "tEXt 注入が失敗"
+        );
+
+        // strip_png_metadata で除去
+        let stripped = strip_png_metadata(&dirty_png).expect("strip");
+
+        // tEXt が消えていることを確認
+        assert!(
+            find_chunk(&stripped, b"tEXt").is_none(),
+            "tEXt が残存している"
+        );
+        // IDAT は残っていることを確認 (画像データ自体は保持)
+        assert!(find_chunk(&stripped, b"IDAT").is_some());
+    }
+
+    /// PNG にテキストチャンク (tEXt) を挿入するテストヘルパー。
+    fn inject_text_chunk(png: &[u8], keyword: &[u8], text: &[u8]) -> Vec<u8> {
+        // IEND チャンクの位置を見つける
+        let iend_pos = find_chunk(png, b"IEND").expect("IEND not found");
+
+        // tEXt のデータ部 = keyword + 0x00 + text
+        let mut data = Vec::new();
+        data.extend_from_slice(keyword);
+        data.push(0x00);
+        data.extend_from_slice(text);
+
+        let mut chunk = Vec::new();
+        chunk.extend_from_slice(&(data.len() as u32).to_be_bytes());
+        chunk.extend_from_slice(b"tEXt");
+        chunk.extend_from_slice(&data);
+        // CRC32 (type + data)
+        let mut crc_input = Vec::new();
+        crc_input.extend_from_slice(b"tEXt");
+        crc_input.extend_from_slice(&data);
+        chunk.extend_from_slice(&crc32(&crc_input).to_be_bytes());
+
+        // IEND の直前 (= iend_pos - 8 から: 4 byte length + 4 byte type) に挿入
+        let insert_at = iend_pos - 4; // length 4 byte 前
+        let mut out = Vec::with_capacity(png.len() + chunk.len());
+        out.extend_from_slice(&png[..insert_at]);
+        out.extend_from_slice(&chunk);
+        out.extend_from_slice(&png[insert_at..]);
+        out
+    }
+
+    /// チャンクタイプ (4 bytes) を探して、その位置 (タイプ先頭オフセット) を返す。
+    fn find_chunk(png: &[u8], chunk_type: &[u8; 4]) -> Option<usize> {
+        // PNG header 8 bytes をスキップ
+        let mut pos = 8;
+        while pos + 8 <= png.len() {
+            let len = u32::from_be_bytes([
+                png[pos],
+                png[pos + 1],
+                png[pos + 2],
+                png[pos + 3],
+            ]) as usize;
+            let typ = &png[pos + 4..pos + 8];
+            if typ == chunk_type {
+                return Some(pos + 4);
+            }
+            pos += 4 + 4 + len + 4; // length + type + data + crc
+        }
+        None
+    }
+
+    /// CRC32 (PNG-style)
+    fn crc32(data: &[u8]) -> u32 {
+        let mut table = [0u32; 256];
+        for n in 0..256 {
+            let mut c = n as u32;
+            for _ in 0..8 {
+                c = if c & 1 != 0 { 0xedb88320 ^ (c >> 1) } else { c >> 1 };
+            }
+            table[n] = c;
+        }
+        let mut crc = 0xffffffffu32;
+        for &b in data {
+            crc = table[((crc ^ b as u32) & 0xff) as usize] ^ (crc >> 8);
+        }
+        crc ^ 0xffffffff
     }
 }

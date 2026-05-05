@@ -59,10 +59,12 @@
 ### 3-1: 画像処理パイプライン ✅
 - [x] Lanczos / Nearest-Neighbor リサイズ（6サイズ自動生成）
 - [x] ドット絵自動判定ロジック（色数サンプリング）
-- [ ] PNG/SVG → RGBA バッファ変換（Nuxt側 Canvas）
-- [ ] RGBA バッファの IPC 転送
-- [ ] 画像メタデータのパージ
-- [ ] リサイズ結果のキャッシュ（17役割 × 6サイズ = 102枚の最適化）
+- [x] PNG/SVG → RGBA バッファ変換（Nuxt 側 Canvas + sanitizeSvg → rasterizeSvgToPng）
+- [x] PNG バイト列の IPC 転送 (build_cur_from_png)
+- [x] **画像メタデータのパージ** — `cursor::strip_png_metadata` + `build_cur_from_png` 内部での自動剥離
+  - `image::DynamicImage` 経由で tEXt / iTXt / zTXt / eXIf 等の補助チャンクを破棄
+  - 単体テストで tEXt 剥離を検証 (`test_strip_png_metadata_removes_text_chunk`)
+- [x] リサイズ結果のキャッシュ（17 役割 × 6 サイズ = 102 枚の最適化、`RESIZE_CACHE`）
 - [ ] 進捗表示・キャンセル機能（IPC ストリーム経由）
 
 ### 3-2: `.cur` バイナリ生成 ✅
