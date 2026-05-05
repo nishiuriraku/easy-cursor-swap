@@ -22,6 +22,7 @@ pub mod darkmode;
 pub mod environment;
 pub mod errors;
 pub mod health;
+pub mod hotkey;
 pub mod keystore;
 pub mod logging;
 pub mod marketplace;

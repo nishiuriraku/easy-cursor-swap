@@ -49,8 +49,21 @@ function onKeydown(e: KeyboardEvent) {
   }
 }
 
+// Tauri 側のグローバルホットキー (Rust の RegisterHotKey)
+// アプリがフォーカスを持っていなくてもバックグラウンドから panic-hotkey を発火するので
+// keydown ハンドラ (フォーカス時のみ) と二重に購読する。
+let unlistenHotkey: (() => void) | null = null
+
 onMounted(async () => {
   window.addEventListener('keydown', onKeydown)
+  try {
+    const { listen } = await import('@tauri-apps/api/event')
+    unlistenHotkey = await listen('panic-hotkey', () => {
+      panicOpen.value = true
+    })
+  } catch {
+    // Web 開発時はスキップ
+  }
   await loadAppConfig()
   syncFromConfig(appConfig.value?.general.language)
 })
@@ -63,6 +76,7 @@ watch(
 
 onUnmounted(() => {
   window.removeEventListener('keydown', onKeydown)
+  if (unlistenHotkey) unlistenHotkey()
 })
 </script>
 

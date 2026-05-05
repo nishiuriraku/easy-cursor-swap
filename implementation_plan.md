@@ -172,8 +172,16 @@
 - [x] IPC `get_autostart_status` でレジストリ実態の確認可能
 - [ ] MSIX 環境では `<Extension Category="windows.startupTask">` を使い分け (Phase 8-3 残)
 
-### 4-6: グローバルホットキー ⬅️ NEW
-- [ ] `Ctrl+Alt+Shift+R` での強制リセット（Windows 既定カーソルに復旧）
+### 4-6: グローバルホットキー ✅ 実装完了
+- [x] **`Ctrl+Alt+Shift+R` での強制リセット**（Windows 既定カーソルに復旧）
+  - `src-tauri/src/hotkey.rs` 新設
+  - Win32 `RegisterHotKey` を不可視メッセージウィンドウで購読 (cursor_watcher と同パターン)
+  - `parse_hotkey(spec)` で `Ctrl+Alt+Shift+R` を `(modifiers, vk)` に分解 (Ctrl/Alt/Shift/Win + A-Z/0-9/F1-F24)
+  - `MOD_NOREPEAT` 付きで誤連射を抑止
+  - 押下時は `panic-hotkey` Tauri イベントを発火 + ウィンドウを前面化
+  - `default.vue` で `listen('panic-hotkey')` 購読 → `panicOpen.value = true`
+  - フロントの keydown ハンドラ (フォーカス時のみ) と二重購読でカバレッジ最大化
+  - 単体テスト 7 件 (デフォルト / 大小文字 / Function キー / 数字 / 不正入力)
 
 ### 4-7: Windows 11 統合・競合検出 ⬅️ NEW
 - [ ] アクセシビリティ機能との競合検出（`CursorIndicator` / `ContrastScheme` / `CursorBaseSize`）

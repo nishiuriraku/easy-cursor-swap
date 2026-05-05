@@ -12,6 +12,7 @@ use app_lib::config::ConfigManager;
 use app_lib::cursor_watcher;
 use app_lib::darkmode;
 use app_lib::health::{RollbackTarget, StartupCheck};
+use app_lib::hotkey;
 use app_lib::logging;
 use app_lib::registry::RegistryManager;
 use app_lib::single_instance::{self, SingleInstanceLock};
@@ -218,6 +219,13 @@ fn main() {
         }
     }
 
+    // setup クロージャは config_manager が move された後に実行されるため、
+    // ホットキー文字列はここで先に取り出して持ち回す
+    let hotkey_spec = config_manager
+        .get()
+        .map(|c| c.general.panic_hotkey.clone())
+        .unwrap_or_else(|_| "Ctrl+Alt+Shift+R".to_string());
+
     // Tauri アプリケーションビルド
     let mut builder = tauri::Builder::default();
     #[cfg(debug_assertions)]
@@ -313,6 +321,26 @@ fn main() {
                 }
             }) {
                 tracing::warn!("ダークモード監視の開始に失敗: {}", e);
+            }
+
+            // パニックホットキー (`Ctrl+Alt+Shift+R` 等 config 値) の登録
+            // 押下時はフロントへ `panic-hotkey` イベントを発火し、PanicFlow を起動させる
+            let hotkey_handle = handle.clone();
+            let spec = hotkey_spec.clone();
+            if let Err(e) = hotkey::register_panic_hotkey(&spec, move || {
+                use tauri::{Emitter, Manager};
+                tracing::info!("panic-hotkey イベントを発火");
+                if let Err(err) = hotkey_handle.emit("panic-hotkey", ()) {
+                    tracing::warn!("panic-hotkey emit 失敗: {}", err);
+                }
+                // ウィンドウが最小化/トレイ収納の場合は表に出す
+                if let Some(window) = hotkey_handle.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.unminimize();
+                    let _ = window.set_focus();
+                }
+            }) {
+                tracing::warn!("パニックホットキー登録に失敗: {}", e);
             }
 
             // 外部カーソル変更監視 — コントロールパネル等で書き換えられたら UI を再読込
