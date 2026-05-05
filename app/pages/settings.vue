@@ -14,6 +14,7 @@ import { useAppConfig } from '~/composables/useAppConfig'
 import { useKeystore } from '~/composables/useKeystore'
 import { invokeTauri } from '~/composables/useTauri'
 import { useI18n } from '~/composables/useI18n'
+import { useUpdater } from '~/composables/useUpdater'
 
 const { t } = useI18n()
 
@@ -73,6 +74,43 @@ const security = ref({
   warnUnsignedImport: true,
 })
 const { info: keystoreInfo, busy: keystoreBusy, lastError: keystoreError, refresh: refreshKeystore, generate: generateKeystore, remove: removeKeystore, exportPrivate: exportPrivateKey, importPrivate: importPrivateKey } = useKeystore()
+
+const {
+  checking: updaterChecking,
+  downloading: updaterDownloading,
+  available: updaterAvailable,
+  error: updaterError,
+  progressBytes: updaterProgress,
+  totalBytes: updaterTotal,
+  check: checkForUpdate,
+  downloadAndInstall: downloadUpdate,
+  relaunch: relaunchApp,
+} = useUpdater()
+const updaterMessage = ref<string | null>(null)
+
+async function onCheckUpdate() {
+  updaterMessage.value = null
+  const info = await checkForUpdate()
+  if (info) {
+    updaterMessage.value = `新しいバージョン v${info.version} が利用可能です (現在: v${info.currentVersion})`
+  } else {
+    updaterMessage.value = '最新バージョンを使用中です'
+  }
+}
+
+async function onDownloadUpdate() {
+  updaterMessage.value = null
+  const ok = await downloadUpdate()
+  if (ok) {
+    updaterMessage.value = 'ダウンロード完了。再起動して反映します。'
+    const { ask } = await import('@tauri-apps/plugin-dialog')
+    const restart = await ask('アプリを再起動して新バージョンを適用しますか？', {
+      title: 'アップデート完了',
+      kind: 'info',
+    })
+    if (restart) await relaunchApp()
+  }
+}
 
 // パスフレーズプロンプト制御
 const passphrasePrompt = ref<{ mode: 'export' | 'import', open: boolean }>({ mode: 'export', open: false })
@@ -604,10 +642,29 @@ function selectSection(id: SectionId) {
                 </select>
               </SettingsRow>
               <SettingsRow label="今すぐ確認">
-                <button class="btn">
-                  <UiIcon name="Import" :size="13" />更新を確認
+                <button class="btn" :disabled="updaterChecking || updaterDownloading" @click="onCheckUpdate">
+                  <span v-if="updaterChecking" class="spinner" style="width: 13px; height: 13px" />
+                  <UiIcon v-else name="Import" :size="13" />
+                  {{ updaterChecking ? '確認中...' : '更新を確認' }}
                 </button>
               </SettingsRow>
+              <SettingsRow
+                v-if="updaterAvailable"
+                :label="`v${updaterAvailable.version} へ更新`"
+                :desc="updaterAvailable.body ?? ''"
+              >
+                <button class="btn primary" :disabled="updaterDownloading" @click="onDownloadUpdate">
+                  <span v-if="updaterDownloading" class="spinner" style="width: 13px; height: 13px" />
+                  <UiIcon v-else name="Import" :size="13" />
+                  {{ updaterDownloading
+                    ? `DL中 ${updaterTotal > 0 ? Math.round((updaterProgress / updaterTotal) * 100) : 0}%`
+                    : 'ダウンロード & インストール' }}
+                </button>
+              </SettingsRow>
+              <div v-if="updaterMessage" class="profile-msg">{{ updaterMessage }}</div>
+              <div v-if="updaterError" class="profile-msg" style="background: rgba(255,107,138,0.06); border-color: rgba(255,107,138,0.4); color: #ffb8c5;">
+                {{ updaterError }}
+              </div>
             </div>
           </div>
         </section>

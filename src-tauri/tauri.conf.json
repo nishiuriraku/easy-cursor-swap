@@ -50,5 +50,13 @@
       }
     }
   },
-  "plugins": {}
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/cursorforge/cursor-forge/releases/latest/download/latest.json"
+      ],
+      "dialog": false,
+      "pubkey": "TAURI_SIGNING_PUBLIC_KEY_PLACEHOLDER"
+    }
+  }
 }
