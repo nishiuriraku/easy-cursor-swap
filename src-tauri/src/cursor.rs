@@ -406,6 +406,121 @@ mod tests {
         assert!(find_chunk(&stripped, b"IDAT").is_some());
     }
 
+    /// eXIf チャンクを含む PNG を作成し、strip_png_metadata が剥離することを確認する。
+    #[test]
+    fn test_strip_png_metadata_removes_exif_chunk() {
+        let img = RgbaImage::from_pixel(16, 16, image::Rgba([255, 0, 0, 255]));
+        let mut clean_png = Vec::new();
+        let encoder = image::codecs::png::PngEncoder::new(&mut clean_png);
+        image::ImageEncoder::write_image(
+            encoder,
+            img.as_raw(),
+            16,
+            16,
+            image::ExtendedColorType::Rgba8,
+        )
+        .unwrap();
+
+        // Exif ヘッダ (II = little-endian) を持つ最小限のバイト列
+        let fake_exif = b"II\x2a\x00\x08\x00\x00\x00".to_vec();
+        let dirty_png = inject_raw_chunk(&clean_png, b"eXIf", &fake_exif);
+        assert!(find_chunk(&dirty_png, b"eXIf").is_some(), "eXIf 注入が失敗");
+
+        let stripped = strip_png_metadata(&dirty_png).expect("strip");
+        assert!(
+            find_chunk(&stripped, b"eXIf").is_none(),
+            "eXIf が残存している"
+        );
+        assert!(find_chunk(&stripped, b"IDAT").is_some());
+    }
+
+    /// iTXt チャンクを含む PNG を作成し、strip_png_metadata が剥離することを確認する。
+    #[test]
+    fn test_strip_png_metadata_removes_itxt_chunk() {
+        let img = RgbaImage::from_pixel(16, 16, image::Rgba([0, 255, 0, 255]));
+        let mut clean_png = Vec::new();
+        let encoder = image::codecs::png::PngEncoder::new(&mut clean_png);
+        image::ImageEncoder::write_image(
+            encoder,
+            img.as_raw(),
+            16,
+            16,
+            image::ExtendedColorType::Rgba8,
+        )
+        .unwrap();
+
+        // iTXt: keyword\0 compression_flag(0) compression_method(0) language\0 translated\0 text
+        let mut itxt_data = Vec::new();
+        itxt_data.extend_from_slice(b"Comment\x00"); // keyword + NUL
+        itxt_data.push(0); // compression_flag = not compressed
+        itxt_data.push(0); // compression_method
+        itxt_data.push(0); // language tag NUL
+        itxt_data.push(0); // translated keyword NUL
+        itxt_data.extend_from_slice(b"GPS:35.6895,139.6917"); // payload
+        let dirty_png = inject_raw_chunk(&clean_png, b"iTXt", &itxt_data);
+        assert!(find_chunk(&dirty_png, b"iTXt").is_some(), "iTXt 注入が失敗");
+
+        let stripped = strip_png_metadata(&dirty_png).expect("strip");
+        assert!(
+            find_chunk(&stripped, b"iTXt").is_none(),
+            "iTXt が残存している"
+        );
+        assert!(find_chunk(&stripped, b"IDAT").is_some());
+    }
+
+    /// zTXt チャンクを含む PNG を作成し、strip_png_metadata が剥離することを確認する。
+    #[test]
+    fn test_strip_png_metadata_removes_ztxt_chunk() {
+        let img = RgbaImage::from_pixel(16, 16, image::Rgba([0, 0, 255, 255]));
+        let mut clean_png = Vec::new();
+        let encoder = image::codecs::png::PngEncoder::new(&mut clean_png);
+        image::ImageEncoder::write_image(
+            encoder,
+            img.as_raw(),
+            16,
+            16,
+            image::ExtendedColorType::Rgba8,
+        )
+        .unwrap();
+
+        // zTXt: keyword\0 compression_method(0) compressed_text
+        // 圧縮データは正当でなくても inject_raw_chunk 経由で注入すればチャンクとして認識される
+        let mut ztxt_data = Vec::new();
+        ztxt_data.extend_from_slice(b"Description\x00"); // keyword + NUL
+        ztxt_data.push(0); // compression method = deflate
+        ztxt_data.extend_from_slice(b"\x78\x9c\x03\x00\x00\x00\x00\x01"); // minimal deflate stream
+        let dirty_png = inject_raw_chunk(&clean_png, b"zTXt", &ztxt_data);
+        assert!(find_chunk(&dirty_png, b"zTXt").is_some(), "zTXt 注入が失敗");
+
+        let stripped = strip_png_metadata(&dirty_png).expect("strip");
+        assert!(
+            find_chunk(&stripped, b"zTXt").is_none(),
+            "zTXt が残存している"
+        );
+        assert!(find_chunk(&stripped, b"IDAT").is_some());
+    }
+
+    /// 任意チャンクタイプと任意データを IEND 直前に注入するテストヘルパー。
+    fn inject_raw_chunk(png: &[u8], chunk_type: &[u8; 4], data: &[u8]) -> Vec<u8> {
+        let iend_pos = find_chunk(png, b"IEND").expect("IEND not found");
+        let insert_at = iend_pos - 4;
+
+        let mut chunk = Vec::new();
+        chunk.extend_from_slice(&(data.len() as u32).to_be_bytes());
+        chunk.extend_from_slice(chunk_type);
+        chunk.extend_from_slice(data);
+        let mut crc_input = Vec::new();
+        crc_input.extend_from_slice(chunk_type);
+        crc_input.extend_from_slice(data);
+        chunk.extend_from_slice(&crc32(&crc_input).to_be_bytes());
+
+        let mut out = Vec::with_capacity(png.len() + chunk.len());
+        out.extend_from_slice(&png[..insert_at]);
+        out.extend_from_slice(&chunk);
+        out.extend_from_slice(&png[insert_at..]);
+        out
+    }
+
     /// PNG にテキストチャンク (tEXt) を挿入するテストヘルパー。
     fn inject_text_chunk(png: &[u8], keyword: &[u8], text: &[u8]) -> Vec<u8> {
         // IEND チャンクの位置を見つける
