@@ -16,6 +16,7 @@ pub mod config;
 pub mod cursor;
 pub mod cursor_watcher;
 pub mod darkmode;
+pub mod environment;
 pub mod errors;
 pub mod keystore;
 pub mod logging;

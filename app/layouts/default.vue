@@ -69,6 +69,7 @@ onUnmounted(() => {
 <template>
   <div class="win">
     <AppTitlebar />
+    <EnvironmentBanner />
     <div class="body">
       <AppSidebar
         :active="activeNav"

@@ -8,6 +8,7 @@ use crate::config::{AppConfig, ConfigManager};
 use crate::cursor::{build_cur_from_png, ResizeMethod};
 use sha2::Digest;
 use crate::darkmode;
+use crate::environment::EnvironmentReport;
 use crate::errors::AppError;
 use crate::keystore::{Keystore, KeystoreInfo};
 use crate::marketplace::{MarketplaceClient, MarketplaceIndex, MarketplaceInstallRequest};
@@ -349,6 +350,13 @@ pub fn get_dark_mode_status() -> Result<bool, AppError> {
     darkmode::is_dark_mode()
 }
 
+/// 動作環境レポートを返す (RDP / Server SKU 検出)。
+/// UI 起動時に呼んで警告ダイアログ表示判定に使う。
+#[tauri::command]
+pub fn get_environment_report() -> EnvironmentReport {
+    EnvironmentReport::detect()
+}
+
 /// アプリケーション設定を取得する
 #[tauri::command]
 pub fn get_config(config: State<'_, ConfigManager>) -> Result<AppConfig, AppError> {
@@ -430,6 +438,7 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         reset_to_default,
         reset_to_initial,
         get_dark_mode_status,
+        get_environment_report,
         get_config,
         update_config,
         get_app_info,

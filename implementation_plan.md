@@ -116,7 +116,9 @@
 ### 4-7: Windows 11 統合・競合検出 ⬅️ NEW
 - [ ] アクセシビリティ機能との競合検出（`CursorIndicator` / `ContrastScheme` / `CursorBaseSize`）
 - [ ] 競合検出時の警告ダイアログ表示
-- [ ] 動作環境マトリクス — RDP / Citrix / Server を起動時検出して警告ダイアログ
+- [x] **動作環境マトリクス — RDP / Citrix / Server を起動時検出して警告バナー**
+  - `src-tauri/src/environment.rs` (`GetSystemMetrics(SM_REMOTESESSION)` + `InstallationType` レジストリ)
+  - `get_environment_report` IPC + `EnvironmentBanner.vue` (sessionStorage で「閉じる」を記憶)
 
 ---
 
