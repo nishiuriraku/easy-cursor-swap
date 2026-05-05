@@ -1,6 +1,6 @@
 /**
  * 公式インデックス (Marketplace) 関連の型定義。
- * `cursorforge/index` リポジトリの `index.json` スキーマに準拠。
+ * `easycursorswap/index` リポジトリの `index.json` スキーマに準拠。
  */
 
 export interface MarketplaceEntry {

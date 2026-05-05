@@ -10,7 +10,7 @@ withDefaults(defineProps<{
   title?: string
   version?: string
 }>(), {
-  title: 'CursorForge',
+  title: 'EasyCursorSwap',
   version: 'v1.0.0',
 })
 

@@ -10,8 +10,8 @@ dist/
 src-tauri/target/
 src-tauri/gen/
 # Tauri updater signing keys (private key must NOT be committed)
-src-tauri/signing/cursorforge
-!src-tauri/signing/cursorforge.pub
+src-tauri/signing/easycursorswap
+!src-tauri/signing/easycursorswap.pub
 
 # IDE
 .vscode/

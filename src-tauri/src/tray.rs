@@ -1,4 +1,4 @@
-//! CursorForge システムトレイモジュール
+//! EasyCursorSwap システムトレイモジュール
 //!
 //! システムトレイ（タスクトレイ）への常駐と、トレイメニューの管理を行う。
 
@@ -11,7 +11,7 @@ use tauri::{
 /// システムトレイを初期化する
 pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     // メニューアイテムの作成
-    let show_item = MenuItem::with_id(app, "show", "CursorForge を開く", true, None::<&str>)?;
+    let show_item = MenuItem::with_id(app, "show", "EasyCursorSwap を開く", true, None::<&str>)?;
     let separator1 = MenuItem::with_id(app, "sep1", "────────────", false, None::<&str>)?;
     let panic_default = MenuItem::with_id(
         app,
@@ -56,7 +56,7 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     // トレイアイコンの構築
     let _tray = TrayIconBuilder::new()
         .menu(&menu)
-        .tooltip("CursorForge")
+        .tooltip("EasyCursorSwap")
         .on_menu_event(move |app, event| {
             handle_tray_menu_event(app, event.id().as_ref());
         })

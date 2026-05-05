@@ -216,8 +216,8 @@ async function exportProfile() {
     const { save } = await import('@tauri-apps/plugin-dialog')
     const today = new Date().toISOString().slice(0, 10)
     const target = await save({
-      defaultPath: `cursorforge-${today}.cursorprofile`,
-      filters: [{ name: 'CursorForge Profile', extensions: ['cursorprofile'] }],
+      defaultPath: `easycursorswap-${today}.cursorprofile`,
+      filters: [{ name: 'EasyCursorSwap Profile', extensions: ['cursorprofile'] }],
     })
     if (!target) return
     await invokeTauri<void>('export_profile', { path: target })
@@ -238,7 +238,7 @@ async function importProfile() {
     const { open, ask } = await import('@tauri-apps/plugin-dialog')
     const selected = await open({
       multiple: false,
-      filters: [{ name: 'CursorForge Profile', extensions: ['cursorprofile'] }],
+      filters: [{ name: 'EasyCursorSwap Profile', extensions: ['cursorprofile'] }],
     })
     if (!selected || Array.isArray(selected)) return
     const overwrite = await ask(t('settings.profileImportAskMsg'), {
@@ -278,8 +278,8 @@ async function onPassphraseConfirm(passphrase: string) {
     const { save } = await import('@tauri-apps/plugin-dialog')
     const today = new Date().toISOString().slice(0, 10)
     const target = await save({
-      defaultPath: `cursorforge-key-${today}.cfkey`,
-      filters: [{ name: 'CursorForge Key', extensions: ['cfkey'] }],
+      defaultPath: `easycursorswap-key-${today}.cfkey`,
+      filters: [{ name: 'EasyCursorSwap Key', extensions: ['cfkey'] }],
     })
     if (!target) return
     const written = await exportPrivateKey(passphrase, target)
@@ -290,7 +290,7 @@ async function onPassphraseConfirm(passphrase: string) {
     const { open } = await import('@tauri-apps/plugin-dialog')
     const selected = await open({
       multiple: false,
-      filters: [{ name: 'CursorForge Key', extensions: ['cfkey'] }],
+      filters: [{ name: 'EasyCursorSwap Key', extensions: ['cfkey'] }],
     })
     if (!selected || Array.isArray(selected)) return
     const result = await importPrivateKey(passphrase, selected)
@@ -722,12 +722,12 @@ function selectSection(id: SectionId) {
             </div>
             <div class="prop-body">
               <SettingsRow :label="t('settings.homepageLabel')" mono>
-                <a class="btn ghost" href="https://github.com/cursorforge" target="_blank" rel="noopener">
-                  <UiIcon name="Globe" :size="13" />github.com/cursorforge
+                <a class="btn ghost" href="https://github.com/easycursorswap" target="_blank" rel="noopener">
+                  <UiIcon name="Globe" :size="13" />github.com/easycursorswap
                 </a>
               </SettingsRow>
               <SettingsRow :label="t('settings.issuesLabel')" mono>
-                <a class="btn ghost" href="https://github.com/cursorforge/cursor-forge/issues" target="_blank" rel="noopener">
+                <a class="btn ghost" href="https://github.com/easycursorswap/easy-cursor-swap/issues" target="_blank" rel="noopener">
                   <UiIcon name="Alert" :size="13" />Issues
                 </a>
               </SettingsRow>

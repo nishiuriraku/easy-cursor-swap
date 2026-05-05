@@ -1,4 +1,4 @@
-# 1. CursorForge 製品仕様
+# 1. EasyCursorSwap 製品仕様
 
 ## 1.1 プロジェクト概要とライセンス
 - **ライセンス:** OSS / MIT ライセンス（GitHub公開）。完全無料。

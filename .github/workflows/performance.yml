@@ -80,7 +80,7 @@ jobs:
       - name: Measure release binary size
         shell: pwsh
         run: |
-          $bin = Get-ChildItem -Path src-tauri/target/release -Filter "cursor-forge.exe" -Recurse | Select-Object -First 1
+          $bin = Get-ChildItem -Path src-tauri/target/release -Filter "easy-cursor-swap.exe" -Recurse | Select-Object -First 1
           if ($bin) {
             $sizeMB = [math]::Round($bin.Length / 1MB, 2)
             Write-Host "release_exe_size_mb=$sizeMB"

@@ -4,7 +4,7 @@
  */
 export default {
   app: {
-    name: 'CursorForge',
+    name: 'EasyCursorSwap',
     edition: 'Win-Exclusive',
   },
   nav: {
@@ -238,7 +238,7 @@ export default {
     keyExportSuccess: 'Private key exported ({size} bytes) → {target}',
     keyImportSuccess: 'Private key imported key_id={keyId}',
     // Logging
-    descLogging: 'Retention and verbosity for logs in %LOCALAPPDATA%\\CursorForge\\logs\\.',
+    descLogging: 'Retention and verbosity for logs in %LOCALAPPDATA%\\EasyCursorSwap\\logs\\.',
     groupLogOutput: 'Log output',
     logLevelLabel: 'Log level',
     logLevelDesc: 'INFO recommended for release. Bump to DEBUG when troubleshooting',
@@ -247,7 +247,7 @@ export default {
     maxSizeLabel: 'Total size limit (MB)',
     maxSizeDesc: 'Oldest files are deleted when over limit',
     openLogFolderLabel: 'Open current log folder',
-    openLogFolderDesc: 'Open `%LOCALAPPDATA%\\CursorForge\\logs\\` in Explorer',
+    openLogFolderDesc: 'Open `%LOCALAPPDATA%\\EasyCursorSwap\\logs\\` in Explorer',
     btnOpen: 'Open',
     // Updates
     descUpdates: 'Auto-update toggle and channel. Major version jumps are always manual.',

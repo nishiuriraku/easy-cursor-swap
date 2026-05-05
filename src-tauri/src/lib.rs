@@ -1,4 +1,4 @@
-//! CursorForge - Rust バックエンドのモジュール構成
+//! EasyCursorSwap - Rust バックエンドのモジュール構成
 //! 
 //! 各モジュールの役割:
 //! - config: アプリケーション設定の読み書き（Source of Truth）

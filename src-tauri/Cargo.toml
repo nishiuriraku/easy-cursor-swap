@@ -1,5 +1,5 @@
 [package]
-name = "cursor-forge"
+name = "easy-cursor-swap"
 version = "0.1.0"
 description = "次世代マウスカーソル管理ツール (Windows専用)"
 authors = ["nishiuriraku"]

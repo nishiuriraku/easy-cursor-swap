@@ -1,4 +1,4 @@
-//! CursorForge テーマ管理モジュール
+//! EasyCursorSwap テーマ管理モジュール
 //!
 //! .cursorpack パッケージの作成・解凍・バリデーションを行う。
 //! テーマメタデータ (theme.json) の管理も担当。

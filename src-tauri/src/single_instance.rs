@@ -23,12 +23,12 @@ use crate::errors::{AppError, AppResult};
 
 /// アプリ固有の GUID。複数プロダクトとの衝突を避けるため一意の値を使用。
 /// 変更すると既存ユーザーの常駐プロセスとは別系統と判定されるので注意。
-const MUTEX_NAME: &str = "Local\\CursorForge.SingleInstance.7c2a4f9a-3b8d-4e6f-8a1c-5d9e0f3b6c7d";
+const MUTEX_NAME: &str = "Local\\EasyCursorSwap.SingleInstance.7c2a4f9a-3b8d-4e6f-8a1c-5d9e0f3b6c7d";
 
 /// 「ウィンドウを表示せよ」シグナル用の Named Event 名。
 /// MUTEX_NAME と同じ GUID を流用してアプリ単位で対応付ける。
 const SHOW_EVENT_NAME: &str =
-    "Local\\CursorForge.ShowWindow.7c2a4f9a-3b8d-4e6f-8a1c-5d9e0f3b6c7d";
+    "Local\\EasyCursorSwap.ShowWindow.7c2a4f9a-3b8d-4e6f-8a1c-5d9e0f3b6c7d";
 
 #[cfg(windows)]
 pub struct SingleInstanceLock {
@@ -58,7 +58,7 @@ impl SingleInstanceLock {
                 let _ = windows::Win32::Foundation::CloseHandle(handle);
             }
             return Err(AppError::Config(
-                "既に CursorForge が起動しています".to_string(),
+                "既に EasyCursorSwap が起動しています".to_string(),
             ));
         }
 
@@ -137,7 +137,7 @@ where
     let raw = handle.0 as usize;
 
     std::thread::Builder::new()
-        .name("cursorforge-showwindow-listener".to_string())
+        .name("easycursorswap-showwindow-listener".to_string())
         .spawn(move || {
             let h = HANDLE(raw as *mut _);
             loop {

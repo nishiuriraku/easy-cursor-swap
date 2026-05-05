@@ -1,6 +1,6 @@
 //! OS 起動時自動起動の登録 / 解除
 //!
-//! `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\CursorForge` に
+//! `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\EasyCursorSwap` に
 //! 実行ファイルパスを書き込む / 削除する。HKCU のため UAC 不要。
 //!
 //! 設定 `general.auto_start` を Source of Truth とし、`update_config` 経由および
@@ -12,7 +12,7 @@ use crate::errors::{AppError, AppResult};
 const RUN_KEY_PATH: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
 
 /// レジストリに登録する値名 (= アプリ表示名)
-const APP_VALUE_NAME: &str = "CursorForge";
+const APP_VALUE_NAME: &str = "EasyCursorSwap";
 
 /// `--autostart` 引数を付与した起動コマンド文字列を組み立てる。
 ///
@@ -120,7 +120,7 @@ mod tests {
     /// 既存ユーザーの Run エントリと衝突しないよう、テストごとにユニークな値名を生成する。
     fn unique_name(suffix: &str) -> String {
         format!(
-            "CursorForge_test_{}_{}",
+            "EasyCursorSwap_test_{}_{}",
             std::process::id(),
             suffix
         )

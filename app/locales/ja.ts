@@ -3,7 +3,7 @@
  */
 export default {
   app: {
-    name: 'CursorForge',
+    name: 'EasyCursorSwap',
     edition: 'Win-Exclusive',
   },
   nav: {
@@ -237,7 +237,7 @@ export default {
     keyExportSuccess: '秘密鍵をエクスポートしました ({size} bytes) → {target}',
     keyImportSuccess: '秘密鍵をインポートしました key_id={keyId}',
     // ログ
-    descLogging: '%LOCALAPPDATA%\\CursorForge\\logs\\ に保存されるログの保持と粒度。',
+    descLogging: '%LOCALAPPDATA%\\EasyCursorSwap\\logs\\ に保存されるログの保持と粒度。',
     groupLogOutput: 'ログ出力',
     logLevelLabel: 'ログレベル',
     logLevelDesc: 'リリース版は INFO 推奨。トラブル時は DEBUG へ',
@@ -246,7 +246,7 @@ export default {
     maxSizeLabel: '合計上限サイズ (MB)',
     maxSizeDesc: '超過時は古いものから削除',
     openLogFolderLabel: '現在のログフォルダーを開く',
-    openLogFolderDesc: 'エクスプローラーで `%LOCALAPPDATA%\\CursorForge\\logs\\` を開く',
+    openLogFolderDesc: 'エクスプローラーで `%LOCALAPPDATA%\\EasyCursorSwap\\logs\\` を開く',
     btnOpen: '開く',
     // アップデート
     descUpdates: '自動アップデートの有効化と更新チャンネル。メジャーバージョン跨ぎは常に手動。',

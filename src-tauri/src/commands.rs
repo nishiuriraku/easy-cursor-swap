@@ -1,4 +1,4 @@
-//! CursorForge Tauri IPC コマンド定義
+//! EasyCursorSwap Tauri IPC コマンド定義
 //!
 //! フロントエンド (Nuxt) から呼び出し可能なコマンドを定義する。
 //! 各コマンドは Tauri の `#[tauri::command]` マクロで公開される。
@@ -356,7 +356,7 @@ pub fn import_profile(
 }
 
 /// 公式インデックス (Marketplace) のメタデータを取得する。
-/// `cursorforge/index` リポジトリの `index.json` を HTTPS + rustls で取得。
+/// `easycursorswap/index` リポジトリの `index.json` を HTTPS + rustls で取得。
 #[tauri::command]
 pub async fn marketplace_fetch_index() -> Result<MarketplaceIndex, AppError> {
     MarketplaceClient::fetch_index().await
@@ -445,7 +445,7 @@ pub fn get_app_info() -> AppInfo {
         .unwrap_or_default();
 
     let config_dir = dirs::data_local_dir()
-        .map(|p| p.join("CursorForge").to_string_lossy().to_string())
+        .map(|p| p.join("EasyCursorSwap").to_string_lossy().to_string())
         .unwrap_or_default();
 
     AppInfo {

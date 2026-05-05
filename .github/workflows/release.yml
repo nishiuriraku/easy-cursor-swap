@@ -4,7 +4,7 @@ name: Release
 # Tauri Updater の自動更新に必要な latest.json も生成する。
 #
 # 必要な GitHub Secrets:
-#   TAURI_SIGNING_PRIVATE_KEY       : src-tauri/signing/cursorforge の内容 (base64)
+#   TAURI_SIGNING_PRIVATE_KEY       : src-tauri/signing/easycursorswap の内容 (base64)
 #   TAURI_SIGNING_PRIVATE_KEY_PASSWORD: 鍵のパスフレーズ (パスなしなら設定不要)
 #
 # オプション (コードサイニング):
@@ -57,13 +57,13 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'CursorForge ${{ github.ref_name }}'
+          releaseName: 'EasyCursorSwap ${{ github.ref_name }}'
           releaseBody: |
-            ## CursorForge ${{ github.ref_name }}
+            ## EasyCursorSwap ${{ github.ref_name }}
 
             ### インストール
-            - **MSI** (推奨): `CursorForge_*_x64_ja-JP.msi` または `*_en-US.msi`
-            - **NSIS**: `CursorForge_*_x64-setup.exe`
+            - **MSI** (推奨): `EasyCursorSwap_*_x64_ja-JP.msi` または `*_en-US.msi`
+            - **NSIS**: `EasyCursorSwap_*_x64-setup.exe`
 
             ### 自動アップデート
             Tauri Updater により署名検証済みの差分更新が配信されます。

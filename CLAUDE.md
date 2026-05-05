@@ -1,4 +1,4 @@
-# CursorForge - 次世代マウスカーソル管理ツール
+# EasyCursorSwap - 次世代マウスカーソル管理ツール
 
 ## プロジェクト概要
 Windows 専用のカスタムマウスカーソル管理ツール。
@@ -12,7 +12,7 @@ Tauri v2 + Nuxt 4 + Rust のハイブリッドアーキテクチャ。
 
 ## ディレクトリ構成
 ```
-cursor-forge/
+easy-cursor-swap/
 ├── app/                    # Nuxt フロントエンド
 │   ├── assets/css/         # グローバル CSS
 │   ├── components/         # Vue コンポーネント
@@ -39,10 +39,10 @@ cursor-forge/
 ## 開発コマンド
 ```bash
 # フロントエンド開発サーバー
-cd cursor-forge && npx nuxt dev
+cd easy-cursor-swap && npx nuxt dev
 
 # Tauri アプリ全体の開発
-cd cursor-forge && npx tauri dev
+cd easy-cursor-swap && npx tauri dev
 
 # Rust のみビルドチェック
 cargo check --manifest-path src-tauri/Cargo.toml

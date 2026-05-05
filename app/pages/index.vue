@@ -187,7 +187,7 @@ async function confirmApply(id: string) {
     pendingTheme.value = null
     if (applied) {
       void notify({
-        title: 'CursorForge',
+        title: 'EasyCursorSwap',
         body: t('library.notifyApplied', { name: applied.name }),
         level: 'success',
       })
@@ -267,7 +267,7 @@ async function actuallyImport(path: string) {
     await loadThemes()
     const imported = themes.value.find((t) => t.id === id)
     void notify({
-      title: 'CursorForge',
+      title: 'EasyCursorSwap',
       body: imported
         ? t('library.notifyImported', { name: imported.name })
         : t('library.notifyImportedFallback'),

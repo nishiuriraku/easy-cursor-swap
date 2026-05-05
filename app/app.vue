@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * CursorForge - ルートコンポーネント
+ * EasyCursorSwap - ルートコンポーネント
  */
 </script>
 

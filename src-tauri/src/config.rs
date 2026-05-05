@@ -1,4 +1,4 @@
-//! CursorForge 設定管理モジュール
+//! EasyCursorSwap 設定管理モジュール
 //!
 //! アプリケーション設定の Source of Truth を Rust 側で管理する。
 //! 設定は `config.json` に永続化し、UIが閉じていても常駐プロセスが参照できる。
@@ -150,12 +150,12 @@ impl ConfigManager {
     }
 
     /// 設定ファイルのパスを返す
-    /// %LOCALAPPDATA%/CursorForge/config.json
+    /// %LOCALAPPDATA%/EasyCursorSwap/config.json
     fn config_file_path() -> AppResult<PathBuf> {
         let local_data = dirs::data_local_dir().ok_or_else(|| {
             AppError::Config("LocalAppData ディレクトリが見つかりません".to_string())
         })?;
-        Ok(local_data.join("CursorForge").join("config.json"))
+        Ok(local_data.join("EasyCursorSwap").join("config.json"))
     }
 
     /// 設定マネージャーを初期化する。

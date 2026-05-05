@@ -5,7 +5,7 @@
 //!  > トレイ通知で告知する。
 //!
 //! 実装方針:
-//!  1. 起動時に `%LOCALAPPDATA%\CursorForge\state\startup.json` を読み込む
+//!  1. 起動時に `%LOCALAPPDATA%\EasyCursorSwap\state\startup.json` を読み込む
 //!  2. `pending_failures` カウンタが 3 以上ならロールバック判定 + カウンタを 0 にリセット
 //!  3. それ以外は `pending_failures += 1` してファイルに保存
 //!  4. アプリの初期化が完了して run() に入った後、
@@ -25,7 +25,7 @@ use std::path::PathBuf;
 const ROLLBACK_THRESHOLD: u32 = 3;
 
 /// GitHub リリースのベース URL (installer URL 生成に使用)
-const GITHUB_RELEASES_BASE: &str = "https://github.com/cursorforge/cursor-forge/releases";
+const GITHUB_RELEASES_BASE: &str = "https://github.com/easycursorswap/easy-cursor-swap/releases";
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct StartupState {
@@ -63,7 +63,7 @@ pub fn is_major_bump(current: &str, next: &str) -> bool {
 /// アーキテクチャは x64 固定。
 pub fn installer_url_for(version: &str) -> String {
     format!(
-        "{GITHUB_RELEASES_BASE}/download/v{version}/CursorForge_{version}_x64-setup.exe"
+        "{GITHUB_RELEASES_BASE}/download/v{version}/EasyCursorSwap_{version}_x64-setup.exe"
     )
 }
 
@@ -89,7 +89,7 @@ impl StartupCheck {
     fn state_path() -> AppResult<PathBuf> {
         let base = dirs::data_local_dir()
             .ok_or_else(|| AppError::Config("LocalAppData が取得できません".to_string()))?;
-        let dir = base.join("CursorForge").join("state");
+        let dir = base.join("EasyCursorSwap").join("state");
         std::fs::create_dir_all(&dir)?;
         Ok(dir.join("startup.json"))
     }

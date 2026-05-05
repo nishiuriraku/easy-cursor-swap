@@ -32,7 +32,7 @@ where
 
     std::thread::spawn(move || {
         unsafe {
-            let class_name = w!("CursorForgeCursorWatcher");
+            let class_name = w!("EasyCursorSwapCursorWatcher");
             let wnd_class = WNDCLASSW {
                 lpfnWndProc: Some(cursor_wnd_proc),
                 lpszClassName: class_name,
@@ -43,7 +43,7 @@ where
             let hwnd = match CreateWindowExW(
                 WINDOW_EX_STYLE::default(),
                 class_name,
-                w!("CursorForge Cursor Watcher"),
+                w!("EasyCursorSwap Cursor Watcher"),
                 WS_OVERLAPPED,
                 0,
                 0,

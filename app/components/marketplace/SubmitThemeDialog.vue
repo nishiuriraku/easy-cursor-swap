@@ -6,7 +6,7 @@
  *  1. ローカルライブラリからテーマを選択
  *  2. GitHub ユーザー名を入力
  *  3. entry JSON テンプレートを生成 (sha256/signature/download_url は TODO として表示)
- *  4. 「GitHub で PR を開く」→ github.com/cursorforge/index/new/main でファイルを作成
+ *  4. 「GitHub で PR を開く」→ github.com/easycursorswap/index/new/main でファイルを作成
  *
  * sha256 / signature / download_url はユーザーが cursorpack を自分の GitHub Release 等に
  * アップロードした後、手動で埋めてもらう形式とする。
@@ -52,7 +52,7 @@ const selectedTheme = computed(() =>
 )
 
 // GitHub インデックスリポジトリのベース URL
-const INDEX_REPO = 'https://github.com/cursorforge/index'
+const INDEX_REPO = 'https://github.com/easycursorswap/index'
 
 const entryJson = computed(() => {
   const th = selectedTheme.value

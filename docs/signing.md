@@ -1,22 +1,22 @@
-# CursorForge - Tauri Updater 署名鍵管理
+# EasyCursorSwap - Tauri Updater 署名鍵管理
 
 ## 現在の鍵
 
 | 種別 | 場所 | コミット対象 |
 |---|---|---|
-| 公開鍵 (base64 minisign) | `src-tauri/signing/cursorforge.pub` | ✅ YES |
-| 秘密鍵 | `src-tauri/signing/cursorforge` | ❌ NO (`.gitignore` 登録済み) |
+| 公開鍵 (base64 minisign) | `src-tauri/signing/easycursorswap.pub` | ✅ YES |
+| 秘密鍵 | `src-tauri/signing/easycursorswap` | ❌ NO (`.gitignore` 登録済み) |
 | `tauri.conf.json` pubkey フィールド | `src-tauri/tauri.conf.json` | ✅ YES |
 
 > [!WARNING]
-> 秘密鍵 (`src-tauri/signing/cursorforge`) は絶対にリポジトリに push しないこと。
+> 秘密鍵 (`src-tauri/signing/easycursorswap`) は絶対にリポジトリに push しないこと。
 > CI は GitHub Secrets から読み込む。
 
 ## GitHub Actions に秘密鍵を登録する手順
 
 1. **秘密鍵の内容を取得**:
    ```pwsh
-   Get-Content src-tauri\signing\cursorforge -Raw
+   Get-Content src-tauri\signing\easycursorswap -Raw
    ```
 
 2. **GitHub の Settings → Secrets → New repository secret** で登録:
@@ -31,7 +31,7 @@
 
 1. 新しい鍵を生成:
    ```pwsh
-   npx tauri signer generate --ci -w src-tauri/signing/cursorforge -f
+   npx tauri signer generate --ci -w src-tauri/signing/easycursorswap -f
    ```
 
 2. `src-tauri/tauri.conf.json` の `plugins.updater.pubkey` を新しい公開鍵に更新。

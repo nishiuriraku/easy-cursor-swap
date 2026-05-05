@@ -1,9 +1,9 @@
 <!--
-  鍵ローテーション PR テンプレート (`cursorforge/index` リポジトリ用の雛形)。
-  本リポジトリでは参照のために配置。`cursorforge/index` 側にコピーして使用する。
+  鍵ローテーション PR テンプレート (`easycursorswap/index` リポジトリ用の雛形)。
+  本リポジトリでは参照のために配置。`easycursorswap/index` 側にコピーして使用する。
 
   使用方法:
-    https://github.com/cursorforge/index/compare?template=key_rotation.md
+    https://github.com/easycursorswap/index/compare?template=key_rotation.md
 -->
 
 ## 鍵ローテーション
@@ -25,7 +25,7 @@
 
 ## チェックリスト
 
-- [ ] 新鍵で CursorForge アプリの `keystore_info` を呼び `key_id` が一致することを確認した
+- [ ] 新鍵で EasyCursorSwap アプリの `keystore_info` を呼び `key_id` が一致することを確認した
 - [ ] 旧 `public_key` を `historical_keys` に正しい `key_id` で登録した (緊急失効でない場合)
 - [ ] 秘密鍵をコミットしていない (`.gitignore` で除外されている)
 - [ ] `authors/<github_username>.json` のスキーマが docs/key_rotation.md と一致
@@ -33,4 +33,4 @@
 
 ## 詳細手順
 
-参照: [docs/key_rotation.md](https://github.com/cursorforge/cursor-forge/blob/main/docs/key_rotation.md)
+参照: [docs/key_rotation.md](https://github.com/easycursorswap/easy-cursor-swap/blob/main/docs/key_rotation.md)

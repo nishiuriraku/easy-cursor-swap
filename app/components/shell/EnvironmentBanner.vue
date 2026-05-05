@@ -21,7 +21,7 @@ interface EnvironmentReport {
 const report = ref<EnvironmentReport | null>(null)
 const dismissed = ref(false)
 
-const STORAGE_KEY = 'cursor-forge.env-banner-dismissed'
+const STORAGE_KEY = 'easy-cursor-swap.env-banner-dismissed'
 
 onMounted(async () => {
   // セッション内で既に閉じていれば抑制

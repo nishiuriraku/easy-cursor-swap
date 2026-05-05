@@ -1,4 +1,4 @@
-//! CursorForge ダークモード監視モジュール
+//! EasyCursorSwap ダークモード監視モジュール
 //!
 //! Windows のダークモード設定を監視し、テーマの自動切替を行う。
 //! WM_SETTINGCHANGE メッセージを購読して、レジストリ変更をリアルタイムに検知する。
@@ -44,7 +44,7 @@ where
     std::thread::spawn(move || {
         unsafe {
             // 不可視ウィンドウクラスを登録
-            let class_name = w!("CursorForgeDarkModeWatcher");
+            let class_name = w!("EasyCursorSwapDarkModeWatcher");
             let wnd_class = WNDCLASSW {
                 lpfnWndProc: Some(dark_mode_wnd_proc),
                 lpszClassName: class_name,
@@ -56,7 +56,7 @@ where
             let _hwnd = match CreateWindowExW(
                 WINDOW_EX_STYLE::default(),
                 class_name,
-                w!("CursorForge DarkMode Watcher"),
+                w!("EasyCursorSwap DarkMode Watcher"),
                 WS_OVERLAPPED,
                 0, 0, 0, 0,
                 Some(HWND_MESSAGE),  // メッセージ専用ウィンドウ

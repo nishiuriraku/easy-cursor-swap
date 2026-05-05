@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "CursorForge",
+  "productName": "EasyCursorSwap",
   "version": "0.1.0",
-  "identifier": "dev.cursorforge.app",
+  "identifier": "dev.easycursorswap.app",
   "build": {
     "frontendDist": "../.output/public",
     "devUrl": "http://localhost:3000",
@@ -13,7 +13,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "CursorForge",
+        "title": "EasyCursorSwap",
         "label": "main",
         "width": 1100,
         "height": 750,
@@ -32,14 +32,14 @@
     "trayIcon": {
       "iconPath": "icons/icon.png",
       "iconAsTemplate": false,
-      "tooltip": "CursorForge"
+      "tooltip": "EasyCursorSwap"
     }
   },
   "bundle": {
     "active": true,
     "targets": ["msi", "nsis"],
-    "publisher": "CursorForge",
-    "homepage": "https://github.com/cursorforge/cursor-forge",
+    "publisher": "EasyCursorSwap",
+    "homepage": "https://github.com/easycursorswap/easy-cursor-swap",
     "category": "Utility",
     "shortDescription": "Win11 cursor manager",
     "longDescription": "Next-generation Windows mouse cursor manager with Ed25519 signed theme distribution.",
@@ -69,7 +69,7 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://github.com/cursorforge/cursor-forge/releases/latest/download/latest.json"
+        "https://github.com/easycursorswap/easy-cursor-swap/releases/latest/download/latest.json"
       ],
       "dialog": false,
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdFOTEzM0YxRjc1OTlDMQpSV1RCbVhVZlB4UHBCd1o5enQvdzdvQ0JzMGV1K3RrS2lCYk1nZTMvOUV1ZGlTbHNnTkhxZVg3dQo="

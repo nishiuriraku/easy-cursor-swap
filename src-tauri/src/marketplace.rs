@@ -1,6 +1,6 @@
-//! CursorForge 公式インデックス (Marketplace) クライアント
+//! EasyCursorSwap 公式インデックス (Marketplace) クライアント
 //!
-//! GitHub 上の `cursorforge/index` リポジトリから公開されているメタデータ
+//! GitHub 上の `easycursorswap/index` リポジトリから公開されているメタデータ
 //! インデックス (`index.json`) を取得し、Ed25519 署名検証 + SHA-256 整合性
 //! チェックを経てテーマをローカルにインストールするロジックを提供する。
 //!
@@ -27,11 +27,11 @@ use std::time::Duration;
 
 /// 公式インデックス JSON の URL。
 pub const INDEX_URL: &str =
-    "https://raw.githubusercontent.com/cursorforge/index/main/index.json";
+    "https://raw.githubusercontent.com/easycursorswap/index/main/index.json";
 
 /// 公開鍵レジストリ (`authors/{github}.json`) のベース URL。
 pub const PUBKEY_BASE_URL: &str =
-    "https://raw.githubusercontent.com/cursorforge/index/main/authors";
+    "https://raw.githubusercontent.com/easycursorswap/index/main/authors";
 
 /// HTTP リクエストのタイムアウト。
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
@@ -102,7 +102,7 @@ impl MarketplaceClient {
     fn http() -> AppResult<reqwest::Client> {
         reqwest::Client::builder()
             .timeout(REQUEST_TIMEOUT)
-            .user_agent(concat!("CursorForge/", env!("CARGO_PKG_VERSION")))
+            .user_agent(concat!("EasyCursorSwap/", env!("CARGO_PKG_VERSION")))
             .build()
             .map_err(|e| AppError::Theme(format!("HTTP クライアント初期化失敗: {}", e)))
     }

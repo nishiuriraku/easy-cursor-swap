@@ -154,7 +154,7 @@ async function exportCursorpack(opts: { sign: boolean }) {
   try {
     const { tempDir, join } = await import('@tauri-apps/api/path')
     tempBase = await tempDir()
-    const sessionDir = await join(tempBase, `cursor-forge-${Date.now()}`)
+    const sessionDir = await join(tempBase, `easy-cursor-swap-${Date.now()}`)
 
     for (const [role, png] of Object.entries(assignedPng.value)) {
       const hot = assignedHotspot.value[role] ?? { x: 0, y: 0 }

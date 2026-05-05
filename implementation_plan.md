@@ -1,4 +1,4 @@
-# 🖱️ CursorForge - 実装計画 v2
+# 🖱️ EasyCursorSwap - 実装計画 v2
 
 ---
 
@@ -136,11 +136,11 @@
 - [x] 自動復旧ロジック
 
 ### 4-4: 多重起動防止 ✅ 実装完了
-- [x] Named Mutex (`Local\CursorForge.SingleInstance.<UUID>`) による排他制御
+- [x] Named Mutex (`Local\EasyCursorSwap.SingleInstance.<UUID>`) による排他制御
 - [x] `SingleInstanceLock` RAII 型 — drop 時に `ReleaseMutex` + `CloseHandle`
 - [x] main 起動時に取得失敗 → `tracing::warn` + プロセス終了
 - [x] **既存インスタンスへのフォーカス移動** (CreateEvent シグナル方式)
-  - 第一インスタンス: `Local\CursorForge.ShowWindow.<UUID>` (auto-reset) を作成して待機スレッド起動
+  - 第一インスタンス: `Local\EasyCursorSwap.ShowWindow.<UUID>` (auto-reset) を作成して待機スレッド起動
   - 第二インスタンス: `OpenEventW(EVENT_MODIFY_STATE)` + `SetEvent` でシグナル送信して終了
   - シグナル受信側: `get_webview_window("main").show() / unminimize() / set_focus()`
 
@@ -376,7 +376,7 @@
 
 ### 7-1: ロギング ✅ PII フィルタ適用完了
 - [x] `tracing` + `tracing-subscriber` 導入
-- [x] **`tracing-appender` 日次ローテーション** (`%LOCALAPPDATA%\CursorForge\logs\app-YYYY-MM-DD.log`)
+- [x] **`tracing-appender` 日次ローテーション** (`%LOCALAPPDATA%\EasyCursorSwap\logs\app-YYYY-MM-DD.log`)
 - [x] **14 日経過ログの自動削除** + **合計 100MB 上限の古い順削除** (`logging::cleanup_old_logs`)
 - [x] PII 除外ヘルパー: `logging::redact_path` (ホーム下を `~/...` に置換) + `logging::short_hash` (SHA-256 12 文字短縮)
 - [x] `WorkerGuard` を main で保持して非同期書き出しの flush を保証
@@ -396,9 +396,9 @@
 - [x] capabilities/default.json に notification 権限追加
 - [x] ライブラリのテーマ適用成功 / インポート成功で Toast 表示
 - [x] **`AppUserModelID` の明示的登録** (`src-tauri/src/appusermodel.rs`)
-  - `SetCurrentProcessExplicitAppUserModelID("dev.cursorforge.app")` を main 起動時に呼出
+  - `SetCurrentProcessExplicitAppUserModelID("dev.easycursorswap.app")` を main 起動時に呼出
   - tauri.conf.json の identifier と整合 (Vendor.Product 形式)
-  - 通知センターで送信元アプリ名が CursorForge と表示される
+  - 通知センターで送信元アプリ名が EasyCursorSwap と表示される
 
 ### 7-3: 国際化 🔄 基盤完了
 - [x] **i18n キー管理 (`app/locales/ja.ts` + `en.ts`)** — `as const` で型導出
@@ -475,7 +475,7 @@
 - [ ] 公開鍵 (`pubkey`) の発行 — `tauri signer generate` でリリース署名鍵を生成
 - [ ] メジャーバージョン跨ぎ (v1 → v2) は自動更新しない方針 (現状はチェック側で判定なし)
 - [x] **3 回連続起動失敗の検出機構** — `src-tauri/src/health.rs`
-  - `%LOCALAPPDATA%\CursorForge\state\startup.json` に `pending_failures` を保存
+  - `%LOCALAPPDATA%\EasyCursorSwap\state\startup.json` に `pending_failures` を保存
   - main 起動時に `StartupCheck::begin` でインクリメント
   - setup 完了後に `mark_healthy()` で 0 リセット
   - panic/クラッシュで mark_healthy に到達しなければカウンタが残る
@@ -500,8 +500,8 @@
 
 ### 9-1: GitHub メタデータインデックス ✅ 設計完了
 - [x] テーマメタデータスキーマ Rust 側型定義 (`MarketplaceIndex` / `MarketplaceEntry` / `AuthorRecord`)
-- [x] `index.json` URL 定義 (`raw.githubusercontent.com/cursorforge/index/main/index.json`)
-- [ ] 公式リポジトリの実体構築 (`cursorforge/index` リポジトリ作成)
+- [x] `index.json` URL 定義 (`raw.githubusercontent.com/easycursorswap/index/main/index.json`)
+- [ ] 公式リポジトリの実体構築 (`easycursorswap/index` リポジトリ作成)
 
 ### 9-2: テーマ提出フロー
 - [ ] ブラウザ経由の PR 提出フロー（事前 URL パラメータでテンプレ埋め）
@@ -519,7 +519,7 @@
 - [x] パストラバーサル / Zip 爆弾 / シンボリックリンク防御をローカル経路と共有
 
 ### 9-4: CI 自動検証（GitHub Actions） ✅ 主要検証実装完了
-- [x] **`.github/workflows/marketplace-validate.yml`** — `cursorforge/index` 用ワークフロー雛形
+- [x] **`.github/workflows/marketplace-validate.yml`** — `easycursorswap/index` 用ワークフロー雛形
 - [x] **`scripts/marketplace/validate.mjs`** 本体実装:
   - JSON スキーマ検証 (必須フィールド + UUID + SHA-256 hex 形式 + Arrow ロール必須)
   - **SHA-256 整合性照合** — `themes/<id>.cursorpack` ファイルと entry.sha256 を比較

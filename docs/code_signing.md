@@ -1,6 +1,6 @@
 # コードサイニング調達ガイド
 
-CursorForge の `.msi` / `.exe` インストーラーに付与する Authenticode コードサイニングの
+EasyCursorSwap の `.msi` / `.exe` インストーラーに付与する Authenticode コードサイニングの
 取得方針 (Phase 8-2 残)。
 
 > [!IMPORTANT]
@@ -43,7 +43,7 @@ EV 証明書 (HSM 必須) は個人開発では運用コストが見合わない
 
 1. https://about.signpath.io/foundation 申請フォームから OSS プロジェクト登録
 2. 必要情報:
-   - GitHub リポジトリ URL: https://github.com/cursorforge/cursor-forge
+   - GitHub リポジトリ URL: https://github.com/easycursorswap/easy-cursor-swap
    - ライセンス: MIT
    - メンテナの GitHub アカウント / 連絡先メール
 3. 1〜2 週間の審査後、SignPath プロジェクトページが発行される
@@ -58,7 +58,7 @@ EV 証明書 (HSM 必須) は個人開発では運用コストが見合わない
   with:
     api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
     organization-id: '<signpath-org-id>'
-    project-slug: 'cursor-forge'
+    project-slug: 'easy-cursor-swap'
     signing-policy-slug: 'release-signing'
     artifact-configuration-slug: 'tauri-installers'
     github-artifact-id: ${{ steps.upload.outputs.artifact-id }}
@@ -86,8 +86,8 @@ EV 証明書 (HSM 必須) は個人開発では運用コストが見合わない
     azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
     azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
     endpoint: 'https://eus.codesigning.azure.net/'
-    trusted-signing-account-name: 'cursorforge-signing'
-    certificate-profile-name: 'cursor-forge-release'
+    trusted-signing-account-name: 'easycursorswap-signing'
+    certificate-profile-name: 'easy-cursor-swap-release'
     files-folder: 'src-tauri/target/release/bundle'
     files-folder-filter: 'msi,exe'
     file-digest: 'SHA256'

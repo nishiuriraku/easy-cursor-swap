@@ -1,7 +1,7 @@
-//! CursorForge ロギング初期化
+//! EasyCursorSwap ロギング初期化
 //!
 //! 仕様:
-//!  - `%LOCALAPPDATA%\CursorForge\logs\app-YYYY-MM-DD.log` に日次ローテーション
+//!  - `%LOCALAPPDATA%\EasyCursorSwap\logs\app-YYYY-MM-DD.log` に日次ローテーション
 //!  - 14 日経過したログを起動時に自動削除
 //!  - 合計サイズが 100 MB を超えたら古いものから削除
 //!  - PII 除外フィルター (絶対パス → 相対パス変換、レジストリ RAW 値ハッシュ化など)
@@ -20,11 +20,11 @@ const RETENTION_DAYS: u64 = 14;
 /// ログ合計サイズ上限
 const MAX_TOTAL_BYTES: u64 = 100 * 1024 * 1024;
 
-/// ログディレクトリのパス: `%LOCALAPPDATA%\CursorForge\logs\`
+/// ログディレクトリのパス: `%LOCALAPPDATA%\EasyCursorSwap\logs\`
 pub fn log_dir() -> AppResult<PathBuf> {
     let base = dirs::data_local_dir()
         .ok_or_else(|| AppError::Config("LocalAppData が取得できません".to_string()))?;
-    Ok(base.join("CursorForge").join("logs"))
+    Ok(base.join("EasyCursorSwap").join("logs"))
 }
 
 /// `tracing` の初期化。返り値の `WorkerGuard` を main で保持する必要がある

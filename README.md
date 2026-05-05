@@ -1,16 +1,16 @@
-# CursorForge
+# EasyCursorSwap
 
 **Next-generation mouse cursor manager for Windows**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows%2010%2022H2%2B-blue)](https://github.com/cursorforge/cursor-forge)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%2022H2%2B-blue)](https://github.com/easycursorswap/easy-cursor-swap)
 [![Tauri](https://img.shields.io/badge/Tauri-v2-orange)](https://tauri.app)
 
 [日本語版 README はこちら](README.ja.md)
 
 ---
 
-CursorForge is a Windows-only desktop application for managing custom mouse cursor themes.
+EasyCursorSwap is a Windows-only desktop application for managing custom mouse cursor themes.
 It lets you import, create, and switch cursor themes as `.cursorpack` files, with full support
 for all 17 Windows cursor roles, 6 DPI sizes, Ed25519-signed theme distribution, and automatic
 dark/light mode switching.
@@ -42,12 +42,12 @@ dark/light mode switching.
 ## Installation
 
 Download the latest installer from the
-[Releases page](https://github.com/cursorforge/cursor-forge/releases):
+[Releases page](https://github.com/easycursorswap/easy-cursor-swap/releases):
 
 | File | Description |
 |---|---|
-| `CursorForge_x64-setup.exe` | NSIS installer (per-user, no admin required) |
-| `CursorForge_x64_en-US.msi` | MSI installer |
+| `EasyCursorSwap_x64-setup.exe` | NSIS installer (per-user, no admin required) |
+| `EasyCursorSwap_x64_en-US.msi` | MSI installer |
 
 Both are signed with a minisign key (verified by the built-in updater).
 See [docs/signing.md](docs/signing.md) for signature verification instructions.
@@ -69,8 +69,8 @@ See [docs/signing.md](docs/signing.md) for signature verification instructions.
 ### Quick start
 
 ```bash
-git clone https://github.com/cursorforge/cursor-forge.git
-cd cursor-forge
+git clone https://github.com/easycursorswap/easy-cursor-swap.git
+cd easy-cursor-swap
 npm install
 
 # Run in development mode (Tauri dev window + Nuxt HMR)
@@ -89,7 +89,7 @@ npx tauri build
 ### Project structure
 
 ```
-cursor-forge/
+easy-cursor-swap/
 ├── app/                        # Nuxt 4 frontend (SPA mode)
 │   ├── assets/css/             # Design tokens + global CSS
 │   ├── components/             # Vue SFCs (Composition API + <script setup>)
@@ -120,7 +120,7 @@ cursor-forge/
 
 ## Architecture
 
-CursorForge uses a layered architecture where **Rust is the single source of truth** for all
+EasyCursorSwap uses a layered architecture where **Rust is the single source of truth** for all
 system state:
 
 ```
@@ -152,7 +152,7 @@ See [docs/03_security_and_ecosystem.md](docs/03_security_and_ecosystem.md) for t
 
 1. Create a cursor theme in Creator mode and export a signed `.cursorpack`.
 2. Upload the file to a GitHub Release (or any stable CDN URL).
-3. In CursorForge, go to **Index → Submit to Index**, fill in your GitHub username and the
+3. In EasyCursorSwap, go to **Index → Submit to Index**, fill in your GitHub username and the
    download URL, preview the entry JSON, then click **Open GitHub PR**.
 4. The app opens GitHub's web editor pre-filled with your `entries/{id}.json`.
 5. After the PR is merged, the CI pipeline validates the signature, SHA-256 hash, and

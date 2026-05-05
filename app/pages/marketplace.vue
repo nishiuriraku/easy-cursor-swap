@@ -50,7 +50,7 @@ function makeDemo(): MarketplaceEntry[] {
       sha256: '0'.repeat(64),
       signature: 'demo-signature',
       authorPubkeyId: '7f3a9c' + (i % 10),
-      downloadUrl: `https://github.com/cursorforge/themes/releases/download/${name}.cursorpack`,
+      downloadUrl: `https://github.com/easycursorswap/themes/releases/download/${name}.cursorpack`,
       version: `1.${i % 5}.${i % 3}`,
       downloadCount: f?.downloadCount ?? 420 + i * 137,
       includedRoles: allRoles.slice(0, 6 + (i % 11)),
@@ -114,9 +114,9 @@ async function installEntry(id: string) {
 }
 
 function openGithub() {
-  // 将来: invoke('open_external', { url: 'https://github.com/cursorforge/index' })
+  // 将来: invoke('open_external', { url: 'https://github.com/easycursorswap/index' })
   if (typeof window !== 'undefined') {
-    window.open('https://github.com/cursorforge/index', '_blank', 'noopener,noreferrer')
+    window.open('https://github.com/easycursorswap/index', '_blank', 'noopener,noreferrer')
   }
 }
 
@@ -170,7 +170,7 @@ onMounted(async () => {
         <div>
           <h1>
             {{ t('marketplace.title') }}
-            <span class="repo-link">github.com/cursorforge/index</span>
+            <span class="repo-link">github.com/easycursorswap/index</span>
           </h1>
           <p>{{ t('marketplace.description', { count: entries.length }) }}</p>
         </div>

@@ -1,4 +1,4 @@
-//! CursorForge Ed25519 鍵ペア管理 (Phase 6-3)
+//! EasyCursorSwap Ed25519 鍵ペア管理 (Phase 6-3)
 //!
 //! クリエイターがテーマに署名するための鍵ペアを管理する。
 //!

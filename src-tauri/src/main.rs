@@ -1,4 +1,4 @@
-//! CursorForge - メインエントリポイント
+//! EasyCursorSwap - メインエントリポイント
 //!
 //! Tauri アプリケーションの初期化、トレイ常駐、ダークモード監視を統括する。
 
@@ -27,13 +27,13 @@ fn show_rollback_dialog(target: &RollbackTarget) {
     };
 
     let body = format!(
-        "CursorForge が 3 回連続して正常に起動できませんでした。\n\n\
+        "EasyCursorSwap が 3 回連続して正常に起動できませんでした。\n\n\
         前バージョン v{} にロールバックしますか?\n\n\
         「はい」をクリックするとリリースページをブラウザで開きます。\n\
         インストーラをダウンロードして再インストールしてください。",
         target.version
     );
-    let title = HSTRING::from("CursorForge — 起動失敗を検出");
+    let title = HSTRING::from("EasyCursorSwap — 起動失敗を検出");
     let body_h = HSTRING::from(body);
 
     let result = unsafe {
@@ -73,17 +73,17 @@ fn show_migration_failure_dialog(err: &str) {
     };
 
     let config_dir = dirs::data_local_dir()
-        .map(|p| p.join("CursorForge").to_string_lossy().to_string())
-        .unwrap_or_else(|| "%LOCALAPPDATA%\\CursorForge".to_string());
+        .map(|p| p.join("EasyCursorSwap").to_string_lossy().to_string())
+        .unwrap_or_else(|| "%LOCALAPPDATA%\\EasyCursorSwap".to_string());
 
     let body = format!(
-        "CursorForge の設定ファイルを読み込めませんでした。\n\n\
+        "EasyCursorSwap の設定ファイルを読み込めませんでした。\n\n\
         理由: {err}\n\n\
         バックアップ:\n  {config_dir}\\config.bak.v*.json\n  {config_dir}\\config.corrupt.*.json\n\n\
         いずれかをリネームして config.json に戻すと前回状態に復旧できます。\n\
         詳細はドキュメントを参照してください。"
     );
-    let title = HSTRING::from("CursorForge — 設定読み込みエラー");
+    let title = HSTRING::from("EasyCursorSwap — 設定読み込みエラー");
     let body_h = HSTRING::from(body);
 
     unsafe {
@@ -110,7 +110,7 @@ fn main() {
         }
     };
 
-    tracing::info!("CursorForge v{} を起動しています...", env!("CARGO_PKG_VERSION"));
+    tracing::info!("EasyCursorSwap v{} を起動しています...", env!("CARGO_PKG_VERSION"));
 
     // 起動ヘルスチェック: 連続失敗を検出
     let app_version = env!("CARGO_PKG_VERSION").to_string();
@@ -149,7 +149,7 @@ fn main() {
             // 既存インスタンスへ「ウィンドウを表示せよ」シグナルを送って静かに終了
             if let Err(notify_err) = single_instance::notify_existing_instance() {
                 tracing::warn!("既存インスタンスへの通知失敗: {}", notify_err);
-                eprintln!("CursorForge は既に起動しています");
+                eprintln!("EasyCursorSwap は既に起動しています");
             } else {
                 tracing::info!("既存インスタンスへフォーカス要求を送信しました");
             }
@@ -335,9 +335,9 @@ fn main() {
                 }
             }
 
-            tracing::info!("CursorForge が正常に起動しました");
+            tracing::info!("EasyCursorSwap が正常に起動しました");
             Ok(())
         })
         .run(tauri::generate_context!())
-        .expect("CursorForge の実行中にエラーが発生しました");
+        .expect("EasyCursorSwap の実行中にエラーが発生しました");
 }

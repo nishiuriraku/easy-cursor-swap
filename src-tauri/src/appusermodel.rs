@@ -2,7 +2,7 @@
 //!
 //! Windows のトースト通知 / ジャンプリスト / タスクバーグルーピングで使われる
 //! プロセス識別子。`SetCurrentProcessExplicitAppUserModelID` を呼んで明示しておくと、
-//! 通知センターで送信元アプリ名が CursorForge として正しく表示される。
+//! 通知センターで送信元アプリ名が EasyCursorSwap として正しく表示される。
 //!
 //! 仕様書 §「通知 UX」より:
 //!  > AppUserModelID をマニフェストに登録 (MSIX は自動、`.msi` 版はインストーラで設定)
@@ -11,9 +11,9 @@
 //! 参考: https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-setcurrentprocessexplicitappusermodelid
 
 /// AppUserModelID 文字列 (`Vendor.Product.Subproduct.VersionInformation` 形式が推奨)。
-/// `tauri.conf.json` の `identifier` (`dev.cursorforge.app`) と整合させる。
+/// `tauri.conf.json` の `identifier` (`dev.easycursorswap.app`) と整合させる。
 #[cfg(windows)]
-pub const APP_USER_MODEL_ID: &str = "dev.cursorforge.app";
+pub const APP_USER_MODEL_ID: &str = "dev.easycursorswap.app";
 
 /// プロセスに AppUserModelID を設定する。
 /// 失敗してもアプリ動作は継続 (通知元の表示が "Tauri アプリ" 等になるだけ)。
