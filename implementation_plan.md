@@ -108,7 +108,14 @@
   - `image::DynamicImage` 経由で tEXt / iTXt / zTXt / eXIf 等の補助チャンクを破棄
   - 単体テストで tEXt 剥離を検証 (`test_strip_png_metadata_removes_text_chunk`)
 - [x] リサイズ結果のキャッシュ（17 役割 × 6 サイズ = 102 枚の最適化、`RESIZE_CACHE`）
-- [ ] 進捗表示・キャンセル機能（IPC ストリーム経由）
+- [x] **進捗表示・キャンセル機能（IPC ストリーム経由）**
+  - `export_cursorpack_streamed(req)` IPC を追加 — 全工程 (役割×6サイズ → メタ → 署名 → Zip) を 1 回の呼出で処理
+  - 各 role 完了時 / package / sign / done で `build-progress` Tauri イベントを発火
+  - フロントは `build_id` で payload をフィルタ
+  - キャンセル: `cancel_build(build_id)` IPC + `OnceLock<Mutex<HashSet<String>>>` 共有状態
+  - 各チェックポイントで `is_cancelled` 判定し早期 Err 返却
+  - クリエイター UI に進捗バー + キャンセルボタンを実装
+  - 単体テスト 2 件 (キャンセルフラグライフサイクル / build_id ごと独立)
 
 ### 3-2: `.cur` バイナリ生成 ✅
 - [x] ICO/CUR ヘッダー構造体定義

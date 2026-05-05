@@ -188,7 +188,28 @@ interface ExportResult {
   key_id: string | null
 }
 
-/** クリエイターの全状態を `.cursorpack` として書き出す。 */
+/** ストリームエクスポート時の進捗状態 */
+interface BuildProgress {
+  buildId: string
+  stage: 'role' | 'package' | 'sign' | 'done' | 'cancelled' | 'error'
+  current: number
+  total: number
+  message: string | null
+}
+const exportProgress = ref<BuildProgress | null>(null)
+const currentBuildId = ref<string | null>(null)
+
+/** 進行中のエクスポートを中止する。Rust 側は次のチェックポイントで終了する。 */
+async function cancelExport() {
+  if (!currentBuildId.value) return
+  try {
+    await invokeTauri('cancel_build', { buildId: currentBuildId.value })
+  } catch {
+    // ignore
+  }
+}
+
+/** クリエイターの全状態を `.cursorpack` として書き出す (ストリーム式)。 */
 async function exportCursorpack(opts: { sign: boolean }) {
   if (assignedRoleCount.value === 0) {
     exportMessage.value = '少なくとも 1 役割に画像を割り当ててください'
@@ -200,31 +221,10 @@ async function exportCursorpack(opts: { sign: boolean }) {
   }
   exportBusy.value = true
   exportMessage.value = null
+  exportProgress.value = null
 
-  // 一時ディレクトリに各役割の .cur を吐き出す
-  // (現状は appDataDir/temp/ に書く運用。将来は Rust 側でメモリ上完結に置換)
-  const tempCurPaths: Record<string, string> = {}
-  let tempBase: string | null = null
+  let unlisten: (() => void) | null = null
   try {
-    const { tempDir, join } = await import('@tauri-apps/api/path')
-    tempBase = await tempDir()
-    const sessionDir = await join(tempBase, `easy-cursor-swap-${Date.now()}`)
-
-    for (const [role, png] of Object.entries(assignedPng.value)) {
-      const hot = assignedHotspot.value[role] ?? { x: 0, y: 0 }
-      const target = await join(sessionDir, `${role}.cur`)
-      await invokeTauri<number>('build_cursor_file', {
-        req: {
-          pngBytes: Array.from(png),
-          hotspotX: hot.x,
-          hotspotY: hot.y,
-          resample: resample.value,
-          outputPath: target,
-        },
-      })
-      tempCurPaths[role] = target
-    }
-
     const { save } = await import('@tauri-apps/plugin-dialog')
     const safeName = metaName.value.replace(/[^\p{L}\p{N}_-]+/gu, '_').slice(0, 64) || 'theme'
     const target = await save({
@@ -236,15 +236,37 @@ async function exportCursorpack(opts: { sign: boolean }) {
       return
     }
 
-    const result = await invokeTauri<ExportResult>('export_cursorpack', {
+    // build_id は時刻 + 乱数で衝突回避
+    const buildId = `build-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    currentBuildId.value = buildId
+
+    // 進捗イベントを購読 (build_id でフィルタ)
+    try {
+      const { listen } = await import('@tauri-apps/api/event')
+      unlisten = await listen<BuildProgress>('build-progress', (e) => {
+        if (e.payload.buildId === buildId) exportProgress.value = e.payload
+      })
+    } catch {
+      // Web 開発時は購読をスキップ
+    }
+
+    const roles = Object.entries(assignedPng.value).map(([role, png]) => ({
+      role,
+      pngBytes: Array.from(png),
+      hotspotX: assignedHotspot.value[role]?.x ?? 0,
+      hotspotY: assignedHotspot.value[role]?.y ?? 0,
+      resample: resample.value,
+    }))
+
+    const result = await invokeTauri<ExportResult>('export_cursorpack_streamed', {
       req: {
+        buildId,
         nameJa: metaName.value,
         nameEn: metaNameEn.value || null,
         author: metaAuthor.value || null,
         version: metaVersion.value,
         requiresOsShadow: shadowEnabled.value,
-        hotspots: assignedHotspot.value,
-        curPaths: tempCurPaths,
+        roles,
         outputPath: target,
         sign: opts.sign,
       },
@@ -256,7 +278,13 @@ async function exportCursorpack(opts: { sign: boolean }) {
   } catch (err) {
     exportMessage.value = `エクスポート失敗: ${err instanceof Error ? err.message : String(err)}`
   } finally {
+    if (unlisten) unlisten()
+    currentBuildId.value = null
     exportBusy.value = false
+    // 完了表示は 3 秒残す
+    setTimeout(() => {
+      if (!exportBusy.value) exportProgress.value = null
+    }, 3000)
   }
 }
 
@@ -506,6 +534,46 @@ async function onFileChange(e: Event) {
           <button class="btn ghost" style="margin-left: auto; height: 24px" @click="exportMessage = null">
             <UiIcon name="X" :size="11" />
           </button>
+        </div>
+      </Transition>
+
+      <!-- ストリームエクスポート中の進捗バー + キャンセルボタン -->
+      <Transition name="fade">
+        <div
+          v-if="exportProgress && exportProgress.stage !== 'done'"
+          class="export-progress"
+          role="status"
+          aria-live="polite"
+        >
+          <div class="export-progress-row">
+            <span class="export-progress-label">
+              <template v-if="exportProgress.stage === 'role'">
+                {{ exportProgress.message ?? '' }} ({{ exportProgress.current }}/{{ exportProgress.total }})
+              </template>
+              <template v-else-if="exportProgress.stage === 'sign'">署名中…</template>
+              <template v-else-if="exportProgress.stage === 'package'">パッケージ書き込み中…</template>
+              <template v-else-if="exportProgress.stage === 'cancelled'">キャンセル済み</template>
+              <template v-else>処理中…</template>
+            </span>
+            <button
+              v-if="exportBusy && exportProgress.stage !== 'cancelled'"
+              class="btn ghost"
+              style="height: 24px; margin-left: auto"
+              @click="cancelExport"
+            >
+              <UiIcon name="X" :size="11" />キャンセル
+            </button>
+          </div>
+          <div class="export-progress-bar">
+            <div
+              class="export-progress-fill"
+              :style="{
+                width: exportProgress.total > 0
+                  ? `${(exportProgress.current / exportProgress.total) * 100}%`
+                  : '0%',
+              }"
+            />
+          </div>
         </div>
       </Transition>
     </div>
@@ -828,6 +896,36 @@ async function onFileChange(e: Event) {
   border-radius: 8px;
   font-size: 12px;
   color: var(--fg-dim);
+}
+
+.export-progress {
+  margin: 0 18px 8px;
+  padding: 8px 12px;
+  background: rgba(124, 242, 212, 0.04);
+  border: 1px solid var(--accent-line);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--fg-dim);
+}
+.export-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.export-progress-label {
+  font-variant-numeric: tabular-nums;
+}
+.export-progress-bar {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.export-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 120ms ease-out;
 }
 
 .metadata-pane {

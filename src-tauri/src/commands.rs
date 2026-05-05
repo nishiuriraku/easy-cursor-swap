@@ -289,6 +289,279 @@ pub fn export_cursorpack(req: ExportCursorpackRequest) -> Result<ExportResult, A
     })
 }
 
+// ===========================================================================
+// ストリーム式 .cursorpack ビルド (Phase 3-1 残)
+// ---------------------------------------------------------------------------
+// 17 役割 × 6 サイズ = 最大 102 枚の .cur 生成は重い処理。
+// 以下を 1 回の IPC で実行しつつ、進捗を Tauri イベントで配信する:
+//   1. 各役割の PNG → 6 サイズ .cur をビルド
+//   2. theme.json メタデータ構築
+//   3. 必要なら Ed25519 署名
+//   4. Zip エクスポート
+// 配信イベント: `build-progress` (build_id 付き、フロントが filter する)
+// キャンセル: `cancel_build(build_id)` IPC で AtomicBool 相当のセットに登録
+//   各 role 処理前 / 主要ステップ前にチェックして早期終了。
+// ===========================================================================
+
+use std::sync::OnceLock;
+
+/// キャンセル要求済みの build_id 集合。`OnceLock` で初期化、`Mutex` で同期。
+fn cancel_set() -> &'static std::sync::Mutex<std::collections::HashSet<String>> {
+    static SET: OnceLock<std::sync::Mutex<std::collections::HashSet<String>>> =
+        OnceLock::new();
+    SET.get_or_init(|| std::sync::Mutex::new(std::collections::HashSet::new()))
+}
+
+fn mark_cancelled(build_id: &str) {
+    if let Ok(mut s) = cancel_set().lock() {
+        s.insert(build_id.to_string());
+    }
+}
+
+fn is_cancelled(build_id: &str) -> bool {
+    cancel_set()
+        .lock()
+        .map(|s| s.contains(build_id))
+        .unwrap_or(false)
+}
+
+fn clear_cancel(build_id: &str) {
+    if let Ok(mut s) = cancel_set().lock() {
+        s.remove(build_id);
+    }
+}
+
+/// 1 役割分の入力 (PNG バイト列 + ホットスポット + リサンプル指定)
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RoleBuildEntry {
+    pub role: String,
+    pub png_bytes: Vec<u8>,
+    pub hotspot_x: u32,
+    pub hotspot_y: u32,
+    /// "lanczos" / "nearest" / "auto"
+    pub resample: String,
+}
+
+/// ストリーム式 .cursorpack ビルドリクエスト
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StreamedExportRequest {
+    /// フロント側が生成した一意 ID。`build-progress` イベントの相関キー兼キャンセル ID。
+    pub build_id: String,
+    pub name_ja: String,
+    pub name_en: Option<String>,
+    pub author: Option<String>,
+    pub version: String,
+    pub requires_os_shadow: bool,
+    pub roles: Vec<RoleBuildEntry>,
+    pub output_path: String,
+    pub sign: bool,
+}
+
+/// 進捗イベントペイロード
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BuildProgress {
+    pub build_id: String,
+    /// "role" / "package" / "sign" / "done" / "cancelled" / "error"
+    pub stage: String,
+    pub current: u32,
+    pub total: u32,
+    pub message: Option<String>,
+}
+
+/// 進行中の build を中止する。実際の中止は次のチェックポイントで行われる。
+#[tauri::command]
+pub fn cancel_build(build_id: String) {
+    mark_cancelled(&build_id);
+    tracing::info!("ビルド中止要求: {}", build_id);
+}
+
+fn emit_progress(app: &tauri::AppHandle, payload: BuildProgress) {
+    use tauri::Emitter;
+    if let Err(e) = app.emit("build-progress", payload) {
+        tracing::warn!("build-progress emit 失敗: {}", e);
+    }
+}
+
+/// ストリーム式 .cursorpack ビルド & エクスポート。
+///
+/// 単一 IPC 呼び出しで全工程を実行し、各ステップで `build-progress` イベントを発火する。
+/// `cancel_build(build_id)` が呼ばれていれば次のチェックポイントで早期終了する。
+#[tauri::command]
+pub fn export_cursorpack_streamed(
+    app: tauri::AppHandle,
+    req: StreamedExportRequest,
+) -> Result<ExportResult, AppError> {
+    use std::collections::HashMap;
+
+    let total_roles = req.roles.len() as u32;
+    let total_steps = total_roles + if req.sign { 2 } else { 1 }; // roles + package (+sign)
+
+    // 開始イベント
+    emit_progress(
+        &app,
+        BuildProgress {
+            build_id: req.build_id.clone(),
+            stage: "role".to_string(),
+            current: 0,
+            total: total_steps,
+            message: Some("preparing".to_string()),
+        },
+    );
+
+    // 1) 各役割の .cur をメモリ上でビルド
+    let mut cursor_bytes: HashMap<String, Vec<u8>> = HashMap::new();
+    let mut cursors_meta: HashMap<String, CursorDefinition> = HashMap::new();
+    for (idx, entry) in req.roles.iter().enumerate() {
+        if is_cancelled(&req.build_id) {
+            clear_cancel(&req.build_id);
+            emit_progress(
+                &app,
+                BuildProgress {
+                    build_id: req.build_id.clone(),
+                    stage: "cancelled".to_string(),
+                    current: idx as u32,
+                    total: total_steps,
+                    message: Some(entry.role.clone()),
+                },
+            );
+            return Err(AppError::Other("ビルドがキャンセルされました".to_string()));
+        }
+
+        let resample = match entry.resample.as_str() {
+            "auto" => ResizeMethod::Lanczos,
+            other => ResizeMethod::from_str(other),
+        };
+        let bin = build_cur_from_png(
+            &entry.png_bytes,
+            entry.hotspot_x,
+            entry.hotspot_y,
+            resample,
+        )?;
+        cursor_bytes.insert(entry.role.clone(), bin);
+        cursors_meta.insert(
+            entry.role.clone(),
+            CursorDefinition {
+                file: format!("cursors/{}.cur", entry.role),
+                hotspot_x: entry.hotspot_x,
+                hotspot_y: entry.hotspot_y,
+                resize_method: entry.resample.clone(),
+                size_overrides: None,
+            },
+        );
+
+        emit_progress(
+            &app,
+            BuildProgress {
+                build_id: req.build_id.clone(),
+                stage: "role".to_string(),
+                current: (idx + 1) as u32,
+                total: total_steps,
+                message: Some(entry.role.clone()),
+            },
+        );
+    }
+
+    // 2) theme.json メタデータ
+    let mut name_map = HashMap::new();
+    name_map.insert("ja".to_string(), req.name_ja.clone());
+    if let Some(en) = req.name_en.clone() {
+        name_map.insert("en".to_string(), en);
+    }
+    let mut metadata = ThemeMetadata {
+        schema_version: 1,
+        id: uuid::Uuid::new_v4(),
+        name: LocalizedString::Localized(name_map),
+        version: req.version.clone(),
+        created_at: chrono::Utc::now().to_rfc3339(),
+        requires_os_shadow: req.requires_os_shadow,
+        cursors: cursors_meta,
+        author: req.author.clone(),
+        license: None,
+        homepage: None,
+        description: None,
+        min_app_version: None,
+        signature: None,
+    };
+
+    // 3) 署名
+    let mut signed_key_id: Option<String> = None;
+    if req.sign {
+        if is_cancelled(&req.build_id) {
+            clear_cancel(&req.build_id);
+            return Err(AppError::Other("ビルドがキャンセルされました".to_string()));
+        }
+        emit_progress(
+            &app,
+            BuildProgress {
+                build_id: req.build_id.clone(),
+                stage: "sign".to_string(),
+                current: total_roles,
+                total: total_steps,
+                message: None,
+            },
+        );
+        let info = crate::keystore::Keystore::info()?;
+        if !info.has_keypair {
+            return Err(AppError::Theme(
+                "鍵ペアがありません。設定 → 署名鍵 で生成してください".to_string(),
+            ));
+        }
+        let mut roles: Vec<&String> = metadata.cursors.keys().collect();
+        roles.sort();
+        let role_concat = roles
+            .iter()
+            .map(|s| s.as_str())
+            .collect::<Vec<_>>()
+            .join(",");
+        let sign_input = format!("{}|{}|{}", metadata.id, metadata.version, role_concat);
+        let digest = hex::encode(sha2::Sha256::digest(sign_input.as_bytes()));
+        let sig = crate::keystore::Keystore::sign(digest.as_bytes())?;
+        metadata.signature = Some(sig);
+        signed_key_id = info.key_id.clone();
+    }
+
+    // 4) Zip 出力
+    if is_cancelled(&req.build_id) {
+        clear_cancel(&req.build_id);
+        return Err(AppError::Other("ビルドがキャンセルされました".to_string()));
+    }
+    emit_progress(
+        &app,
+        BuildProgress {
+            build_id: req.build_id.clone(),
+            stage: "package".to_string(),
+            current: total_steps - 1,
+            total: total_steps,
+            message: None,
+        },
+    );
+
+    let out_path = std::path::PathBuf::from(&req.output_path);
+    let size = ThemeManager::export_cursorpack(&mut metadata, &cursor_bytes, &out_path)?;
+
+    emit_progress(
+        &app,
+        BuildProgress {
+            build_id: req.build_id.clone(),
+            stage: "done".to_string(),
+            current: total_steps,
+            total: total_steps,
+            message: Some(metadata.id.to_string()),
+        },
+    );
+    clear_cancel(&req.build_id);
+
+    Ok(ExportResult {
+        theme_id: metadata.id.to_string(),
+        size_bytes: size,
+        signed: req.sign,
+        key_id: signed_key_id,
+    })
+}
+
 /// `.cursorpack` をインポートする前のメタデータ検査。
 /// 既存ライブラリに同 ID のテーマがあればバージョン比較情報を返す。
 #[tauri::command]
@@ -731,5 +1004,33 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         get_autostart_status,
         import_cursor_file,
         inspect_ani_file,
+        export_cursorpack_streamed,
+        cancel_build,
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{clear_cancel, is_cancelled, mark_cancelled};
+
+    #[test]
+    fn cancel_flag_lifecycle() {
+        let id = "test-build-cancel-lifecycle-xyz";
+        // ユニーク ID なので前提状態は false
+        assert!(!is_cancelled(id));
+        mark_cancelled(id);
+        assert!(is_cancelled(id));
+        clear_cancel(id);
+        assert!(!is_cancelled(id));
+    }
+
+    #[test]
+    fn cancel_flags_are_independent_per_build_id() {
+        let id_a = "test-build-independent-a-xyz";
+        let id_b = "test-build-independent-b-xyz";
+        mark_cancelled(id_a);
+        assert!(is_cancelled(id_a));
+        assert!(!is_cancelled(id_b));
+        clear_cancel(id_a);
+    }
 }
