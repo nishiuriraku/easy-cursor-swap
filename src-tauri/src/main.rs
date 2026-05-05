@@ -14,7 +14,7 @@ use app_lib::darkmode;
 use app_lib::health::{RollbackTarget, StartupCheck};
 use app_lib::logging;
 use app_lib::registry::RegistryManager;
-use app_lib::single_instance::SingleInstanceLock;
+use app_lib::single_instance::{self, SingleInstanceLock};
 use app_lib::tray;
 
 /// 連続起動失敗 3 回検出時のロールバック案内ダイアログ。
@@ -146,9 +146,13 @@ fn main() {
         Ok(lock) => lock,
         Err(e) => {
             tracing::warn!("多重起動を検出: {}", e);
-            // TODO: 既存インスタンスのトレイアイコンへフォーカスを移す
-            //       (CreateEvent 経由のシグナル + 既存側で待機)
-            eprintln!("CursorForge は既に起動しています");
+            // 既存インスタンスへ「ウィンドウを表示せよ」シグナルを送って静かに終了
+            if let Err(notify_err) = single_instance::notify_existing_instance() {
+                tracing::warn!("既存インスタンスへの通知失敗: {}", notify_err);
+                eprintln!("CursorForge は既に起動しています");
+            } else {
+                tracing::info!("既存インスタンスへフォーカス要求を送信しました");
+            }
             return;
         }
     };
@@ -226,6 +230,22 @@ fn main() {
             // システムトレイの初期化
             if let Err(e) = tray::setup_tray(&handle) {
                 tracing::error!("システムトレイの初期化に失敗: {}", e);
+            }
+
+            // 第二インスタンスからの「ウィンドウを表示せよ」シグナル待機
+            let show_handle = handle.clone();
+            if let Err(e) = single_instance::start_show_window_listener(move || {
+                use tauri::Manager;
+                if let Some(window) = show_handle.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.unminimize();
+                    let _ = window.set_focus();
+                    tracing::info!("第二インスタンス要求でメインウィンドウを前面化");
+                } else {
+                    tracing::warn!("show-window listener: main ウィンドウが見つからない");
+                }
+            }) {
+                tracing::warn!("show-window listener の起動に失敗: {}", e);
             }
 
             // ダークモード監視の開始 — テーマ自動切替まで含めて配線

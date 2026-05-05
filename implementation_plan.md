@@ -135,7 +135,10 @@
 - [x] Named Mutex (`Local\CursorForge.SingleInstance.<UUID>`) による排他制御
 - [x] `SingleInstanceLock` RAII 型 — drop 時に `ReleaseMutex` + `CloseHandle`
 - [x] main 起動時に取得失敗 → `tracing::warn` + プロセス終了
-- [ ] 既存インスタンスのトレイアイコンへのフォーカス移動 (CreateEvent シグナル方式、次回)
+- [x] **既存インスタンスへのフォーカス移動** (CreateEvent シグナル方式)
+  - 第一インスタンス: `Local\CursorForge.ShowWindow.<UUID>` (auto-reset) を作成して待機スレッド起動
+  - 第二インスタンス: `OpenEventW(EVENT_MODIFY_STATE)` + `SetEvent` でシグナル送信して終了
+  - シグナル受信側: `get_webview_window("main").show() / unminimize() / set_focus()`
 
 ### 4-5: OS 起動時自動起動 ✅ 実装完了
 - [x] **`HKCU\...\Run` へのレジストリ登録/解除** (`src-tauri/src/autostart.rs`)
