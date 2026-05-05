@@ -294,6 +294,12 @@ async function onKeystoreDelete() {
   if (proceed) await removeKeystore()
 }
 
+async function onConfigRestored() {
+  // バックアップから復旧後: 設定を再読み込みして UI に反映
+  await loadConfig()
+  applyConfigToLocal()
+}
+
 onMounted(async () => {
   await loadConfig()
   applyConfigToLocal()
@@ -399,6 +405,9 @@ function selectSection(id: SectionId) {
               </SettingsRow>
             </div>
           </div>
+
+          <!-- バックアップが存在する場合のみ復旧パネルを表示 -->
+          <ConfigRecoveryPanel @restored="onConfigRestored" />
         </section>
 
         <!-- 起動・常駐 -->

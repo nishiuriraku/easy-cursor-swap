@@ -4,7 +4,7 @@
 //! 各コマンドは Tauri の `#[tauri::command]` マクロで公開される。
 
 use crate::backup::{BackupManager, ProfileEnvelope};
-use crate::config::{AppConfig, ConfigManager};
+use crate::config::{AppConfig, BackupInfo, ConfigManager};
 use crate::cursor::{build_cur_from_png, clear_resize_cache, ResizeMethod};
 use sha2::Digest;
 use crate::darkmode;
@@ -453,6 +453,28 @@ fn get_os_version() -> String {
     }
 }
 
+/// 設定バックアップファイルの一覧を返す。
+///
+/// `config.bak.v*.json` (スキーマ移行バックアップ) と
+/// `config.corrupt.*.json` (破損退避ファイル) を列挙し、最終更新日時の降順で返す。
+#[tauri::command]
+pub fn list_config_backups(
+    config: State<'_, ConfigManager>,
+) -> Result<Vec<BackupInfo>, AppError> {
+    config.list_backups()
+}
+
+/// 指定したバックアップファイルを `config.json` に上書きして設定を復旧する。
+///
+/// 復旧後は UI 側でアプリを再起動するかページをリロードすること。
+#[tauri::command]
+pub fn restore_config_backup(
+    file_name: String,
+    config: State<'_, ConfigManager>,
+) -> Result<(), AppError> {
+    config.restore_backup(&file_name)
+}
+
 /// Tauri Builder に全コマンドを登録するためのヘルパー
 pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
     tauri::generate_handler![
@@ -481,5 +503,7 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         get_config,
         update_config,
         get_app_info,
+        list_config_backups,
+        restore_config_backup,
     ]
 }

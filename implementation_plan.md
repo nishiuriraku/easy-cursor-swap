@@ -547,7 +547,7 @@
 8. **🚀 v1→v2 メジャー跨ぎ判定 + 3 回連続失敗ロールバック** — Phase 8-4 残
 9. **🦠 SVG 以外の画像メタデータパージ** — PNG Exif / iTXt の除去強化 (Phase 6-1 残)
 10. ~~**🌐 設定セクション本文の i18n 残置換**~~ ✅ 完了 (98 キー追加 / 8 セクション全文 + ダイアログ + ステータス)
-11. **🆘 GUI 復旧フロー** — config マイグレーション失敗時に「最新バックアップから復元」ボタン提供
+11. ~~**🆘 GUI 復旧フロー**~~ ✅ 完了 (`list_config_backups` / `restore_config_backup` コマンド + ConfigRecoveryPanel.vue + settings General セクションに統合)
 
 ---
 
@@ -563,7 +563,7 @@
 5. **Phase 7-2: AppUserModelID 登録** — トースト通知発信元の明示
 6. **Phase 4-7 残: アクセシビリティ競合検出** — `CursorIndicator` / `ContrastScheme` / `CursorBaseSize` 検出と警告ダイアログ
 7. **Phase 5-11: WCAG AA 準拠** — コントラスト 4.5:1 検証 / キーボードナビ / ARIA ラベル
-8. **Phase 2-1 残: ユーザー向けの復旧 UI** — 現状は MessageBox。GUI で「最新バックアップから復元」ボタンを提供する余地
+8. ~~**Phase 2-1 残: ユーザー向けの復旧 UI**~~ ✅ 完了 — `ConfigRecoveryPanel.vue` が設定 General セクションにバックアップ一覧 + 復旧ボタンを提供
 9. **Phase 6-1 残: `.cursorpack` 内画像メタデータパージ強化** — Exif / トラッキングデータの除去
 10. **README ja/en 整備** — v1.0 既知制約の明記、サポート OS / RDP 動作対象外の警告
 

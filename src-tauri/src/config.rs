@@ -10,6 +10,19 @@ use std::path::PathBuf;
 use std::sync::RwLock;
 use uuid::Uuid;
 
+/// バックアップファイルの情報
+#[derive(Debug, Clone, Serialize)]
+pub struct BackupInfo {
+    /// ファイル名 (例: "config.bak.v2.json", "config.corrupt.1746123456.json")
+    pub file_name: String,
+    /// UTC の ISO 8601 最終更新日時
+    pub modified_utc: String,
+    /// ファイルサイズ (バイト)
+    pub size_bytes: u64,
+    /// "versioned" | "corrupt"
+    pub kind: String,
+}
+
 /// 設定スキーマの現在のバージョン
 const CURRENT_SCHEMA_VERSION: u32 = 1;
 
@@ -277,5 +290,104 @@ impl ConfigManager {
         fs::write(&self.config_path, content)?;
 
         Ok(config.clone())
+    }
+
+    /// 設定ディレクトリ内のバックアップファイル一覧を返す。
+    ///
+    /// 対象: `config.bak.v*.json` (versioned) / `config.corrupt.*.json` (corrupt)
+    /// 返却: 最終更新日時の降順（最新が先頭）
+    pub fn list_backups(&self) -> AppResult<Vec<BackupInfo>> {
+        let dir = self
+            .config_path
+            .parent()
+            .ok_or_else(|| AppError::Config("設定ディレクトリの取得に失敗".to_string()))?;
+
+        if !dir.exists() {
+            return Ok(vec![]);
+        }
+
+        let mut backups: Vec<BackupInfo> = fs::read_dir(dir)?
+            .filter_map(|entry| entry.ok())
+            .filter_map(|entry| {
+                let name = entry.file_name().to_string_lossy().to_string();
+                let kind = if name.starts_with("config.bak.v") && name.ends_with(".json") {
+                    "versioned"
+                } else if name.starts_with("config.corrupt.") && name.ends_with(".json") {
+                    "corrupt"
+                } else {
+                    return None;
+                };
+                let meta = entry.metadata().ok()?;
+                let modified = meta.modified().ok()?;
+                let secs = modified
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs();
+                let dt = chrono::DateTime::<chrono::Utc>::from_timestamp(secs as i64, 0)
+                    .unwrap_or_default();
+                Some(BackupInfo {
+                    file_name: name,
+                    modified_utc: dt.to_rfc3339(),
+                    size_bytes: meta.len(),
+                    kind: kind.to_string(),
+                })
+            })
+            .collect();
+
+        // 最新が先頭
+        backups.sort_by(|a, b| b.modified_utc.cmp(&a.modified_utc));
+        Ok(backups)
+    }
+
+    /// 指定したバックアップファイルを `config.json` に上書きして設定を再ロードする。
+    ///
+    /// セキュリティ: `file_name` は `config.bak.v*.json` / `config.corrupt.*.json` のみ許可。
+    pub fn restore_backup(&self, file_name: &str) -> AppResult<()> {
+        // ファイル名の簡易バリデーション (パストラバーサル防止)
+        let valid = (file_name.starts_with("config.bak.v") || file_name.starts_with("config.corrupt."))
+            && file_name.ends_with(".json")
+            && !file_name.contains('/')
+            && !file_name.contains('\\')
+            && !file_name.contains("..");
+        if !valid {
+            return Err(AppError::Config(format!(
+                "不正なバックアップファイル名: {}",
+                file_name
+            )));
+        }
+
+        let dir = self
+            .config_path
+            .parent()
+            .ok_or_else(|| AppError::Config("設定ディレクトリの取得に失敗".to_string()))?;
+        let backup_path = dir.join(file_name);
+
+        if !backup_path.exists() {
+            return Err(AppError::Config(format!(
+                "バックアップファイルが見つかりません: {}",
+                file_name
+            )));
+        }
+
+        // バックアップを読み込んで有効な JSON (AppConfig) か確認
+        let content = fs::read_to_string(&backup_path)?;
+        let restored: AppConfig = serde_json::from_str(&content).map_err(|e| {
+            AppError::Config(format!("バックアップファイルが無効です: {}", e))
+        })?;
+
+        // config.json を上書き
+        fs::write(&self.config_path, serde_json::to_string_pretty(&restored)?)?;
+
+        // in-memory 更新
+        let mut guard = self.config.write().map_err(|e| {
+            AppError::Config(format!("設定のロックに失敗: {}", e))
+        })?;
+        *guard = restored;
+
+        tracing::info!(
+            "バックアップから復旧: {} → config.json",
+            crate::logging::redact_path(&backup_path)
+        );
+        Ok(())
     }
 }
