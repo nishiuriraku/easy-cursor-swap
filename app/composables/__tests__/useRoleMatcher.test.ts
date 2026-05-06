@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { normalize, scoreRole } from '~/composables/useRoleMatcher'
+import { matchAssetToRole, normalize, resolveCollisions, scoreRole, type MatchCandidate } from '~/composables/useRoleMatcher'
 
 describe('normalize', () => {
   it('lowercases and strips separators', () => {
@@ -54,5 +54,39 @@ describe('scoreRole', () => {
 
   it('returns 0 for unrelated names', () => {
     expect(scoreRole('totally-random.png', 'Arrow')).toBe(0)
+  })
+})
+
+describe('matchAssetToRole', () => {
+  it('returns best matching role', () => {
+    const m = matchAssetToRole('easy-cursor-swap-mint__Arrow.png')
+    expect(m).toEqual({ role: 'Arrow', score: 0.95 })
+  })
+
+  it('returns null when below threshold', () => {
+    expect(matchAssetToRole('totally-random-name.png')).toBeNull()
+  })
+})
+
+describe('resolveCollisions', () => {
+  it('picks the highest resolution when scores tie', () => {
+    const cands: MatchCandidate[] = [
+      { sourceFile: 'arrow_64.png',  nativeSize: 64,  match: { role: 'Arrow', score: 0.95 } },
+      { sourceFile: 'arrow_256.png', nativeSize: 256, match: { role: 'Arrow', score: 0.95 } },
+    ]
+    const { winners, demoted } = resolveCollisions(cands)
+    expect(winners).toHaveLength(1)
+    expect(winners[0].sourceFile).toBe('arrow_256.png')
+    expect(demoted).toHaveLength(1)
+    expect(demoted[0].sourceFile).toBe('arrow_64.png')
+  })
+
+  it('picks the higher score over higher resolution', () => {
+    const cands: MatchCandidate[] = [
+      { sourceFile: 'arrow.png',       nativeSize: 64,  match: { role: 'Arrow', score: 1.0 } },
+      { sourceFile: 'arrow_decor.png', nativeSize: 256, match: { role: 'Arrow', score: 0.90 } },
+    ]
+    const { winners } = resolveCollisions(cands)
+    expect(winners[0].sourceFile).toBe('arrow.png')
   })
 })

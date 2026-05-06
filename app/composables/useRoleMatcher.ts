@@ -65,3 +65,53 @@ export function scoreRole(filename: string, roleId: string): number {
   }
   return best
 }
+
+export interface RoleMatch {
+  role: string
+  score: number
+}
+
+export interface MatchCandidate {
+  sourceFile: string
+  nativeSize: number
+  match: RoleMatch
+  // 任意の追加情報をモーダル側で attach できるように緩く
+  [key: string]: unknown
+}
+
+const MATCH_THRESHOLD = 0.7
+
+export function matchAssetToRole(filename: string): RoleMatch | null {
+  let best: RoleMatch | null = null
+  for (const roleId of CURSOR_ROLE_IDS) {
+    const score = scoreRole(filename, roleId)
+    if (score > 0 && (!best || score > best.score)) {
+      best = { role: roleId, score }
+    }
+  }
+  return best && best.score >= MATCH_THRESHOLD ? best : null
+}
+
+export function resolveCollisions(candidates: MatchCandidate[]): {
+  winners: MatchCandidate[]
+  demoted: MatchCandidate[]
+} {
+  const byRole = new Map<string, MatchCandidate[]>()
+  for (const c of candidates) {
+    const list = byRole.get(c.match.role) ?? []
+    list.push(c)
+    byRole.set(c.match.role, list)
+  }
+
+  const winners: MatchCandidate[] = []
+  const demoted: MatchCandidate[] = []
+  for (const [, group] of byRole) {
+    group.sort((a, b) =>
+      b.match.score - a.match.score ||
+      b.nativeSize - a.nativeSize,
+    )
+    winners.push(group[0])
+    demoted.push(...group.slice(1))
+  }
+  return { winners, demoted }
+}
