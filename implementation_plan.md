@@ -604,8 +604,8 @@
 
 > [!NOTE]
 > v1.0 リリース DOD のクリティカルパス上の **コード変更で完結する** 残タスクは
-> ほぼ枯渇。残るのは **外部依存** (実申請・GitHub リポジトリ実体構築・実機 a11y 計測) と、
-> オプションの「クラッシュレポート送信先サーバー実装」など。
+> ほぼ枯渇。残るのは **外部依存** (実申請・実機 a11y 計測) と、
+> 配布規模を上げるための **クラッシュレポート Worker 強化** など。
 
 ### 🔧 コード変更で完結するもの
 
@@ -615,19 +615,41 @@
 2. **🆘 クラッシュレポート閲覧 / 削除 UI** (Phase 7-1 続き)
    `list_crash_reports` / `clear_crash_reports` IPC は配線済。設定 → ログセクションに
    一覧 + 「履歴を消去」ボタンを追加するだけ。
+3. **📮 クラッシュレポート送信クライアント実装** (Phase 7-1 続き)
+   Worker は [services/crash-report-worker/](services/crash-report-worker/) で構築済。
+   Tauri 側 `submit_pending_reports` を実装し、設定画面に **送信エンドポイント URL** と
+   **App Token** の入力欄を追加 (config 経由で永続化)。
+
+### 🛡️ クラッシュレポート Worker の公開強化 (配布規模次第で必要)
+
+> [!NOTE]
+> 現状の Worker は「個人〜小規模 β」向け。`X-App-Token` はクライアント埋め込みのため
+> 時間の問題で割れる前提で、abuse 耐性を段階的に強化する。
+
+4. **🤖 Cloudflare Turnstile 連携** (Worker public 化前)
+   オプトイン送信時に Tauri の webview で Turnstile を 1 回表示し、トークンを Worker に渡す。
+   bot 系 spam を一段で弾ける。
+5. **🚧 Cloudflare WAF Rule + Logpush** (Worker public 化前)
+   `/crash` への異常な request rate を WAF Free 枠で即ブロック。Logpush で監査ログを保全。
+6. **🔁 ALLOWED_ORIGIN のバージョンローテーション** (任意)
+   アプリのリリースごとに新しい token を発行し、旧 token は `wrangler secret` で並列許可
+   → 一定期間後に廃止する仕組み。Worker 側で複数 token を許容する変更が必要。
+7. **📜 プライバシーポリシー追記** (Worker public 化前)
+   Cloudflare アクセスログに IP が一定期間残ることを README/同意ダイアログに記載。
+   GDPR/個人情報保護法対応として最低限必要。
 
 ### 📡 外部依存 (アプリ単体では完結しない)
 
-3. **✍️ EV/OV コードサイニング実申請** (Phase 8-2)
+8. **✍️ EV/OV コードサイニング実申請** (Phase 8-2)
    調達ガイド ([docs/code_signing.md](docs/code_signing.md)) 完成済。SignPath.io への申請が次のアクション。
-4. **🪪 SmartScreen レピュテーション獲得** (Phase 8-2)
+9. **🪪 SmartScreen レピュテーション獲得** (Phase 8-2)
    署名済バイナリの実配信 → ダウンロード回数の蓄積待ち。
-5. **🏪 Microsoft Store 申請** (Phase 8-3)
-   `runFullTrust` は Restricted Capability のため、開発者アカウント + 申請必要。
-6. **📦 公式インデックスリポジトリ構築** (Phase 9-1)
-   `easycursorswap/index` GitHub リポジトリの実体作成 (ガイド・スキーマ・CI は整備済)。
-7. **📮 クラッシュレポート送信エンドポイント** (Phase 7-1)
-   `easycursorswap/index` の Issue API またはサーバーが必要 (現状はローカル収集のみ)。
+10. **🏪 Microsoft Store 申請** (Phase 8-3)
+    `runFullTrust` は Restricted Capability のため、開発者アカウント + 申請必要。
+11. **🚀 Cloudflare Worker デプロイ** (Phase 7-1, ローカルから 1 回のみ)
+    KV 名前空間は MCP 経由で作成済。`wrangler login` → `wrangler secret put GITHUB_TOKEN`
+    + `ALLOWED_ORIGIN` → `wrangler deploy` の 3 ステップ。詳細は
+    [services/crash-report-worker/README.md](services/crash-report-worker/README.md)。
 
 ### 完了済み主要マイルストーン (記録)
 
@@ -646,7 +668,9 @@
 | Phase 8-3 | ✅ MSIX AppxManifest + startupTask + distribution.md (Store 申請のみ残) |
 | Phase 8-4 | ✅ Tauri Updater + 公開鍵発行 + メジャー跨ぎ警告 + 3 回連続失敗ロールバック誘導 |
 | Phase 8-5 | ✅ CI/CD 4 本体制 (ci / performance / release / marketplace-validate) |
-| Phase 9-1/9-3 | ✅ クライアント側検証 (HTTPS / SHA-256 / Ed25519 / ZIP 展開) — 公式リポジトリ実体構築のみ残 |
+| Phase 9-1 | ✅ 公式インデックス [nishiuriraku/easy-cursor-swap-index](https://github.com/nishiuriraku/easy-cursor-swap-index) 実体構築 (README / schemas / scripts / workflow / authors+entries+themes 雛形) |
+| Phase 9-1/9-3 | ✅ クライアント側検証 (HTTPS / SHA-256 / Ed25519 / ZIP 展開) |
 | Phase 9-2 | ✅ SubmitThemeDialog.vue + open_url IPC で GitHub 提出フロー貫通 |
 | Phase 9-4 | ✅ CI ワークフロー + validate.mjs + VirusTotal API v3 統合 |
 | Phase 9-5 | ✅ 新規著者登録ガイド (author_registration.md) + 鍵ローテーションガイド |
+| Phase 7-1 (Worker) | ✅ クラッシュレポート Cloudflare Worker コード + KV 構築 (デプロイは wrangler login 必要) |
