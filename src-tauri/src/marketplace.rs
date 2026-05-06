@@ -1,6 +1,6 @@
 //! EasyCursorSwap 公式インデックス (Marketplace) クライアント
 //!
-//! GitHub 上の `easycursorswap/index` リポジトリから公開されているメタデータ
+//! GitHub 上の `nishiuriraku/easy-cursor-swap-index` リポジトリから公開されているメタデータ
 //! インデックス (`index.json`) を取得し、Ed25519 署名検証 + SHA-256 整合性
 //! チェックを経てテーマをローカルにインストールするロジックを提供する。
 //!
@@ -27,11 +27,11 @@ use std::time::Duration;
 
 /// 公式インデックス JSON の URL。
 pub const INDEX_URL: &str =
-    "https://raw.githubusercontent.com/easycursorswap/index/main/index.json";
+    "https://raw.githubusercontent.com/nishiuriraku/easy-cursor-swap-index/main/index.json";
 
 /// 公開鍵レジストリ (`authors/{github}.json`) のベース URL。
 pub const PUBKEY_BASE_URL: &str =
-    "https://raw.githubusercontent.com/easycursorswap/index/main/authors";
+    "https://raw.githubusercontent.com/nishiuriraku/easy-cursor-swap-index/main/authors";
 
 /// HTTP リクエストのタイムアウト。
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);

@@ -60,7 +60,7 @@ pub struct GeneralConfig {
     pub panic_hotkey: String,
     /// クラッシュレポート送信オプトイン (デフォルト false)
     ///
-    /// 有効にしても `easycursorswap/index` のサーバー側エンドポイントが
+    /// 有効にしても `nishiuriraku/easy-cursor-swap-index` のサーバー側エンドポイントが
     /// 整備されるまでは収集のみ。`crash::list_reports` で UI に表示する。
     #[serde(default)]
     pub crash_reporting: bool,

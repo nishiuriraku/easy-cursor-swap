@@ -114,9 +114,9 @@ async function installEntry(id: string) {
 }
 
 function openGithub() {
-  // 将来: invoke('open_external', { url: 'https://github.com/easycursorswap/index' })
+  // 将来: invoke('open_external', { url: 'https://github.com/nishiuriraku/easy-cursor-swap-index' })
   if (typeof window !== 'undefined') {
-    window.open('https://github.com/easycursorswap/index', '_blank', 'noopener,noreferrer')
+    window.open('https://github.com/nishiuriraku/easy-cursor-swap-index', '_blank', 'noopener,noreferrer')
   }
 }
 
@@ -170,7 +170,7 @@ onMounted(async () => {
         <div>
           <h1>
             {{ t('marketplace.title') }}
-            <span class="repo-link">github.com/easycursorswap/index</span>
+            <span class="repo-link">github.com/nishiuriraku/easy-cursor-swap-index</span>
           </h1>
           <p>{{ t('marketplace.description', { count: entries.length }) }}</p>
         </div>

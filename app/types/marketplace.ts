@@ -1,6 +1,6 @@
 /**
  * 公式インデックス (Marketplace) 関連の型定義。
- * `easycursorswap/index` リポジトリの `index.json` スキーマに準拠。
+ * `nishiuriraku/easy-cursor-swap-index` リポジトリの `index.json` スキーマに準拠。
  */
 
 export interface MarketplaceEntry {

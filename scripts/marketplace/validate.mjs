@@ -2,7 +2,7 @@
 /**
  * Marketplace 投稿検証スクリプト (Phase 9-4)
  *
- * `easycursorswap/index` リポジトリへの PR で動かす想定。
+ * `nishiuriraku/easy-cursor-swap-index` リポジトリへの PR で動かす想定。
  * 環境変数 `CHANGED_FILES` (改行区切り) に変更ファイル一覧が入っていれば
  * その中の `entries/*.json` を検証対象とする。なければ `entries/*.json` を全走査。
  *

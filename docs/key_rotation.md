@@ -1,6 +1,6 @@
 # 鍵ローテーション PR ガイド
 
-EasyCursorSwap の公式インデックス (`easycursorswap/index` リポジトリ) における
+EasyCursorSwap の公式インデックス (`nishiuriraku/easy-cursor-swap-index` リポジトリ) における
 著者公開鍵 (Ed25519) のローテーション手順。
 
 > **初回登録の方へ:** これからインデックスに新規著者として登録する場合は
@@ -68,7 +68,7 @@ EasyCursorSwap アプリで:
 旧 `authors/{user}.json` の `public_key` 値を控えておくこと。
 `key_id` は `sha256(base64_decode(public_key))[..16].hex()` で再計算可能。
 
-### 3. `easycursorswap/index` リポジトリで PR を作成
+### 3. `nishiuriraku/easy-cursor-swap-index` リポジトリで PR を作成
 
 `authors/{your_github_username}.json` を以下のように更新:
 

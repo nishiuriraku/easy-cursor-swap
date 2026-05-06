@@ -642,7 +642,7 @@ pub fn import_profile(
 }
 
 /// 公式インデックス (Marketplace) のメタデータを取得する。
-/// `easycursorswap/index` リポジトリの `index.json` を HTTPS + rustls で取得。
+/// `nishiuriraku/easy-cursor-swap-index` リポジトリの `index.json` を HTTPS + rustls で取得。
 #[tauri::command]
 pub async fn marketplace_fetch_index() -> Result<MarketplaceIndex, AppError> {
     MarketplaceClient::fetch_index().await
