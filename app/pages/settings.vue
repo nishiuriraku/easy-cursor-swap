@@ -10,7 +10,7 @@
  *       将来セクションが肥大化したら個別 SFC に切り出す。
  */
 import { computed, onMounted, ref, watch } from 'vue'
-import { useAppConfig } from '~/composables/useAppConfig'
+import { useAppSettings } from '~/composables/useAppSettings'
 import { useKeystore } from '~/composables/useKeystore'
 import { invokeTauri } from '~/composables/useTauri'
 import { useI18n } from '~/composables/useI18n'
@@ -48,7 +48,7 @@ const SECTIONS: SectionDef[] = [
 const section = ref<SectionId>('general')
 const searchQuery = ref('')
 
-const { config: appConfig, load: loadConfig, update: persistConfig } = useAppConfig()
+const { config: appConfig, load: loadConfig, update: persistConfig } = useAppSettings()
 
 // バイト ⇄ GB / MB 変換ユーティリティ
 const BYTES_PER_GB = 1024 * 1024 * 1024

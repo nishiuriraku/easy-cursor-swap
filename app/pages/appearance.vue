@@ -3,13 +3,13 @@
  * 外観 / ダークモード連動ペアリング (Phase 5-8)
  *
  * design/settings.jsx の外観セクションを Vue 化したもの。
- * `useAppConfig` / `useThemes` / `ThemePickerModal` と連携して
+ * `useAppSettings` / `useThemes` / `ThemePickerModal` と連携して
  * Light/Dark のテーマペアリングを config に永続化する。
  */
 import { computed, onMounted, ref, watch } from 'vue'
 import type { ThemeCardData } from '~/types/theme'
 import { invokeTauri } from '~/composables/useTauri'
-import { useAppConfig } from '~/composables/useAppConfig'
+import { useAppSettings } from '~/composables/useAppSettings'
 import { useThemes } from '~/composables/useThemes'
 import { useI18n } from '~/composables/useI18n'
 
@@ -17,7 +17,7 @@ const { t } = useI18n()
 
 const isDark = ref(true)
 
-const { config: appConfig, load: loadConfig, update: persistConfig } = useAppConfig()
+const { config: appConfig, load: loadConfig, update: persistConfig } = useAppSettings()
 const { themes, refresh: refreshThemes } = useThemes()
 
 // UI ローカル状態 — config が来たら同期する

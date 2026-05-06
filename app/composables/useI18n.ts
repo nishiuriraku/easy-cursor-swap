@@ -3,7 +3,7 @@
  *
  * - vue-i18n を使わずに最小依存で多言語切替を提供。
  * - グローバルなリアクティブシングルトンとして実装し、全画面で同じ locale を参照。
- * - 起動時は (1) `useAppConfig` の `general.language` (`auto`/`ja`/`en`) →
+ * - 起動時は (1) `useAppSettings` の `general.language` (`auto`/`ja`/`en`) →
  *   (2) ブラウザ/Tauri OS ロケール (`navigator.language`) でフォールバック判定。
  * - `t('a.b.c', { name: 'foo' })` でキー解決 + `{var}` プレースホルダ展開。
  */

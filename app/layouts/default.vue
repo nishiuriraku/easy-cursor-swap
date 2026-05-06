@@ -7,11 +7,11 @@
  * グローバルパニックホットキー (Ctrl+Alt+Shift+R) もここで購読する。
  */
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useAppConfig } from '~/composables/useAppConfig'
+import { useAppSettings } from '~/composables/useAppSettings'
 import { useI18n } from '~/composables/useI18n'
 // `useRoute` / `useRouter` / コンポーネント類は Nuxt の自動インポートで解決
 
-const { config: appConfig, load: loadAppConfig } = useAppConfig()
+const { config: appConfig, load: loadAppConfig } = useAppSettings()
 const { syncFromConfig } = useI18n()
 
 const route = useRoute()
