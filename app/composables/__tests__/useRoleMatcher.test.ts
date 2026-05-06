@@ -64,7 +64,7 @@ describe('matchAssetToRole', () => {
   })
 
   it('returns null when below threshold', () => {
-    expect(matchAssetToRole('totally-random-name.png')).toBeNull()
+    expect(matchAssetToRole('random-thing.png')).toBeNull()
   })
 })
 
