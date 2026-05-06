@@ -51,6 +51,9 @@
       "icons/icon.ico"
     ],
     "windows": {
+      "webviewInstallMode": {
+        "type": "embedBootstrapper"
+      },
       "wix": {
         "language": ["ja-JP", "en-US"],
         "fragmentPaths": [],

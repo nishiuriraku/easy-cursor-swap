@@ -494,12 +494,11 @@
   - ベンチに cold/warm パスを追加して効果計測可能に
 
 ### 8-2: インストーラー & 署名
-- [ ] `.msi` インストーラー生成（x64）
-- [ ] ARM64 ビルドの独立した扱い
-- [ ] WebView2 Evergreen Bootstrapper の `.msi` 同梱戦略
+- [x] **`.msi` インストーラー生成（x64）** — release.yml が tagged push で MSI/NSIS を自動生成
+- [x] **ARM64 ビルドの独立した扱い** — release.yml に `aarch64-pc-windows-msvc` matrix を追加 (Snapdragon Windows 向け)
+- [x] **WebView2 Evergreen Bootstrapper の `.msi` 同梱戦略** — tauri.conf.json `bundle.windows.webviewInstallMode.type = "embedBootstrapper"` で約 1.8MB の Bootstrapper を埋め込み (オフラインインストール対応)
 - [x] **NSIS バンドルターゲット追加** (perUser インストール、ja/en 言語セレクタ)
 - [x] **MSI バンドル設定強化** (publisher / homepage / wix language)
-- [ ] WebView2 Evergreen Bootstrapper の `.msi` 同梱戦略
 - [ ] EV/OV コードサイニング調達方針（SignPath.io 等の OSS 無償署名）
 - [ ] SmartScreen レピュテーション獲得の検証
 
