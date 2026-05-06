@@ -188,7 +188,7 @@
 - [x] `update_config` で `general.auto_start` をレジストリへ自動同期
 - [x] アプリ起動時にも config → レジストリの再同期を実行 (config が Source of Truth)
 - [x] IPC `get_autostart_status` でレジストリ実態の確認可能
-- [ ] MSIX 環境では `<Extension Category="windows.startupTask">` を使い分け (Phase 8-3 残)
+- [x] **MSIX 環境では `<Extension Category="windows.startupTask">` を使い分け** — `autostart::is_msix_packaged` で `\WindowsApps\` 配下を検出、`set_enabled` / `is_enabled` を no-op にして AppxManifest の startupTask に委譲。テスト 3 件追加 (大文字小文字 / 通常パス / パス取得失敗)
 
 ### 4-6: グローバルホットキー ✅ 実装完了
 - [x] **`Ctrl+Alt+Shift+R` での強制リセット**（Windows 既定カーソルに復旧）

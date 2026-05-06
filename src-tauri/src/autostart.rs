@@ -5,6 +5,17 @@
 //!
 //! 設定 `general.auto_start` を Source of Truth とし、`update_config` 経由および
 //! アプリ起動直後にレジストリを同期する。
+//!
+//! ## MSIX パッケージ環境での扱い
+//!
+//! MSIX (Microsoft Store / sideload) 配布で起動された場合は、AppxManifest.xml の
+//! `<Extension Category="windows.startupTask">` 経由で OS が自動起動を管理する。
+//! Run キーへの直接書き込みは Store ポリシー上推奨されないため、本モジュールは
+//! MSIX 環境を検出した場合は no-op として早期 return し、有効状態の問い合わせも
+//! 「OS startupTask 側に委譲」した結果を返す。
+//!
+//! 検出は `current_exe()` のパスに `\WindowsApps\` が含まれるかで簡易判定する
+//! (Microsoft が `GetCurrentPackageFullName` の前段スクリーニングとして例示する手法)。
 
 use crate::errors::{AppError, AppResult};
 
@@ -13,6 +24,23 @@ const RUN_KEY_PATH: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
 
 /// レジストリに登録する値名 (= アプリ表示名)
 const APP_VALUE_NAME: &str = "EasyCursorSwap";
+
+/// MSIX パッケージ環境で実行されているかを判定する。
+///
+/// `current_exe()` が `\WindowsApps\` 配下なら MSIX とみなす。失敗時は `false`
+/// (= 通常の Win32 起動として扱う) にフォールバックする。
+pub fn is_msix_packaged() -> bool {
+    is_msix_packaged_for_path(std::env::current_exe().ok().as_deref())
+}
+
+/// テスト容易性のため、判定対象パスを引数で受け取る純粋関数。
+fn is_msix_packaged_for_path(exe: Option<&std::path::Path>) -> bool {
+    let Some(path) = exe else { return false };
+    // 大文字小文字混在 (`WindowsApps` / `windowsapps`) を許容するため
+    // OsStr → 小文字化した String で照合する。
+    let s = path.to_string_lossy().to_ascii_lowercase();
+    s.contains(r"\windowsapps\")
+}
 
 /// `--autostart` 引数を付与した起動コマンド文字列を組み立てる。
 ///
@@ -28,7 +56,15 @@ fn build_run_command() -> AppResult<String> {
 ///
 /// レジストリに値が存在し、文字列として読み取れる場合のみ `true`。
 /// 値の中身（パス）は検証しない (旧パスが残っているケースも有効扱い)。
+///
+/// MSIX 環境では Run キーは原則使用しないため、AppxManifest の startupTask 宣言
+/// (Enabled=false 初期値) に従い `false` を返す。実際の有効/無効状態の取得は
+/// `Windows.ApplicationModel.StartupTask.GetAsync` を要するが、現状はユーザーが
+/// 「設定 → スタートアップ アプリ」で切替する前提とする。
 pub fn is_enabled() -> bool {
+    if is_msix_packaged() {
+        return false;
+    }
     is_enabled_with_name(APP_VALUE_NAME)
 }
 
@@ -58,6 +94,15 @@ fn is_enabled_with_name(name: &str) -> bool {
 pub fn set_enabled(enabled: bool) -> AppResult<()> {
     #[cfg(windows)]
     {
+        if is_msix_packaged() {
+            // MSIX では AppxManifest の startupTask に委譲する。
+            // ユーザーが「設定 → スタートアップ アプリ」で操作するのが Store ポリシー準拠の動線。
+            tracing::info!(
+                "MSIX 環境を検出: Run キーへの書き込みをスキップ (startupTask に委譲, requested={})",
+                enabled
+            );
+            return Ok(());
+        }
         let command = if enabled { Some(build_run_command()?) } else { None };
         write_value(APP_VALUE_NAME, command.as_deref())
     }
@@ -176,5 +221,47 @@ mod tests {
             "末尾に --autostart 引数が付くべき: {}",
             cmd
         );
+    }
+
+    #[test]
+    fn detects_msix_path_case_insensitive() {
+        use std::path::PathBuf;
+        // 大文字 / 小文字 / 混在のいずれも MSIX として判定される
+        let cases = [
+            r"C:\Program Files\WindowsApps\dev.easycursorswap.app_1.0.0_x64__abc\app.exe",
+            r"C:\Program Files\windowsapps\dev.easycursorswap.app_1.0.0_x64__abc\app.exe",
+            r"C:\PROGRAM FILES\WINDOWSAPPS\dev.easycursorswap.app_1.0.0_x64__abc\app.exe",
+        ];
+        for c in cases {
+            let p = PathBuf::from(c);
+            assert!(
+                is_msix_packaged_for_path(Some(&p)),
+                "MSIX として判定されるべき: {}",
+                c
+            );
+        }
+    }
+
+    #[test]
+    fn does_not_detect_normal_install_paths_as_msix() {
+        use std::path::PathBuf;
+        let cases = [
+            r"C:\Program Files\EasyCursorSwap\easy-cursor-swap.exe",
+            r"<USER_HOME>\AppData\Local\Programs\EasyCursorSwap\app.exe",
+            r"D:\dev\target\release\easy-cursor-swap.exe",
+        ];
+        for c in cases {
+            let p = PathBuf::from(c);
+            assert!(
+                !is_msix_packaged_for_path(Some(&p)),
+                "通常インストールは MSIX 扱いされるべきでない: {}",
+                c
+            );
+        }
+    }
+
+    #[test]
+    fn returns_false_when_exe_path_is_unavailable() {
+        assert!(!is_msix_packaged_for_path(None));
     }
 }
