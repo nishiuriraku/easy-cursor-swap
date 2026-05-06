@@ -10,8 +10,9 @@
 //!  3. それ以外は `pending_failures += 1` してファイルに保存
 //!  4. アプリの初期化が完了して run() に入った後、
 //!     `mark_healthy()` を呼んでカウンタを 0 リセット
-//!  → クラッシュで run() に到達しなければカウンタは増えたまま残り、
-//!     次回起動時に検出される。
+//!
+//! クラッシュで run() に到達しなければカウンタは増えたまま残り、
+//! 次回起動時に検出される。
 //!
 //! ロールバックはバイナリの自動置換ではなく GitHub Releases への誘導とする。
 //! `previous_version` を保持し、前バージョンのインストーラ URL を生成して
@@ -62,9 +63,7 @@ pub fn is_major_bump(current: &str, next: &str) -> bool {
 /// 指定バージョンの NSIS インストーラの GitHub Releases ダウンロード URL を返す。
 /// アーキテクチャは x64 固定。
 pub fn installer_url_for(version: &str) -> String {
-    format!(
-        "{GITHUB_RELEASES_BASE}/download/v{version}/EasyCursorSwap_{version}_x64-setup.exe"
-    )
+    format!("{GITHUB_RELEASES_BASE}/download/v{version}/EasyCursorSwap_{version}_x64-setup.exe")
 }
 
 /// ロールバック先情報

@@ -98,6 +98,11 @@ mod tests {
     }
 
     #[test]
+    #[allow(
+        clippy::nonminimal_bool,
+        clippy::assertions_on_constants,
+        clippy::eq_op
+    )]
     fn cursor_base_size_threshold() {
         // デフォルト 32 ぴったりは競合なし
         assert!(!(33 <= DEFAULT_CURSOR_BASE_SIZE));
@@ -107,6 +112,12 @@ mod tests {
     }
 
     #[test]
+    #[allow(
+        clippy::nonminimal_bool,
+        clippy::bad_bit_mask,
+        clippy::overly_complex_bool_expr,
+        clippy::assertions_on_constants
+    )]
     fn high_contrast_flag_check() {
         // HCF_HIGHCONTRASTON = 0x00000001 の判定ロジック
         assert!((0x0000_0001u32 & 0x0000_0001) != 0);

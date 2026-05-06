@@ -6,7 +6,7 @@
 use crate::errors::{AppError, AppResult};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 use uuid::Uuid;
 
@@ -150,9 +150,8 @@ impl ConfigManager {
     /// カーソル保存ディレクトリのパスを返す
     /// ~/.custom_cursors/
     pub fn cursors_dir() -> AppResult<PathBuf> {
-        let home = dirs::home_dir().ok_or_else(|| {
-            AppError::Config("ホームディレクトリが見つかりません".to_string())
-        })?;
+        let home = dirs::home_dir()
+            .ok_or_else(|| AppError::Config("ホームディレクトリが見つかりません".to_string()))?;
         Ok(home.join(".custom_cursors"))
     }
 
@@ -244,7 +243,7 @@ impl ConfigManager {
     /// `config.bak.v{N}.json` 形式でバージョン番号付きバックアップを作成する。
     /// 同じバージョンのバックアップが既存なら上書きしない (最古を保護)。
     fn write_versioned_backup(
-        config_path: &PathBuf,
+        config_path: &Path,
         from_version: u32,
         config: &AppConfig,
     ) -> AppResult<()> {
@@ -253,15 +252,12 @@ impl ConfigManager {
             return Ok(());
         }
         fs::write(&bak, serde_json::to_string_pretty(config)?)?;
-        tracing::info!(
-            "バックアップを作成: {}",
-            crate::logging::redact_path(&bak)
-        );
+        tracing::info!("バックアップを作成: {}", crate::logging::redact_path(&bak));
         Ok(())
     }
 
     /// パース不可な設定ファイルを `config.corrupt.{epoch}.json` に退避する。
-    fn backup_corrupt(config_path: &PathBuf, raw: &str, reason: &str) -> AppResult<()> {
+    fn backup_corrupt(config_path: &Path, raw: &str, reason: &str) -> AppResult<()> {
         let ts = chrono::Utc::now().timestamp();
         let bak = config_path.with_file_name(format!("config.corrupt.{}.json", ts));
         fs::write(&bak, raw)?;
@@ -275,9 +271,10 @@ impl ConfigManager {
 
     /// 現在の設定を取得する
     pub fn get(&self) -> AppResult<AppConfig> {
-        let config = self.config.read().map_err(|e| {
-            AppError::Config(format!("設定のロックに失敗: {}", e))
-        })?;
+        let config = self
+            .config
+            .read()
+            .map_err(|e| AppError::Config(format!("設定のロックに失敗: {}", e)))?;
         Ok(config.clone())
     }
 
@@ -286,9 +283,10 @@ impl ConfigManager {
     where
         F: FnOnce(&mut AppConfig),
     {
-        let mut config = self.config.write().map_err(|e| {
-            AppError::Config(format!("設定のロックに失敗: {}", e))
-        })?;
+        let mut config = self
+            .config
+            .write()
+            .map_err(|e| AppError::Config(format!("設定のロックに失敗: {}", e)))?;
 
         updater(&mut config);
 
@@ -351,7 +349,8 @@ impl ConfigManager {
     /// セキュリティ: `file_name` は `config.bak.v*.json` / `config.corrupt.*.json` のみ許可。
     pub fn restore_backup(&self, file_name: &str) -> AppResult<()> {
         // ファイル名の簡易バリデーション (パストラバーサル防止)
-        let valid = (file_name.starts_with("config.bak.v") || file_name.starts_with("config.corrupt."))
+        let valid = (file_name.starts_with("config.bak.v")
+            || file_name.starts_with("config.corrupt."))
             && file_name.ends_with(".json")
             && !file_name.contains('/')
             && !file_name.contains('\\')
@@ -378,17 +377,17 @@ impl ConfigManager {
 
         // バックアップを読み込んで有効な JSON (AppConfig) か確認
         let content = fs::read_to_string(&backup_path)?;
-        let restored: AppConfig = serde_json::from_str(&content).map_err(|e| {
-            AppError::Config(format!("バックアップファイルが無効です: {}", e))
-        })?;
+        let restored: AppConfig = serde_json::from_str(&content)
+            .map_err(|e| AppError::Config(format!("バックアップファイルが無効です: {}", e)))?;
 
         // config.json を上書き
         fs::write(&self.config_path, serde_json::to_string_pretty(&restored)?)?;
 
         // in-memory 更新
-        let mut guard = self.config.write().map_err(|e| {
-            AppError::Config(format!("設定のロックに失敗: {}", e))
-        })?;
+        let mut guard = self
+            .config
+            .write()
+            .map_err(|e| AppError::Config(format!("設定のロックに失敗: {}", e)))?;
         *guard = restored;
 
         tracing::info!(

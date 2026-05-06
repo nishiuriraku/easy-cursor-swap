@@ -184,10 +184,11 @@ pub fn clear_reports() -> AppResult<usize> {
             Some(n) => n,
             None => continue,
         };
-        if name.starts_with("panic-") && name.ends_with(".json") {
-            if std::fs::remove_file(&path).is_ok() {
-                removed += 1;
-            }
+        if name.starts_with("panic-")
+            && name.ends_with(".json")
+            && std::fs::remove_file(&path).is_ok()
+        {
+            removed += 1;
         }
     }
     Ok(removed)

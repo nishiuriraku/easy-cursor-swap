@@ -7,20 +7,23 @@ use crate::accessibility::AccessibilityConflicts;
 use crate::autostart;
 use crate::backup::{BackupManager, ProfileEnvelope};
 use crate::config::{AppConfig, BackupInfo, ConfigManager};
-use crate::health::is_major_bump;
 use crate::cursor::{
     build_cur_from_png, clear_resize_cache, parse_ani, parse_ico_cur, pick_largest_as_png,
     ResizeMethod,
 };
-use sha2::Digest;
 use crate::darkmode;
 use crate::environment::EnvironmentReport;
 use crate::errors::AppError;
+use crate::health::is_major_bump;
 use crate::keystore::{Keystore, KeystoreInfo};
 use crate::marketplace::{MarketplaceClient, MarketplaceIndex, MarketplaceInstallRequest};
 use crate::registry::{CursorRole, RegistryManager};
-use crate::theme::{CursorDefinition, CursorpackInspection, LocalizedString, ThemeManager, ThemeMetadata, ThemeSummary};
+use crate::theme::{
+    CursorDefinition, CursorpackInspection, LocalizedString, ThemeManager, ThemeMetadata,
+    ThemeSummary,
+};
 use serde::{Deserialize, Serialize};
+use sha2::Digest;
 use tauri::State;
 
 /// フロントエンドに返すカーソル役割情報
@@ -67,10 +70,7 @@ pub fn get_themes(config: State<'_, ConfigManager>) -> Result<Vec<ThemeSummary>,
 /// 失敗時は内部のスナップショットから自動ロールバックされる。
 /// 成功時は config の `active_theme_id` を更新して永続化する。
 #[tauri::command]
-pub fn apply_theme(
-    config: State<'_, ConfigManager>,
-    theme_id: String,
-) -> Result<(), AppError> {
+pub fn apply_theme(config: State<'_, ConfigManager>, theme_id: String) -> Result<(), AppError> {
     let id = uuid::Uuid::parse_str(&theme_id)
         .map_err(|e| AppError::Theme(format!("無効なテーマ ID: {}", e)))?;
     ThemeManager::apply_theme(id)?;
@@ -124,13 +124,13 @@ pub fn keystore_export(passphrase: String, output_path: String) -> Result<u64, A
 /// パスフレーズ付きエクスポートデータを読み込んで秘密鍵をインポート。
 /// 既存鍵があれば上書きする。
 #[tauri::command]
-pub fn keystore_import(
-    passphrase: String,
-    input_path: String,
-) -> Result<KeystoreInfo, AppError> {
+pub fn keystore_import(passphrase: String, input_path: String) -> Result<KeystoreInfo, AppError> {
     let path = std::path::PathBuf::from(&input_path);
     if !path.exists() {
-        return Err(AppError::Theme(format!("ファイルが見つかりません: {}", input_path)));
+        return Err(AppError::Theme(format!(
+            "ファイルが見つかりません: {}",
+            input_path
+        )));
     }
     let blob = std::fs::read(&path)?;
     Keystore::import_private_key(&blob, &passphrase)
@@ -218,9 +218,18 @@ pub fn export_cursorpack(req: ExportCursorpackRequest) -> Result<ExportResult, A
     for (role, path) in &req.cur_paths {
         let path = std::path::PathBuf::from(path);
         let bin = std::fs::read(&path).map_err(|e| {
-            AppError::Theme(format!("カーソル {} が読み込めません ({}): {}", role, path.display(), e))
+            AppError::Theme(format!(
+                "カーソル {} が読み込めません ({}): {}",
+                role,
+                path.display(),
+                e
+            ))
         })?;
-        let hot = req.hotspots.get(role).cloned().unwrap_or(Hotspot { x: 0, y: 0 });
+        let hot = req
+            .hotspots
+            .get(role)
+            .cloned()
+            .unwrap_or(Hotspot { x: 0, y: 0 });
         cursors_meta.insert(
             role.clone(),
             CursorDefinition {
@@ -269,7 +278,11 @@ pub fn export_cursorpack(req: ExportCursorpackRequest) -> Result<ExportResult, A
         // 署名対象 = `id|version|sorted_role_names` の SHA-256 の hex 文字列
         let mut roles: Vec<&String> = metadata.cursors.keys().collect();
         roles.sort();
-        let role_concat = roles.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(",");
+        let role_concat = roles
+            .iter()
+            .map(|s| s.as_str())
+            .collect::<Vec<_>>()
+            .join(",");
         let sign_input = format!("{}|{}|{}", metadata.id, metadata.version, role_concat);
         let digest = hex::encode(sha2::Sha256::digest(sign_input.as_bytes()));
         let sig = crate::keystore::Keystore::sign(digest.as_bytes())?;
@@ -307,8 +320,7 @@ use std::sync::OnceLock;
 
 /// キャンセル要求済みの build_id 集合。`OnceLock` で初期化、`Mutex` で同期。
 fn cancel_set() -> &'static std::sync::Mutex<std::collections::HashSet<String>> {
-    static SET: OnceLock<std::sync::Mutex<std::collections::HashSet<String>>> =
-        OnceLock::new();
+    static SET: OnceLock<std::sync::Mutex<std::collections::HashSet<String>>> = OnceLock::new();
     SET.get_or_init(|| std::sync::Mutex::new(std::collections::HashSet::new()))
 }
 
@@ -434,12 +446,7 @@ pub fn export_cursorpack_streamed(
             "auto" => ResizeMethod::Lanczos,
             other => ResizeMethod::from_str(other),
         };
-        let bin = build_cur_from_png(
-            &entry.png_bytes,
-            entry.hotspot_x,
-            entry.hotspot_y,
-            resample,
-        )?;
+        let bin = build_cur_from_png(&entry.png_bytes, entry.hotspot_x, entry.hotspot_y, resample)?;
         cursor_bytes.insert(entry.role.clone(), bin);
         cursors_meta.insert(
             entry.role.clone(),
@@ -568,7 +575,10 @@ pub fn export_cursorpack_streamed(
 pub fn inspect_cursorpack(path: String) -> Result<CursorpackInspection, AppError> {
     let buf = std::path::PathBuf::from(&path);
     if !buf.exists() {
-        return Err(AppError::Theme(format!("ファイルが見つかりません: {}", path)));
+        return Err(AppError::Theme(format!(
+            "ファイルが見つかりません: {}",
+            path
+        )));
     }
     ThemeManager::inspect_cursorpack_file(&buf)
 }
@@ -580,7 +590,10 @@ pub fn inspect_cursorpack(path: String) -> Result<CursorpackInspection, AppError
 pub fn import_cursorpack(path: String) -> Result<String, AppError> {
     let buf = std::path::PathBuf::from(&path);
     if !buf.exists() {
-        return Err(AppError::Theme(format!("ファイルが見つかりません: {}", path)));
+        return Err(AppError::Theme(format!(
+            "ファイルが見つかりません: {}",
+            path
+        )));
     }
     // 拡張子を弱バリデーション (Magic Byte は ThemeManager 内で再チェック)
     let ext_ok = buf
@@ -597,15 +610,9 @@ pub fn import_cursorpack(path: String) -> Result<String, AppError> {
     Ok(id.to_string())
 }
 
-/// マーケットプレイス経由のインストール後はテーマ ID を返却する。
-/// (`apply_theme` を続けて呼ぶことで即時アクティブ化可能)
-
 /// `.cursorprofile` (設定 + 全テーマ) を指定パスに書き出す。
 #[tauri::command]
-pub fn export_profile(
-    config: State<'_, ConfigManager>,
-    path: String,
-) -> Result<(), AppError> {
+pub fn export_profile(config: State<'_, ConfigManager>, path: String) -> Result<(), AppError> {
     let cfg = config.get()?;
     let target = std::path::PathBuf::from(&path);
     BackupManager::export(&target, &cfg)
@@ -621,7 +628,10 @@ pub fn import_profile(
 ) -> Result<ProfileEnvelope, AppError> {
     let buf = std::path::PathBuf::from(&path);
     if !buf.exists() {
-        return Err(AppError::Theme(format!("ファイルが見つかりません: {}", path)));
+        return Err(AppError::Theme(format!(
+            "ファイルが見つかりません: {}",
+            path
+        )));
     }
     let envelope = BackupManager::import(&buf, merge)?;
     // 設定もファイル経由で復元
@@ -872,10 +882,7 @@ fn get_os_version() -> String {
     #[cfg(windows)]
     {
         let info = windows::Win32::System::SystemInformation::OSVERSIONINFOW::default();
-        format!(
-            "Windows {}.{}",
-            info.dwMajorVersion, info.dwMinorVersion
-        )
+        format!("Windows {}.{}", info.dwMajorVersion, info.dwMinorVersion)
     }
     #[cfg(not(windows))]
     {
@@ -888,9 +895,7 @@ fn get_os_version() -> String {
 /// `config.bak.v*.json` (スキーマ移行バックアップ) と
 /// `config.corrupt.*.json` (破損退避ファイル) を列挙し、最終更新日時の降順で返す。
 #[tauri::command]
-pub fn list_config_backups(
-    config: State<'_, ConfigManager>,
-) -> Result<Vec<BackupInfo>, AppError> {
+pub fn list_config_backups(config: State<'_, ConfigManager>) -> Result<Vec<BackupInfo>, AppError> {
     config.list_backups()
 }
 
@@ -938,9 +943,7 @@ pub fn open_url(url: String) -> Result<(), AppError> {
         };
         // ShellExecuteW は HINSTANCE を返す; ポインタ値が 32 より大きければ成功
         if (result.0 as usize) <= 32 {
-            return Err(AppError::Other(
-                "ShellExecuteW が失敗しました".to_string(),
-            ));
+            return Err(AppError::Other("ShellExecuteW が失敗しました".to_string()));
         }
     }
     #[cfg(not(windows))]

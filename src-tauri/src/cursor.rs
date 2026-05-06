@@ -13,6 +13,7 @@ use std::sync::Mutex;
 ///
 /// キー: (元画像 SHA-256 12 文字, target_size, resample method)
 ///   - 元画像をそのままキーにすると重いので 12 文字短縮 SHA で衝突確率を下げつつコンパクトに
+///
 /// 値: リサイズ後の RGBA バッファ
 ///
 /// 17 役割 × 6 サイズ = 102 枚を毎回 Lanczos でやり直すと CPU が無駄なので、
@@ -110,6 +111,7 @@ impl ResizeMethod {
     }
 
     /// 文字列からパース
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "nearest" | "pixel" | "dot" => ResizeMethod::Nearest,
@@ -145,11 +147,7 @@ pub fn detect_pixel_art(img: &RgbaImage) -> bool {
 }
 
 /// RGBA バッファから指定サイズにリサイズする
-pub fn resize_image(
-    img: &DynamicImage,
-    target_size: u32,
-    method: ResizeMethod,
-) -> RgbaImage {
+pub fn resize_image(img: &DynamicImage, target_size: u32, method: ResizeMethod) -> RgbaImage {
     img.resize_exact(target_size, target_size, method.to_filter_type())
         .to_rgba8()
 }
@@ -402,9 +400,7 @@ pub fn parse_ico_cur(bytes: &[u8]) -> AppResult<ParsedIcoCur> {
         }
     };
     if count == 0 {
-        return Err(AppError::ImageProcessing(
-            "エントリ数が 0 です".to_string(),
-        ));
+        return Err(AppError::ImageProcessing("エントリ数が 0 です".to_string()));
     }
     let dir_size = 6 + count * 16;
     if bytes.len() < dir_size {
@@ -461,9 +457,7 @@ pub fn parse_ico_cur(bytes: &[u8]) -> AppResult<ParsedIcoCur> {
 fn decode_ico_cur_entry(data: &[u8], expected_w: u32, expected_h: u32) -> AppResult<RgbaImage> {
     if data.len() >= PNG_MAGIC.len() && &data[..PNG_MAGIC.len()] == PNG_MAGIC {
         let dyn_img = image::load_from_memory_with_format(data, image::ImageFormat::Png)
-            .map_err(|e| {
-                AppError::ImageProcessing(format!("PNG エントリのデコード失敗: {}", e))
-            })?;
+            .map_err(|e| AppError::ImageProcessing(format!("PNG エントリのデコード失敗: {}", e)))?;
         return Ok(dyn_img.to_rgba8());
     }
     decode_dib_entry(data, expected_w, expected_h)
@@ -495,7 +489,7 @@ fn decode_dib_entry(data: &[u8], expected_w: u32, expected_h: u32) -> AppResult<
         )));
     }
     let width = dib_w as u32;
-    let real_height = (dib_h.unsigned_abs() / 2) as u32;
+    let real_height = dib_h.unsigned_abs() / 2;
     if width != expected_w || real_height != expected_h {
         return Err(AppError::ImageProcessing(format!(
             "ヘッダー寸法の不一致: ディレクトリ={}x{}, DIB={}x{}",
@@ -600,9 +594,9 @@ pub fn parse_ani(bytes: &[u8]) -> AppResult<ParsedAni> {
         ));
     }
     // riff_size はファイル先頭 8 バイトを除く残りサイズ。総量超過は弾く。
-    let body_end = 8usize.checked_add(riff_size).ok_or_else(|| {
-        AppError::ImageProcessing("RIFF サイズオーバーフロー".to_string())
-    })?;
+    let body_end = 8usize
+        .checked_add(riff_size)
+        .ok_or_else(|| AppError::ImageProcessing("RIFF サイズオーバーフロー".to_string()))?;
     let end = body_end.min(bytes.len());
 
     let mut anih: Option<AniHeader> = None;
@@ -656,9 +650,8 @@ pub fn parse_ani(bytes: &[u8]) -> AppResult<ParsedAni> {
         pos = data_end + (size & 1);
     }
 
-    let header = anih.ok_or_else(|| {
-        AppError::ImageProcessing("'anih' チャンクが見つかりません".to_string())
-    })?;
+    let header = anih
+        .ok_or_else(|| AppError::ImageProcessing("'anih' チャンクが見つかりません".to_string()))?;
     let num_frames = if header.frames == 0 {
         frames.len() as u32
     } else {
@@ -669,7 +662,11 @@ pub fn parse_ani(bytes: &[u8]) -> AppResult<ParsedAni> {
     } else {
         header.steps
     };
-    let default_rate = if header.jif_rate == 0 { 1 } else { header.jif_rate };
+    let default_rate = if header.jif_rate == 0 {
+        1
+    } else {
+        header.jif_rate
+    };
 
     let sequence = seq.unwrap_or_else(|| (0..num_frames).collect());
     let per_step_rate_jiffies = match rates {
@@ -707,9 +704,7 @@ fn parse_anih(data: &[u8]) -> AppResult<AniHeader> {
     let flags = u32::from_le_bytes([data[32], data[33], data[34], data[35]]);
     // AF_ICON (bit 0) が立っていなければ raw DIB エントリの可能性あり (旧形式)
     if flags & 0x01 == 0 {
-        tracing::warn!(
-            "ANI フラグに AF_ICON が立っていません — raw DIB フレームは未対応"
-        );
+        tracing::warn!("ANI フラグに AF_ICON が立っていません — raw DIB フレームは未対応");
     }
     Ok(AniHeader {
         frames,
@@ -728,12 +723,8 @@ fn parse_frame_list(data: &[u8], frames: &mut Vec<ParsedIcoCurEntry>) -> AppResu
     let mut pos = 0;
     while pos + 8 <= data.len() {
         let id = &data[pos..pos + 4];
-        let size = u32::from_le_bytes([
-            data[pos + 4],
-            data[pos + 5],
-            data[pos + 6],
-            data[pos + 7],
-        ]) as usize;
+        let size = u32::from_le_bytes([data[pos + 4], data[pos + 5], data[pos + 6], data[pos + 7]])
+            as usize;
         let start = pos + 8;
         let end = start
             .checked_add(size)
@@ -834,10 +825,7 @@ mod tests {
         let dirty_png = inject_text_chunk(&clean_png, b"Author", b"private@example.com");
 
         // tEXt チャンクが入っていることを確認 (前提条件)
-        assert!(
-            find_chunk(&dirty_png, b"tEXt").is_some(),
-            "tEXt 注入が失敗"
-        );
+        assert!(find_chunk(&dirty_png, b"tEXt").is_some(), "tEXt 注入が失敗");
 
         // strip_png_metadata で除去
         let stripped = strip_png_metadata(&dirty_png).expect("strip");
@@ -1001,12 +989,8 @@ mod tests {
         // PNG header 8 bytes をスキップ
         let mut pos = 8;
         while pos + 8 <= png.len() {
-            let len = u32::from_be_bytes([
-                png[pos],
-                png[pos + 1],
-                png[pos + 2],
-                png[pos + 3],
-            ]) as usize;
+            let len =
+                u32::from_be_bytes([png[pos], png[pos + 1], png[pos + 2], png[pos + 3]]) as usize;
             let typ = &png[pos + 4..pos + 8];
             if typ == chunk_type {
                 return Some(pos + 4);
@@ -1019,12 +1003,16 @@ mod tests {
     /// CRC32 (PNG-style)
     fn crc32(data: &[u8]) -> u32 {
         let mut table = [0u32; 256];
-        for n in 0..256 {
+        for (n, slot) in table.iter_mut().enumerate() {
             let mut c = n as u32;
             for _ in 0..8 {
-                c = if c & 1 != 0 { 0xedb88320 ^ (c >> 1) } else { c >> 1 };
+                c = if c & 1 != 0 {
+                    0xedb88320 ^ (c >> 1)
+                } else {
+                    c >> 1
+                };
             }
-            table[n] = c;
+            *slot = c;
         }
         let mut crc = 0xffffffffu32;
         for &b in data {
@@ -1092,7 +1080,7 @@ mod tests {
         header[0..4].copy_from_slice(&36u32.to_le_bytes()); // cbSizeof
         header[4..8].copy_from_slice(&2u32.to_le_bytes()); // cFrames
         header[8..12].copy_from_slice(&2u32.to_le_bytes()); // cSteps
-        // cx, cy, cBitCount, cPlanes は省略可
+                                                            // cx, cy, cBitCount, cPlanes は省略可
         header[28..32].copy_from_slice(&6u32.to_le_bytes()); // jifRate = 6 (= 100ms)
         header[32..36].copy_from_slice(&0x01u32.to_le_bytes()); // flags = AF_ICON
         ani.extend_from_slice(&header);
@@ -1126,8 +1114,14 @@ mod tests {
         // 1 jiffy = 1/60s ≒ 16.66ms。6 jiffies × 2 = 200ms
         assert_eq!(parsed.total_duration_ms(), 200);
         // フレーム内容
-        assert_eq!(parsed.frames[0].image.get_pixel(0, 0), &image::Rgba([255, 0, 0, 255]));
-        assert_eq!(parsed.frames[1].image.get_pixel(0, 0), &image::Rgba([0, 255, 0, 255]));
+        assert_eq!(
+            parsed.frames[0].image.get_pixel(0, 0),
+            &image::Rgba([255, 0, 0, 255])
+        );
+        assert_eq!(
+            parsed.frames[1].image.get_pixel(0, 0),
+            &image::Rgba([0, 255, 0, 255])
+        );
     }
 
     #[test]

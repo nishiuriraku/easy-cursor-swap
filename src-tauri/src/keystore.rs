@@ -337,10 +337,10 @@ fn dpapi_encrypt(plain: &[u8]) -> AppResult<Vec<u8>> {
     use windows::Win32::Foundation::LocalFree;
     use windows::Win32::Foundation::HLOCAL;
     use windows::Win32::Security::Cryptography::{
-        CryptProtectData, CRYPT_INTEGER_BLOB, CRYPTPROTECT_UI_FORBIDDEN,
+        CryptProtectData, CRYPTPROTECT_UI_FORBIDDEN, CRYPT_INTEGER_BLOB,
     };
 
-    let mut input = CRYPT_INTEGER_BLOB {
+    let input = CRYPT_INTEGER_BLOB {
         cbData: plain.len() as u32,
         pbData: plain.as_ptr() as *mut u8,
     };
@@ -348,7 +348,7 @@ fn dpapi_encrypt(plain: &[u8]) -> AppResult<Vec<u8>> {
 
     unsafe {
         CryptProtectData(
-            &mut input,
+            &input,
             None,
             None,
             None,
@@ -373,10 +373,10 @@ fn dpapi_decrypt(cipher: &[u8]) -> AppResult<Vec<u8>> {
     use windows::Win32::Foundation::LocalFree;
     use windows::Win32::Foundation::HLOCAL;
     use windows::Win32::Security::Cryptography::{
-        CryptUnprotectData, CRYPT_INTEGER_BLOB, CRYPTPROTECT_UI_FORBIDDEN,
+        CryptUnprotectData, CRYPTPROTECT_UI_FORBIDDEN, CRYPT_INTEGER_BLOB,
     };
 
-    let mut input = CRYPT_INTEGER_BLOB {
+    let input = CRYPT_INTEGER_BLOB {
         cbData: cipher.len() as u32,
         pbData: cipher.as_ptr() as *mut u8,
     };
@@ -384,7 +384,7 @@ fn dpapi_decrypt(cipher: &[u8]) -> AppResult<Vec<u8>> {
 
     unsafe {
         CryptUnprotectData(
-            &mut input,
+            &input,
             None,
             None,
             None,
@@ -406,14 +406,10 @@ fn dpapi_decrypt(cipher: &[u8]) -> AppResult<Vec<u8>> {
 
 #[cfg(not(windows))]
 fn dpapi_encrypt(_plain: &[u8]) -> AppResult<Vec<u8>> {
-    Err(AppError::Theme(
-        "DPAPI は Windows 専用です".to_string(),
-    ))
+    Err(AppError::Theme("DPAPI は Windows 専用です".to_string()))
 }
 
 #[cfg(not(windows))]
 fn dpapi_decrypt(_cipher: &[u8]) -> AppResult<Vec<u8>> {
-    Err(AppError::Theme(
-        "DPAPI は Windows 専用です".to_string(),
-    ))
+    Err(AppError::Theme("DPAPI は Windows 専用です".to_string()))
 }

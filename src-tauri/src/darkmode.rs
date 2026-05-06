@@ -23,7 +23,9 @@ pub fn is_dark_mode() -> AppResult<bool> {
         }
         Err(_) => {
             // キーが存在しない場合はライトモードと見なす
-            tracing::warn!("ダークモード設定のレジストリキーが見つかりません。ライトモードを使用します。");
+            tracing::warn!(
+                "ダークモード設定のレジストリキーが見つかりません。ライトモードを使用します。"
+            );
             Ok(false)
         }
     }
@@ -38,8 +40,8 @@ pub fn start_dark_mode_watcher<F>(on_change: F) -> AppResult<()>
 where
     F: Fn(bool) + Send + 'static,
 {
-    use windows::Win32::UI::WindowsAndMessaging::*;
     use windows::core::*;
+    use windows::Win32::UI::WindowsAndMessaging::*;
 
     std::thread::spawn(move || {
         unsafe {
@@ -58,8 +60,11 @@ where
                 class_name,
                 w!("EasyCursorSwap DarkMode Watcher"),
                 WS_OVERLAPPED,
-                0, 0, 0, 0,
-                Some(HWND_MESSAGE),  // メッセージ専用ウィンドウ
+                0,
+                0,
+                0,
+                0,
+                Some(HWND_MESSAGE), // メッセージ専用ウィンドウ
                 None,
                 None,
                 None,
@@ -103,8 +108,9 @@ where
 
 /// ダークモード変更コールバック（グローバル）
 #[cfg(windows)]
-static DARK_MODE_CALLBACK: std::sync::Mutex<Option<Box<dyn Fn(bool) + Send>>> =
-    std::sync::Mutex::new(None);
+type DarkModeCallback = Box<dyn Fn(bool) + Send>;
+#[cfg(windows)]
+static DARK_MODE_CALLBACK: std::sync::Mutex<Option<DarkModeCallback>> = std::sync::Mutex::new(None);
 
 /// 不可視ウィンドウのメッセージプロシージャ
 #[cfg(windows)]
