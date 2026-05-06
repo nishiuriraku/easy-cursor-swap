@@ -651,6 +651,62 @@
     + `ALLOWED_ORIGIN` → `wrangler deploy` の 3 ステップ。詳細は
     [services/crash-report-worker/README.md](services/crash-report-worker/README.md)。
 
+### 👤 ユーザー手動が必要な残作業 (要対話 / 要外部権限)
+
+> [!IMPORTANT]
+> 自動化できなかった理由付きでここに集約。Claude Code セッションから実行不能な操作。
+
+#### A. Cloudflare Worker デプロイ
+**理由**: 現在接続されている Cloudflare MCP は KV 作成等の write は通るが、
+`workers:edit` 相当のスコープが付与されておらず PUT `/workers/scripts/*` が
+`10000: Authentication error` で拒否される。`wrangler` も未認証。
+
+```bash
+cd services/crash-report-worker
+npm install
+npx wrangler login                       # 1. ブラウザ認証 (1 回のみ)
+npx wrangler secret put GITHUB_TOKEN     # 2. 下記の fine-grained PAT を貼り付け
+npx wrangler secret put ALLOWED_ORIGIN   # 3. 任意ランダム文字列。Tauri 側にも同値を埋める
+npx wrangler deploy                      # 4. デプロイ
+```
+
+KV 名前空間 (`RATE_LIMIT_KV` / `DEDUP_KV`) と `account_id` は
+[services/crash-report-worker/wrangler.toml](services/crash-report-worker/wrangler.toml) に反映済。
+
+#### B. GitHub Fine-grained PAT 発行 (Worker secret 用)
+**理由**: GitHub の PAT 発行 UI は対話必須 + 2FA challenge があるため自動化不可。
+
+GitHub → Settings → Developer settings → **Fine-grained PAT** で発行:
+
+| 項目 | 値 |
+|---|---|
+| Repository access | `nishiuriraku/easy-cursor-swap-index` のみ |
+| Repository permissions | **Issues: Read and write** |
+| Expiration | 1 年など (期限切れ時は再発行 → `wrangler secret put GITHUB_TOKEN` で上書き) |
+
+#### C. `ALLOWED_ORIGIN` のランダム生成と Tauri 側への埋込
+**理由**: 共有 secret はリポジトリにコミットしてはいけない。
+
+```bash
+# ランダム値生成例 (PowerShell)
+[System.Convert]::ToBase64String([byte[]](1..32 | % { Get-Random -Max 256 }))
+```
+
+生成した値を:
+1. `wrangler secret put ALLOWED_ORIGIN` (Worker 側)
+2. Tauri 側 `config.crash_reporting.app_token` に保存 (Phase 7-1 残のクライアント実装で配線)
+
+#### D. デプロイ後の URL を `config.crash_reporting.endpoint` に登録
+**理由**: 払い出される `https://easy-cursor-swap-crash-report.<sub>.workers.dev` の
+サブドメインは Cloudflare アカウントごとに変わるため、デプロイ後に確定する。
+
+設定画面 (Settings → Logging) に **Endpoint URL** + **App Token** の入力欄を追加し
+config に永続化 (= Phase 7-1 続きのクライアント実装側で対応)。
+
+#### E. (任意) GitHub の `easy-cursor-swap` org 作成
+**理由**: 現在のトークンは `admin:org` スコープを持たないため API では作れない。
+取りたい場合は GitHub Web UI で org 作成 → repo を transfer。
+
 ### 完了済み主要マイルストーン (記録)
 
 | Phase | 状態 |
