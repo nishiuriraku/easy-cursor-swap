@@ -7,6 +7,7 @@
 
 use app_lib::appusermodel;
 use app_lib::autostart;
+use app_lib::bulk_import;
 use app_lib::commands;
 use app_lib::config::ConfigManager;
 use app_lib::crash;
@@ -252,6 +253,7 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .manage(config_manager)
+        .manage(bulk_import::CancelRegistry::default())
         // 閉じるボタン → WebView を破棄してメモリ解放 (Phase 4-1)
         // アプリ自体はトレイに常駐し続ける。再表示時に tray::show_or_recreate_main_window が
         // ウィンドウを再生成する。

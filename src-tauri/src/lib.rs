@@ -14,6 +14,7 @@ pub mod accessibility;
 pub mod appusermodel;
 pub mod autostart;
 pub mod backup;
+pub mod bulk_import;
 pub mod commands;
 pub mod config;
 pub mod crash;

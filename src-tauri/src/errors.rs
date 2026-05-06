@@ -42,6 +42,18 @@ pub enum AppError {
     /// その他のエラー
     #[error("{0}")]
     Other(String),
+
+    #[error("一括インポートが中断されました")]
+    BulkImportCancelled,
+
+    #[error("対応ファイルが見つかりません: {path}")]
+    NoSupportedFiles { path: String },
+
+    #[error("サイズ上限超過: {path} ({size} bytes)")]
+    OversizeFile { path: String, size: u64 },
+
+    #[error(".cursorpack の解析に失敗: {reason}")]
+    InvalidCursorpack { reason: String },
 }
 
 /// Tauri IPC 向けのシリアライズ可能エラー
