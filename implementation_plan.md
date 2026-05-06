@@ -201,9 +201,10 @@
   - フロントの keydown ハンドラ (フォーカス時のみ) と二重購読でカバレッジ最大化
   - 単体テスト 7 件 (デフォルト / 大小文字 / Function キー / 数字 / 不正入力)
 
-### 4-7: Windows 11 統合・競合検出 ⬅️ NEW
-- [ ] アクセシビリティ機能との競合検出（`CursorIndicator` / `ContrastScheme` / `CursorBaseSize`）
-- [ ] 競合検出時の警告ダイアログ表示
+### 4-7: Windows 11 統合・競合検出 ✅ 完了
+- [x] **アクセシビリティ機能との競合検出** — `src-tauri/src/accessibility.rs` で
+  `CursorIndicator` / `ContrastScheme` / `CursorBaseSize` を HKCU/HKLM から読取
+- [x] **競合検出時の警告ダイアログ表示** — `get_accessibility_conflicts` IPC + `ApplyModal.vue` の警告バナー
 - [x] **動作環境マトリクス — RDP / Citrix / Server を起動時検出して警告バナー**
   - `src-tauri/src/environment.rs` (`GetSystemMetrics(SM_REMOTESESSION)` + `InstallationType` レジストリ)
   - `get_environment_report` IPC + `EnvironmentBanner.vue` (sessionStorage で「閉じる」を記憶)
@@ -303,7 +304,7 @@
 - [x] **実 HTTP 取得 (rustls-tls) + SHA-256 + Ed25519 署名検証** — Phase 9 一部前倒し
 - [x] 著者公開鍵レコード (`authors/{github}.json`) 取得 + key_id 一致確認 + ローテーション対応
 - [x] サイズ上限 (50MB) 付きダウンロード (Zip 爆弾対策の入口)
-- [ ] ZIP 展開を `~/.custom_cursors/<UUID>/` へ統合 (Phase 9 残タスク)
+- [x] **ZIP 展開を `~/.custom_cursors/<UUID>/` へ統合** — Phase 9-3 で完了 (`ThemeManager::import_cursorpack_bytes` 共有)
 
 ### 5-7: 画面 05 — 一般設定（8セクション） ✅ 完了 + IPC 接続
 - [x] `app/pages/settings.vue` — 8 セクション切替 (一般 / 起動 / ライブラリ / セキュリティ / 鍵 / ログ / 更新 / About)
@@ -352,10 +353,11 @@
 - [x] `inspect_cursorpack` は theme.json のみ読んで既存テーマとの衝突情報を返却
 - [x] `build_cursor_file` は PNG → 6 サイズ .cur をビルドして指定パスへ書き出し、書込みバイト数を返却
 
-### 5-11: アクセシビリティ
-- [ ] WCAG AA 準拠（コントラスト比 4.5:1 以上）
-- [ ] キーボードナビゲーション対応
-- [ ] スクリーンリーダー対応（ARIA ラベル）
+### 5-11: アクセシビリティ 🔄 ARIA 完了 / コントラスト実測残
+- [ ] WCAG AA 準拠（コントラスト比 4.5:1 以上の実測検証） — axe-DevTools 等での自動測定が残
+- [x] **キーボードナビゲーション対応** — `tabindex` / Enter/Space 操作 / `skip-to-content` リンク
+- [x] **スクリーンリーダー対応（ARIA ラベル）** — `aria-current` / `aria-labelledby` / `aria-pressed` / `aria-live` を全モーダル + サイドバーに付与
+- [x] **`prefers-reduced-motion` 対応** — `@media (prefers-reduced-motion: reduce)` でアニメーション抑制
 
 ---
 
@@ -401,7 +403,8 @@
   - フォーマット: `CFKEY1\n\0` magic + 16 byte salt + 24 byte nonce + ciphertext
   - `keystore_export(passphrase, path)` / `keystore_import(passphrase, path)` IPC
   - `PassphrasePrompt.vue` (8 文字以上の弱バリデーション + 確認入力)
-- [ ] 鍵ローテーション（公開鍵差し替え PR、過去 `key_id` 検証維持）
+- [x] **鍵ローテーション PR ガイド** — [docs/key_rotation.md](docs/key_rotation.md) (緊急/定期更新の判断基準 + historical_keys 管理 + key_id 計算スニペット) + [.github/PULL_REQUEST_TEMPLATE/key_rotation.md](.github/PULL_REQUEST_TEMPLATE/key_rotation.md)
+- [x] **過去 `key_id` 検証維持** — `MarketplaceClient` が `historical_keys` から過去鍵を引いて検証可能
 
 ### 6-4: `.cursorprofile` フルバックアップ ✅ 完了
 - [x] `.cursorprofile` 形式設計 — Zip 構造 (`profile.json` + `cursors/<UUID>/`)
@@ -415,9 +418,9 @@
 
 ---
 
-## Phase 7: 通知・ロギング・国際化 📋 🔲 未着手
+## Phase 7: 通知・ロギング・国際化 📋 ✅ 完了
 
-### 7-1: ロギング ✅ PII フィルタ適用完了
+### 7-1: ロギング ✅ PII フィルタ + クラッシュレポート完了
 - [x] `tracing` + `tracing-subscriber` 導入
 - [x] **`tracing-appender` 日次ローテーション** (`%LOCALAPPDATA%\EasyCursorSwap\logs\app-YYYY-MM-DD.log`)
 - [x] **14 日経過ログの自動削除** + **合計 100MB 上限の古い順削除** (`logging::cleanup_old_logs`)
@@ -450,7 +453,7 @@
   - tauri.conf.json の identifier と整合 (Vendor.Product 形式)
   - 通知センターで送信元アプリ名が EasyCursorSwap と表示される
 
-### 7-3: 国際化 🔄 基盤完了
+### 7-3: 国際化 ✅ 全文配線完了
 - [x] **i18n キー管理 (`app/locales/ja.ts` + `en.ts`)** — `as const` で型導出
 - [x] **`useI18n` composable** — `t(key, params)` + プレースホルダ展開 + フォールバック
 - [x] OS ロケール自動判定 (`navigator.language` 経由) + `general.language` 設定での上書き
@@ -461,13 +464,13 @@
 - [x] 通知メッセージ (`library.notifyApplied` / `notifyImported`) も多言語化
 - [x] CI で `scripts/check-i18n.mjs` がキー差分を検出 (現在 ja=en=177)
 - [x] PanicFlow / ImportConflictDialog も完了
-- [ ] 残: 設定画面の各セクション本文 (現状は dynamic な短い説明のみ)
+- [x] **設定画面 8 セクション全文の i18n 配線完了** (288 キー / ja-en parity / ダイアログ + ステータス含む)
 
 ---
 
 ## Phase 8: リリース準備 & 配布 🚀 🔲 未着手
 
-### 8-1: パフォーマンス 🔄 雛形整備
+### 8-1: パフォーマンス ✅ 実測完了
 - [x] **`.github/workflows/performance.yml`** — release ビルドのバイナリサイズ計測 + 30MB 警告
 - [x] **`.github/workflows/ci.yml`** — `cargo fmt --check` + `clippy -D warnings` + `cargo test` + `vue-tsc --noEmit` + i18n キー差分
 - [x] **`.github/workflows/marketplace-validate.yml`** — Phase 9 連携用雛形
@@ -486,7 +489,7 @@
   - 64x64 / 256x256 の Lanczos リサイズ + 6 サイズ .cur ビルドを計測
   - 32x32 の Nearest 経路もベンチ
   - performance.yml が `cargo bench --bench cursor_build` を実行し、bencher 形式で出力 → artifact 保存
-- [ ] 起動時間 / メモリ使用量の actual 測定
+- [x] **起動時間 / メモリ使用量の actual 測定** — `src-tauri/benches/startup.rs` + `performance.yml` で目標値検証 (起動 1.5s / 常駐 15MB / 適用 3s / MSI 30MB)
 - [x] **リサイズ結果のキャッシュ** (`cursor.rs::RESIZE_CACHE`)
   - キー: (元画像 SHA-256 12 文字, target_size, ResizeMethod) / 値: RgbaImage
   - 容量 64 エントリの単純 FIFO 削除
@@ -512,7 +515,7 @@
   - SmartScreen 緩和策
 - [ ] Microsoft Store 申請審査 (`runFullTrust` は Restricted Capability)
 
-### 8-4: 自動アップデート 🔄 基盤完了
+### 8-4: 自動アップデート ✅ コア完了
 - [x] **Tauri Updater 設定** (`tauri-plugin-updater` + `tauri-plugin-process`)
   - tauri.conf.json: GitHub Releases の `latest.json` をエンドポイント指定
   - capability に updater:* / process:allow-restart 追加
@@ -521,8 +524,8 @@
 - [x] 設定画面のアップデートセクションに実機能配線
   - 「更新を確認」ボタン → 利用可能バージョンを表示
   - 「ダウンロード & インストール」ボタン → 進捗 % 表示 → 完了後 ask ダイアログで再起動
-- [ ] 公開鍵 (`pubkey`) の発行 — `tauri signer generate` でリリース署名鍵を生成
-- [ ] メジャーバージョン跨ぎ (v1 → v2) は自動更新しない方針 (現状はチェック側で判定なし)
+- [x] **公開鍵 (`pubkey`) の発行** — `tauri signer generate` で生成 → tauri.conf.json に組込済み + [docs/signing.md](docs/signing.md)
+- [x] **メジャーバージョン跨ぎ (v1 → v2) 警告** — `check_update_is_major_jump` IPC + UI で追加確認ダイアログ
 - [x] **3 回連続起動失敗の検出機構** — `src-tauri/src/health.rs`
   - `%LOCALAPPDATA%\EasyCursorSwap\state\startup.json` に `pending_failures` を保存
   - main 起動時に `StartupCheck::begin` でインクリメント
@@ -530,10 +533,14 @@
   - panic/クラッシュで mark_healthy に到達しなければカウンタが残る
   - バージョン変更を検知したらカウンタを自動リセット
   - 単体テスト 2 件 PASS
-- [ ] 検出時の Tauri Updater 旧バージョン取得 + 自動置換 (現状はカウンタ管理 + 警告ログのみ)
+- [x] **検出時のロールバック誘導** — `main.rs` で Win32 MessageBox を表示し、ユーザー同意で前バージョンのリリースページをブラウザで開く (フル自動置換は Store ポリシー上避ける)
 
 ### 8-5: CI/CD & ドキュメント
-- [ ] CI/CD パイプライン構築
+- [x] **CI/CD パイプライン構築** — `.github/workflows/{ci,performance,release,marketplace-validate}.yml` の 4 本体制
+  - ci: fmt + clippy + cargo test + vue-tsc + i18n parity
+  - performance: criterion ベンチ + バイナリサイズ測定 + 起動時間/メモリ目標値検証
+  - release: tagged push → MSI + NSIS (x64 / ARM64 matrix) + Updater 署名 + GitHub Release ドラフト
+  - marketplace-validate: 著者鍵 + 署名 + SHA-256 + VirusTotal で `easycursorswap/index` PR を検証
 - [x] README / LICENSE 整備
 - [x] v1.0 の既知制約を README に明記 (README.md + README.ja.md):
   - `.ani` 新規生成不可
@@ -545,16 +552,16 @@
 
 ---
 
-## Phase 9: 公式インデックス連携 🌐 🔄 着手中（クライアント実装の半分完了）
+## Phase 9: 公式インデックス連携 🌐 🔄 公式リポジトリ実体構築待ち
 
 ### 9-1: GitHub メタデータインデックス ✅ 設計完了
 - [x] テーマメタデータスキーマ Rust 側型定義 (`MarketplaceIndex` / `MarketplaceEntry` / `AuthorRecord`)
 - [x] `index.json` URL 定義 (`raw.githubusercontent.com/easycursorswap/index/main/index.json`)
 - [ ] 公式リポジトリの実体構築 (`easycursorswap/index` リポジトリ作成)
 
-### 9-2: テーマ提出フロー
-- [ ] ブラウザ経由の PR 提出フロー（事前 URL パラメータでテンプレ埋め）
-- [ ] アプリ内の「公式インデックスに提出」ボタン
+### 9-2: テーマ提出フロー ✅ 完了
+- [x] **ブラウザ経由の PR 提出フロー** — `SubmitThemeDialog.vue` が GitHub ファイルエディタの new URL を組立 (テーマメタデータを query で事前埋め)
+- [x] **アプリ内の「公式インデックスに提出」ボタン** — テーマ詳細パネルから起動 + `open_url` IPC で既定ブラウザを開く
 
 ### 9-3: クライアント側検証 ✅ 実装完了
 - [x] `reqwest` (rustls-tls) ベースの HTTPS 取得
@@ -576,7 +583,7 @@
   - **key_id 一致確認** + ローテーション対応 (`historical_keys` から過去鍵参照)
   - **サイズ閾値チェック** (50MB)
   - **マルウェアハッシュ DB 照合** (`scripts/marketplace/malware-hashes.txt` の SHA-256 リスト)
-- [ ] VirusTotal API 経由のリアルタイムマルウェアスキャン (将来)
+- [x] **VirusTotal API 経由のリアルタイムマルウェアスキャン** — `validate.mjs` で VT API v3 統合 (429/ネットワーク障害は fail-open)
 
 ### 9-5: 公開鍵管理
 - [x] Rust 側で `authors/{github_username}.json` の取得 / パース実装
@@ -596,53 +603,50 @@
 ## 次回セッションでの優先タスク
 
 > [!NOTE]
-> 直近 6 セッションで主要機能 (UI 7 画面 / Marketplace / 鍵管理 / .cursorpack 入出力 /
-> ダーク自動切替 / 多重起動防止 / 通知 / 環境検出) はすべて完了。
-> ここからは仕上げと「v1.0 リリース DOD」に向けた残タスク。
+> v1.0 リリース DOD のクリティカルパス上の **コード変更で完結する** 残タスクは
+> ほぼ枯渇。残るのは **外部依存** (実申請・GitHub リポジトリ実体構築・実機 a11y 計測) と、
+> オプションの「クラッシュレポート送信先サーバー実装」など。
 
-1. ~~**📦 MSIX / `runFullTrust` capability**~~ ✅ 完了 (Phase 8-3 — AppxManifest.xml + distribution.md)
-2. **✍️ EV/OV コードサイニング調達** — 調達ガイド作成済 ([docs/code_signing.md](docs/code_signing.md))。実申請は外部待ち
-3. ~~**🪪 Tauri Updater 公開鍵発行**~~ ✅ 完了 (`tauri signer generate` + tauri.conf.json 更新 + release.yml + docs/signing.md)
-4. ~~**♿ WCAG AA 検証**~~ ✅ 完了 (ARIA / aria-current / aria-labelledby / aria-pressed / skip-to-content / prefers-reduced-motion)
-5. ~~**🛡️ VirusTotal API 統合**~~ ✅ 完了 (validate.mjs を VT API v3 対応、429/ネットワーク障害は fail-open)
-6. ~~**🧪 起動時間 / メモリ / 適用時間の実測ベンチ**~~ ✅ 完了 (benches/startup.rs + performance.yml に闾値検証)
-7. ~~**🪝 鍵ローテーション PR テンプレ**~~ ✅ 完了 (docs/key_rotation.md + .github/PULL_REQUEST_TEMPLATE/key_rotation.md)
-8. ~~**🚀 v1→v2 メジャー跨ぎ判定 + 3 回連続失敗ロールバック**~~ ✅ 完了 (health.rs + main.rs Win32 ダイアログ + settings.vue 追加確認)
-9. ~~**🦠 SVG 以外の画像メタデータパージ**~~ ✅ 完了 (eXIf / iTXt / zTXt チャンク除去テスト追加 16 pass)
-10. ~~**🌐 設定セクション本文の i18n 残置換**~~ ✅ 完了 (288 キー / 8 セクション全文 + ダイアログ + ステータス)
-11. ~~**🆘 GUI 復旧フロー**~~ ✅ 完了 (`list_config_backups` / `restore_config_backup` + ConfigRecoveryPanel.vue)
+### 🔧 コード変更で完結するもの
 
----
+1. **♿ WCAG AA コントラスト比 4.5:1 の実測検証** (Phase 5-11)
+   axe-DevTools / Lighthouse などでの自動チェックを CI に組込む。違反箇所を `global.css`
+   のトークン側で調整。
+2. **🆘 クラッシュレポート閲覧 / 削除 UI** (Phase 7-1 続き)
+   `list_crash_reports` / `clear_crash_reports` IPC は配線済。設定 → ログセクションに
+   一覧 + 「履歴を消去」ボタンを追加するだけ。
 
-## 優先度の高いギャップ（要注意領域）
+### 📡 外部依存 (アプリ単体では完結しない)
 
-> [!CAUTION]
-> 以下の領域は仕様書に記載があるが、まだ実装未着手 / 部分的のため重点的に扱う。
-
-1. **Phase 8-2/8-3: 配布基盤** — `.msi` / `.msix` インストーラー生成、WebView2 Bootstrapper 同梱、SmartScreen レピュテーション獲得
-2. ~~**Phase 8-4: 自動アップデート**~~ ✅ 完了 — メジャー跨ぎ警告 + 3 回連続失敗ロールバック誘導 (GitHub Releases ブラウザ誘導)
-3. ~~**Phase 9-2: テーマ提出フロー**~~ ✅ 完了 — SubmitThemeDialog.vue + open_url IPC + GitHub ファイルエディタ自動 URL 生成
-4. ~~**Phase 9-3: マルウェアハッシュ実 DB**~~ ✅ 完了 — VirusTotal API v3 統合 + fail-open
-5. **Phase 7-2: AppUserModelID 登録** — トースト通知発信元の明示
-6. ~~**Phase 4-7 残: アクセシビリティ競合検出**~~ ✅ 完了 (accessibility.rs + ApplyModal.vue 警告バナー)
-7. **Phase 5-11: WCAG AA 準拠** — コントラスト 4.5:1 検証 / キーボードナビ / ARIA ラベル
-8. ~~**Phase 2-1 残: ユーザー向けの復旧 UI**~~ ✅ 完了 — `ConfigRecoveryPanel.vue` が設定 General セクションにバックアップ一覧 + 復旧ボタンを提供
-9. **Phase 6-1 残: `.cursorpack` 内画像メタデータパージ強化** — Exif / トラッキングデータの除去
-10. ~~**README ja/en 整備**~~ ✅ 完了 — README.md (英語) + README.ja.md (日本語)、v1.0 既知制約・RDP 警告・セキュリティモデル・サブミットフロー明記
+3. **✍️ EV/OV コードサイニング実申請** (Phase 8-2)
+   調達ガイド ([docs/code_signing.md](docs/code_signing.md)) 完成済。SignPath.io への申請が次のアクション。
+4. **🪪 SmartScreen レピュテーション獲得** (Phase 8-2)
+   署名済バイナリの実配信 → ダウンロード回数の蓄積待ち。
+5. **🏪 Microsoft Store 申請** (Phase 8-3)
+   `runFullTrust` は Restricted Capability のため、開発者アカウント + 申請必要。
+6. **📦 公式インデックスリポジトリ構築** (Phase 9-1)
+   `easycursorswap/index` GitHub リポジトリの実体作成 (ガイド・スキーマ・CI は整備済)。
+7. **📮 クラッシュレポート送信エンドポイント** (Phase 7-1)
+   `easycursorswap/index` の Issue API またはサーバーが必要 (現状はローカル収集のみ)。
 
 ### 完了済み主要マイルストーン (記録)
 
 | Phase | 状態 |
 |---|---|
-| Phase 1-4 | ✅ プロジェクト基盤 / Rust コア / 画像 + .cur / トレイ + ダーク / 多重起動 / 環境検出 |
-| Phase 5 (UI) | ✅ 7 画面 + i18n 主要 4 画面 + 17 コンポーネント |
-| Phase 6-1/6-2 | ✅ .cursorpack 入出力 / 多層セキュリティ防御 (path traversal / Zip 爆弾 / symlink / Magic Byte / SVG sanitize) |
-| Phase 6-3 | ✅ Ed25519 鍵管理 (DPAPI + パスフレーズ export/import) |
+| Phase 1-4 | ✅ プロジェクト基盤 / Rust コア / 画像 + .cur / トレイ + ダーク / 多重起動 / 環境検出 / アクセシビリティ競合検出 / MSIX 起動分岐 |
+| Phase 5 (UI) | ✅ 7 画面 + 17 コンポーネント + ARIA / キーボードナビ / prefers-reduced-motion (コントラスト実測のみ残) |
+| Phase 6-1/6-2 | ✅ .cursorpack 入出力 / 多層セキュリティ防御 (path traversal / Zip 爆弾 / symlink / Magic Byte / SVG sanitize / PNG メタデータ剥離) |
+| Phase 6-3 | ✅ Ed25519 鍵管理 (DPAPI + パスフレーズ export/import + 鍵ローテーション PR ガイド) |
 | Phase 6-4 | ✅ .cursorprofile フルバックアップ |
-| Phase 7-1 | ✅ ロギング (日次ローテ / 14 日保持 / 100MB 上限 / PII redaction + URL short_hash) |
+| Phase 7-1 | ✅ ロギング (日次ローテ / 14 日保持 / 100MB 上限 / PII redaction) + クラッシュレポートのオプトイン収集 |
 | Phase 7-2 | ✅ 通知 3 層配線 + AppUserModelID 登録 |
-| Phase 7-3 | ✅ i18n 基盤 + 全画面配線 (275 キー / ja-en parity / 設定 8 セクション全文配線) |
-| Phase 8-1 | 🔄 CI 雛形 + criterion ベンチ + リサイズキャッシュ (実測値の数値目標検証は残) |
-| Phase 8-4 | 🔄 Tauri Updater 配線完了 (公開鍵発行 + ロールバック検出は残) |
-| Phase 9-1/9-3 | ✅ クライアント側検証 (HTTPS / SHA-256 / Ed25519 / ZIP 展開) |
-| Phase 9-4 | ✅ CI ワークフロー + scripts/marketplace/validate.mjs |
+| Phase 7-3 | ✅ i18n 全画面配線 (288 キー / ja-en parity / 設定 8 セクション全文) |
+| Phase 8-1 | ✅ CI ベンチ + 起動時間 / メモリ / 適用時間の目標値検証 + リサイズキャッシュ |
+| Phase 8-2 | ✅ MSI/NSIS x64 + ARM64 matrix + WebView2 embedBootstrapper (EV 署名実申請のみ残) |
+| Phase 8-3 | ✅ MSIX AppxManifest + startupTask + distribution.md (Store 申請のみ残) |
+| Phase 8-4 | ✅ Tauri Updater + 公開鍵発行 + メジャー跨ぎ警告 + 3 回連続失敗ロールバック誘導 |
+| Phase 8-5 | ✅ CI/CD 4 本体制 (ci / performance / release / marketplace-validate) |
+| Phase 9-1/9-3 | ✅ クライアント側検証 (HTTPS / SHA-256 / Ed25519 / ZIP 展開) — 公式リポジトリ実体構築のみ残 |
+| Phase 9-2 | ✅ SubmitThemeDialog.vue + open_url IPC で GitHub 提出フロー貫通 |
+| Phase 9-4 | ✅ CI ワークフロー + validate.mjs + VirusTotal API v3 統合 |
+| Phase 9-5 | ✅ 新規著者登録ガイド (author_registration.md) + 鍵ローテーションガイド |
