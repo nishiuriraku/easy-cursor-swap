@@ -399,11 +399,24 @@ impl RegistryManager {
                 None,
                 SPIF_UPDATEINIFILE | SPIF_SENDCHANGE,
             );
+            // BOOL=FALSE だが GetLastError=0 の場合、これは SPIF_SENDCHANGE が
+            // 内部で行う WM_SETTINGCHANGE のブロードキャストで応答しない
+            // トップレベルウィンドウがあったときに発生する偽陽性。
+            // レジストリ書き込みは完了済みでカーソル自体は反映されるため、
+            // 警告ログのみ残して成功扱いとする。
             if let Err(e) = result {
-                return Err(AppError::Registry(format!(
-                    "SystemParametersInfoW の呼び出しに失敗: {}",
-                    e
-                )));
+                if e.code().is_ok() {
+                    tracing::warn!(
+                        "SystemParametersInfoW(SPI_SETCURSORS) が BOOL=FALSE を返したが \
+                         GetLastError=0。WM_SETTINGCHANGE ブロードキャストの \
+                         偽陽性として継続"
+                    );
+                } else {
+                    return Err(AppError::Registry(format!(
+                        "SystemParametersInfoW の呼び出しに失敗: {}",
+                        e
+                    )));
+                }
             }
         }
         Ok(())
@@ -441,11 +454,20 @@ impl RegistryManager {
                 None,
                 SPIF_UPDATEINIFILE | SPIF_SENDCHANGE,
             );
+            // SPI_SETCURSORS と同じく WM_SETTINGCHANGE ブロードキャスト
+            // タイムアウトの偽陽性を許容する。
             if let Err(e) = result {
-                return Err(AppError::Registry(format!(
-                    "SPI_SETCURSORSHADOW の呼び出しに失敗: {}",
-                    e
-                )));
+                if e.code().is_ok() {
+                    tracing::warn!(
+                        "SystemParametersInfoW(SPI_SETCURSORSHADOW) が BOOL=FALSE を \
+                         返したが GetLastError=0。ブロードキャスト偽陽性として継続"
+                    );
+                } else {
+                    return Err(AppError::Registry(format!(
+                        "SPI_SETCURSORSHADOW の呼び出しに失敗: {}",
+                        e
+                    )));
+                }
             }
         }
         Ok(())
