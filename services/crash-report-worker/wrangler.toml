@@ -1,0 +1,25 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "easy-cursor-swap-crash-report"
+main = "src/index.ts"
+compatibility_date = "2026-05-01"
+workers_dev = true
+account_id = "ac974a750251c79fc7d40daeacf8a5b3"
+
+# 通常時の vars (secret は wrangler secret put で別管理)
+[vars]
+GITHUB_OWNER = "nishiuriraku"
+GITHUB_REPO  = "easy-cursor-swap-index"
+
+# wrangler kv:namespace create RATE_LIMIT_KV / DEDUP_KV で生成し、
+# 出力された ID をここに貼り付けて再デプロイする。
+[[kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "eabcd37159f5443aa8d001d3bf7bc2b1"
+
+[[kv_namespaces]]
+binding = "DEDUP_KV"
+id = "65f65da516694ee19184a7c93e3aad11"
+
+# secrets (set via `wrangler secret put`):
+#   GITHUB_TOKEN     repo (issues:write) PAT
+#   ALLOWED_ORIGIN   Tauri 側 X-App-Token と一致させる任意トークン
