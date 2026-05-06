@@ -942,8 +942,4 @@ async function onFileChange(e: Event) {
   gap: 18px;
 }
 
-.creator-grid {
-  flex: 1;
-  min-height: 0;
-}
 </style>

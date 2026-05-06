@@ -44,11 +44,5 @@ function tileIconSize(s: number): number {
 </template>
 
 <style scoped>
-.size-tile {
-  /* グローバルの .size-tile スタイルを継承しつつ、button のリセット */
-  background: var(--bg-2);
-  background:
-    repeating-conic-gradient(rgba(255, 255, 255, 0.03) 0% 25%, transparent 0% 50%) 0 / 8px 8px,
-    var(--bg-2);
-}
+/* `.size-tile` 本体は global.css 側で完全に定義済み。ここではスタイル追加なし。 */
 </style>

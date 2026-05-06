@@ -30,12 +30,7 @@ defineEmits<{
 </template>
 
 <style scoped>
-.role {
-  width: 100%;
-  background: transparent;
-  border: 1px solid transparent;
-  text-align: left;
-}
+/* `.role` 本体のレイアウトは global.css で定義。ここでは role-label のみ。 */
 .role-label {
   display: flex;
   align-items: center;
