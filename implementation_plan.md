@@ -574,7 +574,7 @@
 
 ### 9-5: 公開鍵管理
 - [x] Rust 側で `authors/{github_username}.json` の取得 / パース実装
-- [ ] PR ベースでの公開鍵登録ガイドの整備
+- [x] **PR ベースでの公開鍵登録ガイドの整備** — [docs/author_registration.md](docs/author_registration.md) (新規著者の初回登録 7 ステップ + CI 失敗時対処表 + メンテナ向けレビュー観点) + [docs/key_rotation.md](docs/key_rotation.md) (既存著者の鍵更新)
 
 ---
 
