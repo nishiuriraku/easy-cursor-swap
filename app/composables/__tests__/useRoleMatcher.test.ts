@@ -47,6 +47,11 @@ describe('scoreRole', () => {
     expect(scoreRole('arr.png', 'Arrow')).toBe(0)
   })
 
+  it('returns 0.70 for typo with levenshtein distance 1', () => {
+    // 'arrov' → alias 'arrow' (1 substitution)
+    expect(scoreRole('arrov.png', 'Arrow')).toBe(0.70)
+  })
+
   it('returns 0 for unrelated names', () => {
     expect(scoreRole('totally-random.png', 'Arrow')).toBe(0)
   })
