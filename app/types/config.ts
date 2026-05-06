@@ -9,6 +9,18 @@ export interface GeneralConfig {
   language: string
   active_theme_id: string | null
   panic_hotkey: string
+  /** クラッシュレポート送信オプトイン (デフォルト false) */
+  crash_reporting: boolean
+}
+
+/** `list_crash_reports` IPC が返すクラッシュレポート 1 件 */
+export interface CrashReport {
+  file_name: string
+  timestamp_utc: string
+  app_version: string
+  os: string
+  message: string
+  location: string | null
 }
 
 export interface DarkModeConfig {

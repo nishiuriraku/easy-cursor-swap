@@ -426,7 +426,14 @@
 - [x] デバッグビルドは標準出力にも色付きで出力
 - [x] **既存 `tracing!` のパス出力箇所に `redact_path` 適用** (theme/backup/commands/config)
 - [x] **Marketplace の URL ログを `short_hash` で短縮**してフィッシング先追跡を防ぐ
-- [ ] クラッシュレポート オプトイン送信 (Phase 7-2 と統合)
+- [x] **クラッシュレポート オプトイン収集** — `src-tauri/src/crash.rs`
+  - `install_panic_hook` を main 冒頭で呼び、panic を `%LOCALAPPDATA%\EasyCursorSwap\crash\panic-{epoch_ms}.json` に保存
+  - レコード: timestamp / app_version / os / message / location (ホームパスは `~/...` に redact)
+  - `general.crash_reporting: bool` (デフォルト false, `#[serde(default)]` で既存 config 互換)
+  - IPC: `list_crash_reports` (新しい順 50 件) / `clear_crash_reports`
+  - 起動時 `prune_old_reports` で 30 日経過レポートを削除
+  - 単体テスト 3 件 (PII redact / 非パステキスト維持 / hook 多重呼出耐性)
+  - サーバー送信 (`easycursorswap/index` 経由) は将来実装。現状は収集 + UI 表示の枠まで
 
 ### 7-2: 通知システム ✅ 実装完了 (層 1/2/3 すべて)
 - [x] 3 層通知の設計と振り分け:

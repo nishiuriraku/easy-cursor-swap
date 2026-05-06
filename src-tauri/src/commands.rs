@@ -968,6 +968,23 @@ pub fn check_update_is_major_jump(current_version: String, new_version: String) 
     is_major_bump(&current_version, &new_version)
 }
 
+/// 保存済みクラッシュレポート (panic) の一覧を返す。
+///
+/// 新しい順、上限 50 件 (`crash::list_reports` の内部上限)。
+/// レポート本体には PII 除外済みのメッセージのみ含まれる。
+#[tauri::command]
+pub fn list_crash_reports() -> Result<Vec<crate::crash::CrashReport>, AppError> {
+    crate::crash::list_reports()
+}
+
+/// 保存済みクラッシュレポートを全削除する。戻り値は削除した件数。
+///
+/// ユーザーが「設定 → ログ → クラッシュ履歴を消去」を実行したときに呼ぶ想定。
+#[tauri::command]
+pub fn clear_crash_reports() -> Result<usize, AppError> {
+    crate::crash::clear_reports()
+}
+
 /// Tauri Builder に全コマンドを登録するためのヘルパー
 pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
     tauri::generate_handler![
@@ -1006,6 +1023,8 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         inspect_ani_file,
         export_cursorpack_streamed,
         cancel_build,
+        list_crash_reports,
+        clear_crash_reports,
     ]
 }
 

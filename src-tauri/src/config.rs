@@ -58,6 +58,12 @@ pub struct GeneralConfig {
     pub active_theme_id: Option<Uuid>,
     /// グローバルホットキー（パニックボタン）
     pub panic_hotkey: String,
+    /// クラッシュレポート送信オプトイン (デフォルト false)
+    ///
+    /// 有効にしても `easycursorswap/index` のサーバー側エンドポイントが
+    /// 整備されるまでは収集のみ。`crash::list_reports` で UI に表示する。
+    #[serde(default)]
+    pub crash_reporting: bool,
 }
 
 /// ダークモード連動設定
@@ -105,6 +111,7 @@ impl Default for AppConfig {
                 language: "auto".to_string(),
                 active_theme_id: None,
                 panic_hotkey: "Ctrl+Alt+Shift+R".to_string(),
+                crash_reporting: false,
             },
             dark_mode: DarkModeConfig {
                 enabled: false,

@@ -16,6 +16,7 @@ pub mod autostart;
 pub mod backup;
 pub mod commands;
 pub mod config;
+pub mod crash;
 pub mod cursor;
 pub mod cursor_watcher;
 pub mod darkmode;

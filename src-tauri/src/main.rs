@@ -9,6 +9,7 @@ use app_lib::appusermodel;
 use app_lib::autostart;
 use app_lib::commands;
 use app_lib::config::ConfigManager;
+use app_lib::crash;
 use app_lib::cursor_watcher;
 use app_lib::darkmode;
 use app_lib::health::{RollbackTarget, StartupCheck};
@@ -96,6 +97,14 @@ fn show_migration_failure_dialog(err: &str) {
 fn show_migration_failure_dialog(_err: &str) {}
 
 fn main() {
+    // panic フックを最優先で仕込む。ロギング初期化前の panic もファイルに記録できるよう
+    // ここで設定する。デフォルトの stderr 出力フックは内部で温存される。
+    crash::install_panic_hook();
+    // 起動時に古いクラッシュレポート (30 日経過) を掃除。失敗してもアプリは続行。
+    if let Err(e) = crash::prune_old_reports() {
+        eprintln!("[crash] prune_old_reports warn: {}", e);
+    }
+
     // ロギング初期化（日次ローテ + 14日保持 + 100MB上限 + PII redaction）
     // _guard は drop 時に未書き出しバッファを flush するため main の最後まで保持。
     let _log_guard = match logging::init_logging("info") {
