@@ -62,7 +62,10 @@ where
             };
 
             // 不可視ウィンドウなのでフォーカスは奪わない
-            CURSOR_CHANGE_CALLBACK.lock().unwrap().replace(Box::new(on_change));
+            CURSOR_CHANGE_CALLBACK
+                .lock()
+                .unwrap()
+                .replace(Box::new(on_change));
             tracing::info!("カーソル設定変更監視を開始しました");
 
             let mut msg = MSG::default();

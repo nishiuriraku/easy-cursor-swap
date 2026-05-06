@@ -389,7 +389,7 @@ impl RegistryManager {
     #[cfg(windows)]
     fn notify_cursor_change() -> AppResult<()> {
         use windows::Win32::UI::WindowsAndMessaging::{
-            SystemParametersInfoW, SPI_SETCURSORS, SPIF_SENDCHANGE, SPIF_UPDATEINIFILE,
+            SystemParametersInfoW, SPIF_SENDCHANGE, SPIF_UPDATEINIFILE, SPI_SETCURSORS,
         };
 
         unsafe {
@@ -508,9 +508,7 @@ impl RegistryManager {
 /// 空文字列は Windows のレジストリにおいて「既定カーソルへフォールバック」を意味する。
 ///
 /// `apply_cursors` から切り出した純粋関数。レジストリに依存しないので単体テスト可能。
-fn compute_apply_values(
-    cursor_paths: &HashMap<String, PathBuf>,
-) -> Vec<(&'static str, String)> {
+fn compute_apply_values(cursor_paths: &HashMap<String, PathBuf>) -> Vec<(&'static str, String)> {
     CursorRole::all()
         .iter()
         .map(|role| {
@@ -592,10 +590,7 @@ mod tests {
         map.insert("IBeam".to_string(), PathBuf::from("C:\\cursors\\ibeam.cur"));
 
         let entries = compute_apply_values(&map);
-        let by_name: HashMap<&str, &str> = entries
-            .iter()
-            .map(|(k, v)| (*k, v.as_str()))
-            .collect();
+        let by_name: HashMap<&str, &str> = entries.iter().map(|(k, v)| (*k, v.as_str())).collect();
 
         // 指定した役割は書き込み値あり
         assert_eq!(by_name["Arrow"], "C:\\cursors\\arrow.cur");

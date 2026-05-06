@@ -37,8 +37,8 @@ fn bench_build_lanczos(c: &mut Criterion) {
     c.bench_function("build_cur_from_png/64x64/lanczos/cold", |b| {
         b.iter(|| {
             clear_resize_cache();
-            let _ = build_cur_from_png(black_box(&png_64), 0, 0, ResizeMethod::Lanczos)
-                .expect("build");
+            let _ =
+                build_cur_from_png(black_box(&png_64), 0, 0, ResizeMethod::Lanczos).expect("build");
         })
     });
 
@@ -46,8 +46,8 @@ fn bench_build_lanczos(c: &mut Criterion) {
     let _ = build_cur_from_png(&png_64, 0, 0, ResizeMethod::Lanczos);
     c.bench_function("build_cur_from_png/64x64/lanczos/warm", |b| {
         b.iter(|| {
-            let _ = build_cur_from_png(black_box(&png_64), 0, 0, ResizeMethod::Lanczos)
-                .expect("build");
+            let _ =
+                build_cur_from_png(black_box(&png_64), 0, 0, ResizeMethod::Lanczos).expect("build");
         })
     });
 
@@ -65,8 +65,8 @@ fn bench_build_nearest(c: &mut Criterion) {
 
     c.bench_function("build_cur_from_png/32x32/nearest", |b| {
         b.iter(|| {
-            let _ = build_cur_from_png(black_box(&png_32), 0, 0, ResizeMethod::Nearest)
-                .expect("build");
+            let _ =
+                build_cur_from_png(black_box(&png_32), 0, 0, ResizeMethod::Nearest).expect("build");
         })
     });
 }

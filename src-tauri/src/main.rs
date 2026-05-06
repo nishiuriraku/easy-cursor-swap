@@ -39,7 +39,12 @@ fn show_rollback_dialog(target: &RollbackTarget) {
     let body_h = HSTRING::from(body);
 
     let result = unsafe {
-        MessageBoxW(None, &body_h, &title, MB_YESNO | MB_ICONWARNING | MB_TOPMOST)
+        MessageBoxW(
+            None,
+            &body_h,
+            &title,
+            MB_YESNO | MB_ICONWARNING | MB_TOPMOST,
+        )
     };
     if result == IDYES {
         // ShellExecute でブラウザを開く
@@ -70,9 +75,7 @@ fn show_rollback_dialog(_target: &RollbackTarget) {}
 #[cfg(windows)]
 fn show_migration_failure_dialog(err: &str) {
     use windows::core::HSTRING;
-    use windows::Win32::UI::WindowsAndMessaging::{
-        MessageBoxW, MB_ICONERROR, MB_OK, MB_TOPMOST,
-    };
+    use windows::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR, MB_OK, MB_TOPMOST};
 
     let config_dir = dirs::data_local_dir()
         .map(|p| p.join("EasyCursorSwap").to_string_lossy().to_string())
@@ -120,7 +123,10 @@ fn main() {
         }
     };
 
-    tracing::info!("EasyCursorSwap v{} を起動しています...", env!("CARGO_PKG_VERSION"));
+    tracing::info!(
+        "EasyCursorSwap v{} を起動しています...",
+        env!("CARGO_PKG_VERSION")
+    );
 
     // 起動ヘルスチェック: 連続失敗を検出
     let app_version = env!("CARGO_PKG_VERSION").to_string();
@@ -133,9 +139,7 @@ fn main() {
     };
     if let Some(ref check) = startup_check {
         if check.should_rollback {
-            tracing::warn!(
-                "連続起動失敗 3 回を検出。ロールバックダイアログを表示します。"
-            );
+            tracing::warn!("連続起動失敗 3 回を検出。ロールバックダイアログを表示します。");
             if let Some(target) = check.rollback_target() {
                 // Win32 ダイアログを表示し、ユーザーが「はい」の場合にリリースページを開く
                 show_rollback_dialog(&target);
@@ -256,9 +260,7 @@ fn main() {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
                     let _ = window.destroy();
-                    tracing::info!(
-                        "メインウィンドウを破棄しました (トレイ常駐 / メモリ解放)"
-                    );
+                    tracing::info!("メインウィンドウを破棄しました (トレイ常駐 / メモリ解放)");
                 }
             }
         })

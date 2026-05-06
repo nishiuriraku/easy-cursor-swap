@@ -127,7 +127,7 @@ pub fn show_or_recreate_main_window(app: &AppHandle) {
     }
 
     // 破棄済み → tauri.conf.json の "main" 定義から再生成
-    use tauri::{WebviewWindowBuilder, WebviewUrl};
+    use tauri::{WebviewUrl, WebviewWindowBuilder};
     match WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
         .title("EasyCursorSwap")
         .inner_size(1100.0, 750.0)

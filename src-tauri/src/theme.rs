@@ -177,7 +177,10 @@ impl ThemeManager {
             Ok(d) => d,
             Err(_) => return false,
         };
-        cursors_dir.join(id.to_string()).join("theme.json").is_file()
+        cursors_dir
+            .join(id.to_string())
+            .join("theme.json")
+            .is_file()
     }
 
     /// 起動時の孤児カーソル復旧チェック。
@@ -188,9 +191,7 @@ impl ThemeManager {
     ///  - dark_mode 側の孤児: 該当フィールドを `None` に戻す (適用済みでなければレジストリは触らない)
     ///
     /// 何もする必要がなければ `Ok(false)` を返す。復旧した場合は `Ok(true)`。
-    pub fn cleanup_orphan_references(
-        config: &crate::config::ConfigManager,
-    ) -> AppResult<bool> {
+    pub fn cleanup_orphan_references(config: &crate::config::ConfigManager) -> AppResult<bool> {
         use crate::registry::RegistryManager;
 
         let cfg = config.get()?;
@@ -509,9 +510,8 @@ impl ThemeManager {
         }
         let file = std::fs::File::create(output_path)?;
         let mut zip = zip::ZipWriter::new(file);
-        let opts: zip::write::SimpleFileOptions =
-            zip::write::SimpleFileOptions::default()
-                .compression_method(zip::CompressionMethod::Deflated);
+        let opts: zip::write::SimpleFileOptions = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated);
 
         zip.start_file("theme.json", opts)?;
         zip.write_all(&metadata_json)?;
@@ -646,9 +646,8 @@ impl ThemeManager {
             }
         }
 
-        let (theme_dir, metadata) = target.ok_or_else(|| {
-            AppError::Theme(format!("テーマ {} が見つかりません", id))
-        })?;
+        let (theme_dir, metadata) =
+            target.ok_or_else(|| AppError::Theme(format!("テーマ {} が見つかりません", id)))?;
 
         // 役割名 → 絶対パスのマップを構築
         let mut cursor_paths: HashMap<String, PathBuf> = HashMap::new();
@@ -782,7 +781,10 @@ mod tests {
     #[test]
     fn accepts_normal_paths() {
         let p = sanitize_archive_path("cursors/Arrow.png").unwrap();
-        assert_eq!(p.to_string_lossy(), "cursors\\Arrow.png".replace('\\', std::path::MAIN_SEPARATOR_STR));
+        assert_eq!(
+            p.to_string_lossy(),
+            "cursors\\Arrow.png".replace('\\', std::path::MAIN_SEPARATOR_STR)
+        );
     }
 
     #[test]

@@ -259,9 +259,10 @@ fn decode_verifying_key(pubkey_b64: &str) -> AppResult<VerifyingKey> {
     let raw = base64::engine::general_purpose::STANDARD
         .decode(pubkey_b64)
         .map_err(|e| AppError::Theme(format!("公開鍵 Base64 デコード失敗: {}", e)))?;
-    let bytes: [u8; 32] = raw.as_slice().try_into().map_err(|_| {
-        AppError::Theme(format!("公開鍵長が不正: {} bytes (32 必要)", raw.len()))
-    })?;
+    let bytes: [u8; 32] = raw
+        .as_slice()
+        .try_into()
+        .map_err(|_| AppError::Theme(format!("公開鍵長が不正: {} bytes (32 必要)", raw.len())))?;
     VerifyingKey::from_bytes(&bytes)
         .map_err(|e| AppError::Theme(format!("公開鍵パース失敗: {}", e)))
 }
@@ -270,8 +271,9 @@ fn decode_signature(sig_b64: &str) -> AppResult<Signature> {
     let raw = base64::engine::general_purpose::STANDARD
         .decode(sig_b64)
         .map_err(|e| AppError::Theme(format!("署名 Base64 デコード失敗: {}", e)))?;
-    let bytes: [u8; 64] = raw.as_slice().try_into().map_err(|_| {
-        AppError::Theme(format!("署名長が不正: {} bytes (64 必要)", raw.len()))
-    })?;
+    let bytes: [u8; 64] = raw
+        .as_slice()
+        .try_into()
+        .map_err(|_| AppError::Theme(format!("署名長が不正: {} bytes (64 必要)", raw.len())))?;
     Ok(Signature::from_bytes(&bytes))
 }

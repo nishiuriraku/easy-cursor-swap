@@ -103,7 +103,11 @@ pub fn set_enabled(enabled: bool) -> AppResult<()> {
             );
             return Ok(());
         }
-        let command = if enabled { Some(build_run_command()?) } else { None };
+        let command = if enabled {
+            Some(build_run_command()?)
+        } else {
+            None
+        };
         write_value(APP_VALUE_NAME, command.as_deref())
     }
     #[cfg(not(windows))]
@@ -164,11 +168,7 @@ mod tests {
 
     /// 既存ユーザーの Run エントリと衝突しないよう、テストごとにユニークな値名を生成する。
     fn unique_name(suffix: &str) -> String {
-        format!(
-            "EasyCursorSwap_test_{}_{}",
-            std::process::id(),
-            suffix
-        )
+        format!("EasyCursorSwap_test_{}_{}", std::process::id(), suffix)
     }
 
     /// テスト後に値が残らないようクリーンアップ
@@ -185,7 +185,10 @@ mod tests {
         cleanup(&name);
 
         write_value(&name, Some("\"C:\\fake\\path.exe\" --autostart")).unwrap();
-        assert!(is_enabled_with_name(&name), "書き込み後に有効と判定されるべき");
+        assert!(
+            is_enabled_with_name(&name),
+            "書き込み後に有効と判定されるべき"
+        );
 
         cleanup(&name);
     }
@@ -215,7 +218,11 @@ mod tests {
     #[test]
     fn build_run_command_quotes_path_and_appends_autostart_flag() {
         let cmd = build_run_command().unwrap();
-        assert!(cmd.starts_with('"'), "パスは二重引用符で囲まれるべき: {}", cmd);
+        assert!(
+            cmd.starts_with('"'),
+            "パスは二重引用符で囲まれるべき: {}",
+            cmd
+        );
         assert!(
             cmd.ends_with("--autostart"),
             "末尾に --autostart 引数が付くべき: {}",

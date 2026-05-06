@@ -23,7 +23,8 @@ use crate::errors::{AppError, AppResult};
 
 /// アプリ固有の GUID。複数プロダクトとの衝突を避けるため一意の値を使用。
 /// 変更すると既存ユーザーの常駐プロセスとは別系統と判定されるので注意。
-const MUTEX_NAME: &str = "Local\\EasyCursorSwap.SingleInstance.7c2a4f9a-3b8d-4e6f-8a1c-5d9e0f3b6c7d";
+const MUTEX_NAME: &str =
+    "Local\\EasyCursorSwap.SingleInstance.7c2a4f9a-3b8d-4e6f-8a1c-5d9e0f3b6c7d";
 
 /// 「ウィンドウを表示せよ」シグナル用の Named Event 名。
 /// MUTEX_NAME と同じ GUID を流用してアプリ単位で対応付ける。
@@ -39,14 +40,13 @@ pub struct SingleInstanceLock {
 impl SingleInstanceLock {
     pub fn acquire() -> AppResult<Self> {
         use windows::core::HSTRING;
-        use windows::Win32::Foundation::{ERROR_ALREADY_EXISTS, GetLastError};
+        use windows::Win32::Foundation::{GetLastError, ERROR_ALREADY_EXISTS};
         use windows::Win32::System::Threading::CreateMutexW;
 
         let name = HSTRING::from(MUTEX_NAME);
         let handle = unsafe {
-            CreateMutexW(None, true, &name).map_err(|e| {
-                AppError::Config(format!("CreateMutexW 失敗: {}", e))
-            })?
+            CreateMutexW(None, true, &name)
+                .map_err(|e| AppError::Config(format!("CreateMutexW 失敗: {}", e)))?
         };
 
         // CreateMutexW は既存ミューテックスがあっても成功する。
@@ -153,9 +153,7 @@ where
                 }
             }
         })
-        .map_err(|e| {
-            AppError::Other(format!("show-window listener スレッド起動失敗: {}", e))
-        })?;
+        .map_err(|e| AppError::Other(format!("show-window listener スレッド起動失敗: {}", e)))?;
     Ok(())
 }
 

@@ -59,9 +59,8 @@ impl BackupManager {
         }
         let file = std::fs::File::create(out_path)?;
         let mut zip = zip::ZipWriter::new(file);
-        let opts: zip::write::SimpleFileOptions =
-            zip::write::SimpleFileOptions::default()
-                .compression_method(zip::CompressionMethod::Deflated);
+        let opts: zip::write::SimpleFileOptions = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated);
 
         // 1) profile.json
         zip.start_file(PROFILE_JSON_NAME, opts)?;
@@ -236,17 +235,16 @@ fn add_dir_to_zip(
     archive_prefix: &Path,
     opts: &zip::write::SimpleFileOptions,
 ) -> AppResult<()> {
-    let dir_name = src
-        .file_name()
-        .and_then(|n| n.to_str())
-        .ok_or_else(|| AppError::Theme(format!("ディレクトリ名が取得できません: {}", src.display())))?;
+    let dir_name = src.file_name().and_then(|n| n.to_str()).ok_or_else(|| {
+        AppError::Theme(format!("ディレクトリ名が取得できません: {}", src.display()))
+    })?;
     let archive_dir = archive_prefix.join(dir_name);
 
     for entry in walkdir(src)? {
         let path = entry?;
-        let rel = path.strip_prefix(src).map_err(|e| {
-            AppError::Theme(format!("相対パス計算失敗: {}", e))
-        })?;
+        let rel = path
+            .strip_prefix(src)
+            .map_err(|e| AppError::Theme(format!("相対パス計算失敗: {}", e)))?;
         let archive_path = archive_dir.join(rel);
         let archive_str = archive_path
             .to_str()
@@ -290,5 +288,8 @@ fn walkdir(root: &Path) -> AppResult<Vec<AppResult<PathBuf>>> {
         }
     }
     // ルート自体は archive_dir に展開済みなので除く
-    Ok(out.into_iter().filter(|r| r.as_ref().map_or(true, |p| p != root)).collect())
+    Ok(out
+        .into_iter()
+        .filter(|r| r.as_ref().map_or(true, |p| p != root))
+        .collect())
 }
