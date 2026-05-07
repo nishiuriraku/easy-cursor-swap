@@ -43,15 +43,19 @@ pub enum AppError {
     #[error("{0}")]
     Other(String),
 
+    /// 一括インポートがユーザー操作で中断されたとき。
     #[error("一括インポートが中断されました")]
     BulkImportCancelled,
 
+    /// 指定パス配下に対応拡張子のファイルがなかったとき。
     #[error("対応ファイルが見つかりません: {path}")]
     NoSupportedFiles { path: String },
 
+    /// 個別ファイルが MAX_FILE_BYTES を超えたとき。
     #[error("サイズ上限超過: {path} ({size} bytes)")]
     OversizeFile { path: String, size: u64 },
 
+    /// .cursorpack ZIP / metadata が壊れているとき。
     #[error(".cursorpack の解析に失敗: {reason}")]
     InvalidCursorpack { reason: String },
 }

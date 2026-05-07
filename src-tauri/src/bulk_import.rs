@@ -86,6 +86,8 @@ impl CancelRegistry {
             *v = false;
         }
     }
+    /// 指定 job_id が登録済みかつキャンセルされていなければ true。未登録の job_id は false を返す（不明 = 非アクティブ扱い）。
+    /// ワーカーが poll する前に必ず `register` を先行させること。
     pub fn is_active(&self, job_id: &str) -> bool {
         *self.inner.lock().unwrap().get(job_id).unwrap_or(&false)
     }
