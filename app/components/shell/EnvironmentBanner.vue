@@ -9,6 +9,9 @@
  */
 import { onMounted, ref } from 'vue'
 import { invokeTauri } from '~/composables/useTauri'
+import { useI18n } from '~/composables/useI18n'
+
+const { t } = useI18n()
 
 interface EnvironmentReport {
   is_remote_session: boolean
@@ -53,10 +56,10 @@ function close() {
     >
       <UiIcon name="Alert" :size="14" />
       <div class="env-text">
-        <strong>動作対象外の環境を検出</strong>
+        <strong>{{ t('environment.unsupportedDetected') }}</strong>
         <span>{{ report.message }}</span>
       </div>
-      <button class="btn ghost env-close" aria-label="閉じる" @click="close">
+      <button class="btn ghost env-close" :aria-label="t('common.close')" @click="close">
         <UiIcon name="X" :size="11" />
       </button>
     </div>

@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from '~/composables/useI18n'
+
+const { t } = useI18n()
 
 const emit = defineEmits<{
   (e: 'bulk-files'): void
@@ -22,14 +25,14 @@ function pick(action: 'files' | 'folder' | 'cursorpack') {
   <div class="bi-btn-host" @keydown.esc="close">
     <button class="btn ghost" @click="open = !open">
       <UiIcon name="Import" :size="13" />
-      一括インポート
+      {{ t('bulkImport.dropdownLabel') }}
       <span class="caret">▾</span>
     </button>
     <Transition name="fade">
       <div v-if="open" v-click-outside="close" class="bi-menu">
-        <button class="bi-menu-item" @click="pick('files')">画像をまとめて選択</button>
-        <button class="bi-menu-item" @click="pick('folder')">フォルダから読み込む</button>
-        <button class="bi-menu-item" @click="pick('cursorpack')">.cursorpack を取り込む</button>
+        <button class="bi-menu-item" @click="pick('files')">{{ t('bulkImport.dropdownFiles') }}</button>
+        <button class="bi-menu-item" @click="pick('folder')">{{ t('bulkImport.dropdownFolder') }}</button>
+        <button class="bi-menu-item" @click="pick('cursorpack')">{{ t('bulkImport.dropdownPack') }}</button>
       </div>
     </Transition>
   </div>

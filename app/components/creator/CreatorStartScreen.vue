@@ -8,6 +8,10 @@
  * ドラフト一覧は将来の `get_drafts` IPC を想定し、現状は空配列で渡されたら
  * セクションごと非表示にするフォールバック設計。
  */
+import { useI18n } from '~/composables/useI18n'
+
+const { t } = useI18n()
+
 defineProps<{
   /** 最近編集中のドラフト一覧。空配列なら "RECENT DRAFTS" セクションを隠す。 */
   recentDrafts?: Array<{
@@ -39,31 +43,28 @@ const emit = defineEmits<{
         <CursorIcon role="Arrow" :size="48" style="color: var(--accent)" />
       </div>
       <div class="es-eyebrow">CREATOR · v1.0</div>
-      <h1>カーソルテーマを作る</h1>
-      <p>
-        17 個のシステム役割と最大 6 解像度のアセットを 1 つの <code>.cursorpack</code> に束ね、
-        Ed25519 で署名して配布できます。空のキャンバスから始めるか、既存パックを取り込んで編集しましょう。
-      </p>
+      <h1>{{ t('creatorStart.title') }}</h1>
+      <p>{{ t('creatorStart.description') }}</p>
 
       <div class="es-cta-row">
         <button class="btn primary es-cta-primary" @click="emit('startNew')">
           <UiIcon name="Plus" :size="14" />
-          新規作成
+          {{ t('creatorStart.btnNew') }}
         </button>
         <button class="btn" @click="emit('importPack')">
-          <UiIcon name="Import" :size="13" />.cursorpack をインポート
+          <UiIcon name="Import" :size="13" />{{ t('creatorStart.btnImport') }}
         </button>
         <button class="btn ghost" @click="emit('duplicateExisting')">
-          <UiIcon name="Brush" :size="13" />既存テーマを複製して編集
+          <UiIcon name="Brush" :size="13" />{{ t('creatorStart.btnDuplicate') }}
         </button>
       </div>
 
       <div class="es-shortcuts">
         <span class="es-kb">
-          <span class="kbd">Ctrl</span><span class="kbd">N</span><span>新規</span>
+          <span class="kbd">Ctrl</span><span class="kbd">N</span><span>{{ t('creatorStart.kbdNew') }}</span>
         </span>
         <span class="es-kb">
-          <span class="kbd">Ctrl</span><span class="kbd">O</span><span>開く</span>
+          <span class="kbd">Ctrl</span><span class="kbd">O</span><span>{{ t('creatorStart.kbdOpen') }}</span>
         </span>
       </div>
     </div>

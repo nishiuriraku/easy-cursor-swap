@@ -6,6 +6,9 @@
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useUiTheme } from '~/composables/useUiTheme'
+import { useI18n } from '~/composables/useI18n'
+
+const { t } = useI18n()
 
 withDefaults(defineProps<{
   title?: string
@@ -122,18 +125,18 @@ async function onTitlebarMouseDown(e: MouseEvent) {
       >
         <UiIcon :name="themeIcon" :size="12" />
       </button>
-      <button type="button" class="tb-btn" aria-label="最小化" @click="call('minimize')">
+      <button type="button" class="tb-btn" :aria-label="t('titlebar.minimize')" @click="call('minimize')">
         <UiIcon name="Min" :size="12" />
       </button>
       <button
         type="button"
         class="tb-btn"
-        :aria-label="isMaximized ? '元に戻す' : '最大化'"
+        :aria-label="isMaximized ? t('titlebar.restore') : t('titlebar.maximize')"
         @click="call('toggleMaximize')"
       >
         <UiIcon :name="isMaximized ? 'Restore' : 'Max'" :size="12" />
       </button>
-      <button type="button" class="tb-btn close" aria-label="閉じる" @click="call('close')">
+      <button type="button" class="tb-btn close" :aria-label="t('common.close')" @click="call('close')">
         <UiIcon name="X" :size="12" />
       </button>
     </div>

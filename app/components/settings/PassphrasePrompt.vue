@@ -7,6 +7,9 @@
  * - エンターで確定
  */
 import { computed, ref, watch } from 'vue'
+import { useI18n } from '~/composables/useI18n'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   /** モード: export(2回入力) / import(1回入力) */
@@ -38,9 +41,9 @@ const canConfirm = computed(() => {
 
 const error = computed(() => {
   if (phrase.value.length === 0) return ''
-  if (phrase.value.length < 8) return 'パスフレーズは 8 文字以上にしてください'
+  if (phrase.value.length < 8) return t('passphrase.errorTooShort')
   if (props.mode === 'export' && phraseConfirm.value && phrase.value !== phraseConfirm.value) {
-    return '確認用と一致しません'
+    return t('passphrase.errorMismatch')
   }
   return ''
 })
@@ -63,18 +66,16 @@ function confirm() {
         <div class="modal-head">
           <div class="modal-icon" aria-hidden="true"><UiIcon name="Shield" :size="20" /></div>
           <div style="flex: 1; min-width: 0">
-            <h2 id="passphrase-modal-title">{{ mode === 'export' ? '秘密鍵をエクスポート' : '秘密鍵をインポート' }}</h2>
-            <p>
-              {{ mode === 'export'
-                ? 'パスフレーズで暗号化したバックアップを生成します。'
-                : 'パスフレーズを入力して秘密鍵を復号します。' }}
-            </p>
+            <h2 id="passphrase-modal-title">
+              {{ mode === 'export' ? t('passphrase.exportTitle') : t('passphrase.importTitle') }}
+            </h2>
+            <p>{{ mode === 'export' ? t('passphrase.exportDesc') : t('passphrase.importDesc') }}</p>
           </div>
         </div>
 
         <div class="modal-body">
           <label class="pp-row">
-            <span class="pp-label">パスフレーズ (8 文字以上)</span>
+            <span class="pp-label">{{ t('passphrase.phraseLabel') }}</span>
             <input
               v-model="phrase"
               type="password"
@@ -84,7 +85,7 @@ function confirm() {
             >
           </label>
           <label v-if="mode === 'export'" class="pp-row">
-            <span class="pp-label">確認のためもう一度</span>
+            <span class="pp-label">{{ t('passphrase.confirmLabel') }}</span>
             <input
               v-model="phraseConfirm"
               type="password"
@@ -96,7 +97,7 @@ function confirm() {
           <p v-if="error" class="pp-error">{{ error }}</p>
           <p class="pp-note">
             <UiIcon name="Alert" :size="11" />
-            このパスフレーズを失うと秘密鍵を復号できません。安全に管理してください。
+            {{ t('passphrase.note') }}
           </p>
         </div>
 
@@ -106,10 +107,10 @@ function confirm() {
             XChaCha20-Poly1305 + Argon2id (m=64MiB, t=3)
           </div>
           <div class="actions">
-            <button class="btn ghost" @click="close">キャンセル</button>
+            <button class="btn ghost" @click="close">{{ t('common.cancel') }}</button>
             <button class="btn primary" :disabled="!canConfirm" @click="confirm">
               <UiIcon name="Check" :size="13" />
-              {{ mode === 'export' ? 'エクスポート' : 'インポート' }}
+              {{ mode === 'export' ? t('common.export') : t('common.import') }}
             </button>
           </div>
         </div>

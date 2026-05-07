@@ -873,10 +873,10 @@ async function onFileChange(e: Event) {
               <template v-if="exportProgress.stage === 'role'">
                 {{ exportProgress.message ?? '' }} ({{ exportProgress.current }}/{{ exportProgress.total }})
               </template>
-              <template v-else-if="exportProgress.stage === 'sign'">署名中…</template>
-              <template v-else-if="exportProgress.stage === 'package'">パッケージ書き込み中…</template>
-              <template v-else-if="exportProgress.stage === 'cancelled'">キャンセル済み</template>
-              <template v-else>処理中…</template>
+              <template v-else-if="exportProgress.stage === 'sign'">{{ t('creatorStart.exportStageSign') }}</template>
+              <template v-else-if="exportProgress.stage === 'package'">{{ t('creatorStart.exportStagePackage') }}</template>
+              <template v-else-if="exportProgress.stage === 'cancelled'">{{ t('creatorStart.exportStageCancelled') }}</template>
+              <template v-else>{{ t('creatorStart.exportStageWorking') }}</template>
             </span>
             <button
               v-if="exportBusy && exportProgress.stage !== 'cancelled'"
@@ -1060,15 +1060,15 @@ async function onFileChange(e: Event) {
           </div>
           <div class="prop-body">
             <div class="prop-row">
-              <label>X座標</label>
+              <label>{{ t('creatorStart.propHotspotX') }}</label>
               <input v-model.number="hotspotX" type="number" class="input mono" min="0" />
             </div>
             <div class="prop-row">
-              <label>Y座標</label>
+              <label>{{ t('creatorStart.propHotspotY') }}</label>
               <input v-model.number="hotspotY" type="number" class="input mono" min="0" />
             </div>
             <div class="prop-row">
-              <label>サイズ別</label>
+              <label>{{ t('creatorStart.propPerSize') }}</label>
               <button
                 :class="['toggle', { on: perSizeHotspot }]"
                 :aria-pressed="perSizeHotspot"
@@ -1085,11 +1085,11 @@ async function onFileChange(e: Event) {
           <div class="prop-head">{{ t('creator.propsAsset') }}</div>
           <div class="prop-body">
             <div class="prop-row">
-              <label>形式</label>
+              <label>{{ t('creatorStart.propAssetFormat') }}</label>
               <span class="tag">PNG · 24bit · α</span>
             </div>
             <div class="prop-row">
-              <label>カラー</label>
+              <label>{{ t('creatorStart.propAssetColor') }}</label>
               <div class="color-chips">
                 <span class="cc" style="background: #7cf2d4" />
                 <span class="cc" style="background: #0a0b0f" />
@@ -1097,7 +1097,7 @@ async function onFileChange(e: Event) {
               </div>
             </div>
             <div class="prop-row">
-              <label>影</label>
+              <label>{{ t('creatorStart.propAssetShadow') }}</label>
               <button
                 :class="['toggle', { on: shadowEnabled }]"
                 :aria-pressed="shadowEnabled"

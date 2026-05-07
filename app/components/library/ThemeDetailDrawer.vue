@@ -22,6 +22,9 @@
 import { computed, ref } from 'vue'
 import type { ThemeCardData } from '~/types/theme'
 import { CURSOR_ROLES } from '~/components/icons/CursorIcons'
+import { useI18n } from '~/composables/useI18n'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   theme: ThemeCardData
@@ -98,7 +101,7 @@ const tags = computed<string[]>(() => {
           <li class="current">
             <span class="td-cv">v{{ theme.version }}</span>
             <span class="td-cd">{{ theme.date.slice(0, 10) }}</span>
-            <span class="td-cm">最新版。詳細な変更履歴は将来のリリースで対応予定です。</span>
+            <span class="td-cm">{{ t('themePicker.latestVersionNote') }}</span>
           </li>
         </ul>
       </section>
@@ -157,7 +160,7 @@ const tags = computed<string[]>(() => {
               </template>
               <div v-else class="td-rp-missing">
                 <UiIcon name="Alert" :size="20" />
-                <span>欠落</span>
+                <span>{{ t('themePicker.roleMissing') }}</span>
               </div>
             </div>
             <div class="td-rp-meta">

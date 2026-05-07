@@ -12,6 +12,9 @@
  */
 import { computed, onBeforeUnmount, watch } from 'vue'
 import type { ThemeCardData } from '~/types/theme'
+import { useI18n } from '~/composables/useI18n'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   /** 開く対象のテーマ。null のときはモーダル非表示。 */
@@ -84,7 +87,7 @@ onBeforeUnmount(() => {
         <div class="td-standalone td-modal-shell" @click.stop>
           <div class="td-standalone-h">
             <div>
-              <div class="td-standalone-eyebrow">テーマ詳細</div>
+              <div class="td-standalone-eyebrow">{{ t('themePicker.detailsEyebrow') }}</div>
               <h2>{{ theme.name }}</h2>
               <div class="td-standalone-sub">
                 @{{ theme.author ?? 'unknown' }} · v{{ theme.version }}
@@ -93,8 +96,8 @@ onBeforeUnmount(() => {
             </div>
             <button
               class="btn icon"
-              aria-label="閉じる"
-              title="閉じる (Esc)"
+              :aria-label="t('common.close')"
+              :title="`${t('common.close')} (Esc)`"
               @click="close"
             >
               <UiIcon name="X" :size="13" />

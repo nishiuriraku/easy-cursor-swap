@@ -742,14 +742,14 @@ onUnmounted(() => {
               <UiIcon name="Import" :size="20" style="color: var(--accent)" />
               <div>
                 <div class="es-drop-t">.cursorpack をここにドロップ</div>
-                <div class="es-drop-s">複数ファイル可・自動で署名検証されます</div>
+                <div class="es-drop-s">{{ t('drop.autoVerify') }}</div>
               </div>
             </div>
           </div>
 
           <div class="es-foot-tip">
             <UiIcon name="Shield" :size="11" style="color: var(--accent)" />
-            <span>取り込んだファイルは <code>~/.custom_cursors/</code> にコピーされ、Ed25519 署名が検証されます。</span>
+            <span>{{ t('drop.footTip') }}</span>
           </div>
         </div>
       </div>

@@ -4,6 +4,9 @@
  * - 画像サムネ + 信頼度バッジ + 衝突アイコン + 採用/スキップトグル
  */
 import { computed } from 'vue'
+import { useI18n } from '~/composables/useI18n'
+
+const { t } = useI18n()
 
 interface Props {
   roleId: string
@@ -26,8 +29,8 @@ const confidenceLabel = computed(() => {
   return `${Math.round(props.confidence * 100)}%`
 })
 const conflictTitle = computed(() => {
-  if (props.conflict === 'overwrite-existing') return '既存の画像を上書きします'
-  if (props.conflict === 'collision-with-other-pending') return '他ファイルと衝突しています'
+  if (props.conflict === 'overwrite-existing') return t('bulkImport.conflictOverwrite')
+  if (props.conflict === 'collision-with-other-pending') return t('bulkImport.conflictCollision')
   return ''
 })
 </script>
@@ -41,7 +44,7 @@ const conflictTitle = computed(() => {
     </div>
     <div class="thumb-cell">
       <img v-if="previewUrl" :src="previewUrl" :alt="roleId" />
-      <span v-else class="dim">— 未提供 —</span>
+      <span v-else class="dim">{{ t('bulkImport.notProvided') }}</span>
     </div>
     <div class="meta-cell">
       <span v-if="sourceFile" class="src">{{ sourceFile }}</span>

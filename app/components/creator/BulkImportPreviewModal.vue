@@ -9,7 +9,10 @@ import {
 import { CURSOR_ROLES } from '~/components/icons/CursorIcons'
 import type { ResolvedAsset, ParsedCursorpack } from '~/composables/useBulkImport'
 import type { RoleAsset } from '~/composables/useCreatorAssets'
+import { useI18n } from '~/composables/useI18n'
 import BulkImportRoleRow from './BulkImportRoleRow.vue'
+
+const { t } = useI18n()
 
 interface Props {
   open: boolean
@@ -223,18 +226,18 @@ onUnmounted(resetState)
   <div v-if="open" class="bi-overlay" @click.self="emit('cancel')">
     <div class="bi-modal" role="dialog" aria-modal="true">
       <header class="bi-head">
-        <h3>一括インポート プレビュー</h3>
-        <button class="btn ghost" @click="emit('cancel')">✕</button>
+        <h3>{{ t('bulkImport.previewTitle') }}</h3>
+        <button class="btn ghost" :aria-label="t('common.close')" @click="emit('cancel')">✕</button>
       </header>
       <div class="bi-body">
         <div class="bi-source">{{ sourceLabel }} — {{ summaryLine }}</div>
 
         <label class="bi-protect">
           <input v-model="protectExisting" type="checkbox" />
-          既存ロールを保護する
+          {{ t('bulkImport.protectExisting') }}
         </label>
 
-        <h4>17 ロール</h4>
+        <h4>{{ t('bulkImport.seventeenRoles') }}</h4>
         <BulkImportRoleRow
           v-for="row in allRoleRows"
           :key="row.roleId"
@@ -250,34 +253,36 @@ onUnmounted(resetState)
           @toggle="(v) => row.match && (row.match.decision = v)"
         />
 
-        <h4 v-if="unmatched.length">未マッチファイル ({{ unmatched.length }})</h4>
+        <h4 v-if="unmatched.length">{{ t('bulkImport.unmatchedHeader', { count: unmatched.length }) }}</h4>
         <div v-for="u in unmatched" :key="u.asset.sourcePath" class="bi-unmatched">
           <img :src="u.previewUrl" :alt="u.asset.sourceFile" />
           <span>{{ u.asset.sourceFile }} ({{ u.asset.nativeSize }}px)</span>
           <select v-model="u.manuallyAssignedRole">
-            <option :value="null">— ロール選択 —</option>
+            <option :value="null">{{ t('bulkImport.selectRolePlaceholder') }}</option>
             <option v-for="r in CURSOR_ROLE_IDS" :key="r" :value="r">{{ r }}</option>
           </select>
         </div>
 
         <template v-if="cursorpack">
-          <h4>パッケージ メタデータ</h4>
+          <h4>{{ t('bulkImport.metadataHeader') }}</h4>
           <div class="bi-meta-info">
-            名前: {{ cursorpack.metadata.nameJa ?? '—' }} /
-            作者: {{ cursorpack.metadata.author ?? '—' }} /
-            Version: {{ cursorpack.metadata.version ?? '—' }}
+            {{ t('bulkImport.metadataNameLabel') }}: {{ cursorpack.metadata.nameJa ?? '—' }} /
+            {{ t('bulkImport.metadataAuthorLabel') }}: {{ cursorpack.metadata.author ?? '—' }} /
+            {{ t('bulkImport.metadataVersionLabel') }}: {{ cursorpack.metadata.version ?? '—' }}
           </div>
-          <label><input v-model="metadataChoice" type="radio" value="keep" /> 現在の編集を保持</label>
-          <label><input v-model="metadataChoice" type="radio" value="overwrite" /> 取り込んだメタデータで上書き</label>
-          <label><input v-model="metadataChoice" type="radio" value="name-only" /> 名前のみ採用</label>
+          <label><input v-model="metadataChoice" type="radio" value="keep" /> {{ t('bulkImport.metadataKeep') }}</label>
+          <label><input v-model="metadataChoice" type="radio" value="overwrite" /> {{ t('bulkImport.metadataOverwrite') }}</label>
+          <label><input v-model="metadataChoice" type="radio" value="name-only" /> {{ t('bulkImport.metadataNameOnly') }}</label>
         </template>
       </div>
 
       <footer class="bi-foot">
-        <button class="btn ghost" @click="emit('cancel')">キャンセル</button>
+        <button class="btn ghost" @click="emit('cancel')">{{ t('common.cancel') }}</button>
         <button class="btn primary" @click="apply">
-          ✓ {{ matches.filter(m => m.decision === 'apply').length
-              + unmatched.filter(u => u.manuallyAssignedRole !== null).length }} 件を適用
+          ✓ {{ t('bulkImport.applyCount', {
+              count: matches.filter(m => m.decision === 'apply').length
+                   + unmatched.filter(u => u.manuallyAssignedRole !== null).length
+          }) }}
         </button>
       </footer>
     </div>

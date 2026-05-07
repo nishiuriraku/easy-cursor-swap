@@ -9,6 +9,9 @@
  */
 import { computed, ref } from 'vue'
 import type { ThemeCardData } from '~/types/theme'
+import { useI18n } from '~/composables/useI18n'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   /** 表示中のテーマ一覧 */
@@ -67,10 +70,10 @@ function onBackdrop(e: MouseEvent) {
           <UiIcon name="Library" :size="20" />
         </div>
         <div style="flex: 1; min-width: 0">
-          <h2 id="picker-modal-title">{{ title ?? 'テーマを選択' }}</h2>
+          <h2 id="picker-modal-title">{{ title ?? t('themePicker.titleDefault') }}</h2>
           <p v-if="sub">{{ sub }}</p>
         </div>
-        <button class="btn icon" aria-label="閉じる" @click="emit('cancel')">
+        <button class="btn icon" :aria-label="t('common.close')" @click="emit('cancel')">
           <UiIcon name="X" :size="11" />
         </button>
       </div>
@@ -80,14 +83,14 @@ function onBackdrop(e: MouseEvent) {
           <UiIcon name="Search" :size="14" style="color: var(--fg-mute)" />
           <input
             v-model="query"
-            placeholder="テーマ名・作者名で検索..."
-            aria-label="検索"
+            :placeholder="t('library.searchPlaceholder')"
+            :aria-label="t('common.search')"
           />
         </div>
 
         <div v-if="filtered.length === 0" class="picker-empty">
           <UiIcon name="Search" :size="32" />
-          <p>該当するテーマが見つかりません</p>
+          <p>{{ t('themePicker.notFound') }}</p>
         </div>
 
         <ul v-else class="picker-list">
@@ -119,9 +122,9 @@ function onBackdrop(e: MouseEvent) {
       </div>
 
       <div class="modal-foot">
-        <button class="btn ghost" @click="clear">未指定にする</button>
+        <button class="btn ghost" @click="clear">{{ t('themePicker.clear') }}</button>
         <div class="actions">
-          <button class="btn ghost" @click="emit('cancel')">キャンセル</button>
+          <button class="btn ghost" @click="emit('cancel')">{{ t('common.cancel') }}</button>
         </div>
       </div>
     </div>
