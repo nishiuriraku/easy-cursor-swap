@@ -158,7 +158,7 @@ pub fn build_cursor_file(req: BuildCurRequest) -> Result<u64, AppError> {
         "auto" => ResizeMethod::Lanczos, // 自動判定は build_cur_from_png 内で行う
         other => ResizeMethod::from_str(other),
     };
-    let bin = build_cur_from_png(&req.png_bytes, req.hotspot_x, req.hotspot_y, resample)?;
+    let bin = build_cur_from_png(&req.png_bytes, req.hotspot_x, req.hotspot_y, resample, None)?;
 
     let path = std::path::PathBuf::from(&req.output_path);
     if let Some(parent) = path.parent() {
@@ -353,6 +353,11 @@ pub struct RoleBuildEntry {
     pub hotspot_y: u32,
     /// "lanczos" / "nearest" / "auto"
     pub resample: String,
+    /// サイズ別オーバーライド (px → PNG bytes)。
+    /// Some の場合、対応サイズはリサンプルせずそのまま使用。
+    /// None / 空なら従来どおり png_bytes をリサンプル。
+    #[serde(default)]
+    pub sized_png_bytes: Option<std::collections::HashMap<u32, Vec<u8>>>,
 }
 
 /// ストリーム式 .cursorpack ビルドリクエスト
@@ -446,7 +451,13 @@ pub fn export_cursorpack_streamed(
             "auto" => ResizeMethod::Lanczos,
             other => ResizeMethod::from_str(other),
         };
-        let bin = build_cur_from_png(&entry.png_bytes, entry.hotspot_x, entry.hotspot_y, resample)?;
+        let bin = build_cur_from_png(
+            &entry.png_bytes,
+            entry.hotspot_x,
+            entry.hotspot_y,
+            resample,
+            entry.sized_png_bytes.as_ref(),
+        )?;
         cursor_bytes.insert(entry.role.clone(), bin);
         cursors_meta.insert(
             entry.role.clone(),

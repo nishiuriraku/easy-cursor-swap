@@ -213,6 +213,7 @@ pub fn build_cur_from_png(
     hotspot_x: u32,
     hotspot_y: u32,
     resample: ResizeMethod,
+    sized_overrides: Option<&std::collections::HashMap<u32, Vec<u8>>>,
 ) -> AppResult<Vec<u8>> {
     // PNG マジックバイト検証 (Magic Byte 第一防御線)
     const PNG_MAGIC: [u8; 8] = [0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a];
@@ -251,7 +252,41 @@ pub fn build_cur_from_png(
 
     let mut entries: Vec<(RgbaImage, u32, u32)> = Vec::with_capacity(CURSOR_SIZES.len());
     for &target in CURSOR_SIZES {
-        let resized = resize_image_cached(&img, &src_hash, target, effective);
+        let img_at_size = if let Some(overrides) = sized_overrides {
+            if let Some(bytes) = overrides.get(&target) {
+                // オーバーライドの PNG をデコード。サイズが合わなければリサンプルでフォールバック。
+                match image::load_from_memory_with_format(bytes, image::ImageFormat::Png) {
+                    Ok(decoded) => {
+                        let r = decoded.to_rgba8();
+                        if r.width() == target && r.height() == target {
+                            Some(r)
+                        } else {
+                            tracing::warn!(
+                                "sized override {}px のサイズが {}x{} で不一致 → リサンプル",
+                                target,
+                                r.width(),
+                                r.height()
+                            );
+                            None
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "sized override {}px の decode 失敗: {} → リサンプル",
+                            target,
+                            e
+                        );
+                        None
+                    }
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        let resized = img_at_size
+            .unwrap_or_else(|| resize_image_cached(&img, &src_hash, target, effective));
         let (hx, hy) = scale_hotspot(hotspot_x, hotspot_y, original_size, target);
         entries.push((resized, hx, hy));
     }
@@ -1199,5 +1234,56 @@ mod tests {
         assert_eq!(largest.width, 256);
         assert_eq!((largest.hotspot_x, largest.hotspot_y), (100, 110));
         assert!(png.starts_with(PNG_MAGIC));
+    }
+
+    /// build_cur_from_png に sized_overrides を渡したとき、対応サイズはリサンプルではなく
+    /// 渡された PNG をそのまま使う。
+    #[test]
+    fn build_cur_uses_sized_override_when_size_matches() {
+        // 64x64 の赤 PNG (オーバーライド)
+        let img64: image::RgbaImage =
+            image::ImageBuffer::from_pixel(64, 64, image::Rgba([255, 0, 0, 255]));
+        let mut png64 = Vec::new();
+        image::ImageEncoder::write_image(
+            image::codecs::png::PngEncoder::new(&mut png64),
+            img64.as_raw(),
+            64,
+            64,
+            image::ExtendedColorType::Rgba8,
+        )
+        .unwrap();
+
+        // primary は 256x256 の青
+        let img256: image::RgbaImage =
+            image::ImageBuffer::from_pixel(256, 256, image::Rgba([0, 0, 255, 255]));
+        let mut png256 = Vec::new();
+        image::ImageEncoder::write_image(
+            image::codecs::png::PngEncoder::new(&mut png256),
+            img256.as_raw(),
+            256,
+            256,
+            image::ExtendedColorType::Rgba8,
+        )
+        .unwrap();
+
+        let mut overrides = std::collections::HashMap::new();
+        overrides.insert(64u32, png64.clone());
+
+        // sized_overrides ありでビルド
+        let cur_bytes =
+            build_cur_from_png(&png256, 0, 0, ResizeMethod::Lanczos, Some(&overrides)).unwrap();
+
+        // 出力 .cur をパースして 64x64 のエントリの最初のピクセルが赤か確認
+        let parsed = parse_ico_cur(&cur_bytes).unwrap();
+        let entry_64 = parsed
+            .entries
+            .iter()
+            .find(|e| e.width == 64)
+            .expect("64px エントリがあるはず");
+        let pixel = entry_64.image.get_pixel(0, 0);
+        assert_eq!(pixel[0], 255, "R");
+        assert_eq!(pixel[1], 0, "G");
+        assert_eq!(pixel[2], 0, "B");
+        assert_eq!(pixel[3], 255, "A");
     }
 }
