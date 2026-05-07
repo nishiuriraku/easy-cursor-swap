@@ -552,6 +552,16 @@ impl RegistryManager {
             }
         };
 
+        // EasyCursorSwap が `register_scheme` で書き込んだスキームは ~/.custom_cursors/ 配下の
+        // パスを指す。同じテーマがローカルライブラリ (= get_themes) と Windows スキームの双方に
+        // 出てしまう二重表示を避けるため、自前管理のスキームはこの段階で取り除く。
+        // パス比較は OS のケース非依存比較で行う (Windows のドライブレター/フォルダ名は
+        // 大文字小文字区別なし)。
+        let app_cursors_dir = ConfigManager::cursors_dir().ok();
+        let app_prefix_lower = app_cursors_dir
+            .as_ref()
+            .map(|p| p.to_string_lossy().to_lowercase());
+
         let mut out: Vec<WindowsScheme> = Vec::new();
         for entry in schemes_key.enum_values() {
             let (name, _raw) = match entry {
@@ -569,9 +579,16 @@ impl RegistryManager {
                 }
             };
             let scheme = parse_scheme_value(&name, &value);
-            if scheme.cursor_paths.values().any(|p| !p.is_empty()) {
-                out.push(scheme);
+            if !scheme.cursor_paths.values().any(|p| !p.is_empty()) {
+                continue;
             }
+            if let Some(prefix) = app_prefix_lower.as_deref() {
+                if scheme_is_app_managed(&scheme, prefix) {
+                    tracing::debug!("Schemes '{}' は EasyCursorSwap 管理下のため除外", name);
+                    continue;
+                }
+            }
+            out.push(scheme);
         }
 
         out.sort_by(|a, b| a.name.cmp(&b.name));
@@ -617,6 +634,29 @@ pub struct WindowsScheme {
     pub cursor_paths: HashMap<String, String>,
     /// 17 役割中、実際にカーソルファイルを上書きする数 (空でないスロット数)。
     pub role_count: usize,
+}
+
+/// スキームが EasyCursorSwap 管理下かどうかを判定する。
+///
+/// 非空の cursor_paths が **すべて** `~/.custom_cursors/` 配下を指していれば
+/// アプリが書き込んだものとみなす。1 つでも他のディレクトリ
+/// (`%SystemRoot%\cursors\` 等) を含む場合はユーザーが手動で編集した可能性が
+/// あるので除外しない。
+///
+/// 比較は ASCII 小文字化した接頭辞で行う。Windows のパスは大文字小文字を
+/// 区別しないため、`%USERPROFILE%` 展開後のパスケース揺れに対応する。
+fn scheme_is_app_managed(scheme: &WindowsScheme, app_prefix_lower: &str) -> bool {
+    let non_empty: Vec<&String> = scheme
+        .cursor_paths
+        .values()
+        .filter(|p| !p.is_empty())
+        .collect();
+    if non_empty.is_empty() {
+        return false;
+    }
+    non_empty
+        .iter()
+        .all(|p| p.to_lowercase().starts_with(app_prefix_lower))
 }
 
 /// `path1,path2,...,path17` 形式の Schemes 値を `WindowsScheme` に分解する。
@@ -839,6 +879,43 @@ mod tests {
         assert_eq!(scheme.cursor_paths.get("Pin").unwrap(), "");
         assert_eq!(scheme.cursor_paths.get("Person").unwrap(), "");
         assert_eq!(scheme.role_count, 13);
+    }
+
+    #[test]
+    fn scheme_is_app_managed_when_all_paths_under_app_dir() {
+        let prefix = "c:\\users\\me\\.custom_cursors";
+        let scheme = parse_scheme_value(
+            "MyTheme",
+            "C:\\Users\\me\\.custom_cursors\\abc\\arrow.cur,\
+             C:\\Users\\me\\.custom_cursors\\abc\\ibeam.cur",
+        );
+        assert!(scheme_is_app_managed(&scheme, prefix));
+    }
+
+    #[test]
+    fn scheme_is_app_managed_returns_false_when_one_path_is_outside() {
+        let prefix = "c:\\users\\me\\.custom_cursors";
+        let scheme = parse_scheme_value(
+            "Mixed",
+            "C:\\Users\\me\\.custom_cursors\\abc\\arrow.cur,\
+             %SystemRoot%\\cursors\\ibeam.cur",
+        );
+        // 1 つでも外部パスがあれば「ユーザーが手で混ぜた」可能性として除外しない。
+        assert!(!scheme_is_app_managed(&scheme, prefix));
+    }
+
+    #[test]
+    fn scheme_is_app_managed_handles_case_insensitive_drive_letter() {
+        let prefix = "c:\\users\\me\\.custom_cursors";
+        let scheme = parse_scheme_value("UpperCase", "C:\\Users\\Me\\.Custom_Cursors\\arrow.cur");
+        assert!(scheme_is_app_managed(&scheme, prefix));
+    }
+
+    #[test]
+    fn scheme_is_app_managed_returns_false_when_all_empty() {
+        let prefix = "c:\\users\\me\\.custom_cursors";
+        let scheme = parse_scheme_value("AllEmpty", ",,,,,,,,,,,,,,,,");
+        assert!(!scheme_is_app_managed(&scheme, prefix));
     }
 
     #[test]
