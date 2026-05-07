@@ -16,6 +16,7 @@ import { sanitizeSvg } from '~/composables/sanitizeSvg'
 import { invokeTauri } from '~/composables/useTauri'
 import { useKeystore } from '~/composables/useKeystore'
 import { useI18n } from '~/composables/useI18n'
+import { useCreatorAssets, type RoleAsset } from '~/composables/useCreatorAssets'
 
 const { t } = useI18n()
 
@@ -48,11 +49,11 @@ const perSizeHotspot = ref(true)
 const shadowEnabled = ref(false)
 
 /**
- * 役割ごとのインポート済み PNG バイト + 役割ごとに保存済みの一時 .cur パス。
- * `assignedPng[role]` に画像があれば、エクスポート時に Rust 側で .cur を生成する。
+ * 役割ごとのインポート済みアセットを `useCreatorAssets` 経由で集約管理する。
+ * 単一インポート / 一括インポート / `.cursorpack` 取り込みなどの経路はすべてここに合流する。
  */
-const assignedPng = ref<Record<string, Uint8Array>>({})
-const assignedHotspot = ref<Record<string, { x: number, y: number }>>({})
+const creatorAssets = useCreatorAssets()
+const { assigned, setAsset, removeAsset, hasAsset, assignedRoleCount, arrowAssigned, toExportPayload } = creatorAssets
 
 // メタデータタブの入力
 const metaName = ref<string>('Untitled Theme')
@@ -159,8 +160,12 @@ async function pickCursorFile() {
     if (!map.includes(activeSize.value)) {
       filledSizesByRole.value[activeRoleId.value] = [...map, activeSize.value]
     }
-    assignedPng.value[activeRoleId.value] = png
-    assignedHotspot.value[activeRoleId.value] = { x: hotspotX.value, y: hotspotY.value }
+    setAsset(activeRoleId.value, {
+      primary: png,
+      primarySize: result.width,
+      hotspot: { x: hotspotX.value, y: hotspotY.value },
+      source: 'manual',
+    })
 
     const sizeList = result.availableSizes.length > 0 ? result.availableSizes.join('/') : '?'
     const kind = result.isCur ? '.cur' : '.ico'
@@ -177,9 +182,6 @@ const buildBusy = ref(false)
 const buildMessage = ref<string | null>(null)
 const exportBusy = ref(false)
 const exportMessage = ref<string | null>(null)
-
-const assignedRoleCount = computed(() => Object.keys(assignedPng.value).length)
-const arrowAssigned = computed(() => 'Arrow' in assignedPng.value)
 
 interface ExportResult {
   theme_id: string
@@ -250,13 +252,7 @@ async function exportCursorpack(opts: { sign: boolean }) {
       // Web 開発時は購読をスキップ
     }
 
-    const roles = Object.entries(assignedPng.value).map(([role, png]) => ({
-      role,
-      pngBytes: Array.from(png),
-      hotspotX: assignedHotspot.value[role]?.x ?? 0,
-      hotspotY: assignedHotspot.value[role]?.y ?? 0,
-      resample: resample.value,
-    }))
+    const roles = toExportPayload(resample.value)
 
     const result = await invokeTauri<ExportResult>('export_cursorpack_streamed', {
       req: {
@@ -396,11 +392,12 @@ async function onFileChange(e: Event) {
 
     // 役割マップに登録 (エクスポート時に使用)
     if (importedPngBytes.value) {
-      assignedPng.value[activeRoleId.value] = importedPngBytes.value
-      assignedHotspot.value[activeRoleId.value] = {
-        x: hotspotX.value,
-        y: hotspotY.value,
-      }
+      setAsset(activeRoleId.value, {
+        primary: importedPngBytes.value,
+        primarySize: 256,
+        hotspot: { x: hotspotX.value, y: hotspotY.value },
+        source: 'manual',
+      })
     }
   } catch (err) {
     importMessage.value = `失敗: ${err instanceof Error ? err.message : String(err)}`
