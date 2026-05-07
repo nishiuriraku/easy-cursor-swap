@@ -4,7 +4,7 @@
  * Tauri ウィンドウコントロール (最小化/最大化/閉じる) を将来的に IPC で接続する。
  * 現状はクリックハンドラーのみ用意し、IPC 未接続時はコンソール警告のみ。
  */
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useUiTheme } from '~/composables/useUiTheme'
 
 withDefaults(defineProps<{
@@ -19,22 +19,66 @@ const { mode, cycle } = useUiTheme()
 const themeIcon = computed(() => (mode.value === 'light' ? 'Sun' : mode.value === 'auto' ? 'Globe' : 'Moon'))
 const themeLabel = computed(() => (mode.value === 'light' ? 'Light' : mode.value === 'auto' ? 'Auto' : 'Dark'))
 
+// 最大化アイコンを Win11 既定動作に揃えるためにウィンドウ状態を購読する。
+const isMaximized = ref(false)
+let unlistenResize: (() => void) | null = null
+
+async function refreshMaximizeState() {
+  try {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window')
+    isMaximized.value = await getCurrentWindow().isMaximized()
+  } catch {
+    // Web 開発時は Tauri API が無いので無視
+  }
+}
+
+onMounted(async () => {
+  await refreshMaximizeState()
+  try {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window')
+    unlistenResize = await getCurrentWindow().onResized(() => {
+      void refreshMaximizeState()
+    })
+  } catch {
+    // Tauri API 未接続環境では購読をスキップ
+  }
+})
+
+onBeforeUnmount(() => {
+  if (unlistenResize) {
+    unlistenResize()
+    unlistenResize = null
+  }
+})
+
 async function call(cmd: 'minimize' | 'toggleMaximize' | 'close') {
   // Tauri v2 のウィンドウ API を遅延 import して SSR/Web 開発時のクラッシュを回避。
   try {
     const { getCurrentWindow } = await import('@tauri-apps/api/window')
     const w = getCurrentWindow()
     if (cmd === 'minimize') await w.minimize()
-    else if (cmd === 'toggleMaximize') await w.toggleMaximize()
+    else if (cmd === 'toggleMaximize') {
+      await w.toggleMaximize()
+      // 状態の永続化を待たずに即座に反映する。`onResized` も走るので二重更新になっても問題ない。
+      isMaximized.value = await w.isMaximized()
+    }
     else await w.close()
   } catch (err) {
     console.warn('[Titlebar] Tauri API unavailable:', err)
   }
 }
+
+/** タイトル領域のダブルクリックで最大化をトグルする（Win11 既定動作）。 */
+function onTitleDblClick(e: MouseEvent) {
+  // ボタン領域上のダブルクリックは無視。
+  const target = e.target as HTMLElement | null
+  if (target?.closest('.tb-btn')) return
+  void call('toggleMaximize')
+}
 </script>
 
 <template>
-  <div class="titlebar">
+  <div class="titlebar" @dblclick="onTitleDblClick">
     <div class="tb-title">
       <span class="tb-mark"><UiIcon name="Logo" :size="12" /></span>
       <span>{{ title }}</span>
@@ -53,8 +97,12 @@ async function call(cmd: 'minimize' | 'toggleMaximize' | 'close') {
       <button class="tb-btn" aria-label="最小化" @click="call('minimize')">
         <UiIcon name="Min" :size="12" />
       </button>
-      <button class="tb-btn" aria-label="最大化" @click="call('toggleMaximize')">
-        <UiIcon name="Max" :size="12" />
+      <button
+        class="tb-btn"
+        :aria-label="isMaximized ? '元に戻す' : '最大化'"
+        @click="call('toggleMaximize')"
+      >
+        <UiIcon :name="isMaximized ? 'Restore' : 'Max'" :size="12" />
       </button>
       <button class="tb-btn close" aria-label="閉じる" @click="call('close')">
         <UiIcon name="X" :size="12" />

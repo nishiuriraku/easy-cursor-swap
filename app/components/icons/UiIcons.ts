@@ -62,6 +62,10 @@ export const UI_ICONS: Record<string, UiIconDef> = {
   },
   Min: { viewBox: '0 0 12 12', body: '<path d="M2.5 6h7"/>' },
   Max: { viewBox: '0 0 12 12', body: '<rect x="2.5" y="2.5" width="7" height="7"/>' },
+  Restore: {
+    viewBox: '0 0 12 12',
+    body: '<rect x="2.5" y="3.5" width="6" height="6"/><path d="M4 3.5V2.5h6v6H9"/>',
+  },
   X: { viewBox: '0 0 12 12', body: '<path d="m3 3 6 6M9 3l-6 6"/>' },
   Logo: {
     viewBox: '0 0 24 24',
