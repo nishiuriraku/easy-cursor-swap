@@ -1028,6 +1028,8 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         cancel_build,
         list_crash_reports,
         clear_crash_reports,
+        crate::bulk_import::bulk_resolve_assets,
+        crate::bulk_import::cancel_bulk_import,
     ]
 }
 

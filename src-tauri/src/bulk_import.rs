@@ -239,6 +239,106 @@ fn resolve_cur_or_ico(
     })
 }
 
+use tauri::{AppHandle, Emitter, Manager, State};
+
+/// 複数の入力パスから対応形式のファイルを集めて `ResolvedAsset` のバッチを生成する。
+/// `on_progress` が `Some` の場合、各ファイル処理ごとに進捗イベントを発火する。
+/// 合計サイズが `MAX_TOTAL_BYTES` を超えた場合は break して以降を `failures` 行きとはせずに打ち切る。
+pub fn bulk_resolve_inner(
+    paths: &[String],
+    recursive: bool,
+    job_id: &str,
+    on_progress: Option<&dyn Fn(BulkImportProgress)>,
+) -> Result<BulkResolveResult, AppError> {
+    let files = collect_target_files(paths, recursive);
+    if files.is_empty() {
+        return Err(AppError::NoSupportedFiles {
+            path: paths.first().cloned().unwrap_or_default(),
+        });
+    }
+    let total = files.len() as u32;
+    let mut assets = Vec::new();
+    let mut failures = Vec::new();
+    let mut total_bytes: u64 = 0;
+
+    for (idx, path) in files.iter().enumerate() {
+        if let Some(cb) = on_progress {
+            cb(BulkImportProgress {
+                job_id: job_id.to_string(),
+                stage: "parse",
+                current: idx as u32,
+                total,
+                message: Some(path.clone()),
+            });
+        }
+        match resolve_one(path) {
+            Ok(asset) => {
+                total_bytes = total_bytes.saturating_add(asset.png_bytes.len() as u64);
+                if total_bytes > MAX_TOTAL_BYTES {
+                    failures.push(ResolveFailure {
+                        source_path: path.clone(),
+                        reason: "総容量制限超過".into(),
+                    });
+                    break;
+                }
+                assets.push(asset);
+            }
+            Err(e) => {
+                failures.push(ResolveFailure {
+                    source_path: path.clone(),
+                    reason: e.to_string(),
+                });
+            }
+        }
+    }
+
+    if let Some(cb) = on_progress {
+        cb(BulkImportProgress {
+            job_id: job_id.to_string(),
+            stage: "done",
+            current: total,
+            total,
+            message: None,
+        });
+    }
+    Ok(BulkResolveResult { assets, failures })
+}
+
+/// クリエイター一括インポートのメイン IPC。
+/// `bulk-import-progress` イベントで進捗を通知する。
+#[tauri::command]
+pub async fn bulk_resolve_assets(
+    app: AppHandle,
+    registry: State<'_, CancelRegistry>,
+    req: BulkResolveRequest,
+) -> Result<BulkResolveResult, AppError> {
+    registry.register(&req.job_id);
+    let job_id = req.job_id.clone();
+    let app_clone = app.clone();
+
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let cb = |p: BulkImportProgress| {
+            let _ = app_clone.emit("bulk-import-progress", p);
+        };
+        bulk_resolve_inner(&req.paths, req.recursive, &req.job_id, Some(&cb))
+    })
+    .await
+    .map_err(|e| AppError::ImageProcessing(format!("join 失敗: {}", e)))?;
+
+    app.state::<CancelRegistry>().drop_job(&job_id);
+    result
+}
+
+/// 進行中の `bulk_resolve_assets` ジョブをキャンセルする。
+#[tauri::command]
+pub fn cancel_bulk_import(
+    registry: State<'_, CancelRegistry>,
+    job_id: String,
+) -> Result<(), AppError> {
+    registry.cancel(&job_id);
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -293,5 +393,38 @@ mod tests {
             crate::errors::AppError::OversizeFile { .. } => {}
             other => panic!("expected OversizeFile, got {:?}", other),
         }
+    }
+
+    #[test]
+    fn bulk_resolve_with_sample_dir_returns_17_assets() {
+        let dir = fixture_dir();
+        let result = bulk_resolve_inner(
+            &[dir.to_string_lossy().to_string()],
+            false,
+            "test-job",
+            None,
+        ).unwrap();
+        assert!(result.assets.len() >= 17, "expected >=17, got {}", result.assets.len());
+        assert!(result.failures.is_empty(), "no failures expected, got {:?}", result.failures);
+    }
+
+    #[test]
+    fn bulk_resolve_with_oversize_collects_failure() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("big.png");
+        std::fs::write(&path, vec![0u8; (MAX_FILE_BYTES + 1) as usize]).unwrap();
+        let small = tmp.path().join("ok.png");
+        // 1x1 PNG (8byte signature + IHDR + IDAT + IEND の最小限)
+        let one_pix = include_bytes!("../tests/fixtures/1x1.png");
+        std::fs::write(&small, one_pix).unwrap();
+
+        let result = bulk_resolve_inner(
+            &[tmp.path().to_string_lossy().to_string()],
+            false,
+            "test-job-2",
+            None,
+        ).unwrap();
+        assert_eq!(result.assets.len(), 1);
+        assert_eq!(result.failures.len(), 1);
     }
 }
