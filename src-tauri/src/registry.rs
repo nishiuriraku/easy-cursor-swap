@@ -187,7 +187,11 @@ impl RegistryManager {
             let name = role.registry_name();
             match cursors_key.get_value::<String, _>(name) {
                 Ok(val) => {
-                    values.insert(name.to_string(), val);
+                    // Windows がスキーム適用時に書き込んだ %SYSTEMROOT%\... を
+                    // 展開して比較・読込で扱いやすくする。`paths_match_current_registry`
+                    // が `WindowsScheme.cursor_paths` (展開済み) と
+                    // 突き合わせるため、両側を同じ形式に揃える必要がある。
+                    values.insert(name.to_string(), expand_env_vars(&val));
                 }
                 Err(_) => {
                     // 値が存在しない場合は空文字列
@@ -711,11 +715,19 @@ fn parse_scheme_value(name: &str, value: &str) -> WindowsScheme {
     let mut cursor_paths: HashMap<String, String> = HashMap::new();
     let mut role_count: usize = 0;
     for (i, role) in roles.iter().enumerate() {
-        let raw = parts.get(i).copied().unwrap_or("").trim().to_string();
-        if !raw.is_empty() {
+        let raw = parts.get(i).copied().unwrap_or("").trim();
+        // %SYSTEMROOT%\Cursors\... のようなレジストリ生値を絶対パスへ展開する。
+        // 展開しないと後段の `is_file()` 判定が常に false になりサムネイルが
+        // 表示されない / cursorpack エクスポートでファイル読込に失敗する。
+        let expanded = if raw.is_empty() {
+            String::new()
+        } else {
+            expand_env_vars(raw)
+        };
+        if !expanded.is_empty() {
             role_count += 1;
         }
-        cursor_paths.insert(role.registry_name().to_string(), raw);
+        cursor_paths.insert(role.registry_name().to_string(), expanded);
     }
     WindowsScheme {
         name: name.to_string(),
@@ -780,6 +792,46 @@ fn sanitize_scheme_name(name: &str) -> String {
         .collect::<String>()
         .trim()
         .to_string()
+}
+
+/// `%SYSTEMROOT%` 等の環境変数を Win32 `ExpandEnvironmentStringsW` で展開する。
+///
+/// `winreg::RegKey::get_value::<String>` は REG_EXPAND_SZ を生のまま返すため、
+/// `HKCU\Cursors\Schemes` の値や `HKCU\Cursors\<role>` の値を直接ファイル
+/// 読み込みに使う前に必ずこの関数を通す必要がある。展開に失敗した場合は
+/// 入力をそのまま返す (= ベストエフォート)。
+#[cfg(windows)]
+pub fn expand_env_vars(input: &str) -> String {
+    use windows::core::{HSTRING, PCWSTR};
+    use windows::Win32::System::Environment::ExpandEnvironmentStringsW;
+
+    if !input.contains('%') {
+        return input.to_string();
+    }
+    let src_h = HSTRING::from(input);
+    // 1 回目で必要バッファサイズを問い合わせ、2 回目で実際に書き込む。
+    let needed = unsafe { ExpandEnvironmentStringsW(PCWSTR(src_h.as_ptr()), None) };
+    if needed == 0 {
+        return input.to_string();
+    }
+    let mut buf: Vec<u16> = vec![0u16; needed as usize];
+    let written =
+        unsafe { ExpandEnvironmentStringsW(PCWSTR(src_h.as_ptr()), Some(buf.as_mut_slice())) };
+    if written == 0 {
+        return input.to_string();
+    }
+    // 戻り値には NUL を含む。strip the trailing NUL(s) for safety.
+    let trimmed = if (written as usize) > 0 && buf.last() == Some(&0u16) {
+        &buf[..(written as usize - 1).min(buf.len())]
+    } else {
+        &buf[..(written as usize).min(buf.len())]
+    };
+    String::from_utf16_lossy(trimmed)
+}
+
+#[cfg(not(windows))]
+pub fn expand_env_vars(input: &str) -> String {
+    input.to_string()
 }
 
 /// 文字列を NUL 終端付き UTF-16 LE バイト列にエンコードする。

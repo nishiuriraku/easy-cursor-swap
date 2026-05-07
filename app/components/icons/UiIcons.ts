@@ -67,13 +67,15 @@ export const UI_ICONS: Record<string, UiIconDef> = {
     body: '<rect x="2.5" y="3.5" width="6" height="6"/><path d="M4 3.5V2.5h6v6H9"/>',
   },
   X: { viewBox: '0 0 12 12', body: '<path d="m3 3 6 6M9 3l-6 6"/>' },
+  // design/EasyCursorSwap App Icon.html の `#ecs-glyph` をそのまま移植。
+  // 単一の矢印カーソル形状で、小サイズ (12-32px) でも視認性を保つ。
+  // 背景・ハロー付きのフルマーク版は src-tauri/icons/ にラスタとして同梱。
   Logo: {
     viewBox: '0 0 24 24',
     body: `
-      <path d="M3 2 L3 12 L5.6 9.6 L7.3 13.4 L8.8 12.8 L7.1 9 L10.4 9 Z" fill="currentColor" stroke="none"/>
-      <path d="M21 22 L21 12 L18.4 14.4 L16.7 10.6 L15.2 11.2 L16.9 15 L13.6 15 Z" fill="currentColor" fill-opacity="0.55" stroke="none"/>
-      <path d="M5 5 Q 12 2 19 7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-opacity="0.45" fill="none"/>
-      <path d="M19 19 Q 12 22 5 17" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-opacity="0.45" fill="none"/>
+      <g transform="translate(6.93 4.5)">
+        <path d="M0 0 L0 15 L3.46 11.54 L6 17.54 L8.31 16.62 L6 10.62 L10.15 10.62 Z" fill="currentColor" stroke="none"/>
+      </g>
     `,
   },
   Check: {
