@@ -1057,15 +1057,21 @@ button {
 }
 
 /* === Creator mode === */
+/*
+ * 既定ウィンドウサイズ (1100x750) - サイドバー (248px) = 852px の本文エリアで
+ * 3 カラムが収まるよう、左右ペインに minmax を使い柔軟に縮める。
+ * 狭いウィンドウ (本文 < 880px) では右ペインを下段に折り返し、
+ * さらに狭いとき (本文 < 660px) は左ペインも上段ヘッダー化する。
+ */
 .creator-grid {
   display: grid;
-  grid-template-columns: 280px 1fr 320px;
+  grid-template-columns: minmax(220px, 260px) minmax(0, 1fr) minmax(240px, 300px);
   gap: 0;
   flex: 1;
   min-height: 0;
   border-top: 1px solid var(--line);
 }
-.cpane { padding: 16px; overflow: auto; }
+.cpane { padding: 14px; overflow: auto; min-width: 0; }
 .cpane.left {
   border-right: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.01);
@@ -1073,6 +1079,39 @@ button {
 .cpane.right {
   border-left: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.01);
+}
+
+/* 本文 880px 未満: 右ペインを下段に回す (中央 + 左 / 右が下) */
+@media (max-width: 1100px) {
+  .creator-grid {
+    grid-template-columns: minmax(200px, 240px) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+  .cpane.right {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    border-left: none;
+    border-top: 1px solid var(--line);
+    max-height: 280px;
+  }
+}
+
+/* 本文 660px 未満: 左ペインも上に回し、エディタを最大化 */
+@media (max-width: 880px) {
+  .creator-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+  .cpane.left {
+    grid-column: 1;
+    grid-row: 1;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+    max-height: 200px;
+  }
+  .cpane.right {
+    grid-row: 3;
+  }
 }
 
 .role-list { display: flex; flex-direction: column; gap: 2px; }
@@ -1130,6 +1169,8 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
   border-bottom: 1px solid var(--line);
   flex-shrink: 0;
 }
