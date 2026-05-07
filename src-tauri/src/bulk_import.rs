@@ -571,8 +571,24 @@ mod tests {
         p
     }
 
+    /// `sample-icon` ディレクトリは git 管理外なので、ローカルに無いときは
+    /// fixture 依存テストをスキップする (CI / 他開発者の環境で誤って失敗扱いにしない)。
+    /// 17 個以上の `.png` が見つかれば「ちゃんと用意されている」と判定する。
+    fn fixture_available() -> bool {
+        let dir = fixture_dir();
+        if !dir.is_dir() {
+            return false;
+        }
+        let files = collect_target_files(&[dir.to_string_lossy().to_string()], false);
+        files.iter().filter(|p| p.ends_with(".png")).count() >= 17
+    }
+
     #[test]
     fn collect_files_non_recursive_finds_pngs() {
+        if !fixture_available() {
+            eprintln!("skipping: sample-icon fixture not present");
+            return;
+        }
         let dir = fixture_dir();
         let files = collect_target_files(&[dir.to_string_lossy().to_string()], false);
         let pngs: Vec<_> = files.iter().filter(|p| p.ends_with(".png")).collect();
@@ -591,6 +607,10 @@ mod tests {
 
     #[test]
     fn resolve_one_png_returns_native_size() {
+        if !fixture_available() {
+            eprintln!("skipping: sample-icon fixture not present");
+            return;
+        }
         let mut p = fixture_dir();
         p.push("easy-cursor-swap-mint__Arrow.png");
         let asset = resolve_one(&p.to_string_lossy()).unwrap();
@@ -617,6 +637,10 @@ mod tests {
 
     #[test]
     fn bulk_resolve_with_sample_dir_returns_17_assets() {
+        if !fixture_available() {
+            eprintln!("skipping: sample-icon fixture not present");
+            return;
+        }
         let dir = fixture_dir();
         let result = bulk_resolve_inner(
             &[dir.to_string_lossy().to_string()],
@@ -632,6 +656,10 @@ mod tests {
     fn parse_cursorpack_basic_returns_roles() {
         let mut p = fixture_dir();
         p.push("easy-cursor-swap-mint.cursorpack");
+        if !p.is_file() {
+            eprintln!("skipping: cursorpack fixture not present");
+            return;
+        }
         let bytes = std::fs::read(&p).expect("fixture must exist");
         let parsed = parse_cursorpack_inner(&bytes).expect("parse should succeed");
         assert!(!parsed.roles.is_empty(), "should extract at least 1 role");
