@@ -17,6 +17,9 @@ import { invokeTauri } from '~/composables/useTauri'
 import { useKeystore } from '~/composables/useKeystore'
 import { useI18n } from '~/composables/useI18n'
 import { useCreatorAssets, type RoleAsset } from '~/composables/useCreatorAssets'
+import { useBulkImport, type ResolvedAsset, type ParsedCursorpack } from '~/composables/useBulkImport'
+import BulkImportButton from '~/components/creator/BulkImportButton.vue'
+import BulkImportPreviewModal, { type ApplyPayload } from '~/components/creator/BulkImportPreviewModal.vue'
 
 const { t } = useI18n()
 
@@ -61,6 +64,17 @@ const metaNameEn = ref<string>('')
 const metaAuthor = ref<string>('')
 const metaVersion = ref<string>('1.0.0')
 const metaDescription = ref<string>('')
+
+// --- 一括インポート ---
+const bulkImport = useBulkImport()
+
+// プレビューモーダル制御
+const bulkModalOpen = ref(false)
+const bulkResolved = ref<ResolvedAsset[] | null>(null)
+const bulkCursorpack = ref<ParsedCursorpack | null>(null)
+const bulkSourceLabel = ref('')
+
+const existingRolesSet = computed(() => new Set(Object.keys(assigned.value)))
 
 // --- 計算プロパティ ---
 const activeRole = computed<CursorRoleDef>(() =>
@@ -345,6 +359,95 @@ async function rasterizeSvgToPng(svgString: string, size: number): Promise<Uint8
   }
 }
 
+// --- 一括インポート ハンドラ ---
+async function handleBulkFiles() {
+  const { open } = await import('@tauri-apps/plugin-dialog')
+  const picked = await open({
+    multiple: true,
+    filters: [{ name: 'Cursor assets', extensions: ['png', 'svg', 'cur', 'ico'] }],
+  })
+  if (!picked) return
+  const paths = Array.isArray(picked) ? picked : [picked]
+  await runBulkResolve(paths, false, `${paths.length} 個のファイル`)
+}
+
+async function handleBulkFolder() {
+  const { open } = await import('@tauri-apps/plugin-dialog')
+  const picked = await open({ directory: true })
+  if (!picked || typeof picked !== 'string') return
+  await runBulkResolve([picked], false, `📁 ${picked}`)
+}
+
+async function handleBulkCursorpack() {
+  const { open } = await import('@tauri-apps/plugin-dialog')
+  const picked = await open({
+    multiple: false,
+    filters: [{ name: 'Cursor Pack', extensions: ['cursorpack'] }],
+  })
+  if (!picked || typeof picked !== 'string') return
+  try {
+    const parsed = await bulkImport.parseCursorpack(picked)
+    bulkCursorpack.value = parsed
+    bulkResolved.value = null
+    bulkSourceLabel.value = `📦 ${picked.split(/[\\/]/).pop()}`
+    bulkModalOpen.value = true
+  } catch (err) {
+    importMessage.value = `cursorpack 取り込み失敗: ${err instanceof Error ? err.message : String(err)}`
+  }
+}
+
+async function runBulkResolve(paths: string[], recursive: boolean, label: string) {
+  try {
+    const r = await bulkImport.resolveAssets(paths, recursive)
+    if (r.assets.length === 0) {
+      importMessage.value = '対応ファイルが見つかりません'
+      return
+    }
+    bulkResolved.value = r.assets
+    bulkCursorpack.value = null
+    bulkSourceLabel.value = label
+    bulkModalOpen.value = true
+    if (r.failures.length > 0) {
+      // 後で本格的な警告 UI に置換可能。現状はトースト風メッセージ。
+      importMessage.value = `${r.failures.length} 件のファイルをスキップしました`
+    }
+  } catch (err) {
+    importMessage.value = `一括インポート失敗: ${err instanceof Error ? err.message : String(err)}`
+  }
+}
+
+function applyBulkImport(payload: ApplyPayload) {
+  for (const { roleId, asset } of payload.roleAssets) {
+    setAsset(roleId, asset)
+    // filledSizesByRole も更新 (UI バッジ用)
+    const sizes = asset.sized
+      ? Array.from(asset.sized.keys())
+      : [asset.primarySize]
+    filledSizesByRole.value = { ...filledSizesByRole.value, [roleId]: sizes }
+    filledRoles.add(roleId)
+  }
+
+  // メタデータ反映 (.cursorpack のみ)
+  if (payload.metadata && payload.metadataChoice !== 'keep') {
+    metaName.value = payload.metadata.nameJa ?? metaName.value
+    if (payload.metadataChoice === 'overwrite') {
+      metaNameEn.value = payload.metadata.nameEn ?? metaNameEn.value
+      metaAuthor.value = payload.metadata.author ?? metaAuthor.value
+      metaVersion.value = payload.metadata.version ?? metaVersion.value
+      metaDescription.value = payload.metadata.description ?? metaDescription.value
+    }
+  }
+
+  bulkModalOpen.value = false
+  importMessage.value = `${payload.roleAssets.length} 件のロールを適用しました`
+}
+
+function cancelBulkImport() {
+  bulkModalOpen.value = false
+  bulkResolved.value = null
+  bulkCursorpack.value = null
+}
+
 async function onFileChange(e: Event) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
@@ -621,6 +724,11 @@ async function onFileChange(e: Event) {
             <button class="btn ghost" :disabled="importBusy" @click="pickCursorFile">
               <UiIcon name="Pkg" :size="13" />{{ t('creator.importCursor') }}
             </button>
+            <BulkImportButton
+              @bulk-files="handleBulkFiles"
+              @bulk-folder="handleBulkFolder"
+              @bulk-cursorpack="handleBulkCursorpack"
+            />
             <input
               ref="fileInput"
               type="file"
@@ -787,6 +895,16 @@ async function onFileChange(e: Event) {
         </div>
       </div>
     </div>
+
+    <BulkImportPreviewModal
+      :open="bulkModalOpen"
+      :resolved="bulkResolved"
+      :cursorpack="bulkCursorpack"
+      :existing-roles="existingRolesSet"
+      :source-label="bulkSourceLabel"
+      @apply="applyBulkImport"
+      @cancel="cancelBulkImport"
+    />
 
     <AppStatusbar
       :items="[
