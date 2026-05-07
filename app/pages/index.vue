@@ -588,8 +588,8 @@ onUnmounted(() => {
         <p v-if="!searchQuery">{{ t('library.emptySubText') }}</p>
       </div>
 
-      <!-- テーマグリッド -->
-      <div v-else class="grid">
+      <!-- テーマグリッド (td-grid-host: 詳細ドロワー展開時に 2 列スパンを許可する) -->
+      <div v-else class="grid td-grid-host">
         <ThemeCard
           v-for="theme in filteredThemes"
           :key="theme.id"
