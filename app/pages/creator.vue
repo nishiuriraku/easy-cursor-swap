@@ -10,13 +10,13 @@
  * NOTE: 実際の画像アップロード / .cur ビルド / 署名生成は今回はスタブ。
  *       UI 構造とインタラクションのみ実装し、IPC 配線は後続タスクに委ねる。
  */
-import { computed, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { CURSOR_ROLES, type CursorRoleDef } from '~/components/icons/CursorIcons'
 import { sanitizeSvg } from '~/composables/sanitizeSvg'
 import { invokeTauri } from '~/composables/useTauri'
 import { useKeystore } from '~/composables/useKeystore'
 import { useI18n } from '~/composables/useI18n'
-import { useCreatorAssets, type RoleAsset } from '~/composables/useCreatorAssets'
+import { useCreatorAssets } from '~/composables/useCreatorAssets'
 import { useBulkImport, type ResolvedAsset, type ParsedCursorpack } from '~/composables/useBulkImport'
 import BulkImportButton from '~/components/creator/BulkImportButton.vue'
 import BulkImportPreviewModal, { type ApplyPayload } from '~/components/creator/BulkImportPreviewModal.vue'
@@ -56,7 +56,7 @@ const shadowEnabled = ref(false)
  * 単一インポート / 一括インポート / `.cursorpack` 取り込みなどの経路はすべてここに合流する。
  */
 const creatorAssets = useCreatorAssets()
-const { assigned, setAsset, removeAsset, hasAsset, assignedRoleCount, arrowAssigned, toExportPayload } = creatorAssets
+const { assigned, setAsset, assignedRoleCount, arrowAssigned, toExportPayload } = creatorAssets
 
 // メタデータタブの入力
 const metaName = ref<string>('Untitled Theme')
@@ -101,6 +101,105 @@ const sizesCovered = computed(() => filledSizes.value.length)
 
 function selectRole(id: string) {
   activeRoleId.value = id
+}
+
+/** ロール一覧で ↑↓ Home End キー操作 — リストボックス相当のフォーカス移動。 */
+function onRoleListKeydown(e: KeyboardEvent) {
+  const idx = CURSOR_ROLES.findIndex((r) => r.id === activeRoleId.value)
+  if (idx === -1) return
+  let next = idx
+  if (e.key === 'ArrowDown' || e.key === 'j') next = Math.min(idx + 1, CURSOR_ROLES.length - 1)
+  else if (e.key === 'ArrowUp' || e.key === 'k') next = Math.max(idx - 1, 0)
+  else if (e.key === 'Home') next = 0
+  else if (e.key === 'End') next = CURSOR_ROLES.length - 1
+  else return
+  e.preventDefault()
+  selectRole(CURSOR_ROLES[next]!.id)
+}
+
+// 各ロールの primary バイト列から Blob URL を派生し、ロール切替時に正しいプレビューを表示する。
+// ロール毎にキャッシュして、リスト中のロール切替で URL を毎回作り直さない。
+const roleBlobCache = new Map<string, { url: string, ref: Uint8Array }>()
+function ensureRoleBlobUrl(roleId: string, bytes: Uint8Array): string {
+  const cached = roleBlobCache.get(roleId)
+  if (cached && cached.ref === bytes) return cached.url
+  if (cached) URL.revokeObjectURL(cached.url)
+  // Uint8Array → BlobPart: 一旦 ArrayBuffer のスライスにコピーして TS 型互換にする
+  const buf = bytes.slice().buffer
+  const url = URL.createObjectURL(new Blob([buf], { type: 'image/png' }))
+  roleBlobCache.set(roleId, { url, ref: bytes })
+  return url
+}
+
+/** 現在の役割に紐付いた表示用 PNG URL。優先順: そのロールの assigned → 直近インポート → null */
+const activePreviewUrl = computed<string | null>(() => {
+  const a = assigned.value[activeRoleId.value]
+  if (a?.primary) return ensureRoleBlobUrl(activeRoleId.value, a.primary)
+  return importedPreviewUrl.value
+})
+
+/** ホットスポットの基準サイズ。アセットがあればその primarySize、なければ現在の activeSize。 */
+const hotspotReferenceSize = computed(() =>
+  assigned.value[activeRoleId.value]?.primarySize ?? activeSize.value,
+)
+
+/** ロールが切り替わったら、そのロールの保存済みホットスポットを反映する。 */
+watch(activeRoleId, (id) => {
+  const a = assigned.value[id]
+  if (a) {
+    hotspotX.value = a.hotspot.x
+    hotspotY.value = a.hotspot.y
+  }
+})
+
+onBeforeUnmount(() => {
+  for (const { url } of roleBlobCache.values()) URL.revokeObjectURL(url)
+  roleBlobCache.clear()
+})
+
+// --- ホットスポットのドラッグ操作 ---
+const bigpreviewEl = ref<HTMLElement | null>(null)
+const hotspotDragging = ref(false)
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value))
+}
+
+function updateHotspotFromEvent(e: PointerEvent) {
+  const el = bigpreviewEl.value
+  if (!el) return
+  const rect = el.getBoundingClientRect()
+  const ratioX = clamp((e.clientX - rect.left) / rect.width, 0, 1)
+  const ratioY = clamp((e.clientY - rect.top) / rect.height, 0, 1)
+  const ref = hotspotReferenceSize.value
+  hotspotX.value = Math.round(ratioX * ref)
+  hotspotY.value = Math.round(ratioY * ref)
+}
+
+function onHotspotPointerDown(e: PointerEvent) {
+  if (e.button !== 0) return
+  hotspotDragging.value = true
+  ;(e.currentTarget as Element).setPointerCapture?.(e.pointerId)
+  updateHotspotFromEvent(e)
+}
+
+function onHotspotPointerMove(e: PointerEvent) {
+  if (!hotspotDragging.value) return
+  updateHotspotFromEvent(e)
+}
+
+function onHotspotPointerUp(e: PointerEvent) {
+  if (!hotspotDragging.value) return
+  hotspotDragging.value = false
+  ;(e.currentTarget as Element).releasePointerCapture?.(e.pointerId)
+  // 保存済みアセットがあればホットスポット値を反映する
+  const a = assigned.value[activeRoleId.value]
+  if (a) {
+    setAsset(activeRoleId.value, {
+      ...a,
+      hotspot: { x: hotspotX.value, y: hotspotY.value },
+    })
+  }
 }
 
 function selectSize(s: number) {
@@ -686,7 +785,7 @@ async function onFileChange(e: Event) {
           <h6>{{ t('creator.rolesPaneTitle') }}</h6>
           <span class="tag">{{ filledCount }} / 17</span>
         </div>
-        <div class="role-list">
+        <div class="role-list" role="listbox" :aria-label="t('creator.rolesPaneTitle')" @keydown="onRoleListKeydown">
           <RoleListItem
             v-for="(role, i) in CURSOR_ROLES"
             :key="role.id"
@@ -763,23 +862,38 @@ async function onFileChange(e: Event) {
 
         <div class="canvas-area">
           <div class="canvas-stage">
-            <!-- ビッグプレビュー -->
-            <div class="bigpreview">
+            <!-- ビッグプレビュー (ホットスポット ドラッグ対応) -->
+            <div
+              ref="bigpreviewEl"
+              :class="['bigpreview', { dragging: hotspotDragging }]"
+              :title="t('creator.hotspotHint')"
+              @pointerdown="onHotspotPointerDown"
+              @pointermove="onHotspotPointerMove"
+              @pointerup="onHotspotPointerUp"
+              @pointercancel="onHotspotPointerUp"
+            >
               <div class="crosshair-h" />
               <div class="crosshair-v" />
               <img
-                v-if="importedPreviewUrl"
-                :src="importedPreviewUrl"
+                v-if="activePreviewUrl"
+                :src="activePreviewUrl"
                 :alt="activeRole.jp"
-                style="max-width: 90%; max-height: 90%; image-rendering: pixelated"
+                draggable="false"
+                style="max-width: 90%; max-height: 90%; image-rendering: pixelated; pointer-events: none;"
               >
               <CursorIcon
                 v-else
                 :role="activeRole.id"
                 :size="90"
-                style="color: var(--fg)"
+                style="color: var(--fg); pointer-events: none;"
               />
-              <div class="hot" :style="{ left: '32%', top: '30%' }" />
+              <div
+                class="hot"
+                :style="{
+                  left: (hotspotX / hotspotReferenceSize) * 100 + '%',
+                  top: (hotspotY / hotspotReferenceSize) * 100 + '%',
+                }"
+              />
               <div class="preview-meta tl">{{ activeSize }} × {{ activeSize }}</div>
               <div class="preview-meta tr">hotspot {{ hotspotX }},{{ hotspotY }}</div>
             </div>

@@ -530,6 +530,18 @@ button {
   border-color: var(--line-hi);
   box-shadow: var(--shadow-2);
 }
+.card.interactive {
+  cursor: pointer;
+}
+.card.interactive:hover {
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 1px var(--accent-line), 0 18px 36px -18px rgba(124, 242, 212, 0.28);
+}
+.card.interactive:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent), 0 18px 36px -18px rgba(124, 242, 212, 0.35);
+}
 .card.active {
   border-color: var(--accent-line);
   box-shadow: 0 0 0 1px var(--accent-line), 0 12px 32px -16px rgba(124, 242, 212, 0.4);
@@ -1158,6 +1170,17 @@ button {
   place-items: center;
   position: relative;
   box-shadow: var(--shadow-2);
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+}
+.bigpreview.dragging .hot {
+  border-color: var(--accent-hi);
+  background: rgba(124, 242, 212, 0.4);
+  box-shadow: 0 0 16px var(--accent), 0 0 0 6px rgba(124, 242, 212, 0.18);
+}
+.bigpreview .hot {
+  transition: box-shadow 120ms ease, background 120ms ease;
 }
 .bigpreview .crosshair-h,
 .bigpreview .crosshair-v {

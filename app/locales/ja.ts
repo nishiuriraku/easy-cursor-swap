@@ -126,6 +126,7 @@ export default {
     requiredRoleNote: 'Windows のメイン操作カーソル。{required}。解像度ごとに独立した画像を割り当て可能。',
     optionalRoleNote: '{en}。任意。未指定時は Windows 既定を継承します。',
     requiredMark: '必須',
+    hotspotHint: 'クリック または ドラッグでホットスポットを移動',
   },
   panic: {
     title: 'パニックリセットを実行',

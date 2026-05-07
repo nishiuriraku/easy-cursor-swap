@@ -127,6 +127,7 @@ export default {
     requiredRoleNote: 'Main Windows cursor. {required}. Each resolution can have its own image.',
     optionalRoleNote: '{en}. Optional. Inherits Windows default when unset.',
     requiredMark: 'Required',
+    hotspotHint: 'Click or drag to move the hotspot',
   },
   panic: {
     title: 'Run Panic Reset',
