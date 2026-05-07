@@ -114,6 +114,13 @@ button {
 }
 
 /* --- タイトルバー --- */
+/*
+ * Tauri v2 では `data-tauri-drag-region` 属性 (mousedown JS フック) でドラッグを
+ * 実装する。CSS `app-region: drag` は Chromium/Electron 用で、Tauri v2 の
+ * WebView2 + decorations:false ではクリックイベントを奪ってしまう副作用があるため
+ * 使用しない。属性ベースなら mousedown 時の event.target がボタンのとき
+ * Tauri は drag を発火しないので、子要素のクリックハンドラが正常に届く。
+ */
 .titlebar {
   height: 36px;
   display: grid;
@@ -126,8 +133,6 @@ button {
   -webkit-backdrop-filter: blur(20px);
   position: relative;
   z-index: 5;
-  -webkit-app-region: drag;
-  app-region: drag;
 }
 .titlebar .tb-title {
   display: flex;
@@ -136,13 +141,16 @@ button {
   font-size: 12px;
   color: var(--fg-dim);
   letter-spacing: 0.02em;
+  /* 子要素 (アイコン/メタテキスト) も含めてドラッグ領域なので pointer-events は通常通り */
 }
 .titlebar .tb-mark { width: 14px; height: 14px; display: grid; place-items: center; color: var(--accent); }
 .titlebar .tb-meta { font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-mute); }
 .titlebar .tb-controls {
   display: flex;
-  -webkit-app-region: no-drag;
-  app-region: no-drag;
+  /* ボタン群は data-tauri-drag-region を持たないのでクリックが優先される。
+     position/z-index でヒットテスト順序を明示し、近接の glow 影に埋もれないようにする。 */
+  position: relative;
+  z-index: 6;
 }
 .titlebar .tb-btn {
   width: 46px; height: 36px;
@@ -150,6 +158,8 @@ button {
   color: var(--fg-dim);
   border: none; background: transparent;
   cursor: pointer;
+  /* WebView2 の release ビルドでクリックが届かないケースを排除するための保険 */
+  pointer-events: auto;
 }
 .titlebar .tb-btn:hover { background: rgba(255, 255, 255, 0.06); color: var(--fg); }
 .titlebar .tb-btn.close:hover { background: #c42b1c; color: #fff; }

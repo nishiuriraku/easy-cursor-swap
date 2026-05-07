@@ -68,25 +68,25 @@ async function call(cmd: 'minimize' | 'toggleMaximize' | 'close') {
   }
 }
 
-/** タイトル領域のダブルクリックで最大化をトグルする（Win11 既定動作）。 */
-function onTitleDblClick(e: MouseEvent) {
-  // ボタン領域上のダブルクリックは無視。
-  const target = e.target as HTMLElement | null
-  if (target?.closest('.tb-btn')) return
-  void call('toggleMaximize')
-}
+// Tauri v2 では `data-tauri-drag-region` 属性 (mousedown 監視ベース) を使うのが
+// 公式の手段。CSS `app-region` は WebView2 + decorations:false で動作しないことが
+// あるので、自前のハンドラに依存しない属性ベースで二重に保険をかける。
+// data-tauri-drag-region をつけた要素が直接の mousedown ターゲットなら startDragging()
+// + ダブルクリック最大化が自動発火する。子要素 (button) で mousedown した場合は
+// target がボタンになるためドラッグは発火せず click が正常通る。
 </script>
 
 <template>
-  <div class="titlebar" @dblclick="onTitleDblClick">
-    <div class="tb-title">
+  <div class="titlebar" data-tauri-drag-region>
+    <div class="tb-title" data-tauri-drag-region>
       <span class="tb-mark"><UiIcon name="Logo" :size="12" /></span>
-      <span>{{ title }}</span>
-      <span style="color: var(--fg-faint)">—</span>
-      <span class="tb-meta">{{ version }} · Win 11</span>
+      <span data-tauri-drag-region>{{ title }}</span>
+      <span data-tauri-drag-region style="color: var(--fg-faint)">—</span>
+      <span class="tb-meta" data-tauri-drag-region>{{ version }} · Win 11</span>
     </div>
     <div class="tb-controls">
       <button
+        type="button"
         class="tb-btn theme"
         :aria-label="`UI テーマ: ${themeLabel} (クリックで切替)`"
         :title="`Theme: ${themeLabel}`"
@@ -94,17 +94,18 @@ function onTitleDblClick(e: MouseEvent) {
       >
         <UiIcon :name="themeIcon" :size="12" />
       </button>
-      <button class="tb-btn" aria-label="最小化" @click="call('minimize')">
+      <button type="button" class="tb-btn" aria-label="最小化" @click="call('minimize')">
         <UiIcon name="Min" :size="12" />
       </button>
       <button
+        type="button"
         class="tb-btn"
         :aria-label="isMaximized ? '元に戻す' : '最大化'"
         @click="call('toggleMaximize')"
       >
         <UiIcon :name="isMaximized ? 'Restore' : 'Max'" :size="12" />
       </button>
-      <button class="tb-btn close" aria-label="閉じる" @click="call('close')">
+      <button type="button" class="tb-btn close" aria-label="閉じる" @click="call('close')">
         <UiIcon name="X" :size="12" />
       </button>
     </div>
