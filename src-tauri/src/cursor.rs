@@ -285,8 +285,8 @@ pub fn build_cur_from_png(
         } else {
             None
         };
-        let resized = img_at_size
-            .unwrap_or_else(|| resize_image_cached(&img, &src_hash, target, effective));
+        let resized =
+            img_at_size.unwrap_or_else(|| resize_image_cached(&img, &src_hash, target, effective));
         let (hx, hy) = scale_hotspot(hotspot_x, hotspot_y, original_size, target);
         entries.push((resized, hx, hy));
     }

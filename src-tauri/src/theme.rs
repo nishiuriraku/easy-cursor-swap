@@ -865,7 +865,6 @@ impl ThemeManager {
     }
 }
 
-
 /// LocalizedString の各ロケール文字列にサフィックスを付けたコピーを返す。
 ///
 /// serde_json::Value 経由で実装することで、LocalizedString が将来増減する

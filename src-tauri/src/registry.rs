@@ -920,10 +920,7 @@ mod tests {
 
     #[test]
     fn parse_scheme_value_trims_whitespace_and_counts_correctly() {
-        let scheme = parse_scheme_value(
-            "Spaced",
-            " C:\\a.cur ,  ,C:\\c.cur,,,,,,,,,,,,,,",
-        );
+        let scheme = parse_scheme_value("Spaced", " C:\\a.cur ,  ,C:\\c.cur,,,,,,,,,,,,,,");
         assert_eq!(scheme.cursor_paths.get("Arrow").unwrap(), "C:\\a.cur");
         assert_eq!(scheme.cursor_paths.get("Help").unwrap(), "");
         assert_eq!(scheme.cursor_paths.get("AppStarting").unwrap(), "C:\\c.cur");

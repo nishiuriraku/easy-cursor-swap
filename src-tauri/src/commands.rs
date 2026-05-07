@@ -77,11 +77,7 @@ pub fn get_theme_previews(
 ) -> Result<std::collections::HashMap<String, Vec<u8>>, AppError> {
     let id = uuid::Uuid::parse_str(&theme_id)
         .map_err(|e| AppError::Theme(format!("無効なテーマ ID: {}", e)))?;
-    let filter: Option<&[String]> = if roles.is_empty() {
-        None
-    } else {
-        Some(&roles)
-    };
+    let filter: Option<&[String]> = if roles.is_empty() { None } else { Some(&roles) };
     ThemeManager::load_role_previews(id, filter)
 }
 
@@ -1048,10 +1044,7 @@ pub fn apply_windows_scheme(name: String) -> Result<(), AppError> {
 /// active_theme_id をクリアする責任を持つ。Windows 側はファイル不在時に
 /// 既定カーソルへフォールバックするので追加処理は不要。
 #[tauri::command]
-pub fn delete_theme(
-    config: State<'_, ConfigManager>,
-    theme_id: String,
-) -> Result<(), AppError> {
+pub fn delete_theme(config: State<'_, ConfigManager>, theme_id: String) -> Result<(), AppError> {
     let id = uuid::Uuid::parse_str(&theme_id)
         .map_err(|e| AppError::Theme(format!("無効なテーマ ID: {}", e)))?;
     ThemeManager::delete_theme(id)?;

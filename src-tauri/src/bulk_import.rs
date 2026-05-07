@@ -124,7 +124,9 @@ pub fn collect_target_files(paths: &[String], recursive: bool) -> Vec<String> {
 }
 
 fn walk_dir(dir: &Path, recursive: bool, out: &mut Vec<String>) {
-    let Ok(rd) = std::fs::read_dir(dir) else { return };
+    let Ok(rd) = std::fs::read_dir(dir) else {
+        return;
+    };
     for entry in rd.flatten() {
         let path = entry.path();
         if path.is_file() {
@@ -157,8 +159,8 @@ pub fn resolve_one(path: &str) -> Result<ResolvedAsset, AppError> {
         .and_then(|e| e.to_str())
         .map(|s| s.to_ascii_lowercase())
         .unwrap_or_default();
-    let bytes = std::fs::read(p)
-        .map_err(|e| AppError::ImageProcessing(format!("読み込み失敗: {}", e)))?;
+    let bytes =
+        std::fs::read(p).map_err(|e| AppError::ImageProcessing(format!("読み込み失敗: {}", e)))?;
     let basename = p
         .file_name()
         .and_then(|s| s.to_str())
@@ -175,9 +177,7 @@ pub fn resolve_one(path: &str) -> Result<ResolvedAsset, AppError> {
 
 fn resolve_png(path: &str, basename: String, bytes: &[u8]) -> Result<ResolvedAsset, AppError> {
     if bytes.len() < 8 || &bytes[..8] != b"\x89PNG\r\n\x1a\n" {
-        return Err(AppError::ImageProcessing(
-            "PNG マジックバイト不一致".into(),
-        ));
+        return Err(AppError::ImageProcessing("PNG マジックバイト不一致".into()));
     }
     let img = image::load_from_memory(bytes)
         .map_err(|e| AppError::ImageProcessing(format!("PNG decode 失敗: {}", e)))?;
@@ -492,9 +492,7 @@ pub fn parse_cursorpack_inner(bytes: &[u8]) -> Result<ParsedCursorpack, AppError
                         continue;
                     }
                     if let Ok(parsed_ov) = crate::cursor::parse_ico_cur(&buf) {
-                        if let Some(matching) =
-                            parsed_ov.entries.iter().find(|e| e.width == size)
-                        {
+                        if let Some(matching) = parsed_ov.entries.iter().find(|e| e.width == size) {
                             if let Ok(png) = encode_entry_to_png(matching) {
                                 sized.insert(size, png);
                             }
@@ -592,7 +590,11 @@ mod tests {
         let dir = fixture_dir();
         let files = collect_target_files(&[dir.to_string_lossy().to_string()], false);
         let pngs: Vec<_> = files.iter().filter(|p| p.ends_with(".png")).collect();
-        assert!(pngs.len() >= 17, "expected >=17 PNGs in sample-icon, got {}", pngs.len());
+        assert!(
+            pngs.len() >= 17,
+            "expected >=17 PNGs in sample-icon, got {}",
+            pngs.len()
+        );
     }
 
     #[test]
@@ -647,9 +649,18 @@ mod tests {
             false,
             "test-job",
             None,
-        ).unwrap();
-        assert!(result.assets.len() >= 17, "expected >=17, got {}", result.assets.len());
-        assert!(result.failures.is_empty(), "no failures expected, got {:?}", result.failures);
+        )
+        .unwrap();
+        assert!(
+            result.assets.len() >= 17,
+            "expected >=17, got {}",
+            result.assets.len()
+        );
+        assert!(
+            result.failures.is_empty(),
+            "no failures expected, got {:?}",
+            result.failures
+        );
     }
 
     #[test]
@@ -663,7 +674,10 @@ mod tests {
         let bytes = std::fs::read(&p).expect("fixture must exist");
         let parsed = parse_cursorpack_inner(&bytes).expect("parse should succeed");
         assert!(!parsed.roles.is_empty(), "should extract at least 1 role");
-        assert!(parsed.roles.contains_key("Arrow"), "Arrow role should be present");
+        assert!(
+            parsed.roles.contains_key("Arrow"),
+            "Arrow role should be present"
+        );
     }
 
     #[test]
@@ -681,7 +695,8 @@ mod tests {
             false,
             "test-job-2",
             None,
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(result.assets.len(), 1);
         assert_eq!(result.failures.len(), 1);
     }
