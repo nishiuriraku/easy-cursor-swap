@@ -68,21 +68,49 @@ async function call(cmd: 'minimize' | 'toggleMaximize' | 'close') {
   }
 }
 
-// Tauri v2 では `data-tauri-drag-region` 属性 (mousedown 監視ベース) を使うのが
-// 公式の手段。CSS `app-region` は WebView2 + decorations:false で動作しないことが
-// あるので、自前のハンドラに依存しない属性ベースで二重に保険をかける。
-// data-tauri-drag-region をつけた要素が直接の mousedown ターゲットなら startDragging()
-// + ダブルクリック最大化が自動発火する。子要素 (button) で mousedown した場合は
-// target がボタンになるためドラッグは発火せず click が正常通る。
+/**
+ * タイトルバーのドラッグ移動 / ダブルクリック最大化をマニュアル実装する。
+ *
+ * Tauri v2 の `data-tauri-drag-region` 属性は内部で `closest()` を使って
+ * ドラッグ対象を判定するため、属性持ち要素の子孫 (button) の mousedown でも
+ * ドラッグが発火してしまい、click イベントが奪われる不具合があった。さらに
+ * `decorations: false` + WebView2 release ビルドの組み合わせで startDragging が
+ * 不安定なケースが報告されている。
+ *
+ * このハンドラを `.titlebar` に直接付けて以下を行う:
+ *   - target がボタン (またはその子) なら何もしない → button の click 通常動作
+ *   - 左クリック以外は無視
+ *   - e.detail === 2 (ダブルクリックの 2 発目) → toggleMaximize()
+ *   - それ以外 → startDragging() で OS にウィンドウ移動を委譲
+ */
+async function onTitlebarMouseDown(e: MouseEvent) {
+  if (e.button !== 0) return
+  const target = e.target as HTMLElement | null
+  if (target?.closest('button')) return
+  try {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window')
+    const w = getCurrentWindow()
+    if (e.detail === 2) {
+      await w.toggleMaximize()
+      isMaximized.value = await w.isMaximized()
+    } else {
+      // startDragging は OS の WM_NCLBUTTONDOWN 経由でドラッグループに入るので
+      // pointermove イベント等を自前で監視する必要はない。
+      await w.startDragging()
+    }
+  } catch (err) {
+    console.warn('[Titlebar] drag/maximize failed:', err)
+  }
+}
 </script>
 
 <template>
-  <div class="titlebar" data-tauri-drag-region>
-    <div class="tb-title" data-tauri-drag-region>
+  <div class="titlebar" @mousedown="onTitlebarMouseDown">
+    <div class="tb-title">
       <span class="tb-mark"><UiIcon name="Logo" :size="12" /></span>
-      <span data-tauri-drag-region>{{ title }}</span>
-      <span data-tauri-drag-region style="color: var(--fg-faint)">—</span>
-      <span class="tb-meta" data-tauri-drag-region>{{ version }} · Win 11</span>
+      <span>{{ title }}</span>
+      <span style="color: var(--fg-faint)">—</span>
+      <span class="tb-meta">{{ version }} · Win 11</span>
     </div>
     <div class="tb-controls">
       <button
