@@ -10,7 +10,7 @@
  * NOTE: 実際の画像アップロード / .cur ビルド / 署名生成は今回はスタブ。
  *       UI 構造とインタラクションのみ実装し、IPC 配線は後続タスクに委ねる。
  */
-import { computed, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { CURSOR_ROLES, type CursorRoleDef } from '~/components/icons/CursorIcons'
 import { sanitizeSvg } from '~/composables/sanitizeSvg'
 import { invokeTauri } from '~/composables/useTauri'
@@ -33,10 +33,10 @@ const SIZES = [32, 48, 64, 96, 128, 256] as const
 type TabId = 'assign' | 'metadata' | 'preview' | 'publish'
 
 // --- ダミーステート (実装は将来の IPC 連携で置換) ---
-const filledRoles = new Set<string>([
+const filledRoles = reactive(new Set<string>([
   'Arrow', 'Help', 'Wait', 'IBeam', 'Hand', 'No', 'Crosshair',
   'SizeNS', 'SizeWE', 'SizeAll', 'NWPen',
-])
+]))
 const partialRoles = new Set<string>(['AppStarting', 'SizeNWSE'])
 
 const activeTab = ref<TabId>('assign')
