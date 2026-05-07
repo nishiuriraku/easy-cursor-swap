@@ -1042,6 +1042,50 @@ pub fn apply_windows_scheme(name: String) -> Result<(), AppError> {
     RegistryManager::apply_windows_scheme(&scheme)
 }
 
+/// 指定 ID のテーマを ~/.custom_cursors/<UUID>/ ごと完全削除する。
+///
+/// 削除されたテーマがアクティブだった場合、呼び出し側 (UI) は config の
+/// active_theme_id をクリアする責任を持つ。Windows 側はファイル不在時に
+/// 既定カーソルへフォールバックするので追加処理は不要。
+#[tauri::command]
+pub fn delete_theme(
+    config: State<'_, ConfigManager>,
+    theme_id: String,
+) -> Result<(), AppError> {
+    let id = uuid::Uuid::parse_str(&theme_id)
+        .map_err(|e| AppError::Theme(format!("無効なテーマ ID: {}", e)))?;
+    ThemeManager::delete_theme(id)?;
+    // 削除されたテーマが active なら config 側もクリアする
+    if let Ok(c) = config.get() {
+        if c.general.active_theme_id == Some(id) {
+            let _ = config.update(|c| c.general.active_theme_id = None);
+        }
+    }
+    Ok(())
+}
+
+/// 指定 ID のテーマを複製する。新テーマの UUID を返す。
+#[tauri::command]
+pub fn duplicate_theme(theme_id: String) -> Result<String, AppError> {
+    let id = uuid::Uuid::parse_str(&theme_id)
+        .map_err(|e| AppError::Theme(format!("無効なテーマ ID: {}", e)))?;
+    let new_id = ThemeManager::duplicate_theme(id)?;
+    Ok(new_id.to_string())
+}
+
+/// 既存ライブラリのテーマを `.cursorpack` ファイルに書き出す。
+///
+/// クリエイターを介さずライブラリ画面からそのままエクスポートできるよう、
+/// `~/.custom_cursors/<UUID>/` を ZIP 化して指定パスに保存する。戻り値は
+/// 書き込んだバイト数。
+#[tauri::command]
+pub fn repackage_theme(theme_id: String, output_path: String) -> Result<u64, AppError> {
+    let id = uuid::Uuid::parse_str(&theme_id)
+        .map_err(|e| AppError::Theme(format!("無効なテーマ ID: {}", e)))?;
+    let path = std::path::PathBuf::from(&output_path);
+    ThemeManager::repackage_theme(id, &path)
+}
+
 /// Tauri Builder に全コマンドを登録するためのヘルパー
 pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
     tauri::generate_handler![
@@ -1085,6 +1129,9 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         clear_crash_reports,
         list_windows_schemes,
         apply_windows_scheme,
+        delete_theme,
+        duplicate_theme,
+        repackage_theme,
         crate::bulk_import::bulk_resolve_assets,
         crate::bulk_import::cancel_bulk_import,
         crate::bulk_import::parse_cursorpack_for_creator,

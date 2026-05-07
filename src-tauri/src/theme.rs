@@ -775,6 +775,155 @@ impl ThemeManager {
             .trim()
             .to_string()
     }
+
+    /// 指定 ID のテーマディレクトリ (`~/.custom_cursors/<UUID>/`) を完全削除する。
+    ///
+    /// アクティブテーマを削除した場合、レジストリ側は EasyCursorSwap が書いたパスが
+    /// ファイル不在になるが Windows は読めない値で既定にフォールバックするので追加
+    /// cleanup は不要。呼び出し側は config.active_theme_id を None に戻す責任を持つ。
+    pub fn delete_theme(id: Uuid) -> AppResult<()> {
+        use crate::config::ConfigManager;
+        use crate::errors::AppError;
+        let cursors_dir = ConfigManager::cursors_dir()?;
+        let theme_dir = cursors_dir.join(id.to_string());
+        if !theme_dir.exists() {
+            return Err(AppError::Theme(format!("テーマ {} が見つかりません", id)));
+        }
+        std::fs::remove_dir_all(&theme_dir)?;
+        tracing::info!("テーマ {} を削除しました", id);
+        Ok(())
+    }
+
+    /// 指定 ID のテーマを複製し、新しい UUID を持つ別テーマとして保存する。
+    ///
+    /// `theme.json` は同内容のコピーで `id` だけ新規 UUID に、`name` には ` (Copy)` を
+    /// 末尾付与して識別しやすくする。戻り値は新テーマの UUID。
+    pub fn duplicate_theme(source_id: Uuid) -> AppResult<Uuid> {
+        use crate::config::ConfigManager;
+        use crate::errors::AppError;
+        let cursors_dir = ConfigManager::cursors_dir()?;
+        let source_dir = cursors_dir.join(source_id.to_string());
+        if !source_dir.exists() {
+            return Err(AppError::Theme(format!(
+                "複製元テーマ {} が見つかりません",
+                source_id
+            )));
+        }
+
+        let source_theme_json = source_dir.join("theme.json");
+        let mut metadata: ThemeMetadata =
+            serde_json::from_str(&std::fs::read_to_string(&source_theme_json)?)?;
+
+        let new_id = Uuid::new_v4();
+        metadata.id = new_id;
+        let original_name = metadata.name.clone();
+        metadata.name = clone_with_suffix(&original_name, " (Copy)");
+
+        let target_dir = cursors_dir.join(new_id.to_string());
+        copy_dir_recursive(&source_dir, &target_dir)?;
+        std::fs::write(
+            target_dir.join("theme.json"),
+            serde_json::to_vec_pretty(&metadata)?,
+        )?;
+
+        tracing::info!("テーマ {} を {} として複製しました", source_id, new_id);
+        Ok(new_id)
+    }
+
+    /// 既存テーマディレクトリを `.cursorpack` (ZIP) に再パッケージしてエクスポートする。
+    ///
+    /// クリエイターを経由せずライブラリから直接書き出したい場合に使う。
+    /// theme.json + 全カーソルファイルをそのままアーカイブする。
+    pub fn repackage_theme(id: Uuid, output_path: &std::path::Path) -> AppResult<u64> {
+        use crate::config::ConfigManager;
+        use crate::errors::AppError;
+        let cursors_dir = ConfigManager::cursors_dir()?;
+        let theme_dir = cursors_dir.join(id.to_string());
+        if !theme_dir.exists() {
+            return Err(AppError::Theme(format!("テーマ {} が見つかりません", id)));
+        }
+        if let Some(parent) = output_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        let file = std::fs::File::create(output_path)?;
+        let mut zip = zip::ZipWriter::new(file);
+        let opts: zip::write::SimpleFileOptions = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated);
+
+        zip_dir_recursive(&theme_dir, &theme_dir, &mut zip, opts)?;
+        zip.finish()?;
+
+        let size = std::fs::metadata(output_path)?.len();
+        tracing::info!(
+            "repackaged theme: {} -> {} ({} bytes)",
+            id,
+            crate::logging::redact_path(output_path),
+            size
+        );
+        Ok(size)
+    }
+}
+
+
+/// LocalizedString の各ロケール文字列にサフィックスを付けたコピーを返す。
+///
+/// serde_json::Value 経由で実装することで、LocalizedString が将来増減する
+/// ロケールに自動追従する。
+fn clone_with_suffix(src: &LocalizedString, suffix: &str) -> LocalizedString {
+    let mut value: serde_json::Value = match serde_json::to_value(src) {
+        Ok(v) => v,
+        Err(_) => return src.clone(),
+    };
+    if let Some(map) = value.as_object_mut() {
+        for (_, v) in map.iter_mut() {
+            if let Some(s) = v.as_str() {
+                *v = serde_json::Value::String(format!("{}{}", s, suffix));
+            }
+        }
+    }
+    serde_json::from_value(value).unwrap_or_else(|_| src.clone())
+}
+
+/// `from` 配下を `to` に再帰コピーする。シンボリックリンクは追わず通常ファイルとして扱う。
+fn copy_dir_recursive(from: &std::path::Path, to: &std::path::Path) -> AppResult<()> {
+    std::fs::create_dir_all(to)?;
+    for entry in std::fs::read_dir(from)? {
+        let entry = entry?;
+        let src = entry.path();
+        let dst = to.join(entry.file_name());
+        let metadata = entry.metadata()?;
+        if metadata.is_dir() {
+            copy_dir_recursive(&src, &dst)?;
+        } else {
+            std::fs::copy(&src, &dst)?;
+        }
+    }
+    Ok(())
+}
+
+/// `dir` 配下を `root` からの相対パスで Zip に書き込む。
+fn zip_dir_recursive<W: std::io::Write + std::io::Seek>(
+    dir: &std::path::Path,
+    root: &std::path::Path,
+    zip: &mut zip::ZipWriter<W>,
+    opts: zip::write::SimpleFileOptions,
+) -> AppResult<()> {
+    use std::io::Write;
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        let rel = path.strip_prefix(root).unwrap_or(&path);
+        let rel_str = rel.to_string_lossy().replace('\\', "/");
+        if entry.metadata()?.is_dir() {
+            zip_dir_recursive(&path, root, zip, opts)?;
+        } else {
+            let bytes = std::fs::read(&path)?;
+            zip.start_file(rel_str, opts)?;
+            zip.write_all(&bytes)?;
+        }
+    }
+    Ok(())
 }
 
 /// 公開ラッパー (`backup` モジュール用)。

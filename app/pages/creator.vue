@@ -237,8 +237,26 @@ function isRequired(id: string): boolean {
 
 // 起動時に keystore 状態を取得して「署名 & エクスポート」ボタンの表示判定に使う
 import { onMounted } from 'vue'
-onMounted(() => {
+onMounted(async () => {
   void refreshKeystore()
+  // ライブラリの「Creator で編集」から `?editPath=...` で .cursorpack を渡された場合は
+  // 自動ロードして editing ステージを開く。一時ファイルなので読み込み後に放置しても
+  // OS が TEMP を整理してくれるので明示削除はしない。
+  const route = useRoute()
+  const editPath = (route.query.editPath as string | undefined) ?? null
+  if (editPath) {
+    try {
+      const parsed = await bulkImport.parseCursorpack(editPath)
+      bulkCursorpack.value = parsed
+      bulkResolved.value = null
+      bulkSourceLabel.value = '📦 編集中'
+      bulkModalOpen.value = true
+      stage.value = 'editing'
+    } catch (err) {
+      importMessage.value = `編集データの読込に失敗: ${err instanceof Error ? err.message : String(err)}`
+      stage.value = 'editing'
+    }
+  }
 })
 
 // --- 画像インポート ---

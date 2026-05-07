@@ -249,6 +249,87 @@ function applyFromDetail(id: string) {
   requestApply(id)
 }
 
+/**
+ * 詳細モーダルからの「Creator で編集」。テーマを再パッケージして一時ファイル化し、
+ * Creator の bulk import 経路で開く。一時ファイルは Rust 側 (tempdir) ではなく
+ * OS の TEMP に書き出し、Nuxt から `parse_cursorpack_for_creator` で読み込む。
+ */
+async function editInCreator(id: string) {
+  try {
+    const { tempDir, sep } = await import('@tauri-apps/api/path')
+    const dir = await tempDir()
+    const tempPath = `${dir}${sep()}_easycursorswap_edit_${Date.now()}.cursorpack`
+    await invokeTauri<number>('repackage_theme', { themeId: id, outputPath: tempPath })
+    closeDetails()
+    // Creator ページに遷移し、ロード対象のパスをクエリで渡す。Creator 側で
+    // `editThemePath` クエリを拾って parse_cursorpack_for_creator を呼ぶ。
+    await navigateTo({ path: '/creator', query: { editPath: tempPath } })
+  } catch (err) {
+    applyError.value = `編集モードへの遷移に失敗: ${err instanceof Error ? err.message : String(err)}`
+  }
+}
+
+/** 詳細モーダルからの「複製」。`duplicate_theme` IPC で新 UUID を作りリロードする。 */
+async function duplicateTheme(id: string) {
+  try {
+    await invokeTauri<string>('duplicate_theme', { themeId: id })
+    closeDetails()
+    await loadThemes()
+    void notify({
+      title: 'EasyCursorSwap',
+      body: `${themes.value.find((tt) => tt.id === id)?.name ?? 'テーマ'} を複製しました`,
+      level: 'success',
+    })
+  } catch (err) {
+    applyError.value = `複製に失敗: ${err instanceof Error ? err.message : String(err)}`
+  }
+}
+
+/** 詳細モーダルからの「エクスポート」。`repackage_theme` で .cursorpack を保存する。 */
+async function exportTheme(id: string) {
+  try {
+    const target = themes.value.find((tt) => tt.id === id)
+    if (!target) return
+    const { save } = await import('@tauri-apps/plugin-dialog')
+    const safeName = target.name.replace(/[^\p{L}\p{N}_-]+/gu, '_').slice(0, 64) || 'theme'
+    const outputPath = await save({
+      defaultPath: `${safeName}.cursorpack`,
+      filters: [{ name: 'Cursor Pack', extensions: ['cursorpack'] }],
+    })
+    if (!outputPath) return
+    const bytes = await invokeTauri<number>('repackage_theme', { themeId: id, outputPath })
+    void notify({
+      title: 'EasyCursorSwap',
+      body: `${target.name} をエクスポートしました (${bytes ?? '?'} bytes)`,
+      level: 'success',
+    })
+  } catch (err) {
+    applyError.value = `エクスポートに失敗: ${err instanceof Error ? err.message : String(err)}`
+  }
+}
+
+/** 詳細モーダルからの「削除」。確認ダイアログを挟んでから `delete_theme` を実行。 */
+async function deleteTheme(id: string) {
+  const target = themes.value.find((tt) => tt.id === id)
+  if (!target) return
+  // ネイティブ confirm はテストしづらいが Tauri WebView では機能するので暫定使用。
+  // 将来的には専用の確認モーダルに置き換える。
+  const ok = window.confirm(`「${target.name}」を完全に削除します。この操作は元に戻せません。`)
+  if (!ok) return
+  try {
+    await invokeTauri<void>('delete_theme', { themeId: id })
+    closeDetails()
+    await loadThemes()
+    void notify({
+      title: 'EasyCursorSwap',
+      body: `${target.name} を削除しました`,
+      level: 'info',
+    })
+  } catch (err) {
+    applyError.value = `削除に失敗: ${err instanceof Error ? err.message : String(err)}`
+  }
+}
+
 // ブラウザの DragEvent は dataTransfer.files に絶対パスを含めないため、
 // Tauri v2 のウィンドウ drag-drop イベントで実ファイルパスを取得する。
 // onMounted で `onDragDropEvent` 購読 → unlisten をクリーンアップ用に保持。
@@ -694,10 +775,10 @@ onUnmounted(() => {
       :preview-map="detailPreviewMap"
       @close="closeDetails"
       @apply="applyFromDetail"
-      @edit="(id) => console.info('[Library] edit (TODO)', id)"
-      @duplicate="(id) => console.info('[Library] duplicate (TODO)', id)"
-      @export-pack="(id) => console.info('[Library] export (TODO)', id)"
-      @delete="(id) => console.info('[Library] delete (TODO)', id)"
+      @edit="editInCreator"
+      @duplicate="duplicateTheme"
+      @export-pack="exportTheme"
+      @delete="deleteTheme"
     />
 
     <!-- 適用確認モーダル -->
