@@ -16,7 +16,7 @@ import { sanitizeSvg } from '~/composables/sanitizeSvg'
 import { invokeTauri } from '~/composables/useTauri'
 import { useKeystore } from '~/composables/useKeystore'
 import { useI18n } from '~/composables/useI18n'
-import { useCreatorAssets } from '~/composables/useCreatorAssets'
+import { useCreatorAssets, scaleHotspot } from '~/composables/useCreatorAssets'
 import { useBulkImport, type ResolvedAsset, type ParsedCursorpack } from '~/composables/useBulkImport'
 import BulkImportButton from '~/components/creator/BulkImportButton.vue'
 import BulkImportPreviewModal, { type ApplyPayload } from '~/components/creator/BulkImportPreviewModal.vue'
@@ -265,18 +265,21 @@ async function pickCursorFile() {
       URL.revokeObjectURL(importedPreviewUrl.value)
     }
     importedPreviewUrl.value = URL.createObjectURL(blob)
-    hotspotX.value = result.hotspotX
-    hotspotY.value = result.hotspotY
 
     filledRoles.add(activeRoleId.value)
     const map = filledSizesByRole.value[activeRoleId.value] ?? []
     if (!map.includes(activeSize.value)) {
       filledSizesByRole.value[activeRoleId.value] = [...map, activeSize.value]
     }
+
+    // .cur/.ico はファイル側にホットスポットが埋め込まれており、その値は既に新しい
+    // primarySize 基準なのでスケール変換せずそのまま採用する。
+    hotspotX.value = result.hotspotX
+    hotspotY.value = result.hotspotY
     setAsset(activeRoleId.value, {
       primary: png,
       primarySize: result.width,
-      hotspot: { x: hotspotX.value, y: hotspotY.value },
+      hotspot: { x: result.hotspotX, y: result.hotspotY },
       source: 'manual',
     })
 
@@ -593,13 +596,25 @@ async function onFileChange(e: Event) {
     }
 
     // 役割マップに登録 (エクスポート時に使用)
+    // PNG/SVG はホットスポット情報を持たないので、現在表示されている比率を維持して
+    // 新しい primarySize (= 256) 基準の px 値に変換する。
+    // ref サイズは「既存アセットの primarySize」優先、なければ activeSize (UI 入力時の基準)。
+    // これにより画像サイズが大きく変わっても見た目のホットスポット位置がずれない。
     if (importedPngBytes.value) {
+      const fromSize = hotspotReferenceSize.value
+      const finalHotspot = scaleHotspot(
+        { x: hotspotX.value, y: hotspotY.value },
+        fromSize,
+        256,
+      )
       setAsset(activeRoleId.value, {
         primary: importedPngBytes.value,
         primarySize: 256,
-        hotspot: { x: hotspotX.value, y: hotspotY.value },
+        hotspot: finalHotspot,
         source: 'manual',
       })
+      hotspotX.value = finalHotspot.x
+      hotspotY.value = finalHotspot.y
     }
   } catch (err) {
     importMessage.value = `失敗: ${err instanceof Error ? err.message : String(err)}`

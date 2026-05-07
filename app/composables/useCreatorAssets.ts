@@ -18,6 +18,29 @@ export interface RoleAsset {
 }
 
 /**
+ * `fromSize` 基準のホットスポット px 値を `toSize` 基準に変換する純粋関数。
+ *
+ * 画像の差し替えやリサンプル時に、UI 上の見た目位置（= ratio）を維持するために使う。
+ * 例: 256px キャンバス上の (4, 4) は ratio (1.5%, 1.5%)。これを 32px キャンバスに移すと
+ * `round(0.015 * 32) = (0, 0)` になり、左上隅という同じ意味を保つ。
+ *
+ * `fromSize <= 0` の場合はゼロ除算を避けて元の値をそのまま返す。
+ */
+export function scaleHotspot(
+  hotspot: Hotspot,
+  fromSize: number,
+  toSize: number,
+): Hotspot {
+  if (fromSize <= 0 || toSize <= 0 || fromSize === toSize) return hotspot
+  const ratioX = hotspot.x / fromSize
+  const ratioY = hotspot.y / fromSize
+  return {
+    x: Math.max(0, Math.min(toSize, Math.round(ratioX * toSize))),
+    y: Math.max(0, Math.min(toSize, Math.round(ratioY * toSize))),
+  }
+}
+
+/**
  * クリエイターのアセット状態を 1 か所で管理する composable。
  * `creator.vue` から `assignedPng` / `assignedHotspot` を取り除き、ここに集約する。
  */
