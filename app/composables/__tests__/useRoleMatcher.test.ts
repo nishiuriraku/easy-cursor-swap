@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { matchAssetToRole, normalize, resolveCollisions, scoreRole, type MatchCandidate } from '~/composables/useRoleMatcher'
+import {
+  matchAssetToRole,
+  matchAssetWithContext,
+  normalize,
+  resolveCollisions,
+  scoreRole,
+  type MatchCandidate,
+} from '~/composables/useRoleMatcher'
 
 describe('normalize', () => {
   it('lowercases and strips separators', () => {
@@ -88,5 +95,81 @@ describe('resolveCollisions', () => {
     ]
     const { winners } = resolveCollisions(cands)
     expect(winners[0].sourceFile).toBe('arrow.png')
+  })
+})
+
+describe('Japanese filename matching', () => {
+  it('matches Japanese role names exactly via aliases', () => {
+    expect(matchAssetToRole('通常.ani')).toEqual({ role: 'Arrow', score: 1.0 })
+    expect(matchAssetToRole('テキスト.ani')).toEqual({ role: 'IBeam', score: 1.0 })
+    expect(matchAssetToRole('待機.ani')).toEqual({ role: 'Wait', score: 1.0 })
+    expect(matchAssetToRole('手書き.ani')).toEqual({ role: 'NWPen', score: 1.0 })
+    expect(matchAssetToRole('移動.ani')).toEqual({ role: 'SizeAll', score: 1.0 })
+    expect(matchAssetToRole('禁止.ani')).toEqual({ role: 'No', score: 1.0 })
+    expect(matchAssetToRole('ヘルプ.ani')).toEqual({ role: 'Help', score: 1.0 })
+  })
+
+  it('matches the official "通常の選択" form', () => {
+    expect(matchAssetToRole('通常の選択.ani')).toEqual({ role: 'Arrow', score: 1.0 })
+    expect(matchAssetToRole('テキストの選択.ani')).toEqual({ role: 'IBeam', score: 1.0 })
+    expect(matchAssetToRole('リンクの選択.ani')).toEqual({ role: 'Hand', score: 1.0 })
+  })
+
+  it('handles full-width spaces (U+3000) inside the filename', () => {
+    // 八重神子 マウスカーソル 通常.ani — 通常 が末尾なので suffix-match → 0.95
+    const m = matchAssetToRole('八重神子　マウスカーソル　通常.ani')
+    expect(m?.role).toBe('Arrow')
+    expect(m?.score).toBeGreaterThanOrEqual(0.95)
+  })
+
+  it('handles 斜め1 / 斜め2 with full-width digit', () => {
+    expect(matchAssetToRole('斜め1.ani')?.role).toBe('SizeNWSE')
+    expect(matchAssetToRole('斜め2.ani')?.role).toBe('SizeNESW')
+  })
+
+  it('does not mis-classify 手書きカーソル as IBeam', () => {
+    // `カーソル` は IBeam の alias から外しているので NWPen が勝つ
+    expect(matchAssetToRole('手書きカーソル.ani')?.role).toBe('NWPen')
+  })
+
+  it('returns null for irrelevant Japanese words', () => {
+    expect(matchAssetToRole('ロゴ.png')).toBeNull()
+  })
+})
+
+describe('matchAssetWithContext', () => {
+  it('falls back to folder name when filename has no signal', () => {
+    // ファイル名は数字のみなので無効、フォルダ名 arrow から推定する
+    const m = matchAssetWithContext('64.png', 'C:/themes/arrow/64.png')
+    expect(m?.role).toBe('Arrow')
+    // フォルダ由来は信頼度を 0.85 倍に下げて返す
+    expect(m?.score).toBeLessThan(1.0)
+    expect(m?.score).toBeGreaterThanOrEqual(0.7)
+  })
+
+  it('falls back to a Japanese folder name', () => {
+    const m = matchAssetWithContext('256.png', '/themes/通常/256.png')
+    expect(m?.role).toBe('Arrow')
+  })
+
+  it('prefers filename match over folder match', () => {
+    // ファイル名で 1.0 取れるのでフォルダ "wait" は無視される
+    const m = matchAssetWithContext('arrow.png', '/themes/wait/arrow.png')
+    expect(m).toEqual({ role: 'Arrow', score: 1.0 })
+  })
+
+  it('handles backslash separators (Windows paths)', () => {
+    const m = matchAssetWithContext('64.png', 'C:\\themes\\テキスト\\64.png')
+    expect(m?.role).toBe('IBeam')
+  })
+
+  it('returns null when neither filename nor folders match', () => {
+    expect(matchAssetWithContext('64.png', '/themes/random/64.png')).toBeNull()
+  })
+
+  it('walks up multiple folder levels', () => {
+    // 直上フォルダは generic, 二段上の `pin` がヒット
+    const m = matchAssetWithContext('64.png', '/themes/pin/sub/64.png')
+    expect(m?.role).toBe('Pin')
   })
 })

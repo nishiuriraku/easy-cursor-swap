@@ -2,7 +2,7 @@
 import { ref, computed, watch, onUnmounted } from 'vue'
 import {
   CURSOR_ROLE_IDS,
-  matchAssetToRole,
+  matchAssetWithContext,
   resolveCollisions,
   type MatchCandidate,
 } from '~/composables/useRoleMatcher'
@@ -107,10 +107,12 @@ watch(() => props.open, (open) => {
     return
   }
 
-  // 通常経路: ファジーマッチ → 衝突解決 → 既存衝突判定
+  // 通常経路: ファイル名 + フォルダ名のファジーマッチ → 衝突解決 → 既存衝突判定。
+  // sourcePath を渡すことで `arrow/64.png` `通常/256.png` のように
+  // フォルダー名にロール名が含まれるケースもマッチさせる。
   const candidates: Array<MatchCandidate & { asset: ResolvedAsset }> = []
   for (const a of props.resolved ?? []) {
-    const m = matchAssetToRole(a.sourceFile)
+    const m = matchAssetWithContext(a.sourceFile, a.sourcePath)
     if (m) {
       candidates.push({ sourceFile: a.sourceFile, nativeSize: a.nativeSize, match: m, asset: a })
     } else {
