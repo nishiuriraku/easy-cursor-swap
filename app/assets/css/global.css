@@ -1263,3 +1263,80 @@ button {
   gap: 8px;
   align-items: center;
 }
+
+/* =============================================
+ * ライトテーマ — html.light に付与してアプリ全体を切替
+ * design/styles.css の `.win.light` から移植
+ * ============================================= */
+html.light {
+  --bg-0: #f4f6fb;
+  --bg-1: #ffffff;
+  --bg-2: #f7f9fd;
+  --bg-3: #eef1f7;
+  --bg-glass: rgba(255, 255, 255, 0.78);
+  --bg-glass-hi: rgba(255, 255, 255, 0.92);
+
+  --line: rgba(15, 20, 35, 0.07);
+  --line-hi: rgba(15, 20, 35, 0.13);
+  --line-strong: rgba(15, 20, 35, 0.22);
+
+  --fg: #14171f;
+  --fg-dim: #5b6070;
+  --fg-mute: #8b91a3;
+  --fg-faint: #c2c7d4;
+
+  --accent: #0fa885;
+  --accent-hi: #0c8a6c;
+  --accent-dim: rgba(15, 168, 133, 0.12);
+  --accent-line: rgba(15, 168, 133, 0.32);
+
+  --violet: #6a5cff;
+  --amber: #c8881f;
+  --rose: #d83a5e;
+
+  --shadow-1: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 1px 2px rgba(15, 20, 35, 0.06);
+  --shadow-2: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 12px 28px -12px rgba(15, 20, 35, 0.18);
+}
+html.light .win::before {
+  background:
+    radial-gradient(800px 500px at 12% -10%, rgba(15, 168, 133, 0.10), transparent 60%),
+    radial-gradient(900px 600px at 110% 110%, rgba(106, 92, 255, 0.08), transparent 60%);
+}
+html.light .titlebar { background: rgba(255, 255, 255, 0.7); }
+html.light .titlebar .tb-btn:hover { background: rgba(15, 20, 35, 0.06); }
+html.light .sidebar {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(247, 249, 253, 0.4));
+}
+html.light .toolbar { background: rgba(255, 255, 255, 0.55); }
+html.light .statbar { background: rgba(255, 255, 255, 0.7); }
+html.light .btn { background: rgba(15, 20, 35, 0.03); }
+html.light .btn:hover { background: rgba(15, 20, 35, 0.06); }
+html.light .btn.primary {
+  color: #ffffff;
+  box-shadow: 0 4px 12px -4px rgba(15, 168, 133, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+html.light .chip.active { color: #ffffff; background: var(--fg); border-color: var(--fg); }
+html.light .input { background: rgba(15, 20, 35, 0.025); }
+html.light .search { background: rgba(15, 20, 35, 0.025); }
+html.light .nav-item.active { background: rgba(15, 20, 35, 0.035); }
+html.light .card-preview {
+  background:
+    linear-gradient(180deg, rgba(15, 20, 35, 0.015), transparent),
+    radial-gradient(120% 100% at 0% 0%, rgba(15, 168, 133, 0.05), transparent 50%);
+}
+html.light .cell { background: rgba(15, 20, 35, 0.025); }
+html.light .cell.empty {
+  background: repeating-linear-gradient(-45deg, rgba(15, 20, 35, 0.04), rgba(15, 20, 35, 0.04) 3px, transparent 3px, transparent 6px);
+}
+html.light .brand-mark svg { color: #ffffff; }
+html.light .brand-mark {
+  background: linear-gradient(135deg, var(--accent), #0c8a6c);
+}
+html.light body,
+html.light html,
+html.light #__nuxt {
+  background: var(--bg-0);
+}
+html.light .session .dot,
+html.light .card-active-tag .pulse,
+html.light .nav-item.active::before { box-shadow: 0 0 8px rgba(15, 168, 133, 0.5); }

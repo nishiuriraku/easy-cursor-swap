@@ -65,8 +65,12 @@ export const UI_ICONS: Record<string, UiIconDef> = {
   X: { viewBox: '0 0 12 12', body: '<path d="m3 3 6 6M9 3l-6 6"/>' },
   Logo: {
     viewBox: '0 0 24 24',
-    filled: true,
-    body: '<path d="M5 3 L5 18 L9 14 L11.5 20 L14 19 L11.5 13 L17 13 Z"/>',
+    body: `
+      <path d="M3 2 L3 12 L5.6 9.6 L7.3 13.4 L8.8 12.8 L7.1 9 L10.4 9 Z" fill="currentColor" stroke="none"/>
+      <path d="M21 22 L21 12 L18.4 14.4 L16.7 10.6 L15.2 11.2 L16.9 15 L13.6 15 Z" fill="currentColor" fill-opacity="0.55" stroke="none"/>
+      <path d="M5 5 Q 12 2 19 7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-opacity="0.45" fill="none"/>
+      <path d="M19 19 Q 12 22 5 17" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-opacity="0.45" fill="none"/>
+    `,
   },
   Check: {
     viewBox: '0 0 16 16',
