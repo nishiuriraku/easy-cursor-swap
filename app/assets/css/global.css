@@ -1395,7 +1395,14 @@ html.light .win::before {
     radial-gradient(900px 600px at 110% 110%, rgba(106, 92, 255, 0.08), transparent 60%);
 }
 html.light .titlebar { background: rgba(255, 255, 255, 0.7); }
-html.light .titlebar .tb-btn:hover { background: rgba(15, 20, 35, 0.06); }
+/*
+ * ライト時の汎用ホバー。`html.light .titlebar .tb-btn:hover` の特異度が
+ * `.titlebar .tb-btn.close:hover` (line ~165) よりも高くなる関係で、
+ * close ボタンの赤ホバーが上書きされてしまう。`:not(.close)` で
+ * close を除外し、close 用の赤ホバー規則を別途用意する。
+ */
+html.light .titlebar .tb-btn:not(.close):hover { background: rgba(15, 20, 35, 0.06); }
+html.light .titlebar .tb-btn.close:hover { background: #c42b1c; color: #fff; }
 html.light .sidebar {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(247, 249, 253, 0.4));
 }
@@ -1403,10 +1410,17 @@ html.light .toolbar { background: rgba(255, 255, 255, 0.55); }
 html.light .statbar { background: rgba(255, 255, 255, 0.7); }
 html.light .btn { background: rgba(15, 20, 35, 0.03); }
 html.light .btn:hover { background: rgba(15, 20, 35, 0.06); }
+/*
+ * ライトモードの primary ボタンは accent (#0fa885) 上に白文字だと
+ * コントラスト比が約 3.4:1 で WCAG AA を満たさず読みづらい。
+ * 同色ペアレントの暗背景 (--bg-0 = #14171f 相当) のテキストを使うことで
+ * 6.0:1 程度を確保する。
+ */
 html.light .btn.primary {
-  color: #ffffff;
-  box-shadow: 0 4px 12px -4px rgba(15, 168, 133, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  color: #0a0b0f;
+  box-shadow: 0 4px 12px -4px rgba(15, 168, 133, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
+html.light .btn.primary svg { color: #0a0b0f; }
 html.light .chip.active { color: #ffffff; background: var(--fg); border-color: var(--fg); }
 html.light .input { background: rgba(15, 20, 35, 0.025); }
 html.light .search { background: rgba(15, 20, 35, 0.025); }
