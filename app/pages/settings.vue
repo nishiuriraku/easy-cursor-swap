@@ -404,10 +404,14 @@ function selectSection(id: SectionId) {
                 :label="t('settings.languageLabel')"
                 :desc="t('settings.languageDesc')"
               >
-                <select v-model="general.language" class="input" style="width: 140px; height: 32px">
-                  <option value="ja">日本語</option>
-                  <option value="en">English</option>
-                </select>
+                <UiSelect
+                  v-model="general.language"
+                  width="140px"
+                  :options="[
+                    { value: 'ja', label: '日本語' },
+                    { value: 'en', label: 'English' },
+                  ]"
+                />
               </SettingsRow>
             </div>
           </div>
@@ -475,12 +479,16 @@ function selectSection(id: SectionId) {
                 :label="t('settings.storageThresholdLabel')"
                 :desc="t('settings.storageThresholdDesc')"
               >
-                <select v-model.number="library.totalLimitWarnGb" class="input" style="width: 100px; height: 32px">
-                  <option :value="0.5">0.5 GB</option>
-                  <option :value="1">1 GB</option>
-                  <option :value="2">2 GB</option>
-                  <option :value="5">5 GB</option>
-                </select>
+                <UiSelect
+                  v-model="library.totalLimitWarnGb"
+                  width="100px"
+                  :options="[
+                    { value: 0.5, label: '0.5 GB' },
+                    { value: 1, label: '1 GB' },
+                    { value: 2, label: '2 GB' },
+                    { value: 5, label: '5 GB' },
+                  ]"
+                />
               </SettingsRow>
               <SettingsRow
                 :label="t('settings.storageWarnEnabledLabel')"
@@ -634,13 +642,17 @@ function selectSection(id: SectionId) {
             <div class="prop-head">{{ t('settings.groupLogOutput') }}</div>
             <div class="prop-body">
               <SettingsRow :label="t('settings.logLevelLabel')" :desc="t('settings.logLevelDesc')">
-                <select v-model="logging.logLevel" class="input" style="width: 140px; height: 32px">
-                  <option>TRACE</option>
-                  <option>DEBUG</option>
-                  <option>INFO</option>
-                  <option>WARN</option>
-                  <option>ERROR</option>
-                </select>
+                <UiSelect
+                  v-model="logging.logLevel"
+                  width="140px"
+                  :options="[
+                    { value: 'TRACE', label: 'TRACE' },
+                    { value: 'DEBUG', label: 'DEBUG' },
+                    { value: 'INFO', label: 'INFO' },
+                    { value: 'WARN', label: 'WARN' },
+                    { value: 'ERROR', label: 'ERROR' },
+                  ]"
+                />
               </SettingsRow>
               <SettingsRow :label="t('settings.retentionLabel')" :desc="t('settings.retentionDesc')">
                 <input v-model.number="logging.retentionDays" type="number" class="input" min="1" max="365" style="width: 80px" />
@@ -676,10 +688,14 @@ function selectSection(id: SectionId) {
                 <SettingsToggle v-model="updates.autoUpdate" />
               </SettingsRow>
               <SettingsRow :label="t('settings.channelLabel')" :desc="t('settings.channelDesc')">
-                <select v-model="updates.channel" class="input" style="width: 140px; height: 32px">
-                  <option value="stable">stable</option>
-                  <option value="beta">beta</option>
-                </select>
+                <UiSelect
+                  v-model="updates.channel"
+                  width="140px"
+                  :options="[
+                    { value: 'stable', label: 'stable' },
+                    { value: 'beta', label: 'beta' },
+                  ]"
+                />
               </SettingsRow>
               <SettingsRow :label="t('settings.checkNowLabel')">
                 <button class="btn" :disabled="updaterChecking || updaterDownloading" @click="onCheckUpdate">

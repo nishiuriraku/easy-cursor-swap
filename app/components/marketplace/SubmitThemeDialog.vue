@@ -143,12 +143,15 @@ onMounted(async () => {
 
             <div class="field">
               <label for="submit-theme">{{ t('marketplace.submitSelectTheme') }}</label>
-              <select id="submit-theme" v-model="selectedThemeId">
-                <option disabled :value="null">-- {{ t('marketplace.submitSelectPlaceholder') }} --</option>
-                <option v-for="th in themes" :key="th.id" :value="th.id">
-                  {{ th.name }} (v{{ th.version }})
-                </option>
-              </select>
+              <UiSelect
+                v-model="selectedThemeId"
+                width="100%"
+                :placeholder="t('marketplace.submitSelectPlaceholder')"
+                :options="themes.map((th) => ({
+                  value: th.id,
+                  label: `${th.name} (v${th.version})`,
+                }))"
+              />
             </div>
 
             <div class="field">

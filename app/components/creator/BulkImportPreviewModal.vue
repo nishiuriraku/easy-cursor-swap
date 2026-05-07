@@ -257,10 +257,15 @@ onUnmounted(resetState)
         <div v-for="u in unmatched" :key="u.asset.sourcePath" class="bi-unmatched">
           <img :src="u.previewUrl" :alt="u.asset.sourceFile" />
           <span>{{ u.asset.sourceFile }} ({{ u.asset.nativeSize }}px)</span>
-          <select v-model="u.manuallyAssignedRole">
-            <option :value="null">{{ t('bulkImport.selectRolePlaceholder') }}</option>
-            <option v-for="r in CURSOR_ROLE_IDS" :key="r" :value="r">{{ r }}</option>
-          </select>
+          <UiSelect
+            v-model="u.manuallyAssignedRole"
+            width="180px"
+            :placeholder="t('bulkImport.selectRolePlaceholder')"
+            :options="[
+              { value: null, label: t('bulkImport.selectRolePlaceholder') },
+              ...CURSOR_ROLE_IDS.map((r) => ({ value: r, label: r })),
+            ]"
+          />
         </div>
 
         <template v-if="cursorpack">
