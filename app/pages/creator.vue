@@ -32,6 +32,31 @@ type ResampleMode = 'lanczos' | 'nearest' | 'auto'
 const SIZES = [32, 48, 64, 96, 128, 256] as const
 type TabId = 'assign' | 'metadata' | 'preview' | 'publish'
 
+/**
+ * Creator のセッションステージ。
+ * - `start`: design/empty-states.jsx::CreatorStart のヒーロー画面。
+ *            「新規作成」を押すと editing に遷移する。
+ * - `editing`: 既存の 17 役割割り当て + メタデータ編集 UI。
+ *
+ * Clear ボタンで editing → start に戻れる。アセットとメタデータは戻る際にクリアする。
+ */
+type CreatorStage = 'start' | 'editing'
+const stage = ref<CreatorStage>('start')
+
+// useSeoMeta は Tauri アプリでは document.title 等の最小用途。Nuxt ページ規約に従って
+// title / description / ogImage を定義しておく。
+useSeoMeta({
+  title: 'EasyCursorSwap — Creator',
+  description: 'Windows 用カーソルテーマを 17 役割 × 6 解像度で作成しエクスポートする',
+  ogImage: '/icon.png',
+})
+
+/* === useSeoMeta は title 用途 (上で設定済) ============================================
+ * 以降は通常のページロジック。`stage` ref に応じて `<template>` 内で
+ * CreatorStartScreen と編集 UI を切替える。useSeoMeta 設定はファイル冒頭で完結している。
+ * ====================================================================================== */
+
+
 // --- ダミーステート (実装は将来の IPC 連携で置換) ---
 const filledRoles = reactive(new Set<string>([
   'Arrow', 'Help', 'Wait', 'IBeam', 'Hand', 'No', 'Crosshair',
@@ -550,6 +575,57 @@ function cancelBulkImport() {
   bulkCursorpack.value = null
 }
 
+/**
+ * Creator の編集状態を完全にリセットして初期画面に戻す。
+ *
+ * アセット・メタデータ・インポートメッセージ・進捗バナーを全てクリアして
+ * 「Clear」ボタンを押した瞬間に Cmd+N と同等の状態に戻す。プレビュー Blob URL も
+ * 解放してメモリリークを防ぐ。
+ */
+function resetCreator() {
+  for (const role of Object.keys(assigned.value)) {
+    creatorAssets.removeAsset(role)
+  }
+  filledRoles.clear()
+  filledSizesByRole.value = {}
+  activeRoleId.value = 'Arrow'
+  activeSize.value = 64
+  hotspotX.value = 4
+  hotspotY.value = 4
+  metaName.value = 'Untitled Theme'
+  metaNameEn.value = ''
+  metaAuthor.value = ''
+  metaVersion.value = '1.0.0'
+  metaDescription.value = ''
+  shadowEnabled.value = false
+  if (importedPreviewUrl.value && importedPreviewUrl.value.startsWith('blob:')) {
+    URL.revokeObjectURL(importedPreviewUrl.value)
+  }
+  importedPreviewUrl.value = null
+  importedPngBytes.value = null
+  importMessage.value = null
+  buildMessage.value = null
+  exportMessage.value = null
+  exportProgress.value = null
+  activeTab.value = 'assign'
+  stage.value = 'start'
+}
+
+/** ヒーロー画面の「新規作成」CTA ハンドラ。空のテーマを開く。 */
+function onStartNew() {
+  stage.value = 'editing'
+}
+
+/** ヒーロー画面の「.cursorpack をインポート」CTA ハンドラ。 */
+async function onImportPackFromStart() {
+  await handleBulkCursorpack()
+  // モーダル経由でロール反映が完了したら editing へ。モーダルが開いたままなら
+  // 後続の applyBulkImport で stage を切り替える。
+  if (bulkModalOpen.value) {
+    stage.value = 'editing'
+  }
+}
+
 async function onFileChange(e: Event) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
@@ -627,6 +703,13 @@ async function onFileChange(e: Event) {
 
 <template>
   <div class="creator-host">
+    <CreatorStartScreen
+      v-if="stage === 'start'"
+      @start-new="onStartNew"
+      @import-pack="onImportPackFromStart"
+      @duplicate-existing="onStartNew"
+    />
+    <template v-else>
     <!-- ツールバー -->
     <div class="toolbar">
       <div class="bcrumb">
@@ -639,6 +722,14 @@ async function onFileChange(e: Event) {
       </div>
       <div />
       <div class="tb-actions">
+        <button
+          class="btn ghost"
+          aria-label="クリアして初期画面に戻る"
+          title="編集中のアセットを破棄して初期画面に戻る"
+          @click="resetCreator"
+        >
+          <UiIcon name="X" :size="13" />クリア
+        </button>
         <span v-if="hasKeystoreSigning" class="tag ok">
           <UiIcon name="Shield" :size="11" />{{ t('creator.signedTag') }}
         </span>
@@ -1037,12 +1128,13 @@ async function onFileChange(e: Event) {
 
     <AppStatusbar
       :items="[
-        { dot: true, text: '編集中: Neon Glow' },
+        { dot: true, text: '編集中: ' + (metaName || 'Untitled') },
         { text: `${filledCount}/17 役割 · ${sizesCovered}/6 解像度` },
         { text: '未保存の変更 3件' },
         { text: 'WebView2 132.0.2957' },
       ]"
     />
+    </template>
   </div>
 </template>
 
