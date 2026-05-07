@@ -54,7 +54,20 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     // トレイアイコンの構築
+    //
+    // tauri.conf.json から `app.trayIcon` を削除し、ここで一元管理する。
+    // config 側に書くと Tauri が自動でアイコンのみのトレイを 1 つ作るため、
+    // 加えてこの関数で 2 個目を作ると「アイコン無し空白 + アイコン付き」の
+    // 2 つがトレイに並んでしまう。明示的にバンドル済み default_window_icon を
+    // 流用してアイコンを設定し、メニューとイベントハンドラを 1 個に集約する。
+    let icon = app
+        .default_window_icon()
+        .cloned()
+        .ok_or("default_window_icon が利用できません")?;
+
     let _tray = TrayIconBuilder::new()
+        .icon(icon)
+        .icon_as_template(false)
         .menu(&menu)
         .tooltip("EasyCursorSwap")
         .on_menu_event(move |app, event| {
