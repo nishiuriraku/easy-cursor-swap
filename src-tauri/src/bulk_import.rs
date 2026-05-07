@@ -139,6 +139,106 @@ fn walk_dir(dir: &Path, recursive: bool, out: &mut Vec<String>) {
     }
 }
 
+use crate::errors::AppError;
+
+/// 単一ファイルを `ResolvedAsset` に変換する。
+pub fn resolve_one(path: &str) -> Result<ResolvedAsset, AppError> {
+    let p = Path::new(path);
+    let metadata = std::fs::metadata(p)
+        .map_err(|e| AppError::ImageProcessing(format!("metadata 取得失敗: {}", e)))?;
+    if metadata.len() > MAX_FILE_BYTES {
+        return Err(AppError::OversizeFile {
+            path: path.to_string(),
+            size: metadata.len(),
+        });
+    }
+    let ext = p
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|s| s.to_ascii_lowercase())
+        .unwrap_or_default();
+    let bytes = std::fs::read(p)
+        .map_err(|e| AppError::ImageProcessing(format!("読み込み失敗: {}", e)))?;
+    let basename = p
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_string();
+
+    match ext.as_str() {
+        "png" => resolve_png(path, basename, &bytes),
+        "svg" => resolve_svg(path, basename, &bytes),
+        "cur" | "ico" => resolve_cur_or_ico(path, basename, &bytes, ext == "cur"),
+        _ => Err(AppError::ImageProcessing(format!("未対応拡張子: {}", ext))),
+    }
+}
+
+fn resolve_png(path: &str, basename: String, bytes: &[u8]) -> Result<ResolvedAsset, AppError> {
+    if bytes.len() < 8 || &bytes[..8] != b"\x89PNG\r\n\x1a\n" {
+        return Err(AppError::ImageProcessing(
+            "PNG マジックバイト不一致".into(),
+        ));
+    }
+    let img = image::load_from_memory(bytes)
+        .map_err(|e| AppError::ImageProcessing(format!("PNG decode 失敗: {}", e)))?;
+    let size = img.width().min(img.height());
+    Ok(ResolvedAsset {
+        source_file: basename,
+        source_path: path.to_string(),
+        kind: AssetKind::Png,
+        png_bytes: bytes.to_vec(),
+        svg_text: None,
+        native_size: size,
+        hotspot_x: 0,
+        hotspot_y: 0,
+        available_sizes: vec![size],
+    })
+}
+
+fn resolve_svg(path: &str, basename: String, bytes: &[u8]) -> Result<ResolvedAsset, AppError> {
+    let text = std::str::from_utf8(bytes)
+        .map_err(|e| AppError::ImageProcessing(format!("SVG が UTF-8 ではありません: {}", e)))?
+        .to_string();
+    Ok(ResolvedAsset {
+        source_file: basename,
+        source_path: path.to_string(),
+        kind: AssetKind::Svg,
+        png_bytes: Vec::new(),
+        svg_text: Some(text),
+        native_size: 256,
+        hotspot_x: 0,
+        hotspot_y: 0,
+        available_sizes: vec![256],
+    })
+}
+
+fn resolve_cur_or_ico(
+    path: &str,
+    basename: String,
+    bytes: &[u8],
+    is_cur_hint: bool,
+) -> Result<ResolvedAsset, AppError> {
+    let parsed = crate::cursor::parse_ico_cur(bytes)?;
+    let available_sizes: Vec<u32> = parsed.entries.iter().map(|e| e.width).collect();
+    let (largest, png_bytes) = crate::cursor::pick_largest_as_png(&parsed)?;
+    let kind = if is_cur_hint || parsed.is_cur {
+        AssetKind::Cur
+    } else {
+        AssetKind::Ico
+    };
+    Ok(ResolvedAsset {
+        source_file: basename,
+        source_path: path.to_string(),
+        kind,
+        png_bytes,
+        svg_text: None,
+        native_size: largest.width,
+        hotspot_x: largest.hotspot_x,
+        hotspot_y: largest.hotspot_y,
+        available_sizes,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -167,5 +267,31 @@ mod tests {
         fs::write(tmp.path().join("foo.exe"), b"x").unwrap();
         let files = collect_target_files(&[tmp.path().to_string_lossy().to_string()], false);
         assert_eq!(files.len(), 1);
+    }
+
+    #[test]
+    fn resolve_one_png_returns_native_size() {
+        let mut p = fixture_dir();
+        p.push("easy-cursor-swap-mint__Arrow.png");
+        let asset = resolve_one(&p.to_string_lossy()).unwrap();
+        assert_eq!(asset.kind, AssetKind::Png);
+        // sample-icon の PNG はすべて 128x128
+        assert_eq!(asset.native_size, 128);
+        assert_eq!(asset.hotspot_x, 0);
+        assert_eq!(asset.source_file, "easy-cursor-swap-mint__Arrow.png");
+        assert!(asset.svg_text.is_none());
+        assert!(!asset.png_bytes.is_empty());
+    }
+
+    #[test]
+    fn resolve_one_oversize_returns_err() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("big.png");
+        std::fs::write(&path, vec![0u8; (MAX_FILE_BYTES + 1) as usize]).unwrap();
+        let err = resolve_one(&path.to_string_lossy()).unwrap_err();
+        match err {
+            crate::errors::AppError::OversizeFile { .. } => {}
+            other => panic!("expected OversizeFile, got {:?}", other),
+        }
     }
 }
