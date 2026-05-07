@@ -20,17 +20,10 @@ const emit = defineEmits<{
   apply: [id: string]
   toggleFavorite: [id: string]
   showDetails: [id: string]
-  edit: [id: string]
-  duplicate: [id: string]
-  exportPack: [id: string]
-  delete: [id: string]
 }>()
 
-/** シェブロンクリックで詳細ドロワーを展開する内部ステート。 */
-const expanded = ref(false)
-function toggleDetail() {
-  expanded.value = !expanded.value
-  // 互換のため showDetails イベントも発火 (将来別の詳細 UI に切替えるための拡張点)。
+/** シェブロン押下: 親 (Library ページ) のモーダル管理にイベントを投げるだけ。 */
+function openDetail() {
   emit('showDetails', props.theme.id)
 }
 
@@ -79,7 +72,7 @@ watch(() => props.theme.id, fetchPreview)
 
 <template>
   <article
-    :class="['card', { active: theme.isActive, interactive: !theme.isActive, 'td-open': expanded }]"
+    :class="['card', { active: theme.isActive, interactive: !theme.isActive }]"
     :aria-label="theme.name"
     :tabindex="theme.isActive ? -1 : 0"
     role="button"
@@ -145,26 +138,13 @@ watch(() => props.theme.id, fetchPreview)
           {{ t('common.apply') }}
         </button>
         <button
-          :class="['btn', 'icon', 'td-toggle', { open: expanded }]"
-          :aria-label="expanded ? `${theme.name} の詳細を閉じる` : `${theme.name} の詳細を表示`"
-          :aria-expanded="expanded"
-          @click="toggleDetail"
+          class="btn icon"
+          :aria-label="`${theme.name} の詳細を開く`"
+          @click="openDetail"
         >
           <UiIcon name="ChevD" :size="13" aria-hidden="true" />
         </button>
       </div>
     </div>
-
-    <ThemeDetailDrawer
-      v-if="expanded"
-      :theme="theme"
-      :preview-map="previewMap"
-      @apply="(id) => emit('apply', id)"
-      @edit="(id) => emit('edit', id)"
-      @duplicate="(id) => emit('duplicate', id)"
-      @export-pack="(id) => emit('exportPack', id)"
-      @delete="(id) => emit('delete', id)"
-      @close="expanded = false"
-    />
   </article>
 </template>

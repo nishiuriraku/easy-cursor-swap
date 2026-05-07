@@ -14,6 +14,7 @@ import type { ThemeCardData } from '~/types/theme'
 import { invokeTauri } from '~/composables/useTauri'
 import { notify } from '~/composables/useNotify'
 import { useI18n } from '~/composables/useI18n'
+import { useThemePreviews } from '~/composables/useThemePreviews'
 
 const { t } = useI18n()
 // UiIcon / ThemeCard / ApplyModal / AppStatusbar は Nuxt の自動インポートで解決される。
@@ -33,6 +34,11 @@ const showDrop = ref(false)
 const pendingTheme = ref<ThemeCardData | null>(null)
 const applyBusy = ref(false)
 const applyError = ref<string | null>(null)
+
+// 詳細モーダル制御。モーダルは画面に同時に 1 つしか出さない。
+const detailTheme = ref<ThemeCardData | null>(null)
+const detailPreviewMap = ref<Record<string, string> | null>(null)
+const themePreviewCache = useThemePreviews()
 
 // インポート衝突ダイアログ用
 interface ConflictPending {
@@ -212,8 +218,35 @@ function toggleFavorite(id: string) {
   if (t) t.isFavorite = !t.isFavorite
 }
 
-function showDetails(id: string) {
-  console.info('[Library] showDetails', id)
+/**
+ * カードのシェブロン押下で開く詳細モーダル。
+ *
+ * モーダルが共有されているのでプレビューマップは開いた瞬間にロードする。
+ * `useThemePreviews` 側で IPC 結果がキャッシュされているので 2 回目以降は即時表示。
+ */
+async function showDetails(id: string) {
+  const found = themes.value.find((tt) => tt.id === id)
+  if (!found) return
+  detailTheme.value = found
+  detailPreviewMap.value = null
+  // Windows システムスキームには ID が `windows:` プレフィックス付きでローカルテーマ
+  // のキャッシュキーと衝突しないので、そのまま渡す。実体取得が無い場合は null のまま。
+  try {
+    detailPreviewMap.value = await themePreviewCache.getMap(id)
+  } catch (err) {
+    console.warn('[Library] preview load for detail failed:', err)
+  }
+}
+
+function closeDetails() {
+  detailTheme.value = null
+  detailPreviewMap.value = null
+}
+
+/** 詳細モーダルから「適用」を選んだとき。確認モーダル経由で apply を実行する。 */
+function applyFromDetail(id: string) {
+  closeDetails()
+  requestApply(id)
 }
 
 // ブラウザの DragEvent は dataTransfer.files に絶対パスを含めないため、
@@ -632,8 +665,8 @@ onUnmounted(() => {
         <h3>{{ t('library.emptySearch') }}</h3>
       </div>
 
-      <!-- テーマグリッド (td-grid-host: 詳細ドロワー展開時に 2 列スパンを許可する) -->
-      <div v-else class="grid td-grid-host">
+      <!-- テーマグリッド -->
+      <div v-else class="grid">
         <ThemeCard
           v-for="theme in filteredThemes"
           :key="theme.id"
@@ -653,6 +686,18 @@ onUnmounted(() => {
         { text: '署名検証: 有効' },
         { text: `~/.custom_cursors/ — ${totalStorageMb} MB` },
       ]"
+    />
+
+    <!-- 詳細モーダル (テーマカードのシェブロンで開く) -->
+    <ThemeDetailModal
+      :theme="detailTheme"
+      :preview-map="detailPreviewMap"
+      @close="closeDetails"
+      @apply="applyFromDetail"
+      @edit="(id) => console.info('[Library] edit (TODO)', id)"
+      @duplicate="(id) => console.info('[Library] duplicate (TODO)', id)"
+      @export-pack="(id) => console.info('[Library] export (TODO)', id)"
+      @delete="(id) => console.info('[Library] delete (TODO)', id)"
     />
 
     <!-- 適用確認モーダル -->
