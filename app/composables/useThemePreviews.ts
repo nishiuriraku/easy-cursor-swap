@@ -22,16 +22,22 @@ function looksLikeUuid(id: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
 }
 
+const WINDOWS_PREFIX = 'windows:'
+
 /**
  * 指定テーマの全ロール (または指定ロール) のプレビューを取得する。
  *
  * 結果は `cache` に保存され、`role → blob URL` のマップを返す。失敗時は null。
+ *
+ * - UUID 形式 → ローカルテーマ (`get_theme_previews`)
+ * - `windows:<scheme name>` → Windows レジストリスキーム (`get_windows_scheme_previews`)
  */
 async function fetchPreviews(
   themeId: string,
   roles?: string[],
 ): Promise<PreviewCacheEntry | null> {
-  if (!looksLikeUuid(themeId)) return null
+  const isWindowsScheme = themeId.startsWith(WINDOWS_PREFIX)
+  if (!isWindowsScheme && !looksLikeUuid(themeId)) return null
   // 全ロール取得済みならキャッシュをそのまま返す。部分リクエストはキャッシュに合流させる。
   const existing = cache.get(themeId)
   if (existing) return existing
@@ -42,10 +48,14 @@ async function fetchPreviews(
 
   const promise = (async () => {
     try {
-      const result = await invokeTauri<Record<string, number[]>>('get_theme_previews', {
-        themeId,
-        roles: roles ?? [],
-      })
+      const result = isWindowsScheme
+        ? await invokeTauri<Record<string, number[]>>('get_windows_scheme_previews', {
+            name: themeId.slice(WINDOWS_PREFIX.length),
+          })
+        : await invokeTauri<Record<string, number[]>>('get_theme_previews', {
+            themeId,
+            roles: roles ?? [],
+          })
       if (!result) return null
       const urls: Record<string, string> = {}
       for (const [role, bytes] of Object.entries(result)) {
@@ -57,7 +67,7 @@ async function fetchPreviews(
       cache.set(themeId, entry)
       return entry
     } catch (err) {
-      console.warn('[useThemePreviews] get_theme_previews failed:', err)
+      console.warn('[useThemePreviews] preview fetch failed:', err)
       return null
     } finally {
       inflight.delete(key)

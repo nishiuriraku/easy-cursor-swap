@@ -59,10 +59,30 @@ pub fn get_current_cursors() -> Result<std::collections::HashMap<String, String>
     RegistryManager::read_current_cursors()
 }
 
-/// テーマ一覧を取得する。`is_active` は config の `active_theme_id` に基づく。
+/// テーマ一覧を取得する。
+///
+/// `is_active` は config の `active_theme_id` に加えてレジストリ実態を検証する。
+/// Windows 側で別スキームに切り替えられたり、リセットされたりした場合は
+/// 該当テーマの `is_active` を **false** にして返し、`config` 側の
+/// `active_theme_id` もクリアする (Source of Truth はレジストリ)。
 #[tauri::command]
 pub fn get_themes(config: State<'_, ConfigManager>) -> Result<Vec<ThemeSummary>, AppError> {
-    let active_id = config.get()?.general.active_theme_id;
+    let cfg = config.get()?;
+    let mut active_id = cfg.general.active_theme_id;
+
+    // 実態と乖離していれば clear (例: ユーザーが Windows のマウスのプロパティで
+    // 別スキームを選択 / 既定にリセットした直後)
+    if let Some(id) = active_id {
+        if !ThemeManager::theme_active_in_registry(id) {
+            tracing::info!(
+                "active_theme_id={} はレジストリ実態と一致しないためクリアします",
+                id
+            );
+            let _ = config.update(|c| c.general.active_theme_id = None);
+            active_id = None;
+        }
+    }
+
     ThemeManager::list_themes(active_id)
 }
 
@@ -1014,6 +1034,53 @@ pub fn clear_crash_reports() -> Result<usize, AppError> {
     crate::crash::clear_reports()
 }
 
+/// 指定 Windows スキームのロール毎 PNG プレビューを返す。
+///
+/// `list_windows_schemes` で得たスキーム名を渡すと、各 `.cur` / `.ani` /
+/// `.ico` を最大解像度 PNG に変換して `HashMap<role, PNG bytes>` で返す。
+/// ファイルが見つからないロールはスキップ (1 つの欠損で全体表示を諦めない)。
+#[tauri::command]
+pub fn get_windows_scheme_previews(
+    name: String,
+) -> Result<std::collections::HashMap<String, Vec<u8>>, AppError> {
+    let schemes = RegistryManager::list_windows_schemes()?;
+    let scheme = schemes
+        .into_iter()
+        .find(|s| s.name == name)
+        .ok_or_else(|| AppError::Registry(format!("スキーム '{}' が見つかりません", name)))?;
+    Ok(ThemeManager::render_paths_as_previews(&scheme.cursor_paths))
+}
+
+/// 指定 Windows スキームを `.cursorpack` として書き出す。
+///
+/// `HKCU\Cursors\Schemes` の値が指す各カーソルファイル (.cur / .ani / .ico) を
+/// 拡張子を保ったまま zip 化し、theme.json を自動生成する。クリエイターを
+/// 通さず、ユーザーが既に Windows 側で構築した配色を共有・バックアップできる。
+#[derive(Debug, Serialize)]
+pub struct ExportSchemeResult {
+    pub theme_id: String,
+    pub size_bytes: u64,
+}
+
+#[tauri::command]
+pub fn export_windows_scheme_as_cursorpack(
+    name: String,
+    output_path: String,
+) -> Result<ExportSchemeResult, AppError> {
+    let schemes = RegistryManager::list_windows_schemes()?;
+    let scheme = schemes
+        .into_iter()
+        .find(|s| s.name == name)
+        .ok_or_else(|| AppError::Registry(format!("スキーム '{}' が見つかりません", name)))?;
+    let path = std::path::PathBuf::from(&output_path);
+    let (id, size) =
+        ThemeManager::export_scheme_as_cursorpack(&scheme.name, &scheme.cursor_paths, &path, None)?;
+    Ok(ExportSchemeResult {
+        theme_id: id.to_string(),
+        size_bytes: size,
+    })
+}
+
 /// `HKCU\Control Panel\Cursors\Schemes` に保存されたカーソルスキーム一覧を返す。
 ///
 /// ライブラリ画面に「Windows のマウスのプロパティに保存済みのスキーム」を
@@ -1122,6 +1189,8 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         clear_crash_reports,
         list_windows_schemes,
         apply_windows_scheme,
+        get_windows_scheme_previews,
+        export_windows_scheme_as_cursorpack,
         delete_theme,
         duplicate_theme,
         repackage_theme,

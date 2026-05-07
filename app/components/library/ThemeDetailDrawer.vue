@@ -263,9 +263,24 @@ const tags = computed<string[]>(() => {
             削除
           </button>
         </template>
-        <span v-else class="td-source mono">
-          <UiIcon name="Globe" :size="11" />システムスキームは適用のみ可能
-        </span>
+        <template v-else>
+          <!--
+            システムスキームは編集・複製・削除はできないが、`.cursorpack`
+            として書き出して別環境へ持ち運ぶことはできる。Rust 側の
+            `export_windows_scheme_as_cursorpack` が `%SystemRoot%\cursors\*`
+            を読み取って zip 化するため、ローカルディレクトリは不要。
+          -->
+          <button
+            class="td-act"
+            :aria-label="`${theme.name} を .cursorpack としてエクスポート`"
+            @click="emit('exportPack', theme.id)"
+          >
+            <UiIcon name="Export" :size="13" />.cursorpack に書き出し
+          </button>
+          <span class="td-source mono">
+            <UiIcon name="Globe" :size="11" />システムスキームは編集・複製不可
+          </span>
+        </template>
       </div>
       <div class="td-foot-r">
         <button

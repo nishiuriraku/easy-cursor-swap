@@ -578,7 +578,7 @@ impl RegistryManager {
                     continue;
                 }
             };
-            let scheme = parse_scheme_value(&name, &value);
+            let mut scheme = parse_scheme_value(&name, &value);
             if !scheme.cursor_paths.values().any(|p| !p.is_empty()) {
                 continue;
             }
@@ -588,6 +588,7 @@ impl RegistryManager {
                     continue;
                 }
             }
+            scheme.is_active = paths_match_current_registry(&scheme.cursor_paths);
             out.push(scheme);
         }
 
@@ -622,6 +623,38 @@ impl RegistryManager {
     }
 }
 
+/// 現在の `HKCU\Control Panel\Cursors` のロール毎パスと、与えられた候補
+/// (`expected`) のパス集合が「実質的に一致」しているかを判定する。
+///
+/// 「一致」の定義:
+///   - `expected` の非空エントリすべてについて、現在のレジストリの同じ役割が
+///     ASCII case-insensitive で同一パスを持つ
+///   - `expected` が空エントリ (= 既定継承) のロールは比較対象外
+///   - `expected` が完全に空 (どのロールにもパスを設定しない) なら false
+///
+/// レジストリ書き換えやテーマ適用後、ユーザーが Windows 側で別スキームに
+/// 切り替えた場合、`active_theme_id` と実態が乖離する。これを検出する用途。
+pub fn paths_match_current_registry(expected: &HashMap<String, String>) -> bool {
+    let non_empty: Vec<(&String, &String)> =
+        expected.iter().filter(|(_, v)| !v.is_empty()).collect();
+    if non_empty.is_empty() {
+        return false;
+    }
+    let current = match RegistryManager::read_current_cursors() {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::warn!("paths_match_current_registry: read failed: {}", e);
+            return false;
+        }
+    };
+    non_empty.iter().all(|(role, path)| {
+        current
+            .get(*role)
+            .map(|c| c.eq_ignore_ascii_case(path))
+            .unwrap_or(false)
+    })
+}
+
 /// Windows のカーソルスキーム 1 件 (HKCU\Control Panel\Cursors\Schemes の値 1 つ分) を表す。
 ///
 /// `cursor_paths` のキーは `CursorRole::registry_name` と同じ 17 種類の役割名。
@@ -634,6 +667,11 @@ pub struct WindowsScheme {
     pub cursor_paths: HashMap<String, String>,
     /// 17 役割中、実際にカーソルファイルを上書きする数 (空でないスロット数)。
     pub role_count: usize,
+    /// このスキームが現在 `HKCU\Control Panel\Cursors` の値と一致しているか。
+    /// `paths_match_current_registry` を経由して `list_windows_schemes` 内で
+    /// 集計するため、UI 側は別 IPC で実態問い合わせをする必要がない。
+    #[serde(default)]
+    pub is_active: bool,
 }
 
 /// スキームが EasyCursorSwap 管理下かどうかを判定する。
@@ -683,6 +721,7 @@ fn parse_scheme_value(name: &str, value: &str) -> WindowsScheme {
         name: name.to_string(),
         cursor_paths,
         role_count,
+        is_active: false,
     }
 }
 

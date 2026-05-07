@@ -365,6 +365,231 @@ impl ThemeManager {
         Ok(out)
     }
 
+    /// 指定 ID のテーマが現在実際にレジストリに適用されているかを判定する。
+    ///
+    /// `theme.json` に書かれた各役割の絶対パスと、`HKCU\Control Panel\Cursors`
+    /// の現在値を比較する。ユーザーが Windows のマウスのプロパティで別スキーム
+    /// に切り替えた / 既定へリセットした直後はここで `false` になり、UI の
+    /// "active" 表示も外れる。
+    pub fn theme_active_in_registry(id: Uuid) -> bool {
+        use crate::config::ConfigManager;
+        use crate::registry::paths_match_current_registry;
+
+        let Ok(cursors_dir) = ConfigManager::cursors_dir() else {
+            return false;
+        };
+        let theme_dir = cursors_dir.join(id.to_string());
+        let theme_json_path = theme_dir.join("theme.json");
+        if !theme_json_path.is_file() {
+            return false;
+        }
+        let content = match std::fs::read_to_string(&theme_json_path) {
+            Ok(c) => c,
+            Err(_) => return false,
+        };
+        let metadata: ThemeMetadata = match serde_json::from_str(&content) {
+            Ok(m) => m,
+            Err(_) => return false,
+        };
+        let mut expected: HashMap<String, String> = HashMap::new();
+        for (role, def) in &metadata.cursors {
+            let abs = theme_dir.join(&def.file);
+            expected.insert(role.clone(), abs.to_string_lossy().to_string());
+        }
+        paths_match_current_registry(&expected)
+    }
+
+    /// 任意の `.cur` / `.ico` / `.ani` ファイル 1 件を最大解像度の PNG にレンダリングする。
+    ///
+    /// ライブラリ画面で Windows のシステムスキーム (HKCU\Cursors\Schemes) を表示する際、
+    /// `%SystemRoot%\cursors\*.cur` 等を直接サムネイル化するために使う。
+    ///
+    /// 拡張子で判別:
+    ///  - `.png` ならバイト列をそのまま返す
+    ///  - `.ani` なら `parse_ani` で先頭フレームを取り出して PNG 化
+    ///  - それ以外 (`.cur` / `.ico`) は `parse_ico_cur` + `pick_largest_as_png`
+    pub fn render_cursor_file_as_png(path: &std::path::Path) -> AppResult<Vec<u8>> {
+        use crate::cursor::{parse_ani, parse_ico_cur, pick_largest_as_png};
+        use crate::errors::AppError;
+        let bytes = std::fs::read(path).map_err(|e| {
+            AppError::ImageProcessing(format!(
+                "ファイル読込失敗 ({}): {}",
+                crate::logging::redact_path(path),
+                e
+            ))
+        })?;
+        let ext = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_ascii_lowercase();
+        if ext == "png" {
+            return Ok(bytes);
+        }
+        if ext == "ani" {
+            let parsed = parse_ani(&bytes)?;
+            let frame = parsed.frames.first().ok_or_else(|| {
+                AppError::ImageProcessing(".ani にフレームがありません".to_string())
+            })?;
+            let mut png = Vec::new();
+            let encoder = image::codecs::png::PngEncoder::new(&mut png);
+            image::ImageEncoder::write_image(
+                encoder,
+                frame.image.as_raw(),
+                frame.image.width(),
+                frame.image.height(),
+                image::ExtendedColorType::Rgba8,
+            )
+            .map_err(|e| AppError::ImageProcessing(format!("PNG エンコード失敗: {}", e)))?;
+            return Ok(png);
+        }
+        // .cur / .ico
+        let parsed = parse_ico_cur(&bytes)?;
+        let (_, png) = pick_largest_as_png(&parsed)?;
+        Ok(png)
+    }
+
+    /// 役割名 → 絶対パス のマップから、各ロールのサムネイル PNG を生成する。
+    ///
+    /// 失敗するロールはスキップしてログに残す (1 つの壊れたファイルで全体表示を
+    /// 諦めない設計)。空文字列パスもスキップ。
+    pub fn render_paths_as_previews(
+        cursor_paths: &HashMap<String, String>,
+    ) -> HashMap<String, Vec<u8>> {
+        let mut out: HashMap<String, Vec<u8>> = HashMap::new();
+        for (role, raw) in cursor_paths {
+            if raw.is_empty() {
+                continue;
+            }
+            let path = std::path::PathBuf::from(raw);
+            if !path.is_file() {
+                tracing::debug!("scheme preview skip ({}): ファイル不在", role);
+                continue;
+            }
+            match Self::render_cursor_file_as_png(&path) {
+                Ok(bytes) => {
+                    out.insert(role.clone(), bytes);
+                }
+                Err(e) => {
+                    tracing::warn!("scheme preview {} のレンダリング失敗: {}", role, e);
+                }
+            }
+        }
+        out
+    }
+
+    /// Windows のレジストリスキームを `.cursorpack` として書き出す。
+    ///
+    /// クリエイターを介さず、ユーザーが既に Windows のマウスのプロパティで
+    /// 保存している配色をそのままパッケージ化したい用途。`.cur` / `.ani` /
+    /// `.ico` といった元の拡張子を保持したまま zip に格納し、theme.json には
+    /// 各ロールの相対パス (`cursors/<role>.<ext>`) を記録する。
+    ///
+    /// `name` が空のロール (= 既定継承スロット) は theme.cursors に含めない。
+    /// 戻り値: 書き込んだバイト数。
+    pub fn export_scheme_as_cursorpack(
+        scheme_name: &str,
+        cursor_paths: &HashMap<String, String>,
+        output_path: &std::path::Path,
+        author: Option<&str>,
+    ) -> AppResult<(Uuid, u64)> {
+        use crate::errors::AppError;
+        use std::io::Write;
+
+        let entries: Vec<(String, std::path::PathBuf)> = cursor_paths
+            .iter()
+            .filter(|(_, v)| !v.is_empty())
+            .map(|(k, v)| (k.clone(), std::path::PathBuf::from(v)))
+            .collect();
+        if entries.is_empty() {
+            return Err(AppError::Theme(
+                "スキームに有効なカーソルファイルがありません".to_string(),
+            ));
+        }
+
+        // theme.json のメタデータ構築
+        let mut name_map: HashMap<String, String> = HashMap::new();
+        name_map.insert("ja".into(), scheme_name.to_string());
+        name_map.insert("en".into(), scheme_name.to_string());
+
+        let mut cursors_meta: HashMap<String, CursorDefinition> = HashMap::new();
+        let mut zip_files: Vec<(String, Vec<u8>)> = Vec::new();
+        for (role, path) in &entries {
+            let ext = path
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("cur")
+                .to_ascii_lowercase();
+            // パッケージ内パスは lower_case 拡張子で統一
+            let rel = format!("cursors/{}.{}", role, ext);
+            let bytes = std::fs::read(path).map_err(|e| {
+                AppError::Theme(format!(
+                    "{} ({}) の読込に失敗: {}",
+                    role,
+                    crate::logging::redact_path(path),
+                    e
+                ))
+            })?;
+            cursors_meta.insert(
+                role.clone(),
+                CursorDefinition {
+                    file: rel.clone(),
+                    hotspot_x: 0,
+                    hotspot_y: 0,
+                    resize_method: "lanczos".to_string(),
+                    size_overrides: None,
+                },
+            );
+            zip_files.push((rel, bytes));
+        }
+
+        let metadata = ThemeMetadata {
+            schema_version: 1,
+            id: Uuid::new_v4(),
+            name: LocalizedString::Localized(name_map),
+            version: "1.0.0".to_string(),
+            created_at: chrono::Utc::now().to_rfc3339(),
+            requires_os_shadow: true,
+            cursors: cursors_meta,
+            author: author
+                .map(|s| s.to_string())
+                .or_else(|| Some("Windows".to_string())),
+            license: None,
+            homepage: None,
+            description: None,
+            min_app_version: None,
+            signature: None,
+        };
+
+        if let Some(parent) = output_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let file = std::fs::File::create(output_path)?;
+        let mut zip = zip::ZipWriter::new(file);
+        let opts: zip::write::SimpleFileOptions = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated);
+
+        let metadata_json = serde_json::to_vec_pretty(&metadata)?;
+        zip.start_file("theme.json", opts)?;
+        zip.write_all(&metadata_json)?;
+
+        for (rel, bytes) in zip_files {
+            zip.start_file(rel, opts)?;
+            zip.write_all(&bytes)?;
+        }
+        zip.finish()?;
+
+        let size = std::fs::metadata(output_path)?.len();
+        tracing::info!(
+            "exported scheme as cursorpack: '{}' ({} roles) → {} ({} bytes)",
+            scheme_name,
+            metadata.cursors.len(),
+            crate::logging::redact_path(output_path),
+            size
+        );
+        Ok((metadata.id, size))
+    }
+
     /// theme.json からサマリー情報を読み込む
     fn load_theme_summary(
         theme_json_path: &std::path::Path,

@@ -297,7 +297,19 @@ async function exportTheme(id: string) {
       filters: [{ name: 'Cursor Pack', extensions: ['cursorpack'] }],
     })
     if (!outputPath) return
-    const bytes = await invokeTauri<number>('repackage_theme', { themeId: id, outputPath })
+    let bytes: number | null = null
+    if (target.kind === 'system') {
+      // Windows レジストリスキームはローカルテーマディレクトリを持たないので
+      // 専用の export_windows_scheme_as_cursorpack を経由する。`%SystemRoot%`
+      // 配下の .cur / .ani をそのまま zip 化する設計。
+      const result = await invokeTauri<{ theme_id: string; size_bytes: number }>(
+        'export_windows_scheme_as_cursorpack',
+        { name: target.name, outputPath },
+      )
+      bytes = result?.size_bytes ?? null
+    } else {
+      bytes = await invokeTauri<number>('repackage_theme', { themeId: id, outputPath })
+    }
     void notify({
       title: 'EasyCursorSwap',
       body: `${target.name} をエクスポートしました (${bytes ?? '?'} bytes)`,
@@ -454,6 +466,8 @@ interface IpcWindowsScheme {
   name: string
   cursor_paths: Record<string, string>
   role_count: number
+  /** Rust 側で `paths_match_current_registry` 判定済み。現在実態と一致するなら true。 */
+  is_active?: boolean
 }
 
 /**
@@ -462,8 +476,8 @@ interface IpcWindowsScheme {
  * - id は `windows:<name>` のプレフィックスでローカルテーマと衝突を避ける
  * - kind: 'system' を立てて UI 側でバッジ・編集不可表示に切り替える
  * - included_roles は cursor_paths のキー (空でないもの) を使う
- * - active 判定は `HKCU\Control Panel\Cursors` の (Default) 値と比較できるが
- *   今は読み取り経路を増やさず、適用後にイベントで再ロードする
+ * - active 判定は Rust 側の `paths_match_current_registry` の結果 (`is_active`)
+ *   をそのまま採用する。フロントで再判定すると IPC 往復が増えるため。
  */
 function mapWindowsSchemeToCard(s: IpcWindowsScheme): ThemeCardData {
   const includedRoles = Object.entries(s.cursor_paths)
@@ -477,7 +491,7 @@ function mapWindowsSchemeToCard(s: IpcWindowsScheme): ThemeCardData {
     date: '',
     applyCount: 0,
     isFavorite: false,
-    isActive: false,
+    isActive: s.is_active === true,
     includedRoles,
     kind: 'system',
   }
