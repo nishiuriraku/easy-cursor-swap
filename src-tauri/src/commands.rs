@@ -66,6 +66,25 @@ pub fn get_themes(config: State<'_, ConfigManager>) -> Result<Vec<ThemeSummary>,
     ThemeManager::list_themes(active_id)
 }
 
+/// 指定テーマのロール毎 PNG プレビューを返す。
+///
+/// `roles` が空配列なら全ロールを返す。値が指定されていればそのロールのみ。
+/// レスポンスは `HashMap<role, PNG bytes>` で、IPC では `Vec<u8>` がそのまま JSON 配列化される。
+#[tauri::command]
+pub fn get_theme_previews(
+    theme_id: String,
+    roles: Vec<String>,
+) -> Result<std::collections::HashMap<String, Vec<u8>>, AppError> {
+    let id = uuid::Uuid::parse_str(&theme_id)
+        .map_err(|e| AppError::Theme(format!("無効なテーマ ID: {}", e)))?;
+    let filter: Option<&[String]> = if roles.is_empty() {
+        None
+    } else {
+        Some(&roles)
+    };
+    ThemeManager::load_role_previews(id, filter)
+}
+
 /// 指定 ID のテーマをシステムに適用する。
 /// 失敗時は内部のスナップショットから自動ロールバックされる。
 /// 成功時は config の `active_theme_id` を更新して永続化する。
@@ -1005,6 +1024,7 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         get_cursor_roles,
         get_current_cursors,
         get_themes,
+        get_theme_previews,
         apply_theme,
         inspect_cursorpack,
         import_cursorpack,

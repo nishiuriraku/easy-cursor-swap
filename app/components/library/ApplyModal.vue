@@ -15,6 +15,7 @@ import type { ThemeCardData } from '~/types/theme'
 import { CURSOR_ROLES } from '~/components/icons/CursorIcons'
 import { useI18n } from '~/composables/useI18n'
 import { invokeTauri } from '~/composables/useTauri'
+import { useThemePreviews } from '~/composables/useThemePreviews'
 
 const { t } = useI18n()
 
@@ -26,6 +27,8 @@ interface AccessibilityConflicts {
 }
 
 const conflicts = ref<AccessibilityConflicts | null>(null)
+const previewMap = ref<Record<string, string> | null>(null)
+const { getMap } = useThemePreviews()
 
 const conflictMessages = computed(() => {
   if (!conflicts.value || !conflicts.value.has_conflicts) return []
@@ -44,6 +47,10 @@ onMounted(async () => {
   } catch {
     // 取得失敗時はバナー非表示 (フェイルセーフ)
     conflicts.value = null
+  }
+  // テーマプレビューを取得 (失敗してもベクター描画にフォールバックする)
+  if (props.theme.id) {
+    previewMap.value = await getMap(props.theme.id)
   }
 })
 
@@ -134,11 +141,15 @@ function onBackdropClick(e: MouseEvent) {
                   :class="['mini', { empty: !theme.includedRoles.includes(role.id) }]"
                   :title="role.jp"
                 >
-                  <CursorIcon
-                    v-if="theme.includedRoles.includes(role.id)"
-                    :role="role.id"
-                    :size="14"
-                  />
+                  <template v-if="theme.includedRoles.includes(role.id)">
+                    <img
+                      v-if="previewMap && previewMap[role.id]"
+                      :src="previewMap[role.id]"
+                      :alt="role.jp"
+                      class="mini-img"
+                    >
+                    <CursorIcon v-else :role="role.id" :size="14" />
+                  </template>
                   <UiIcon v-else name="Plus" :size="10" />
                 </div>
               </div>
@@ -177,6 +188,14 @@ function onBackdropClick(e: MouseEvent) {
 </template>
 
 <style scoped>
+.mini-img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
 .a11y-banner {
   display: flex;
   gap: 10px;

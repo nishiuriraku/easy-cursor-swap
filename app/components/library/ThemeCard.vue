@@ -3,10 +3,12 @@
  * テーマカード。プレビュー (17 ロールマトリクス) + 名前/作者 + メタ + カバレッジ + アクション。
  * - `apply` クリックで親へ emit (Rust IPC は親で実行)
  * - `toggleFavorite` でスター切替
+ * - マウント時に Rust から実カーソル PNG を取得し、マトリクスに反映する
  */
-import { computed } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import type { ThemeCardData } from '~/types/theme'
 import { useI18n } from '~/composables/useI18n'
+import { useThemePreviews } from '~/composables/useThemePreviews'
 
 const { t } = useI18n()
 
@@ -20,6 +22,22 @@ const emit = defineEmits<{
   showDetails: [id: string]
 }>()
 
+/** カード本体のクリック/Enter で「適用」と同じ動作。子の <button> は stopPropagation で防御。 */
+function onCardActivate(e: Event) {
+  if (props.theme.isActive) return
+  // 内側のボタン上ならスキップ (個別ハンドラに委譲)
+  const target = e.target as HTMLElement | null
+  if (target?.closest('button, a, input')) return
+  emit('apply', props.theme.id)
+}
+
+function onCardKeydown(e: KeyboardEvent) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault()
+    onCardActivate(e)
+  }
+}
+
 const coveragePct = computed(() =>
   Math.round((props.theme.includedRoles.length / 17) * 100),
 )
@@ -29,15 +47,39 @@ const displayDate = computed(() => {
   const d = props.theme.date
   return d.length > 10 ? d.slice(0, 10) : d
 })
+
+// 実カーソル画像のプレビュー (キャッシュ越しに取得)
+const previewMap = ref<Record<string, string> | null>(null)
+const { getMap } = useThemePreviews()
+
+async function fetchPreview() {
+  if (!props.theme.id) return
+  const map = await getMap(props.theme.id)
+  previewMap.value = map
+}
+
+onMounted(fetchPreview)
+watch(() => props.theme.id, fetchPreview)
 </script>
 
 <template>
-  <article :class="['card', { active: theme.isActive }]" :aria-label="theme.name">
+  <article
+    :class="['card', { active: theme.isActive, interactive: !theme.isActive }]"
+    :aria-label="theme.name"
+    :tabindex="theme.isActive ? -1 : 0"
+    role="button"
+    @dblclick="onCardActivate"
+    @keydown="onCardKeydown"
+  >
     <div class="card-preview">
       <div v-if="theme.isActive" class="card-active-tag">
         <span class="pulse" aria-hidden="true" />{{ t('library.activeTag') }}
       </div>
-      <CursorMatrix :included="theme.includedRoles" :aria-label="t('library.coverage', { filled: theme.includedRoles.length })" />
+      <CursorMatrix
+        :included="theme.includedRoles"
+        :preview-map="previewMap"
+        :aria-label="t('library.coverage', { filled: theme.includedRoles.length })"
+      />
     </div>
     <div class="card-body">
       <div class="card-row">

@@ -299,6 +299,72 @@ impl ThemeManager {
         Ok(themes)
     }
 
+    /// 指定テーマ ID のロール毎 PNG プレビューを返す。
+    ///
+    /// UI のテーマカード/ApplyModal で「実物の絵」を表示するために使う。
+    /// `~/.custom_cursors/<UUID>/<role-file>` を読み、`.cur` / `.ico` は最大解像度を
+    /// PNG 化し、`.png` 拡張子はそのままバイト列を返す。
+    ///
+    /// `roles_filter` が `Some` の場合は指定ロールのみ返す (カード用に Arrow だけ等)。
+    pub fn load_role_previews(
+        id: Uuid,
+        roles_filter: Option<&[String]>,
+    ) -> AppResult<HashMap<String, Vec<u8>>> {
+        use crate::config::ConfigManager;
+        use crate::cursor::{parse_ico_cur, pick_largest_as_png};
+
+        let cursors_dir = ConfigManager::cursors_dir()?;
+        let theme_dir = cursors_dir.join(id.to_string());
+        let theme_json_path = theme_dir.join("theme.json");
+        if !theme_json_path.is_file() {
+            return Err(crate::errors::AppError::Theme(format!(
+                "テーマ {} が見つかりません",
+                id
+            )));
+        }
+        let content = std::fs::read_to_string(&theme_json_path)?;
+        let metadata: ThemeMetadata = serde_json::from_str(&content)?;
+
+        let mut out: HashMap<String, Vec<u8>> = HashMap::new();
+        for (role, def) in &metadata.cursors {
+            if let Some(filter) = roles_filter {
+                if !filter.iter().any(|r| r == role) {
+                    continue;
+                }
+            }
+            let abs = theme_dir.join(&def.file);
+            if !abs.is_file() {
+                continue;
+            }
+            let bytes = match std::fs::read(&abs) {
+                Ok(b) => b,
+                Err(e) => {
+                    tracing::warn!("プレビュー読込失敗 ({}): {}", role, e);
+                    continue;
+                }
+            };
+            // 拡張子で判別: .png ならそのまま、それ以外は cur/ico として解釈
+            let ext = abs
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("")
+                .to_ascii_lowercase();
+            let png_bytes = if ext == "png" {
+                bytes
+            } else {
+                match parse_ico_cur(&bytes).and_then(|p| pick_largest_as_png(&p)) {
+                    Ok((_, png)) => png,
+                    Err(e) => {
+                        tracing::warn!("{} の PNG 化に失敗: {}", role, e);
+                        continue;
+                    }
+                }
+            };
+            out.insert(role.clone(), png_bytes);
+        }
+        Ok(out)
+    }
+
     /// theme.json からサマリー情報を読み込む
     fn load_theme_summary(
         theme_json_path: &std::path::Path,
