@@ -180,22 +180,28 @@ async function confirmApply(id: string) {
   applyBusy.value = true
   applyError.value = null
   try {
-    await invokeTauri<void>('apply_theme', { themeId: id })
+    const target = themes.value.find((x) => x.id === id)
+    // Windows システムスキームは別 IPC 経路で適用する。ID が `windows:` プレフィックス
+    // の場合は UUID パースエラーを避けるためにこちらを呼ぶ。
+    if (target?.kind === 'system') {
+      await invokeTauri<void>('apply_windows_scheme', { name: target.name })
+    } else {
+      await invokeTauri<void>('apply_theme', { themeId: id })
+    }
     // 成功 → アクティブフラグを更新
     themes.value.forEach((t) => (t.isActive = t.id === id))
-    const applied = themes.value.find((t) => t.id === id)
     pendingTheme.value = null
-    if (applied) {
+    if (target) {
       void notify({
         title: 'EasyCursorSwap',
-        body: t('library.notifyApplied', { name: applied.name }),
+        body: t('library.notifyApplied', { name: target.name }),
         level: 'success',
       })
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     applyError.value = msg
-    console.error('[Library] apply_theme failed:', err)
+    console.error('[Library] apply failed:', err)
   } finally {
     applyBusy.value = false
   }
@@ -329,28 +335,84 @@ interface IpcThemeSummary {
   path: string
 }
 
+/** `list_windows_schemes` のレスポンス。Windows レジストリ HKCU\Cursors\Schemes 由来。 */
+interface IpcWindowsScheme {
+  name: string
+  cursor_paths: Record<string, string>
+  role_count: number
+}
+
+/**
+ * Windows レジストリのスキームを ThemeCardData に変換する。
+ *
+ * - id は `windows:<name>` のプレフィックスでローカルテーマと衝突を避ける
+ * - kind: 'system' を立てて UI 側でバッジ・編集不可表示に切り替える
+ * - included_roles は cursor_paths のキー (空でないもの) を使う
+ * - active 判定は `HKCU\Control Panel\Cursors` の (Default) 値と比較できるが
+ *   今は読み取り経路を増やさず、適用後にイベントで再ロードする
+ */
+function mapWindowsSchemeToCard(s: IpcWindowsScheme): ThemeCardData {
+  const includedRoles = Object.entries(s.cursor_paths)
+    .filter(([, path]) => path.length > 0)
+    .map(([role]) => role)
+  return {
+    id: `windows:${s.name}`,
+    name: s.name,
+    author: 'Windows',
+    version: '—',
+    date: '',
+    applyCount: 0,
+    isFavorite: false,
+    isActive: false,
+    includedRoles,
+    kind: 'system',
+  }
+}
+
 async function loadThemes() {
   isLoading.value = true
   try {
-    const list = await invokeTauri<IpcThemeSummary[]>('get_themes')
-    if (list && list.length > 0) {
-      themes.value = list.map((t) => ({
-        id: t.id,
-        name: t.name,
-        author: t.author,
-        version: t.version,
-        date: t.created_at,
-        applyCount: t.apply_count,
-        isFavorite: t.is_favorite,
-        isActive: t.is_active,
-        includedRoles: t.included_roles,
-      }))
+    // ローカルテーマと Windows スキームを並列取得。Windows スキーム取得はベストエフォート
+    // (権限不足やキー不存在はログに残して空配列扱い) なので失敗してもライブラリ全体は表示する。
+    const [localList, schemes] = await Promise.all([
+      invokeTauri<IpcThemeSummary[]>('get_themes').catch((err) => {
+        console.warn('[Library] get_themes failed:', err)
+        return null
+      }),
+      invokeTauri<IpcWindowsScheme[]>('list_windows_schemes').catch((err) => {
+        console.warn('[Library] list_windows_schemes failed (non-fatal):', err)
+        return [] as IpcWindowsScheme[]
+      }),
+    ])
+
+    const local: ThemeCardData[] = (localList ?? []).map((t) => ({
+      id: t.id,
+      name: t.name,
+      author: t.author,
+      version: t.version,
+      date: t.created_at,
+      applyCount: t.apply_count,
+      isFavorite: t.is_favorite,
+      isActive: t.is_active,
+      includedRoles: t.included_roles,
+      kind: 'local' as const,
+    }))
+
+    // EasyCursorSwap が register_scheme で書き込んだスキームはローカルテーマと
+    // 名前が一致するので除外する (重複表示防止)。
+    const localNames = new Set(local.map((l) => l.name))
+    const system: ThemeCardData[] = (schemes ?? [])
+      .filter((s) => !localNames.has(s.name))
+      .map(mapWindowsSchemeToCard)
+
+    if (local.length > 0 || system.length > 0) {
+      themes.value = [...local, ...system]
     } else if (themes.value.length === 0) {
       // Tauri 未接続 or 空ライブラリ → デモ表示
       themes.value = demoThemes
     }
   } catch (err) {
-    console.warn('[Library] get_themes failed, using demo:', err)
+    console.warn('[Library] loadThemes failed entirely, using demo:', err)
     if (themes.value.length === 0) themes.value = demoThemes
   } finally {
     isLoading.value = false

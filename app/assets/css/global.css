@@ -617,6 +617,24 @@ button {
   animation: pulse 1.6s infinite;
 }
 
+/* Windows システムスキームに付ける識別バッジ。アクティブタグと位置がぶつからないよう左上に置く。 */
+.card-source-tag {
+  position: absolute;
+  top: 10px; left: 10px;
+  padding: 2px 7px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--violet);
+  background: rgba(139, 125, 255, 0.12);
+  border: 1px solid rgba(139, 125, 255, 0.32);
+  border-radius: 4px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  pointer-events: none;
+}
+
 .card-body {
   padding: 14px;
   display: flex;

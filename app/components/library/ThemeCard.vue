@@ -48,6 +48,9 @@ const displayDate = computed(() => {
   return d.length > 10 ? d.slice(0, 10) : d
 })
 
+/** Windows のシステムスキーム (HKCU\Cursors\Schemes) は編集・お気に入りを許可しない。 */
+const isSystem = computed(() => props.theme.kind === 'system')
+
 // 実カーソル画像のプレビュー (キャッシュ越しに取得)
 const previewMap = ref<Record<string, string> | null>(null)
 const { getMap } = useThemePreviews()
@@ -75,6 +78,9 @@ watch(() => props.theme.id, fetchPreview)
       <div v-if="theme.isActive" class="card-active-tag">
         <span class="pulse" aria-hidden="true" />{{ t('library.activeTag') }}
       </div>
+      <div v-if="isSystem" class="card-source-tag" aria-label="Windows システムスキーム">
+        WINDOWS
+      </div>
       <CursorMatrix
         :included="theme.includedRoles"
         :preview-map="previewMap"
@@ -88,6 +94,7 @@ watch(() => props.theme.id, fetchPreview)
           <div class="card-author">@{{ theme.author ?? 'unknown' }}</div>
         </div>
         <button
+          v-if="!isSystem"
           :class="['star', { on: theme.isFavorite }]"
           :aria-label="theme.isFavorite
             ? t('library.filterFavorites') + 'から削除'

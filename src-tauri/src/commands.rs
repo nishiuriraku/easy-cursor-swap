@@ -17,7 +17,7 @@ use crate::errors::AppError;
 use crate::health::is_major_bump;
 use crate::keystore::{Keystore, KeystoreInfo};
 use crate::marketplace::{MarketplaceClient, MarketplaceIndex, MarketplaceInstallRequest};
-use crate::registry::{CursorRole, RegistryManager};
+use crate::registry::{CursorRole, RegistryManager, WindowsScheme};
 use crate::theme::{
     CursorDefinition, CursorpackInspection, LocalizedString, ThemeManager, ThemeMetadata,
     ThemeSummary,
@@ -1018,6 +1018,30 @@ pub fn clear_crash_reports() -> Result<usize, AppError> {
     crate::crash::clear_reports()
 }
 
+/// `HKCU\Control Panel\Cursors\Schemes` に保存されたカーソルスキーム一覧を返す。
+///
+/// ライブラリ画面に「Windows のマウスのプロパティに保存済みのスキーム」を
+/// マージ表示するために使う。EasyCursorSwap で適用済みのテーマも同じキー配下に
+/// 入っているが、それらは `get_themes` 側で重複除去すべき (UI 層で判断)。
+#[tauri::command]
+pub fn list_windows_schemes() -> Result<Vec<WindowsScheme>, AppError> {
+    RegistryManager::list_windows_schemes()
+}
+
+/// 指定された Windows スキームをシステムに適用する。
+///
+/// `apply_theme` (`.cursorpack` 形式の独自テーマ) と区別するため別コマンドにしている。
+/// スキームは編集・エクスポート・署名検証の対象外で、適用のみが許される。
+#[tauri::command]
+pub fn apply_windows_scheme(name: String) -> Result<(), AppError> {
+    let schemes = RegistryManager::list_windows_schemes()?;
+    let scheme = schemes
+        .into_iter()
+        .find(|s| s.name == name)
+        .ok_or_else(|| AppError::Registry(format!("スキーム '{}' が見つかりません", name)))?;
+    RegistryManager::apply_windows_scheme(&scheme)
+}
+
 /// Tauri Builder に全コマンドを登録するためのヘルパー
 pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
     tauri::generate_handler![
@@ -1059,6 +1083,8 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         cancel_build,
         list_crash_reports,
         clear_crash_reports,
+        list_windows_schemes,
+        apply_windows_scheme,
         crate::bulk_import::bulk_resolve_assets,
         crate::bulk_import::cancel_bulk_import,
         crate::bulk_import::parse_cursorpack_for_creator,

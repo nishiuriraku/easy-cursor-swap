@@ -522,6 +522,128 @@ impl RegistryManager {
         tracing::info!("初回スナップショットからカーソル設定を復元しました");
         Ok(())
     }
+
+    /// `HKCU\Control Panel\Cursors\Schemes` に保存されたカーソルスキームを列挙する。
+    ///
+    /// マウスのプロパティ → ポインター タブの「配色」ドロップダウンに表示される
+    /// ユーザー保存スキームと同じ集合。EasyCursorSwap が `register_scheme` で
+    /// 書き込んだものも含まれる。
+    ///
+    /// 各値は `REG_EXPAND_SZ` で `path1,path2,...,path17` の形式。空のスロットは
+    /// 「Windows 既定継承」を意味する。`%SystemRoot%` 等の環境変数は OS 側で
+    /// 自動展開された絶対パスとして返される。
+    ///
+    /// 全スロット空のスキーム (= 何も上書きしない) は UI 表示する意味がないので除外する。
+    /// Schemes キー自体が存在しない (一度もカスタムスキームを保存していない) 場合は
+    /// 空配列を返す。
+    pub fn list_windows_schemes() -> AppResult<Vec<WindowsScheme>> {
+        use winreg::enums::*;
+        use winreg::RegKey;
+
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let schemes_key = match hkcu.open_subkey("Control Panel\\Cursors\\Schemes") {
+            Ok(k) => k,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(e) => {
+                return Err(AppError::Registry(format!(
+                    "Schemes キーを開けません: {}",
+                    e
+                )))
+            }
+        };
+
+        let mut out: Vec<WindowsScheme> = Vec::new();
+        for entry in schemes_key.enum_values() {
+            let (name, _raw) = match entry {
+                Ok(t) => t,
+                Err(e) => {
+                    tracing::warn!("Schemes 値の列挙に失敗: {}", e);
+                    continue;
+                }
+            };
+            let value: String = match schemes_key.get_value::<String, _>(&name) {
+                Ok(v) => v,
+                Err(e) => {
+                    tracing::warn!("Schemes 値 '{}' の読み取りに失敗: {}", name, e);
+                    continue;
+                }
+            };
+            let scheme = parse_scheme_value(&name, &value);
+            if scheme.cursor_paths.values().any(|p| !p.is_empty()) {
+                out.push(scheme);
+            }
+        }
+
+        out.sort_by(|a, b| a.name.cmp(&b.name));
+        Ok(out)
+    }
+
+    /// Windows スキームを現在のカーソル設定として適用する。
+    ///
+    /// 既存の `apply_cursors` をラップし、HKCU\Control Panel\Cursors の
+    /// 各役割値を Schemes 値に基づいて書き戻す。スナップショット保護と
+    /// SPI_SETCURSORS による即時反映は `apply_cursors` 側で担保される。
+    pub fn apply_windows_scheme(scheme: &WindowsScheme) -> AppResult<()> {
+        let cursor_paths: HashMap<String, PathBuf> = scheme
+            .cursor_paths
+            .iter()
+            .filter(|(_, v)| !v.is_empty())
+            .map(|(k, v)| (k.clone(), PathBuf::from(v)))
+            .collect();
+        Self::apply_cursors(&cursor_paths)?;
+
+        // 既定スキーム名 (`(Default)` 値) も書き換え、コントロールパネルの
+        // ドロップダウンで現在のスキームが正しく表示されるようにする。
+        use winreg::enums::*;
+        use winreg::RegKey;
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        if let Ok(cursors_key) = hkcu.open_subkey_with_flags("Control Panel\\Cursors", KEY_WRITE) {
+            let _ = cursors_key.set_value("", &scheme.name);
+        }
+        tracing::info!("Windows スキーム '{}' を適用しました", scheme.name);
+        Ok(())
+    }
+}
+
+/// Windows のカーソルスキーム 1 件 (HKCU\Control Panel\Cursors\Schemes の値 1 つ分) を表す。
+///
+/// `cursor_paths` のキーは `CursorRole::registry_name` と同じ 17 種類の役割名。
+/// 値は絶対パス (環境変数展開済み) で、空文字列なら「OS 既定継承」を意味する。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WindowsScheme {
+    /// Schemes キーでの値名 (= スキーム名)。日本語名や記号も含み得る。
+    pub name: String,
+    /// 役割名 → 絶対パス (空文字列はスキップ可能)。
+    pub cursor_paths: HashMap<String, String>,
+    /// 17 役割中、実際にカーソルファイルを上書きする数 (空でないスロット数)。
+    pub role_count: usize,
+}
+
+/// `path1,path2,...,path17` 形式の Schemes 値を `WindowsScheme` に分解する。
+///
+/// `build_scheme_value` の逆操作。区切りはカンマ、要素数が 17 未満なら不足分を
+/// 空文字列で埋める (古い OS や手書きの不完全なエントリへの耐性)。
+/// パス自体は `path` を改変せずそのまま保持する (`%SystemRoot%` 等は呼び出し側が
+/// 既に展開済みの想定)。
+fn parse_scheme_value(name: &str, value: &str) -> WindowsScheme {
+    let parts: Vec<&str> = value.split(',').collect();
+    let mut roles: Vec<&CursorRole> = CursorRole::all().iter().collect();
+    roles.sort_by_key(|r| r.scheme_index());
+
+    let mut cursor_paths: HashMap<String, String> = HashMap::new();
+    let mut role_count: usize = 0;
+    for (i, role) in roles.iter().enumerate() {
+        let raw = parts.get(i).copied().unwrap_or("").trim().to_string();
+        if !raw.is_empty() {
+            role_count += 1;
+        }
+        cursor_paths.insert(role.registry_name().to_string(), raw);
+    }
+    WindowsScheme {
+        name: name.to_string(),
+        cursor_paths,
+        role_count,
+    }
 }
 
 /// 17 役割それぞれに書き込むレジストリ値を計算する。
@@ -688,5 +810,46 @@ mod tests {
     fn encode_utf16_with_nul_handles_japanese() {
         let bytes = encode_utf16_with_nul("あ"); // U+3042
         assert_eq!(bytes, vec![0x42, 0x30, 0x00, 0x00]);
+    }
+
+    #[test]
+    fn parse_scheme_value_distributes_paths_in_index_order() {
+        // build_scheme_value のラウンドトリップ
+        let mut input: HashMap<String, PathBuf> = HashMap::new();
+        input.insert("Arrow".into(), PathBuf::from("C:\\a.cur"));
+        input.insert("IBeam".into(), PathBuf::from("C:\\i.cur"));
+        input.insert("Person".into(), PathBuf::from("C:\\p.cur"));
+        let value = build_scheme_value(&input);
+
+        let scheme = parse_scheme_value("My Theme", &value);
+        assert_eq!(scheme.name, "My Theme");
+        assert_eq!(scheme.role_count, 3);
+        assert_eq!(scheme.cursor_paths.get("Arrow").unwrap(), "C:\\a.cur");
+        assert_eq!(scheme.cursor_paths.get("IBeam").unwrap(), "C:\\i.cur");
+        assert_eq!(scheme.cursor_paths.get("Person").unwrap(), "C:\\p.cur");
+        assert_eq!(scheme.cursor_paths.get("Hand").unwrap(), "");
+        assert_eq!(scheme.cursor_paths.len(), 17);
+    }
+
+    #[test]
+    fn parse_scheme_value_pads_missing_slots_with_empty() {
+        // 13 要素しか無くても 17 役割マップが返る
+        let scheme = parse_scheme_value("Short", "a,b,c,d,e,f,g,h,i,j,k,l,m");
+        assert_eq!(scheme.cursor_paths.len(), 17);
+        assert_eq!(scheme.cursor_paths.get("Pin").unwrap(), "");
+        assert_eq!(scheme.cursor_paths.get("Person").unwrap(), "");
+        assert_eq!(scheme.role_count, 13);
+    }
+
+    #[test]
+    fn parse_scheme_value_trims_whitespace_and_counts_correctly() {
+        let scheme = parse_scheme_value(
+            "Spaced",
+            " C:\\a.cur ,  ,C:\\c.cur,,,,,,,,,,,,,,",
+        );
+        assert_eq!(scheme.cursor_paths.get("Arrow").unwrap(), "C:\\a.cur");
+        assert_eq!(scheme.cursor_paths.get("Help").unwrap(), "");
+        assert_eq!(scheme.cursor_paths.get("AppStarting").unwrap(), "C:\\c.cur");
+        assert_eq!(scheme.role_count, 2);
     }
 }
