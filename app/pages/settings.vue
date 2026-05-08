@@ -471,69 +471,15 @@ function selectSection(id: SectionId) {
           v-model:start-minimized="startup.startMinimized"
         />
 
-        <!-- ライブラリ -->
-        <section v-else-if="section === 'library'">
-          <header class="section-head">
-            <h1>{{ t('settings.sectionLibrary') }}</h1>
-            <p>{{ t('settings.descLibrary') }}</p>
-          </header>
-          <div class="prop-section">
-            <div class="prop-head">{{ t('settings.groupStorageWarning') }}</div>
-            <div class="prop-body">
-              <SettingsRow
-                :label="t('settings.storageThresholdLabel')"
-                :desc="t('settings.storageThresholdDesc')"
-              >
-                <UiSelect
-                  v-model="library.totalLimitWarnGb"
-                  width="100px"
-                  :options="[
-                    { value: 0.5, label: '0.5 GB' },
-                    { value: 1, label: '1 GB' },
-                    { value: 2, label: '2 GB' },
-                    { value: 5, label: '5 GB' },
-                  ]"
-                />
-              </SettingsRow>
-              <SettingsRow
-                :label="t('settings.storageWarnEnabledLabel')"
-                :desc="t('settings.storageWarnEnabledDesc')"
-              >
-                <SettingsToggle v-model="library.storageWarnEnabled" />
-              </SettingsRow>
-            </div>
-          </div>
-
-          <div class="prop-section">
-            <div class="prop-head">
-              {{ t('settings.groupProfileBackup') }}
-              <span class="head-hint">{{ t('settings.profileBackupHint') }}</span>
-            </div>
-            <div class="prop-body">
-              <SettingsRow
-                :label="t('settings.profileExportLabel')"
-                :desc="t('settings.profileExportDesc')"
-              >
-                <button class="btn" :disabled="profileBusy" @click="exportProfile">
-                  <span v-if="profileBusy" class="spinner" style="width: 13px; height: 13px" />
-                  <UiIcon v-else name="Export" :size="13" />{{ t('common.export') }}
-                </button>
-              </SettingsRow>
-              <SettingsRow
-                :label="t('settings.profileImportLabel')"
-                :desc="t('settings.profileImportDesc')"
-              >
-                <button class="btn" :disabled="profileBusy" @click="importProfile">
-                  <span v-if="profileBusy" class="spinner" style="width: 13px; height: 13px" />
-                  <UiIcon v-else name="Import" :size="13" />{{ t('common.import') }}
-                </button>
-              </SettingsRow>
-              <div v-if="profileMessage" class="profile-msg">
-                {{ profileMessage }}
-              </div>
-            </div>
-          </div>
-        </section>
+        <LibrarySection
+          v-else-if="section === 'library'"
+          v-model:total-limit-warn-gb="library.totalLimitWarnGb"
+          v-model:storage-warn-enabled="library.storageWarnEnabled"
+          :profile-busy="profileBusy"
+          :profile-message="profileMessage"
+          @export-profile="exportProfile"
+          @import-profile="importProfile"
+        />
 
         <SecuritySection
           v-else-if="section === 'security'"
@@ -647,90 +593,20 @@ function selectSection(id: SectionId) {
         />
 
         <!-- アップデート -->
-        <section v-else-if="section === 'updates'">
-          <header class="section-head">
-            <h1>{{ t('settings.sectionUpdates') }}</h1>
-            <p>{{ t('settings.descUpdates') }}</p>
-          </header>
-          <div class="prop-section">
-            <div class="prop-head">{{ t('settings.groupAutoUpdate') }}</div>
-            <div class="prop-body">
-              <SettingsRow
-                :label="t('settings.autoUpdateLabel')"
-                :desc="t('settings.autoUpdateDesc')"
-              >
-                <SettingsToggle v-model="updates.autoUpdate" />
-              </SettingsRow>
-              <SettingsRow :label="t('settings.channelLabel')" :desc="t('settings.channelDesc')">
-                <UiSelect
-                  v-model="updates.channel"
-                  width="140px"
-                  :options="[
-                    { value: 'stable', label: 'stable' },
-                    { value: 'beta', label: 'beta' },
-                  ]"
-                />
-              </SettingsRow>
-              <SettingsRow :label="t('settings.checkNowLabel')">
-                <button
-                  class="btn"
-                  :disabled="updaterChecking || updaterDownloading"
-                  @click="onCheckUpdate"
-                >
-                  <span v-if="updaterChecking" class="spinner" style="width: 13px; height: 13px" />
-                  <UiIcon v-else name="Import" :size="13" />
-                  {{ updaterChecking ? t('settings.btnChecking') : t('settings.btnCheckUpdate') }}
-                </button>
-              </SettingsRow>
-              <SettingsRow
-                v-if="updaterAvailable"
-                :label="
-                  t('settings.updateAvailableLabel', {
-                    version: updaterAvailable.version,
-                  })
-                "
-                :desc="updaterAvailable.body ?? ''"
-              >
-                <button
-                  class="btn primary"
-                  :disabled="updaterDownloading"
-                  @click="onDownloadUpdate"
-                >
-                  <span
-                    v-if="updaterDownloading"
-                    class="spinner"
-                    style="width: 13px; height: 13px"
-                  />
-                  <UiIcon v-else name="Import" :size="13" />
-                  {{
-                    updaterDownloading
-                      ? t('settings.btnDownloading', {
-                          percent:
-                            updaterTotal > 0
-                              ? Math.round((updaterProgress / updaterTotal) * 100)
-                              : 0,
-                        })
-                      : t('settings.btnDownloadInstall')
-                  }}
-                </button>
-              </SettingsRow>
-              <div v-if="updaterMessage" class="profile-msg">
-                {{ updaterMessage }}
-              </div>
-              <div
-                v-if="updaterError"
-                class="profile-msg"
-                style="
-                  background: rgba(255, 107, 138, 0.06);
-                  border-color: rgba(255, 107, 138, 0.4);
-                  color: #ffb8c5;
-                "
-              >
-                {{ updaterError }}
-              </div>
-            </div>
-          </div>
-        </section>
+        <UpdatesSection
+          v-else-if="section === 'updates'"
+          v-model:auto-update="updates.autoUpdate"
+          v-model:channel="updates.channel"
+          :updater-checking="updaterChecking"
+          :updater-downloading="updaterDownloading"
+          :updater-available="updaterAvailable"
+          :updater-message="updaterMessage"
+          :updater-error="updaterError"
+          :updater-progress="updaterProgress"
+          :updater-total="updaterTotal"
+          @check-update="onCheckUpdate"
+          @download-update="onDownloadUpdate"
+        />
 
         <!-- About -->
         <AboutSection v-else />
