@@ -465,33 +465,11 @@ function selectSection(id: SectionId) {
           <ConfigRecoveryPanel @restored="onConfigRestored" />
         </section>
 
-        <!-- 起動・常駐 -->
-        <section v-else-if="section === 'startup'">
-          <header class="section-head">
-            <h1>{{ t('settings.sectionStartup') }}</h1>
-            <p>{{ t('settings.descStartup') }}</p>
-          </header>
-          <div class="prop-section">
-            <div class="prop-head">
-              {{ t('settings.groupAutoStart') }}
-              <span class="head-hint">{{ t('settings.autoStartHint') }}</span>
-            </div>
-            <div class="prop-body">
-              <SettingsRow
-                :label="t('settings.autoStartLabel')"
-                :desc="t('settings.autoStartDesc')"
-              >
-                <SettingsToggle v-model="startup.autoStart" />
-              </SettingsRow>
-              <SettingsRow
-                :label="t('settings.startMinimizedLabel')"
-                :desc="t('settings.startMinimizedDesc')"
-              >
-                <SettingsToggle v-model="startup.startMinimized" />
-              </SettingsRow>
-            </div>
-          </div>
-        </section>
+        <StartupSection
+          v-else-if="section === 'startup'"
+          v-model:auto-start="startup.autoStart"
+          v-model:start-minimized="startup.startMinimized"
+        />
 
         <!-- ライブラリ -->
         <section v-else-if="section === 'library'">
@@ -557,30 +535,11 @@ function selectSection(id: SectionId) {
           </div>
         </section>
 
-        <!-- セキュリティ -->
-        <section v-else-if="section === 'security'">
-          <header class="section-head">
-            <h1>{{ t('settings.sectionSecurity') }}</h1>
-            <p>{{ t('settings.descSecurity') }}</p>
-          </header>
-          <div class="prop-section">
-            <div class="prop-head">{{ t('settings.groupThemeVerify') }}</div>
-            <div class="prop-body">
-              <SettingsRow
-                :label="t('settings.requireSignedLabel')"
-                :desc="t('settings.requireSignedDesc')"
-              >
-                <SettingsToggle v-model="security.requireSignedThemes" />
-              </SettingsRow>
-              <SettingsRow
-                :label="t('settings.warnUnsignedLabel')"
-                :desc="t('settings.warnUnsignedDesc')"
-              >
-                <SettingsToggle v-model="security.warnUnsignedImport" />
-              </SettingsRow>
-            </div>
-          </div>
-        </section>
+        <SecuritySection
+          v-else-if="section === 'security'"
+          v-model:require-signed-themes="security.requireSignedThemes"
+          v-model:warn-unsigned-import="security.warnUnsignedImport"
+        />
 
         <!-- 署名鍵 -->
         <section v-else-if="section === 'keys'">
@@ -680,62 +639,12 @@ function selectSection(id: SectionId) {
           </div>
         </section>
 
-        <!-- ログ -->
-        <section v-else-if="section === 'logging'">
-          <header class="section-head">
-            <h1>{{ t('settings.sectionLogging') }}</h1>
-            <p>{{ t('settings.descLogging') }}</p>
-          </header>
-          <div class="prop-section">
-            <div class="prop-head">{{ t('settings.groupLogOutput') }}</div>
-            <div class="prop-body">
-              <SettingsRow :label="t('settings.logLevelLabel')" :desc="t('settings.logLevelDesc')">
-                <UiSelect
-                  v-model="logging.logLevel"
-                  width="140px"
-                  :options="[
-                    { value: 'TRACE', label: 'TRACE' },
-                    { value: 'DEBUG', label: 'DEBUG' },
-                    { value: 'INFO', label: 'INFO' },
-                    { value: 'WARN', label: 'WARN' },
-                    { value: 'ERROR', label: 'ERROR' },
-                  ]"
-                />
-              </SettingsRow>
-              <SettingsRow
-                :label="t('settings.retentionLabel')"
-                :desc="t('settings.retentionDesc')"
-              >
-                <input
-                  v-model.number="logging.retentionDays"
-                  type="number"
-                  class="input"
-                  min="1"
-                  max="365"
-                  style="width: 80px"
-                />
-              </SettingsRow>
-              <SettingsRow :label="t('settings.maxSizeLabel')" :desc="t('settings.maxSizeDesc')">
-                <input
-                  v-model.number="logging.maxSizeMb"
-                  type="number"
-                  class="input"
-                  min="10"
-                  max="2048"
-                  style="width: 80px"
-                />
-              </SettingsRow>
-              <SettingsRow
-                :label="t('settings.openLogFolderLabel')"
-                :desc="t('settings.openLogFolderDesc')"
-              >
-                <button class="btn">
-                  <UiIcon name="Globe" :size="13" />{{ t('settings.btnOpen') }}
-                </button>
-              </SettingsRow>
-            </div>
-          </div>
-        </section>
+        <LoggingSection
+          v-else-if="section === 'logging'"
+          v-model:log-level="logging.logLevel"
+          v-model:retention-days="logging.retentionDays"
+          v-model:max-size-mb="logging.maxSizeMb"
+        />
 
         <!-- アップデート -->
         <section v-else-if="section === 'updates'">
