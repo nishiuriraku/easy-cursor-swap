@@ -13,24 +13,26 @@ EasyCursorSwap の `.msi` / `.exe` インストーラーに付与する Authenti
 
 ## 選択肢の比較
 
-| 方式 | 年間費用 | OSS 無償 | EV / OV | SmartScreen 即時信用 | 取得期間 | 備考 |
-|---|---|---|---|---|---|---|
-| **SignPath.io (Foundation)** | 無償 | ✅ | OV | ❌ (レピュテーション蓄積必要) | 1〜2 週間 (審査) | OSS プロジェクト向け。年間更新審査あり |
-| **Microsoft Trusted Signing** | $9.99/月〜 | ❌ | OV (相当) | ✅ (即時) | 1 日〜 | Azure サブスクリプション必須 |
-| **DigiCert / Sectigo EV** | 約 $400〜500 | ❌ | EV | ✅ (即時) | 1〜3 営業日 | HSM/USB トークン必須 |
-| **Sectigo OV (個人)** | 約 $200〜350 | ❌ | OV | ❌ (レピュテーション蓄積必要) | 1 週間程度 | 個人開発者でも取得可 |
-| **無署名** | 0 | — | — | ❌ | — | SmartScreen で警告ダイアログが必ず出る |
+| 方式                          | 年間費用     | OSS 無償 | EV / OV   | SmartScreen 即時信用          | 取得期間         | 備考                                   |
+| ----------------------------- | ------------ | -------- | --------- | ----------------------------- | ---------------- | -------------------------------------- |
+| **SignPath.io (Foundation)**  | 無償         | ✅       | OV        | ❌ (レピュテーション蓄積必要) | 1〜2 週間 (審査) | OSS プロジェクト向け。年間更新審査あり |
+| **Microsoft Trusted Signing** | $9.99/月〜   | ❌       | OV (相当) | ✅ (即時)                     | 1 日〜           | Azure サブスクリプション必須           |
+| **DigiCert / Sectigo EV**     | 約 $400〜500 | ❌       | EV        | ✅ (即時)                     | 1〜3 営業日      | HSM/USB トークン必須                   |
+| **Sectigo OV (個人)**         | 約 $200〜350 | ❌       | OV        | ❌ (レピュテーション蓄積必要) | 1 週間程度       | 個人開発者でも取得可                   |
+| **無署名**                    | 0            | —        | —         | ❌                            | —                | SmartScreen で警告ダイアログが必ず出る |
 
 ---
 
 ## 推奨パス
 
 **v1.0 リリースまで**: SignPath.io Foundation で OV 署名取得。
+
 - OSS なので無償
 - リリース毎に SignPath の Web UI から署名要求 → 自動承認
 - SmartScreen のレピュテーションは数十〜数百ダウンロードで通り始める
 
 **ユーザーが増えてきた段階**: Microsoft Trusted Signing への移行を検討。
+
 - 月額 $9.99 + Azure サブスクリプション
 - Microsoft 自身のルート CA から発行されるため SmartScreen 即時信用
 - HSM 不要、Azure Key Vault に署名鍵が格納される
@@ -43,7 +45,7 @@ EV 証明書 (HSM 必須) は個人開発では運用コストが見合わない
 
 1. https://about.signpath.io/foundation 申請フォームから OSS プロジェクト登録
 2. 必要情報:
-   - GitHub リポジトリ URL: https://github.com/easycursorswap/easy-cursor-swap
+   - GitHub リポジトリ URL: https://github.com/nishiuriraku/easy-cursor-swap
    - ライセンス: MIT
    - メンテナの GitHub アカウント / 連絡先メール
 3. 1〜2 週間の審査後、SignPath プロジェクトページが発行される

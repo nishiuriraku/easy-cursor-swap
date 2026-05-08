@@ -1,6 +1,6 @@
 name: Marketplace Theme Validate
 
-# `easycursorswap/index` リポジトリへの PR で使う雛形 (Phase 9-4)。
+# `nishiuriraku/easy-cursor-swap-index` リポジトリへの PR で使う雛形 (Phase 9-4)。
 # 本リポジトリでは触らないが、index 側にコピペで使えるよう placeholder として置く。
 #
 # 想定: PR で `entries/*.json` または `themes/*.cursorpack` が追加されたとき、

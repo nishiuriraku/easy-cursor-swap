@@ -26,7 +26,7 @@ use std::path::PathBuf;
 const ROLLBACK_THRESHOLD: u32 = 3;
 
 /// GitHub リリースのベース URL (installer URL 生成に使用)
-const GITHUB_RELEASES_BASE: &str = "https://github.com/easycursorswap/easy-cursor-swap/releases";
+const GITHUB_RELEASES_BASE: &str = "https://github.com/nishiuriraku/easy-cursor-swap/releases";
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct StartupState {

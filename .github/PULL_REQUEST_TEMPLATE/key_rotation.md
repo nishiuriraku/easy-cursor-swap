@@ -1,9 +1,9 @@
 <!--
-  鍵ローテーション PR テンプレート (`easycursorswap/index` リポジトリ用の雛形)。
-  本リポジトリでは参照のために配置。`easycursorswap/index` 側にコピーして使用する。
+  鍵ローテーション PR テンプレート (`nishiuriraku/easy-cursor-swap-index` リポジトリ用の雛形)。
+  本リポジトリでは参照のために配置。`nishiuriraku/easy-cursor-swap-index` 側にコピーして使用する。
 
   使用方法:
-    https://github.com/easycursorswap/index/compare?template=key_rotation.md
+    https://github.com/nishiuriraku/easy-cursor-swap-index/compare?template=key_rotation.md
 -->
 
 ## 鍵ローテーション
@@ -33,4 +33,4 @@
 
 ## 詳細手順
 
-参照: [docs/key_rotation.md](https://github.com/easycursorswap/easy-cursor-swap/blob/main/docs/key_rotation.md)
+参照: [docs/key_rotation.md](https://github.com/nishiuriraku/easy-cursor-swap/blob/main/docs/key_rotation.md)

@@ -3,7 +3,7 @@
 **Next-generation mouse cursor manager for Windows**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows%2010%2022H2%2B-blue)](https://github.com/easycursorswap/easy-cursor-swap)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%2022H2%2B-blue)](https://github.com/nishiuriraku/easy-cursor-swap)
 [![Tauri](https://img.shields.io/badge/Tauri-v2-orange)](https://tauri.app)
 
 [日本語版 README はこちら](README.ja.md)
@@ -29,12 +29,12 @@ dark/light mode switching.
 
 ## System Requirements
 
-| Requirement | Minimum |
-|---|---|
-| OS | Windows 10 22H2 (build 19045) or Windows 11 |
-| Architecture | x64 (ARM64 planned) |
-| WebView2 | Evergreen runtime (built-in on Windows 11; auto-installed on Windows 10) |
-| Disk space | ~30 MB for the installer; ~100 MB typical for a theme library |
+| Requirement  | Minimum                                                                  |
+| ------------ | ------------------------------------------------------------------------ |
+| OS           | Windows 10 22H2 (build 19045) or Windows 11                              |
+| Architecture | x64 (ARM64 planned)                                                      |
+| WebView2     | Evergreen runtime (built-in on Windows 11; auto-installed on Windows 10) |
+| Disk space   | ~30 MB for the installer; ~100 MB typical for a theme library            |
 
 > **Not supported:** Remote Desktop (RDP), Citrix, Windows Server, UAC Secure Desktop,
 > lock screen, and multi-user simultaneous sessions.
@@ -42,12 +42,12 @@ dark/light mode switching.
 ## Installation
 
 Download the latest installer from the
-[Releases page](https://github.com/easycursorswap/easy-cursor-swap/releases):
+[Releases page](https://github.com/nishiuriraku/easy-cursor-swap/releases):
 
-| File | Description |
-|---|---|
+| File                           | Description                                  |
+| ------------------------------ | -------------------------------------------- |
 | `EasyCursorSwap_x64-setup.exe` | NSIS installer (per-user, no admin required) |
-| `EasyCursorSwap_x64_en-US.msi` | MSI installer |
+| `EasyCursorSwap_x64_en-US.msi` | MSI installer                                |
 
 Both are signed with a minisign key (verified by the built-in updater).
 See [docs/signing.md](docs/signing.md) for signature verification instructions.
@@ -69,7 +69,7 @@ See [docs/signing.md](docs/signing.md) for signature verification instructions.
 ### Quick start
 
 ```bash
-git clone https://github.com/easycursorswap/easy-cursor-swap.git
+git clone https://github.com/nishiuriraku/easy-cursor-swap.git
 cd easy-cursor-swap
 npm install
 
@@ -136,15 +136,15 @@ See [docs/02_architecture_and_core.md](docs/02_architecture_and_core.md) for det
 
 ## Security Model
 
-| Layer | Mechanism |
-|---|---|
-| Theme integrity | Ed25519 signatures (ed25519-dalek), key_id = SHA-256[:16] of public key |
-| Private key storage | Windows DPAPI (`CryptProtectData`) — tied to the user account |
-| Key export | XChaCha20-Poly1305 + Argon2id passphrase encryption (`.cfkey` format) |
-| Download safety | SHA-256 hash check + 50 MB / 200 MB / 10 MB three-stage size limits |
-| Archive safety | Path traversal prevention, symlink rejection, ZIP bomb detection |
-| Image safety | PNG metadata stripping (eXIf, iTXt, zTXt), SVG sanitisation |
-| Transport | rustls-tls (no OS TLS stack dependency) |
+| Layer               | Mechanism                                                               |
+| ------------------- | ----------------------------------------------------------------------- |
+| Theme integrity     | Ed25519 signatures (ed25519-dalek), key_id = SHA-256[:16] of public key |
+| Private key storage | Windows DPAPI (`CryptProtectData`) — tied to the user account           |
+| Key export          | XChaCha20-Poly1305 + Argon2id passphrase encryption (`.cfkey` format)   |
+| Download safety     | SHA-256 hash check + 50 MB / 200 MB / 10 MB three-stage size limits     |
+| Archive safety      | Path traversal prevention, symlink rejection, ZIP bomb detection        |
+| Image safety        | PNG metadata stripping (eXIf, iTXt, zTXt), SVG sanitisation             |
+| Transport           | rustls-tls (no OS TLS stack dependency)                                 |
 
 See [docs/03_security_and_ecosystem.md](docs/03_security_and_ecosystem.md) for the full model.
 
@@ -162,17 +162,17 @@ See [docs/key_rotation.md](docs/key_rotation.md) if you need to rotate your sign
 
 ## Known Limitations (v1.0)
 
-| Limitation | Notes |
-|---|---|
-| No `.ani` authoring | Animated cursors can be imported but not created |
-| No live preview | Changes are applied immediately to the registry; no preview mode |
-| No undo | Apply is intentionally one-way; use the panic button to restore |
-| Dark mode only for auto-switch | Auto-switch is tied to the OS dark/light toggle only |
-| UAC Secure Desktop | Shows Windows built-in cursors during elevated dialogs |
-| Lock screen / sign-in screen | Shows Windows built-in cursors |
-| Multi-user sessions | Each Windows user account has independent cursor settings |
-| Remote Desktop (RDP) | Not supported; cursor rendering is controlled by the RDP host |
-| ARM64 | Not yet tested; x64 binary runs via emulation on ARM64 Windows |
+| Limitation                     | Notes                                                            |
+| ------------------------------ | ---------------------------------------------------------------- |
+| No `.ani` authoring            | Animated cursors can be imported but not created                 |
+| No live preview                | Changes are applied immediately to the registry; no preview mode |
+| No undo                        | Apply is intentionally one-way; use the panic button to restore  |
+| Dark mode only for auto-switch | Auto-switch is tied to the OS dark/light toggle only             |
+| UAC Secure Desktop             | Shows Windows built-in cursors during elevated dialogs           |
+| Lock screen / sign-in screen   | Shows Windows built-in cursors                                   |
+| Multi-user sessions            | Each Windows user account has independent cursor settings        |
+| Remote Desktop (RDP)           | Not supported; cursor rendering is controlled by the RDP host    |
+| ARM64                          | Not yet tested; x64 binary runs via emulation on ARM64 Windows   |
 
 ## Contributing
 

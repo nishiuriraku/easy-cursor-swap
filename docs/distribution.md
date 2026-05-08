@@ -4,11 +4,11 @@
 
 ## 配布形態
 
-| 形式 | 用途 | 状態 |
-|---|---|---|
-| `.msi` | デフォルト配布 (GitHub Releases / 自社サイト) | ✅ Tauri ビルダーで自動生成 |
-| `.nsis` (`.exe`) | より柔軟なインストーラー (perUser インストール) | ✅ Tauri ビルダーで自動生成 |
-| `.msix` | Microsoft Store 配布 / 高度なサンドボックス | 🔄 手動変換 (本ドキュメント参照) |
+| 形式             | 用途                                            | 状態                             |
+| ---------------- | ----------------------------------------------- | -------------------------------- |
+| `.msi`           | デフォルト配布 (GitHub Releases / 自社サイト)   | ✅ Tauri ビルダーで自動生成      |
+| `.nsis` (`.exe`) | より柔軟なインストーラー (perUser インストール) | ✅ Tauri ビルダーで自動生成      |
+| `.msix`          | Microsoft Store 配布 / 高度なサンドボックス     | 🔄 手動変換 (本ドキュメント参照) |
 
 ## ビルド手順
 
@@ -23,6 +23,7 @@ npm run tauri:build
 ```
 
 出力先:
+
 - `src-tauri/target/release/bundle/msi/EasyCursorSwap_*.msi`
 - `src-tauri/target/release/bundle/nsis/EasyCursorSwap_*-setup.exe`
 
@@ -58,16 +59,17 @@ signtool sign /a /v /fd SHA256 /f cert.pfx /p "<password>" EasyCursorSwap.msix
 ## コードサイニング
 
 仕様書「§5 コードサイニング」要件:
+
 - 配布物は EV/OV 証明書で署名 (SmartScreen レピュテーション獲得)
 - OSS 向けの無償署名サービスを第一候補
 
 ### 候補
 
-| サービス | 種類 | 条件 |
-|---|---|---|
+| サービス                            | 種類          | 条件                 |
+| ----------------------------------- | ------------- | -------------------- |
 | [SignPath.io](https://signpath.io/) | OV (組織検証) | OSS プロジェクト無償 |
-| Microsoft Trusted Signing | EV | $9.99/月、Azure 経由 |
-| SSL.com Code Signing | EV/OV | 商用、有料 |
+| Microsoft Trusted Signing           | EV            | $9.99/月、Azure 経由 |
+| SSL.com Code Signing                | EV/OV         | 商用、有料           |
 
 ### SignPath.io 申請手順 (推奨)
 
@@ -79,6 +81,7 @@ signtool sign /a /v /fd SHA256 /f cert.pfx /p "<password>" EasyCursorSwap.msix
 ## SmartScreen レピュテーション獲得
 
 新規発行の証明書は SmartScreen の警告を受ける。緩和策:
+
 1. **EV 証明書を使う** → 即時レピュテーション
 2. **OV 証明書を使う** → 数週間〜数か月のダウンロード実績で警告解消
 3. **未署名で配布** → 不可 (常駐 + 自動起動アプリのため)
@@ -90,7 +93,7 @@ signtool sign /a /v /fd SHA256 /f cert.pfx /p "<password>" EasyCursorSwap.msix
 ```json
 {
   "endpoints": [
-    "https://github.com/easycursorswap/easy-cursor-swap/releases/latest/download/latest.json"
+    "https://github.com/nishiuriraku/easy-cursor-swap/releases/latest/download/latest.json"
   ]
 }
 ```
@@ -105,7 +108,7 @@ GitHub Releases の `latest.json` フォーマット:
   "platforms": {
     "windows-x86_64": {
       "signature": "...Tauri-signer 署名...",
-      "url": "https://github.com/easycursorswap/easy-cursor-swap/releases/download/v1.0.1/EasyCursorSwap_1.0.1_x64-setup.nsis.zip"
+      "url": "https://github.com/nishiuriraku/easy-cursor-swap/releases/download/v1.0.1/EasyCursorSwap_1.0.1_x64-setup.nsis.zip"
     }
   }
 }
