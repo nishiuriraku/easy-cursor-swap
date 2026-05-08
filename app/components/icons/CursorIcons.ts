@@ -105,3 +105,23 @@ export const CURSOR_ROLES: CursorRoleDef[] = [
   { id: 'Pin', jp: '場所の選択', en: 'Location Select' },
   { id: 'Person', jp: '人の選択', en: 'Person Select' },
 ]
+
+/**
+ * 既定ホットスポットを画像中央 (primarySize / 2) に置くロール ID の集合。
+ * 視覚的にカーソルの「効点」が中央にあるカーソル
+ * (待ち / 領域選択 / I-Beam / 利用不可 / リサイズ各種 / 移動)。
+ *
+ * 残り 8 ロール (Arrow / Help / AppStarting / NWPen / UpArrow / Hand / Pin / Person)
+ * は左上 (4, 4) 既定 — カーソル先端が画像左上にあるため。
+ */
+export const CENTER_HOTSPOT_ROLES = new Set<string>([
+  'Wait',
+  'Crosshair',
+  'IBeam',
+  'No',
+  'SizeNS',
+  'SizeWE',
+  'SizeNWSE',
+  'SizeNESW',
+  'SizeAll',
+])
