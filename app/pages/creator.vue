@@ -26,9 +26,9 @@ import BulkImportButton from '~/components/creator/BulkImportButton.vue'
 import BulkImportPreviewModal, {
   type ApplyPayload,
 } from '~/components/creator/BulkImportPreviewModal.vue'
-import NewThemeStartModal, {
-  type ConfirmPayload as NewThemeConfirm,
-} from '~/components/creator/NewThemeStartModal.vue'
+import NewThemeStartModal from '~/components/creator/NewThemeStartModal.vue'
+import ThemePickerModal from '~/components/library/ThemePickerModal.vue'
+import { useThemes } from '~/composables/useThemes'
 
 const { t } = useI18n()
 
@@ -132,6 +132,11 @@ const bulkModalOpen = ref(false)
 const bulkResolved = ref<ResolvedAsset[] | null>(null)
 const bulkCursorpack = ref<ParsedCursorpack | null>(null)
 const bulkSourceLabel = ref('')
+
+// 既存テーマ複製ピッカー
+const themePickerOpen = ref(false)
+const themePickerSelected = ref<string | null>(null)
+const { themes: pickerThemes, refresh: refreshPickerThemes } = useThemes()
 
 const existingRolesSet = computed(() => new Set(Object.keys(assigned.value)))
 
@@ -614,40 +619,77 @@ async function rasterizeSvgToPng(svgString: string, size: number): Promise<Uint8
 }
 
 // --- 一括インポート ハンドラ ---
-async function handleBulkFiles() {
+
+/**
+ * 統合エントリ。png/svg/cur/ico/.cursorpack をまとめて選べるダイアログを開き、
+ * 拡張子で内部分岐:
+ *   - 単独 `.cursorpack`     → cursorpack 解析経路 (parseCursorpack)
+ *   - 通常ファイル (複数可)   → bulk_resolve_assets 経路
+ *   - 混在 / 複数 cursorpack  → 警告メッセージを表示し非サポート部分を除外
+ *
+ * フォルダ取込はネイティブダイアログ仕様で別経路 (`pickBulkFolder`) になる。
+ */
+async function pickBulkAuto() {
   const { open } = await import('@tauri-apps/plugin-dialog')
   const picked = await open({
     multiple: true,
-    filters: [{ name: 'Cursor assets', extensions: ['png', 'svg', 'cur', 'ico'] }],
+    filters: [
+      {
+        name: 'Cursor assets / pack',
+        extensions: ['png', 'svg', 'cur', 'ico', 'cursorpack'],
+      },
+    ],
   })
   if (!picked) return
   const paths = Array.isArray(picked) ? picked : [picked]
-  await runBulkResolve(paths, false, `${paths.length} 個のファイル`)
+  await dispatchBulkPaths(paths)
 }
 
-async function handleBulkFolder() {
+/** フォルダから取込 (chevron サブメニュー / 新規作成モーダル経由)。 */
+async function pickBulkFolder() {
   const { open } = await import('@tauri-apps/plugin-dialog')
   const picked = await open({ directory: true })
   if (!picked || typeof picked !== 'string') return
   await runBulkResolve([picked], false, `📁 ${picked}`)
 }
 
-async function handleBulkCursorpack() {
-  const { open } = await import('@tauri-apps/plugin-dialog')
-  const picked = await open({
-    multiple: false,
-    filters: [{ name: 'Cursor Pack', extensions: ['cursorpack'] }],
-  })
-  if (!picked || typeof picked !== 'string') return
-  try {
-    const parsed = await bulkImport.parseCursorpack(picked)
-    bulkCursorpack.value = parsed
-    bulkResolved.value = null
-    bulkSourceLabel.value = `📦 ${picked.split(/[\\/]/).pop()}`
-    bulkModalOpen.value = true
-  } catch (err) {
-    importMessage.value = `cursorpack 取り込み失敗: ${err instanceof Error ? err.message : String(err)}`
+/**
+ * 拡張子分岐の本体。`pickBulkAuto` から、または将来のドラッグ&ドロップから呼ばれる想定。
+ *
+ * 設計判断:
+ *  - `.cursorpack` は他のファイルと一緒に取り込む意味的整合性が無い (パッケージ単位の取込なので)
+ *    ため、混在時は通常ファイルのみ取り込み、cursorpack 部分は無視する
+ *  - 複数 `.cursorpack` の同時取込もサポートしない (ロール衝突解決が複雑になるため)
+ */
+async function dispatchBulkPaths(paths: string[]) {
+  const packs = paths.filter((p) => p.toLowerCase().endsWith('.cursorpack'))
+  const others = paths.filter((p) => !p.toLowerCase().endsWith('.cursorpack'))
+
+  if (packs.length === 1 && others.length === 0) {
+    try {
+      const parsed = await bulkImport.parseCursorpack(packs[0]!)
+      bulkCursorpack.value = parsed
+      bulkResolved.value = null
+      bulkSourceLabel.value = `📦 ${packs[0]!.split(/[\\/]/).pop()}`
+      bulkModalOpen.value = true
+    } catch (err) {
+      importMessage.value = `cursorpack 取り込み失敗: ${err instanceof Error ? err.message : String(err)}`
+    }
+    return
   }
+
+  if (packs.length >= 2) {
+    importMessage.value = '.cursorpack は 1 つだけ選択してください'
+    return
+  }
+
+  if (packs.length === 1 && others.length > 0) {
+    importMessage.value =
+      '.cursorpack は他のファイルと同時に取り込めません (.cursorpack 以外を取り込みました)'
+  }
+
+  if (others.length === 0) return
+  await runBulkResolve(others, false, `${others.length} 個のファイル`)
 }
 
 async function runBulkResolve(paths: string[], recursive: boolean, label: string) {
@@ -745,42 +787,24 @@ function onStartNew() {
 }
 
 /**
- * モーダルでベース画像が確定されたら、対象ロールに割り当てて編集画面へ進む。
- *
- * TODO(設計判断): 適用先ロールの戦略を決める。デフォルトは ['Arrow'] (必須ロールのみ) だが、
- * 全 17 ロール / 主要 4 ロール (Arrow / IBeam / Hand / Wait) など複数の案がある。
- * 下記の `targetRoles` 配列を変えるだけで切替可能。Arrow は必須なので必ず含める。
+ * 「ファイル/パックから取り込む」CTA — bulkAuto を起動。
+ * モーダルを閉じてから dispatch する。プレビューモーダルが開いたら editing へ遷移する。
  */
-function onNewThemeConfirm(payload: NewThemeConfirm) {
-  importedPngBytes.value = payload.png
-  if (importedPreviewUrl.value && importedPreviewUrl.value.startsWith('blob:')) {
-    URL.revokeObjectURL(importedPreviewUrl.value)
-  }
-  importedPreviewUrl.value = payload.previewUrl
-
-  // ★ ここでロール戦略を決める (案 A=現状 / B / C のいずれか)
-  const targetRoles: string[] = ['Arrow']
-
-  for (const roleId of targetRoles) {
-    setAsset(roleId, {
-      primary: payload.png,
-      primarySize: payload.primarySize,
-      hotspot: payload.hotspot,
-      source: 'manual',
-    })
-    filledRoles.add(roleId)
-    filledSizesByRole.value = { ...filledSizesByRole.value, [roleId]: [payload.primarySize] }
-  }
-  activeRoleId.value = 'Arrow'
-  hotspotX.value = payload.hotspot.x
-  hotspotY.value = payload.hotspot.y
+async function onNewThemePickFiles() {
   newThemeModalOpen.value = false
-  stage.value = 'editing'
-  const noun = payload.fromCursorFile ? 'カーソルファイル' : '画像'
-  importMessage.value =
-    targetRoles.length === 1
-      ? `${noun}を Arrow ロールに割り当てました`
-      : `${noun}を ${targetRoles.length} 個のロールに割り当てました`
+  await pickBulkAuto()
+  if (bulkModalOpen.value) {
+    stage.value = 'editing'
+  }
+}
+
+/** 「フォルダから取り込む」CTA。 */
+async function onNewThemePickFolder() {
+  newThemeModalOpen.value = false
+  await pickBulkFolder()
+  if (bulkModalOpen.value) {
+    stage.value = 'editing'
+  }
 }
 
 /** モーダルから「画像なしで開始」を選んだ場合は従来通りの空エディタに遷移。 */
@@ -793,14 +817,42 @@ function onNewThemeCancel() {
   newThemeModalOpen.value = false
 }
 
-/** ヒーロー画面の「.cursorpack をインポート」CTA ハンドラ。 */
-async function onImportPackFromStart() {
-  await handleBulkCursorpack()
-  // モーダル経由でロール反映が完了したら editing へ。モーダルが開いたままなら
-  // 後続の applyBulkImport で stage を切り替える。
-  if (bulkModalOpen.value) {
+/**
+ * 「既存テーマを複製して編集」CTA ハンドラ。
+ *
+ * 1. ライブラリのテーマ一覧をロードしてピッカーモーダルを開く
+ * 2. 選択されたテーマを `repackage_theme` で一時 `.cursorpack` 化
+ * 3. 既存の bulk preview modal 経路 (parseCursorpack) に流して editing へ遷移
+ *
+ * 詳細モーダルの `editInCreator` と同じ IPC を使うので、ロール衝突解決や
+ * メタデータ反映の挙動はそちらと統一される。
+ */
+async function onDuplicateExistingFromStart() {
+  await refreshPickerThemes()
+  themePickerSelected.value = null
+  themePickerOpen.value = true
+}
+
+async function onThemePickerSelect(id: string | null) {
+  themePickerOpen.value = false
+  if (!id) return
+  try {
+    const { tempDir, sep } = await import('@tauri-apps/api/path')
+    const dir = await tempDir()
+    const tempPath = `${dir}${sep()}_easycursorswap_dup_${Date.now()}.cursorpack`
+    await invokeTauri<number>('repackage_theme', { themeId: id, outputPath: tempPath })
+    await dispatchBulkPaths([tempPath])
+    if (bulkModalOpen.value) {
+      stage.value = 'editing'
+    }
+  } catch (err) {
+    importMessage.value = `既存テーマの複製に失敗: ${err instanceof Error ? err.message : String(err)}`
     stage.value = 'editing'
   }
+}
+
+function onThemePickerCancel() {
+  themePickerOpen.value = false
 }
 
 async function onFileChange(e: Event) {
@@ -886,8 +938,7 @@ async function onFileChange(e: Event) {
     <CreatorStartScreen
       v-if="stage === 'start'"
       @start-new="onStartNew"
-      @import-pack="onImportPackFromStart"
-      @duplicate-existing="onStartNew"
+      @duplicate-existing="onDuplicateExistingFromStart"
     />
     <template v-else>
       <CreatorToolbar
@@ -967,11 +1018,7 @@ async function onFileChange(e: Event) {
                 <span v-if="importBusy" class="spinner" style="width: 13px; height: 13px" />
                 <UiIcon v-else name="Import" :size="13" />{{ t('creator.addAsset') }}
               </button>
-              <BulkImportButton
-                @bulk-files="handleBulkFiles"
-                @bulk-folder="handleBulkFolder"
-                @bulk-cursorpack="handleBulkCursorpack"
-              />
+              <BulkImportButton @bulk-auto="pickBulkAuto" @bulk-folder="pickBulkFolder" />
               <input
                 ref="fileInput"
                 type="file"
@@ -1150,9 +1197,24 @@ async function onFileChange(e: Event) {
     -->
     <NewThemeStartModal
       :open="newThemeModalOpen"
-      @confirm="onNewThemeConfirm"
-      @cancel="onNewThemeCancel"
+      @pick-files="onNewThemePickFiles"
+      @pick-folder="onNewThemePickFolder"
       @start-empty="onNewThemeStartEmpty"
+      @cancel="onNewThemeCancel"
+    />
+
+    <!--
+      既存テーマ複製ピッカー。「既存テーマを複製して編集」CTA から開く。
+      選択時は `onThemePickerSelect` で repackage_theme → dispatchBulkPaths に流れる。
+    -->
+    <ThemePickerModal
+      v-if="themePickerOpen"
+      :model-value="themePickerSelected"
+      :themes="pickerThemes"
+      :title="t('creatorStart.duplicatePickerTitle')"
+      :sub="t('creatorStart.duplicatePickerSub')"
+      @update:model-value="onThemePickerSelect"
+      @cancel="onThemePickerCancel"
     />
   </div>
 </template>

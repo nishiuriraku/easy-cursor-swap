@@ -26,9 +26,7 @@ defineProps<{
 const emit = defineEmits<{
   /** ヒーローの「新規作成」CTA。空のテーマで Creator モードに入る。 */
   startNew: []
-  /** ".cursorpack をインポート" CTA。親で Tauri ダイアログを開く。 */
-  importPack: []
-  /** 既存テーマ複製。親で Library 選択モーダルを開く想定。 */
+  /** 既存テーマ複製。親で Library 選択モーダルを開いてから取込フローに流す。 */
   duplicateExisting: []
   /** 最近のドラフトを開く。 */
   openDraft: [id: string]
@@ -50,9 +48,6 @@ const emit = defineEmits<{
         <button class="btn primary es-cta-primary" @click="emit('startNew')">
           <UiIcon name="Plus" :size="14" />
           {{ t('creatorStart.btnNew') }}
-        </button>
-        <button class="btn" @click="emit('importPack')">
-          <UiIcon name="Import" :size="13" />{{ t('creatorStart.btnImport') }}
         </button>
         <button class="btn ghost" @click="emit('duplicateExisting')">
           <UiIcon name="Brush" :size="13" />{{ t('creatorStart.btnDuplicate') }}

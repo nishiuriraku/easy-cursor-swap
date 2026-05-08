@@ -1,17 +1,19 @@
 <script setup lang="ts">
 /**
- * 「新規作成」を押したときに表示されるモーダル。
+ * 「新規作成」を押したときに表示されるモーダル (chooser 構成)。
  *
- * 設計方針:
- *  - 1 枚のベース画像を選んで Arrow ロールに割り当て、その画像から 6 解像度を一括生成する
- *    (= 解像度ごとに別画像を選ぶワークフローはあくまで詳細設定オプション扱い)。
- *  - PNG / SVG / .cur / .ico の取り込みボタンは creator 本体と統合した共通ロジックを使う
- *    ため、このモーダルでは選択結果のバイト列とプレビュー URL だけを親に返す。
- *  - 「画像なしで開始」の逃げ道も用意して、空テンプレで編集を始めたいケースをカバー。
+ * 設計方針 (旧版からの変更):
+ *  - 旧版は単一ファイルピッカ + プレビュー + Arrow ロール割当の専用モーダルだった。
+ *    複数ファイル取込ができず、bulkImport との分岐重複が技術負債化していたため、
+ *    本版ではモーダル自体は薄い chooser に縮小し、実際の取込は creator.vue の
+ *    bulkImport ハンドラに委譲する。
+ *  - 3 つのエントリ:
+ *      1. ファイル/パックから (png/svg/cur/ico/.cursorpack 統合 — 主導線)
+ *      2. フォルダから        (フォルダ単位の一括スキャン)
+ *      3. 画像なしで開始          (空のキャンバスから編集開始)
+ *  - 取込結果は `BulkImportPreviewModal` に流れ、ロールマッチング/上書き判定/
+ *    メタデータ反映を経て Creator が editing ステージに遷移する。
  */
-import { ref, computed, onUnmounted } from 'vue'
-import { sanitizeSvg } from '~/composables/sanitizeSvg'
-import { invokeTauri } from '~/composables/useTauri'
 import { useI18n } from '~/composables/useI18n'
 
 const { t } = useI18n()
@@ -22,265 +24,27 @@ interface Props {
 defineProps<Props>()
 
 const emit = defineEmits<{
-  /** 画像が選択されて確定したとき。Arrow ロールに割り当てて編集画面へ遷移する想定。 */
-  (e: 'confirm', payload: ConfirmPayload): void
+  /** ファイル/パック取込ダイアログを開く。creator.vue の `pickBulkAuto` に流す。 */
+  (e: 'pick-files'): void
+  /** フォルダ取込ダイアログを開く。creator.vue の `pickBulkFolder` に流す。 */
+  (e: 'pick-folder'): void
+  /** 画像なしで空テンプレから編集開始。 */
+  (e: 'start-empty'): void
   /** モーダルを閉じる (キャンセル / Esc / オーバーレイクリック)。 */
   (e: 'cancel'): void
-  /** 画像なしで空のキャンバスから開始する。 */
-  (e: 'start-empty'): void
 }>()
 
-export interface ConfirmPayload {
-  png: Uint8Array
-  /** Hotspot は後でエディタで微調整できるが、デフォルト 4,4 を渡しておく */
-  hotspot: { x: number; y: number }
-  /** UI プレビュー用の Object URL。creator 側で revoke する責務。 */
-  previewUrl: string
-  /** 「.cur/.ico 由来でホットスポット情報を含む」場合は true。 */
-  fromCursorFile: boolean
-  /** 元ファイルの primary サイズ (raster の場合)。SVG ラスタ時は 256。 */
-  primarySize: number
+function pickFiles() {
+  emit('pick-files')
 }
-
-const busy = ref(false)
-const errorMsg = ref<string | null>(null)
-const previewUrl = ref<string | null>(null)
-const previewName = ref<string | null>(null)
-
-/** モーダルを閉じるときに blob URL のリーク防止 */
-function clearPreview() {
-  if (previewUrl.value && previewUrl.value.startsWith('blob:')) {
-    URL.revokeObjectURL(previewUrl.value)
-  }
-  previewUrl.value = null
-  previewName.value = null
-  errorMsg.value = null
+function pickFolder() {
+  emit('pick-folder')
 }
-onUnmounted(clearPreview)
-
-const fileInput = ref<HTMLInputElement | null>(null)
-
-/** PNG / SVG / .cur / .ico をまとめて選べる Tauri ダイアログを開く。 */
-async function pickViaTauri() {
-  busy.value = true
-  errorMsg.value = null
-  try {
-    const { open } = await import('@tauri-apps/plugin-dialog')
-    const picked = await open({
-      multiple: false,
-      filters: [
-        {
-          name: t('newTheme.fileFilterLabel'),
-          extensions: ['png', 'svg', 'cur', 'ico'],
-        },
-      ],
-    })
-    if (!picked || typeof picked !== 'string') return
-    const ext = picked.split('.').pop()?.toLowerCase() ?? ''
-    if (ext === 'cur' || ext === 'ico') {
-      await loadCursorFile(picked)
-    } else {
-      await loadRasterOrSvgFromPath(picked, ext)
-    }
-  } catch (err) {
-    errorMsg.value = err instanceof Error ? err.message : String(err)
-  } finally {
-    busy.value = false
-  }
-}
-
-interface ImportCursorResult {
-  isCur: boolean
-  width: number
-  height: number
-  hotspotX: number
-  hotspotY: number
-  pngBytes: number[]
-  availableSizes: number[]
-}
-
-async function loadCursorFile(path: string) {
-  const result = await invokeTauri<ImportCursorResult>('import_cursor_file', { path })
-  if (!result) throw new Error(t('newTheme.errorIpcEmpty'))
-  const png = new Uint8Array(result.pngBytes)
-  setPendingImage(png, path, result.width, true, { x: result.hotspotX, y: result.hotspotY })
-}
-
-async function loadRasterOrSvgFromPath(path: string, ext: string) {
-  // Tauri 経由のファイル読み込み (Tauri の plugin-fs を経由するか、Rust 側 IPC を呼ぶ)。
-  // 既存実装と揃えるため、ここでは `<input type="file">` のフォールバックも残す。
-  // Tauri 開発時は plugin-fs 経由の方が確実なので、利用可能なら使う。
-  try {
-    const { readFile } = await import('@tauri-apps/plugin-fs')
-    const data = await readFile(path)
-    const bytes = data instanceof Uint8Array ? data : new Uint8Array(data)
-    if (ext === 'svg') {
-      const text = new TextDecoder().decode(bytes)
-      const { sanitized } = sanitizeSvg(text)
-      if (!sanitized) throw new Error(t('newTheme.errorSvgParse'))
-      const png = await rasterizeSvgToPng(sanitized, 256)
-      const url = URL.createObjectURL(new Blob([png.slice().buffer], { type: 'image/png' }))
-      setPendingImageRaw(
-        png,
-        path.split(/[\\/]/).pop() ?? 'image.svg',
-        256,
-        false,
-        { x: 4, y: 4 },
-        url,
-      )
-    } else {
-      // PNG: magic-byte をざっと確認
-      if (bytes.length < 8 || bytes[0] !== 0x89 || bytes[1] !== 0x50) {
-        throw new Error(t('newTheme.errorPngMagic'))
-      }
-      setPendingImage(bytes, path, 256, false, { x: 4, y: 4 })
-    }
-  } catch (err) {
-    // plugin-fs が無い環境 (純 Web プレビュー) → ファイル input にフォールバックさせる
-    throw err
-  }
-}
-
-function pickViaInput() {
-  fileInput.value?.click()
-}
-
-async function onFileChange(e: Event) {
-  const input = e.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) return
-  busy.value = true
-  errorMsg.value = null
-  try {
-    if (file.size > 10 * 1024 * 1024) throw new Error(t('newTheme.errorTooLarge'))
-    const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
-    if (ext === 'svg') {
-      const text = await file.text()
-      const { sanitized } = sanitizeSvg(text)
-      if (!sanitized) throw new Error(t('newTheme.errorSvgParse'))
-      const png = await rasterizeSvgToPng(sanitized, 256)
-      const url = URL.createObjectURL(new Blob([png.slice().buffer], { type: 'image/png' }))
-      setPendingImageRaw(png, file.name, 256, false, { x: 4, y: 4 }, url)
-    } else if (ext === 'png') {
-      const bytes = new Uint8Array(await file.arrayBuffer())
-      if (bytes.length < 8 || bytes[0] !== 0x89 || bytes[1] !== 0x50) {
-        throw new Error(t('newTheme.errorPngMagic'))
-      }
-      const url = URL.createObjectURL(file)
-      setPendingImageRaw(bytes, file.name, 256, false, { x: 4, y: 4 }, url)
-    } else {
-      throw new Error(t('newTheme.errorUnsupportedExt', { ext }))
-    }
-  } catch (err) {
-    errorMsg.value = err instanceof Error ? err.message : String(err)
-  } finally {
-    busy.value = false
-    if (fileInput.value) fileInput.value.value = ''
-  }
-}
-
-function setPendingImage(
-  png: Uint8Array,
-  pathOrName: string,
-  primarySize: number,
-  fromCursorFile: boolean,
-  hotspot: { x: number; y: number },
-) {
-  clearPreview()
-  const url = URL.createObjectURL(new Blob([png.slice().buffer], { type: 'image/png' }))
-  setPendingImageRaw(
-    png,
-    pathOrName.split(/[\\/]/).pop() ?? pathOrName,
-    primarySize,
-    fromCursorFile,
-    hotspot,
-    url,
-  )
-}
-
-function setPendingImageRaw(
-  png: Uint8Array,
-  filename: string,
-  primarySize: number,
-  fromCursorFile: boolean,
-  hotspot: { x: number; y: number },
-  url: string,
-) {
-  if (previewUrl.value && previewUrl.value.startsWith('blob:')) {
-    URL.revokeObjectURL(previewUrl.value)
-  }
-  previewUrl.value = url
-  previewName.value = filename
-  pending.value = { png, hotspot, fromCursorFile, primarySize }
-}
-
-const pending = ref<{
-  png: Uint8Array
-  hotspot: { x: number; y: number }
-  fromCursorFile: boolean
-  primarySize: number
-} | null>(null)
-
-const canConfirm = computed(() => pending.value !== null && previewUrl.value !== null)
-
-function confirm() {
-  if (!pending.value || !previewUrl.value) return
-  const url = previewUrl.value
-  // url の所有権は親に渡す。clearPreview を呼ばずに参照だけ手放す。
-  previewUrl.value = null
-  emit('confirm', {
-    png: pending.value.png,
-    hotspot: pending.value.hotspot,
-    previewUrl: url,
-    fromCursorFile: pending.value.fromCursorFile,
-    primarySize: pending.value.primarySize,
-  })
-  pending.value = null
-  previewName.value = null
-}
-
-function cancel() {
-  clearPreview()
-  pending.value = null
-  emit('cancel')
-}
-
 function startEmpty() {
-  clearPreview()
-  pending.value = null
   emit('start-empty')
 }
-
-/** sanitized SVG → 指定サイズの PNG (Canvas 経由) */
-async function rasterizeSvgToPng(svgString: string, size: number): Promise<Uint8Array> {
-  const blob = new Blob([svgString], { type: 'image/svg+xml' })
-  const url = URL.createObjectURL(blob)
-  try {
-    const img = new Image()
-    img.decoding = 'async'
-    img.src = url
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve()
-      img.onerror = () => reject(new Error(t('newTheme.errorSvgLoad')))
-    })
-    const canvas = document.createElement('canvas')
-    canvas.width = size
-    canvas.height = size
-    const ctx = canvas.getContext('2d')
-    if (!ctx) throw new Error(t('newTheme.errorCanvas'))
-    ctx.imageSmoothingEnabled = true
-    ctx.imageSmoothingQuality = 'high'
-    ctx.drawImage(img, 0, 0, size, size)
-    const pngBlob: Blob = await new Promise((resolve, reject) => {
-      canvas.toBlob(
-        (b) => (b ? resolve(b) : reject(new Error(t('newTheme.errorEncode')))),
-        'image/png',
-      )
-    })
-    return new Uint8Array(await pngBlob.arrayBuffer())
-  } finally {
-    URL.revokeObjectURL(url)
-  }
+function cancel() {
+  emit('cancel')
 }
 </script>
 
@@ -298,45 +62,36 @@ async function rasterizeSvgToPng(svgString: string, size: number): Promise<Uint8
       <div class="nt-body">
         <p class="nt-desc">{{ t('newTheme.description') }}</p>
 
-        <div :class="['nt-drop', { ready: previewUrl, busy }]">
-          <template v-if="!previewUrl">
-            <div class="nt-drop-icon">
-              <UiIcon name="Import" :size="28" />
+        <div class="nt-choices">
+          <button class="nt-choice primary" @click="pickFiles">
+            <div class="nt-choice-icon">
+              <UiIcon name="Import" :size="22" />
             </div>
-            <div class="nt-drop-title">{{ t('newTheme.dropTitle') }}</div>
-            <div class="nt-drop-sub">{{ t('newTheme.dropSub') }}</div>
-            <div class="nt-cta-row">
-              <button class="btn primary" :disabled="busy" @click="pickViaTauri">
-                <UiIcon name="Import" :size="13" />
-                {{ t('newTheme.btnPick') }}
-              </button>
-              <button class="btn ghost" :disabled="busy" @click="pickViaInput">
-                <UiIcon name="Brush" :size="13" />
-                {{ t('newTheme.btnPickBrowser') }}
-              </button>
-              <input
-                ref="fileInput"
-                type="file"
-                accept=".png,.svg,image/png,image/svg+xml"
-                hidden
-                @change="onFileChange"
-              />
+            <div class="nt-choice-body">
+              <div class="nt-choice-title">{{ t('newTheme.choiceFiles') }}</div>
+              <div class="nt-choice-sub">{{ t('newTheme.choiceFilesSub') }}</div>
             </div>
-          </template>
-          <template v-else>
-            <img :src="previewUrl" :alt="previewName ?? ''" class="nt-preview" />
-            <div class="nt-preview-meta">
-              <div class="nt-preview-name mono">{{ previewName }}</div>
-              <button class="btn ghost" :disabled="busy" @click="clearPreview">
-                <UiIcon name="X" :size="11" />{{ t('newTheme.changeImage') }}
-              </button>
-            </div>
-          </template>
-        </div>
+          </button>
 
-        <div v-if="errorMsg" class="nt-error" role="alert">
-          <UiIcon name="Alert" :size="13" />
-          <span>{{ errorMsg }}</span>
+          <button class="nt-choice" @click="pickFolder">
+            <div class="nt-choice-icon">
+              <UiIcon name="Library" :size="22" />
+            </div>
+            <div class="nt-choice-body">
+              <div class="nt-choice-title">{{ t('newTheme.choiceFolder') }}</div>
+              <div class="nt-choice-sub">{{ t('newTheme.choiceFolderSub') }}</div>
+            </div>
+          </button>
+
+          <button class="nt-choice" @click="startEmpty">
+            <div class="nt-choice-icon">
+              <UiIcon name="Brush" :size="22" />
+            </div>
+            <div class="nt-choice-body">
+              <div class="nt-choice-title">{{ t('newTheme.choiceEmpty') }}</div>
+              <div class="nt-choice-sub">{{ t('newTheme.choiceEmptySub') }}</div>
+            </div>
+          </button>
         </div>
 
         <p class="nt-tip">
@@ -346,16 +101,7 @@ async function rasterizeSvgToPng(svgString: string, size: number): Promise<Uint8
       </div>
 
       <footer class="nt-foot">
-        <button class="btn ghost" @click="startEmpty">
-          {{ t('newTheme.startEmpty') }}
-        </button>
-        <div class="nt-foot-r">
-          <button class="btn ghost" @click="cancel">{{ t('common.cancel') }}</button>
-          <button class="btn primary" :disabled="!canConfirm" @click="confirm">
-            <UiIcon name="Check" :size="13" />
-            {{ t('newTheme.confirm') }}
-          </button>
-        </div>
+        <button class="btn ghost" @click="cancel">{{ t('common.cancel') }}</button>
       </footer>
     </div>
   </div>
@@ -395,10 +141,7 @@ async function rasterizeSvgToPng(svgString: string, size: number): Promise<Uint8
 .nt-foot {
   border-top: 1px solid var(--line);
   align-items: center;
-}
-.nt-foot-r {
-  display: flex;
-  gap: 8px;
+  justify-content: flex-end;
 }
 .nt-head h3 {
   margin: 4px 0 0;
@@ -422,81 +165,64 @@ async function rasterizeSvgToPng(svgString: string, size: number): Promise<Uint8
   line-height: 1.55;
 }
 
-.nt-drop {
-  border: 1.5px dashed var(--line);
-  border-radius: 12px;
-  padding: 24px;
+.nt-choices {
   display: flex;
   flex-direction: column;
+  gap: 10px;
+}
+.nt-choice {
+  display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
   background: rgba(124, 242, 212, 0.02);
+  text-align: left;
+  cursor: pointer;
+  color: var(--fg);
   transition:
     border-color 160ms ease,
-    background 160ms ease;
+    background 160ms ease,
+    transform 80ms ease;
 }
-.nt-drop.ready {
-  border-style: solid;
+.nt-choice:hover {
   border-color: var(--accent-line);
   background: rgba(124, 242, 212, 0.05);
 }
-.nt-drop.busy {
-  opacity: 0.6;
-  pointer-events: none;
+.nt-choice:active {
+  transform: translateY(1px);
 }
-.nt-drop-icon {
+.nt-choice.primary {
+  border-color: var(--accent-line);
+  background: rgba(124, 242, 212, 0.06);
+}
+.nt-choice-icon {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--accent);
+  background: rgba(124, 242, 212, 0.08);
 }
-.nt-drop-title {
-  font-size: 13px;
+.nt-choice-body {
+  flex: 1;
+  min-width: 0;
+}
+.nt-choice-title {
+  font-size: 13.5px;
   font-weight: 600;
+  margin-bottom: 2px;
 }
-.nt-drop-sub {
+.nt-choice-sub {
   font-size: 11.5px;
   color: var(--fg-mute);
-}
-.nt-cta-row {
-  display: flex;
-  gap: 8px;
-  margin-top: 10px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-.nt-preview {
-  max-width: 128px;
-  max-height: 128px;
-  image-rendering: pixelated;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.03);
-  padding: 8px;
-}
-.nt-preview-meta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 8px;
-  font-size: 11.5px;
-  color: var(--fg-dim);
-}
-.nt-preview-name {
-  max-width: 280px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.5;
 }
 
-.nt-error {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 12px;
-  padding: 8px 12px;
-  border: 1px solid rgba(255, 107, 138, 0.35);
-  border-radius: 8px;
-  font-size: 12px;
-  color: var(--rose, #ff6b8a);
-  background: rgba(255, 107, 138, 0.06);
-}
 .nt-tip {
   display: flex;
   align-items: center;
