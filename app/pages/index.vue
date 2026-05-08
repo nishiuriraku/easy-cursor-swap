@@ -15,6 +15,7 @@ import { invokeTauri } from '~/composables/useTauri'
 import { notify } from '~/composables/useNotify'
 import { useI18n } from '~/composables/useI18n'
 import { useThemePreviews } from '~/composables/useThemePreviews'
+import { useAppSettings } from '~/composables/useAppSettings'
 
 const { t } = useI18n()
 // UiIcon / ThemeCard / ApplyModal / AppStatusbar は Nuxt の自動インポートで解決される。
@@ -225,8 +226,10 @@ const filteredThemes = computed(() => {
     )
   }
 
-  if (filter.value === 'favorites') result = result.filter((t) => t.isFavorite)
-  // `recent` / `unsigned` は将来の API で追加。現状は all と同じ。
+  if (filter.value === 'favorites') result = result.filter((tt) => tt.isFavorite)
+  else if (filter.value === 'recent')
+    result = result.filter((tt) => Boolean(tt.lastAppliedAt) || tt.applyCount > 0)
+  else if (filter.value === 'unsigned') result = result.filter((tt) => tt.signed === false)
 
   // Q2: sortKey/sortDir はグリッドと一覧で共有。sortDir で昇降を切替。
   const dirSign = sortDir.value === 'asc' ? 1 : -1
@@ -257,13 +260,37 @@ const filteredThemes = computed(() => {
 
 const counts = computed(() => ({
   all: themes.value.length,
-  favorites: themes.value.filter((t) => t.isFavorite).length,
-  recent: themes.value.filter((t) => t.applyCount > 0).length,
-  unsigned: 2,
+  favorites: themes.value.filter((tt) => tt.isFavorite).length,
+  recent: themes.value.filter((tt) => Boolean(tt.lastAppliedAt) || tt.applyCount > 0).length,
+  unsigned: themes.value.filter((tt) => tt.signed === false).length,
 }))
 
-const activeTheme = computed(() => themes.value.find((t) => t.isActive))
-const totalStorageMb = 412 // TODO: invoke('get_storage_usage')
+const activeTheme = computed(() => themes.value.find((tt) => tt.isActive))
+
+/** ライブラリ全体のストレージ使用量を MB 表示。
+ *  Source of Truth は Rust 側 `ThemeSummary.size_bytes` の合計。
+ *  Windows システムスキームは `sizeBytes` が undefined なので除外される。 */
+const totalStorageMb = computed(() => {
+  const totalBytes = themes.value.reduce((sum, tt) => sum + (tt.sizeBytes ?? 0), 0)
+  return (totalBytes / (1024 * 1024)).toFixed(1)
+})
+
+// --- ステータスバー用の動的情報 ---
+// `useAppSettings` はグローバルシングルトン。Settings 画面で更新されると自動追従する。
+const appSettings = useAppSettings()
+const darkModeStatusLabel = computed(() => {
+  const enabled = appSettings.config.value?.dark_mode.enabled
+  return `${t('library.statusDarkMode')}: ${enabled ? t('library.statusOn') : t('library.statusOff')}`
+})
+const signatureVerifyLabel = computed(
+  () => `${t('library.statusSignature')}: ${t('library.statusOn')}`,
+)
+const activeStatusLabel = computed(() =>
+  activeTheme.value
+    ? `${t('library.statusActive')}: ${activeTheme.value.name}`
+    : `${t('library.statusActive')}: ${t('library.statusActiveDefault')}`,
+)
+const storageStatusLabel = computed(() => `~/.custom_cursors/ — ${totalStorageMb.value} MB`)
 
 // --- ハンドラ ---
 /** カードの「適用」クリック → 確認モーダルを開く */
@@ -311,9 +338,32 @@ async function confirmApply(id: string) {
   }
 }
 
-function toggleFavorite(id: string) {
-  const t = themes.value.find((x) => x.id === id)
-  if (t) t.isFavorite = !t.isFavorite
+/**
+ * お気に入り切替。Source of Truth は Rust 側 `AppConfig.general.favorites` で、
+ * `set_theme_favorite` IPC が永続化を行い、戻り値で全体リストを返す。
+ * Windows システムスキームには対応しないので Rust 側エラー時は UI 側で握り潰す。
+ */
+async function toggleFavorite(id: string) {
+  const target = themes.value.find((x) => x.id === id)
+  if (!target || target.kind === 'system') return
+  const next = !target.isFavorite
+  // 楽観的更新 (失敗時は Rust の戻り値で上書き)
+  target.isFavorite = next
+  try {
+    const updated = await invokeTauri<string[]>('set_theme_favorite', {
+      themeId: id,
+      isFavorite: next,
+    })
+    if (updated) {
+      const set = new Set(updated)
+      themes.value.forEach((tt) => {
+        if (tt.kind !== 'system') tt.isFavorite = set.has(tt.id)
+      })
+    }
+  } catch (err) {
+    // Tauri 未起動時はエラーになるが、ローカル状態は既に更新済みなので無視。
+    console.warn('[Library] set_theme_favorite failed:', err)
+  }
 }
 
 /**
@@ -582,6 +632,8 @@ interface IpcThemeSummary {
   size_bytes: number
   /** `metadata.signature.is_some()` の結果 (検証ではなく存在判定のみ) */
   signed: boolean
+  /** 最終適用日時 (RFC3339)。一度も適用されていなければ null。 */
+  last_applied_at: string | null
 }
 
 /** `list_windows_schemes` のレスポンス。Windows レジストリ HKCU\Cursors\Schemes 由来。 */
@@ -622,6 +674,7 @@ function mapWindowsSchemeToCard(s: IpcWindowsScheme): ThemeCardData {
     tags: [],
     sizeBytes: undefined,
     signed: true,
+    lastAppliedAt: null,
   }
 }
 
@@ -641,20 +694,21 @@ async function loadThemes() {
       }),
     ])
 
-    const local: ThemeCardData[] = (localList ?? []).map((t) => ({
-      id: t.id,
-      name: t.name,
-      author: t.author,
-      version: t.version,
-      date: t.created_at,
-      applyCount: t.apply_count,
-      isFavorite: t.is_favorite,
-      isActive: t.is_active,
-      includedRoles: t.included_roles,
+    const local: ThemeCardData[] = (localList ?? []).map((tt) => ({
+      id: tt.id,
+      name: tt.name,
+      author: tt.author,
+      version: tt.version,
+      date: tt.created_at,
+      applyCount: tt.apply_count,
+      isFavorite: tt.is_favorite,
+      isActive: tt.is_active,
+      includedRoles: tt.included_roles,
       kind: 'local' as const,
-      tags: t.tags,
-      sizeBytes: t.size_bytes,
-      signed: t.signed,
+      tags: tt.tags,
+      sizeBytes: tt.size_bytes,
+      signed: tt.signed,
+      lastAppliedAt: tt.last_applied_at,
     }))
 
     // EasyCursorSwap が register_scheme で書き込んだスキームはローカルテーマと
@@ -724,6 +778,9 @@ onMounted(async () => {
   await loadThemes()
   await setupTauriDrop()
   await setupCursorChangeListener()
+  // ステータスバーで `dark_mode.enabled` を表示するため、初回ロードのみ取りに行く。
+  // 既に Settings 画面などで取得済みならキャッシュが返る。
+  await appSettings.load().catch(() => null)
 })
 
 onUnmounted(() => {
@@ -798,7 +855,6 @@ onUnmounted(() => {
           v-for="theme in filteredThemes"
           :key="theme.id"
           :theme="theme"
-          @apply="requestApply"
           @toggle-favorite="toggleFavorite"
           @show-details="showDetails"
         />
@@ -875,27 +931,25 @@ onUnmounted(() => {
             }}</span>
           </div>
           <div class="lt-col lt-sig" role="columnheader">{{ t('library.colSignature') }}</div>
-          <div class="lt-col lt-act" role="columnheader" />
         </div>
 
         <ThemeRow
           v-for="theme in filteredThemes"
           :key="theme.id"
           :theme="theme"
-          @apply="requestApply"
           @toggle-favorite="toggleFavorite"
           @show-details="showDetails"
         />
       </div>
     </div>
 
-    <!-- ステータスバー -->
+    <!-- ステータスバー: 各項目は config / themes 由来で動的に算出。 -->
     <AppStatusbar
       :items="[
-        { dot: true, text: activeTheme ? `Active: ${activeTheme.name}` : 'Active: Windows 既定' },
-        { text: 'ダークモード自動切替: ON' },
-        { text: '署名検証: 有効' },
-        { text: `~/.custom_cursors/ — ${totalStorageMb} MB` },
+        { dot: true, text: activeStatusLabel },
+        { text: darkModeStatusLabel },
+        { text: signatureVerifyLabel },
+        { text: storageStatusLabel },
       ]"
     />
 
@@ -917,7 +971,7 @@ onUnmounted(() => {
         v-if="pendingTheme"
         :theme="pendingTheme"
         :busy="applyBusy"
-        :signed-key-id="pendingTheme.author === 'PixelMaster' ? '7f3a9c…b21e' : null"
+        :signed-key-id="null"
         @cancel="cancelApply"
         @confirm="confirmApply"
       />

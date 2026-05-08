@@ -74,7 +74,33 @@ pub fn get_themes(config: State<'_, ConfigManager>) -> Result<Vec<ThemeSummary>,
         }
     }
 
-    ThemeManager::list_themes(active_id)
+    ThemeManager::list_themes(active_id, &cfg.general.favorites, &cfg.general.usage)
+}
+
+/// テーマのお気に入りフラグを永続化する。
+/// 戻り値は更新後のお気に入り ID リスト (UI でクライアントキャッシュを更新する用途)。
+#[tauri::command]
+pub fn set_theme_favorite(
+    config: State<'_, ConfigManager>,
+    theme_id: String,
+    is_favorite: bool,
+) -> Result<Vec<String>, AppError> {
+    let id = uuid::Uuid::parse_str(&theme_id)
+        .map_err(|e| AppError::Theme(format!("無効なテーマ ID: {}", e)))?;
+    let updated = config.update(|c| {
+        let already = c.general.favorites.contains(&id);
+        if is_favorite && !already {
+            c.general.favorites.push(id);
+        } else if !is_favorite && already {
+            c.general.favorites.retain(|x| x != &id);
+        }
+    })?;
+    Ok(updated
+        .general
+        .favorites
+        .iter()
+        .map(|u| u.to_string())
+        .collect())
 }
 
 /// 指定テーマのロール毎 PNG プレビューを返す。
@@ -94,15 +120,19 @@ pub fn get_theme_previews(
 
 /// 指定 ID のテーマをシステムに適用する。
 /// 失敗時は内部のスナップショットから自動ロールバックされる。
-/// 成功時は config の `active_theme_id` を更新して永続化する。
+/// 成功時は config の `active_theme_id` と `usage` を更新して永続化する。
 #[tauri::command]
 pub fn apply_theme(config: State<'_, ConfigManager>, theme_id: String) -> Result<(), AppError> {
     let id = uuid::Uuid::parse_str(&theme_id)
         .map_err(|e| AppError::Theme(format!("無効なテーマ ID: {}", e)))?;
     ThemeManager::apply_theme(id)?;
-    // 適用成功 → アクティブテーマ ID を永続化
+    // 適用成功 → アクティブテーマ ID + 利用統計を永続化
+    let now = chrono::Utc::now().to_rfc3339();
     config.update(|c| {
         c.general.active_theme_id = Some(id);
+        let entry = c.general.usage.entry(id).or_default();
+        entry.apply_count = entry.apply_count.saturating_add(1);
+        entry.last_applied_at = Some(now);
     })?;
     Ok(())
 }

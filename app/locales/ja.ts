@@ -67,6 +67,12 @@ export default {
     sigSigned: 'Ed25519',
     sigUnsigned: '未署名',
     appliedActive: '適用中',
+    statusActive: 'Active',
+    statusActiveDefault: 'Windows 既定',
+    statusDarkMode: 'ダークモード自動切替',
+    statusSignature: '署名検証',
+    statusOn: 'ON',
+    statusOff: 'OFF',
   },
   apply: {
     title: '「{name}」をシステムに適用',

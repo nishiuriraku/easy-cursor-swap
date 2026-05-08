@@ -24,7 +24,6 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  apply: [id: string]
   toggleFavorite: [id: string]
   showDetails: [id: string]
 }>()
@@ -58,29 +57,39 @@ const displaySize = computed(() => {
 
 const isSigned = computed(() => props.theme.signed !== false)
 
-/** Active / 非 Active で別ボタン。Active ボタンは disabled だが clickable に
- *  しないため `aria-disabled` も付与している。 */
-const applyLabel = computed(() =>
-  props.theme.isActive ? t('library.appliedActive') : t('common.apply'),
-)
-
-function onApply() {
-  if (props.theme.isActive) return
-  emit('apply', props.theme.id)
-}
-
-function onFav() {
+function onFav(e: Event) {
+  e.stopPropagation()
   if (isSystem.value) return
   emit('toggleFavorite', props.theme.id)
 }
 
-function onDetail() {
+/**
+ * 行クリック/Enter/Space → 詳細モーダル。
+ * 内側の <button> は stopPropagation で防御し、星ボタンとイベントの取り合いを避ける。
+ */
+function onRowActivate(e: Event) {
+  const target = e.target as HTMLElement | null
+  if (target?.closest('button, a, input')) return
   emit('showDetails', props.theme.id)
+}
+
+function onRowKeydown(e: KeyboardEvent) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault()
+    onRowActivate(e)
+  }
 }
 </script>
 
 <template>
-  <div :class="['lib-row', { active: theme.isActive }]" role="row">
+  <div
+    :class="['lib-row', { active: theme.isActive }]"
+    role="row"
+    tabindex="0"
+    :aria-label="`${theme.name} の詳細を開く`"
+    @click="onRowActivate"
+    @keydown="onRowKeydown"
+  >
     <!-- お気に入り -->
     <div class="lt-col lt-fav" role="cell">
       <button
@@ -160,37 +169,6 @@ function onDetail() {
       <span v-else class="lt-sig-warn">
         <UiIcon name="Alert" :size="11" aria-hidden="true" />{{ t('library.sigUnsigned') }}
       </span>
-    </div>
-
-    <!-- アクション -->
-    <div class="lt-col lt-act" role="cell">
-      <button
-        v-if="theme.isActive"
-        class="btn"
-        disabled
-        aria-disabled="true"
-        :aria-label="`${theme.name} — ${applyLabel}`"
-        style="opacity: 0.6; cursor: default; height: 28px"
-      >
-        <UiIcon name="Check" :size="12" aria-hidden="true" />{{ applyLabel }}
-      </button>
-      <button
-        v-else
-        class="btn primary"
-        :aria-label="`${theme.name} を${t('common.apply')}`"
-        style="height: 28px"
-        @click="onApply"
-      >
-        {{ applyLabel }}
-      </button>
-      <button
-        class="btn icon"
-        :aria-label="`${theme.name} の詳細を開く`"
-        style="height: 28px; width: 28px"
-        @click="onDetail"
-      >
-        <UiIcon name="ChevD" :size="12" aria-hidden="true" />
-      </button>
     </div>
   </div>
 </template>

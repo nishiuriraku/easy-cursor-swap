@@ -3033,8 +3033,7 @@ html.light .es-new-foot {
     78px /* ver */
     104px /* date */
     72px /* size */
-    104px /* signed */
-    auto; /* actions */
+    104px; /* signed */
   align-items: center;
   gap: 14px;
   padding: 0 16px;
@@ -3042,6 +3041,13 @@ html.light .es-new-foot {
   border-bottom: 1px solid var(--line);
   transition: background 0.12s;
   position: relative;
+}
+.lib-row:not(.lib-head) {
+  cursor: pointer;
+  outline: none;
+}
+.lib-row:not(.lib-head):focus-visible {
+  box-shadow: inset 0 0 0 2px var(--accent-line);
 }
 .lib-row:last-child {
   border-bottom: none;
@@ -3328,8 +3334,7 @@ html.light .lt-cov-bar {
       140px /* coverage */
       72px /* ver */
       96px /* date */
-      96px /* signed */
-      auto; /* actions (size 列削除) */
+      96px; /* signed (size 列削除) */
     gap: 12px;
   }
   .lib-row.lib-head .lt-size,

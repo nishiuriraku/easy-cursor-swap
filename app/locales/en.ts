@@ -68,6 +68,12 @@ export default {
     sigSigned: 'Ed25519',
     sigUnsigned: 'Unsigned',
     appliedActive: 'Active',
+    statusActive: 'Active',
+    statusActiveDefault: 'Windows default',
+    statusDarkMode: 'Dark mode auto-switch',
+    statusSignature: 'Signature verify',
+    statusOn: 'ON',
+    statusOff: 'OFF',
   },
   apply: {
     title: 'Apply "{name}" to system',

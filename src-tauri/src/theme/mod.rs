@@ -115,7 +115,12 @@ impl ThemeManager {
     /// インストール済みテーマの一覧を取得する。
     /// `active_id` (config.general.active_theme_id) と一致するテーマだけ
     /// `is_active = true` で返却する。
-    pub fn list_themes(active_id: Option<Uuid>) -> AppResult<Vec<ThemeSummary>> {
+    /// `favorites` / `usage` は config.general から渡し、各サマリーに反映する。
+    pub fn list_themes(
+        active_id: Option<Uuid>,
+        favorites: &[Uuid],
+        usage: &std::collections::HashMap<Uuid, crate::config::ThemeUsage>,
+    ) -> AppResult<Vec<ThemeSummary>> {
         use crate::config::ConfigManager;
 
         let cursors_dir = ConfigManager::cursors_dir()?;
@@ -147,7 +152,7 @@ impl ThemeManager {
                 continue;
             }
 
-            match Self::load_theme_summary(&theme_json_path, &path, active_id) {
+            match Self::load_theme_summary(&theme_json_path, &path, active_id, favorites, usage) {
                 Ok(summary) => themes.push(summary),
                 Err(e) => {
                     tracing::warn!(
@@ -454,11 +459,16 @@ impl ThemeManager {
         Ok((metadata.id, size))
     }
 
-    /// theme.json からサマリー情報を読み込む
+    /// theme.json からサマリー情報を読み込む。
+    ///
+    /// `favorites` / `usage` は呼び出し側 (`list_themes`) で 1 回だけ取り出した
+    /// 値を共有して渡し、ディレクトリ走査の毎回 config を読み直すのを避ける。
     fn load_theme_summary(
         theme_json_path: &std::path::Path,
         theme_dir: &std::path::Path,
         active_id: Option<Uuid>,
+        favorites: &[Uuid],
+        usage: &std::collections::HashMap<Uuid, crate::config::ThemeUsage>,
     ) -> AppResult<ThemeSummary> {
         let content = std::fs::read_to_string(theme_json_path)?;
         let metadata: ThemeMetadata = serde_json::from_str(&content)?;
@@ -468,6 +478,8 @@ impl ThemeManager {
         let tags = metadata.tags.clone();
         let size_bytes = Self::dir_size_bytes(theme_dir);
         let signed = metadata.signature.is_some();
+        let is_favorite = favorites.contains(&metadata.id);
+        let usage_entry = usage.get(&metadata.id).cloned().unwrap_or_default();
 
         Ok(ThemeSummary {
             id: metadata.id,
@@ -476,8 +488,9 @@ impl ThemeManager {
             version: metadata.version,
             created_at: metadata.created_at,
             is_active,
-            is_favorite: false, // TODO: config の favorites リストから判定
-            apply_count: 0,     // TODO: config の usage 統計から判定
+            is_favorite,
+            apply_count: usage_entry.apply_count,
+            last_applied_at: usage_entry.last_applied_at,
             included_roles,
             path: theme_dir.to_string_lossy().to_string(),
             tags,

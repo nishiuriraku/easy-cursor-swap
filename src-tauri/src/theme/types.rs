@@ -163,6 +163,9 @@ pub struct ThemeSummary {
     pub is_favorite: bool,
     /// 適用回数
     pub apply_count: u32,
+    /// 最終適用日時 (RFC3339)。一度も適用されていなければ None。
+    /// Library 画面「最近使用」フィルタと「最近使った順」ソートで使用。
+    pub last_applied_at: Option<String>,
     /// 含まれるカーソル役割の一覧
     pub included_roles: Vec<String>,
     /// テーマディレクトリのパス

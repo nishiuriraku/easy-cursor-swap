@@ -41,6 +41,7 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         theme::get_themes,
         theme::get_theme_previews,
         theme::apply_theme,
+        theme::set_theme_favorite,
         theme::clear_cursor_cache,
         theme::inspect_cursorpack,
         theme::import_cursorpack,

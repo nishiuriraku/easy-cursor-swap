@@ -17,23 +17,20 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  apply: [id: string]
   toggleFavorite: [id: string]
   showDetails: [id: string]
 }>()
 
-/** シェブロン押下: 親 (Library ページ) のモーダル管理にイベントを投げるだけ。 */
-function openDetail() {
-  emit('showDetails', props.theme.id)
-}
-
-/** カード本体のクリック/Enter で「適用」と同じ動作。子の <button> は stopPropagation で防御。 */
+/**
+ * カード本体のクリック/Enter/Space で詳細モーダルを開く。
+ * 適用フローは「カード → 詳細モーダル → 適用モーダル」の 2 段階に統一されており、
+ * カード自体には適用ボタンを置かない。
+ * 子の <button>/<a>/<input> は個別ハンドラに委譲するため stopPropagation する。
+ */
 function onCardActivate(e: Event) {
-  if (props.theme.isActive) return
-  // 内側のボタン上ならスキップ (個別ハンドラに委譲)
   const target = e.target as HTMLElement | null
   if (target?.closest('button, a, input')) return
-  emit('apply', props.theme.id)
+  emit('showDetails', props.theme.id)
 }
 
 function onCardKeydown(e: KeyboardEvent) {
@@ -70,11 +67,11 @@ watch(() => props.theme.id, fetchPreview)
 
 <template>
   <article
-    :class="['card', { active: theme.isActive, interactive: !theme.isActive }]"
-    :aria-label="theme.name"
-    :tabindex="theme.isActive ? -1 : 0"
+    :class="['card', { active: theme.isActive }, 'interactive']"
+    :aria-label="`${theme.name} の詳細を開く`"
+    tabindex="0"
     role="button"
-    @dblclick="onCardActivate"
+    @click="onCardActivate"
     @keydown="onCardKeydown"
   >
     <div class="card-preview">
@@ -118,28 +115,6 @@ watch(() => props.theme.id, fetchPreview)
       <div class="coverage" aria-label="カバレッジ {{ theme.includedRoles.length }}/17">
         <div class="bar" aria-hidden="true"><i :style="{ width: coveragePct + '%' }" /></div>
         <span class="num" aria-hidden="true">{{ theme.includedRoles.length }}/17</span>
-      </div>
-      <div class="card-actions">
-        <button
-          v-if="theme.isActive"
-          class="btn"
-          disabled
-          :aria-label="`${theme.name} — ${t('common.apply')}済み`"
-          style="opacity: 0.6; cursor: default"
-        >
-          <UiIcon name="Check" :size="13" aria-hidden="true" />{{ t('common.apply') }}済み
-        </button>
-        <button
-          v-else
-          class="btn primary"
-          :aria-label="`${theme.name} を${t('common.apply')}`"
-          @click="emit('apply', theme.id)"
-        >
-          {{ t('common.apply') }}
-        </button>
-        <button class="btn icon" :aria-label="`${theme.name} の詳細を開く`" @click="openDetail">
-          <UiIcon name="ChevD" :size="13" aria-hidden="true" />
-        </button>
       </div>
     </div>
   </article>

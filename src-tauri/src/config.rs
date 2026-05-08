@@ -5,6 +5,7 @@
 
 use crate::errors::{AppError, AppResult};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
@@ -67,6 +68,26 @@ pub struct GeneralConfig {
     /// 環境変数未設定でビルドされた場合は本フラグが true でも送信は行われない。
     #[serde(default)]
     pub crash_reporting: bool,
+
+    /// お気に入り登録されたテーマ ID。Library 画面の星マークで永続化する。
+    /// 旧スキーマ互換のため `serde(default)` で空配列にフォールバック。
+    #[serde(default)]
+    pub favorites: Vec<Uuid>,
+
+    /// テーマごとの利用統計 (適用回数 + 最終適用日時)。
+    /// Library 画面の「最近使用」フィルタと sortApplied 用。
+    /// 旧スキーマ互換のため `serde(default)`。
+    #[serde(default)]
+    pub usage: HashMap<Uuid, ThemeUsage>,
+}
+
+/// テーマ利用統計 (1 テーマあたり)
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ThemeUsage {
+    /// 累積適用回数
+    pub apply_count: u32,
+    /// 最終適用日時 (RFC3339)
+    pub last_applied_at: Option<String>,
 }
 
 /// ダークモード連動設定
@@ -115,6 +136,8 @@ impl Default for AppConfig {
                 active_theme_id: None,
                 panic_hotkey: "Ctrl+Alt+Shift+R".to_string(),
                 crash_reporting: false,
+                favorites: Vec::new(),
+                usage: HashMap::new(),
             },
             dark_mode: DarkModeConfig {
                 enabled: false,
@@ -501,6 +524,48 @@ mod tests {
         let cfg: AppConfig = serde_json::from_str(json).expect("legacy schema should parse");
         assert!(!cfg.general.crash_reporting);
         assert_eq!(cfg.general.language, "ja");
+    }
+
+    #[test]
+    fn deserialize_accepts_missing_favorites_and_usage() {
+        // 旧スキーマ (favorites / usage が無い) は serde(default) で空コレクションになる
+        let json = r#"{
+            "schema_version": 1,
+            "general": {
+                "auto_start": true,
+                "auto_update": true,
+                "language": "ja",
+                "active_theme_id": null,
+                "panic_hotkey": "Ctrl+Alt+Shift+R",
+                "crash_reporting": false
+            },
+            "dark_mode": {
+                "enabled": false,
+                "light_theme_id": null,
+                "dark_theme_id": null
+            },
+            "security": {
+                "max_pack_compressed_size": 52428800,
+                "max_pack_uncompressed_size": 209715200,
+                "max_image_file_size": 10485760,
+                "storage_warning_threshold": 1073741824
+            },
+            "logging": {
+                "level": "INFO",
+                "retention_days": 14,
+                "max_total_size": 104857600
+            }
+        }"#;
+        let cfg: AppConfig = serde_json::from_str(json).expect("legacy schema should parse");
+        assert!(cfg.general.favorites.is_empty());
+        assert!(cfg.general.usage.is_empty());
+    }
+
+    #[test]
+    fn default_favorites_and_usage_are_empty() {
+        let cfg = AppConfig::default();
+        assert!(cfg.general.favorites.is_empty());
+        assert!(cfg.general.usage.is_empty());
     }
 
     #[test]

@@ -40,4 +40,9 @@ export interface ThemeCardData {
   sizeBytes?: number
   /** 署名済みかどうか (Ed25519)。未取得時は `undefined` でフォールバック表示。 */
   signed?: boolean
+  /**
+   * 最終適用日時 (RFC3339)。一度も適用されていない場合は `null`。
+   * 「最近使用」フィルタの判定に使う。Windows システムスキームは未追跡 (`null`)。
+   */
+  lastAppliedAt?: string | null
 }

@@ -17,6 +17,19 @@ export interface GeneralConfig {
    * env 未設定でビルドされたアプリでは本フラグが true でも送信は行われない。
    */
   crash_reporting: boolean
+  /** お気に入りテーマ ID (UUID 文字列) リスト。 */
+  favorites?: string[]
+  /** テーマ ID → 利用統計 の辞書。 */
+  usage?: Record<string, ThemeUsage>
+}
+
+/**
+ * テーマ利用統計 (Rust 側 `crate::config::ThemeUsage` と対応)。
+ * 適用回数と最終適用日時 (RFC3339) を持つ。
+ */
+export interface ThemeUsage {
+  apply_count: number
+  last_applied_at: string | null
 }
 
 /**
