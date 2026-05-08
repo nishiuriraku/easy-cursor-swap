@@ -41,34 +41,35 @@
 
 ## Rust 側モジュール (`src-tauri/src/`)
 
-合計 22 モジュール / 約 9,300 行。`lib.rs` で全モジュールを `pub mod` 公開し、`main.rs` から `tauri::Builder` に組み込む。
+`lib.rs` で全モジュールを `pub mod` 公開し、`main.rs` から `tauri::Builder` に組み込む。
+2026-05-08 のリファクタで `commands` / `cursor` / `theme` を **ディレクトリ + サブモジュール構成** に分割した。
 
 ### 責務マップ
 
-| カテゴリ | モジュール | 主な役割 | 行数 |
-|---|---|---|---|
-| **IPC 表玄関** | `commands.rs` | 49 個の `#[tauri::command]` を `tauri::generate_handler!` に登録 | 1229 |
-| **設定 / 状態** | `config.rs` | `AppConfig` / `ConfigManager` (RwLock + 自動 schema migration + バックアップ) | 399 |
-| | `errors.rs` | `AppError` / `AppResult` 共通型 | 75 |
-| **カーソル生成パイプライン** | `cursor.rs` | PNG/SVG → `.cur` バイナリ生成 (Lanczos/Nearest, 6 サイズ, hotspot, ANI/CUR/ICO 解析) | 1289 |
-| | `cursor_watcher.rs` | コントロールパネル等で外部に書き換えられたら `cursor-changed` を発火 | 114 |
-| **レジストリ操作** | `registry.rs` | `HKCU\Control Panel\Cursors` 適用/復元、Scheme 列挙、トランザクションログ、初期スナップショット | 1020 |
-| **テーマパッケージ** | `theme.rs` | `.cursorpack` の作成 / 解凍 / バリデーション、theme.json 管理、孤児カーソル復旧 | 1255 |
-| | `bulk_import.rs` | ファイル / フォルダ / cursorpack の一括取り込み (リサンプル並列化, キャンセル可能) | 703 |
-| | `backup.rs` | `.cursorprofile` (config + 全テーマの ZIP) の export/import | 295 |
-| **マーケットプレース** | `marketplace.rs` | HTTP インデックス取得、SHA-256 + Ed25519 検証、ダウンロードサイズ上限 | 279 |
-| | `keystore.rs` | クリエイター用 Ed25519 鍵ペア (DPAPI 暗号化), `.cfkey` import/export, key_id 計算 | 415 |
-| **信頼性 / 復旧** | `health.rs` | 起動連続失敗カウンタ + ロールバック対象バージョン算出 | 209 |
-| | `crash.rs` | panic フック + `crash-reports/` ディレクトリの retention | 269 |
-| **OS 統合** | `tray.rs` | システムトレイ常駐 / メインウィンドウ再生成 | 162 |
-| | `darkmode.rs` | OS テーマ変更監視 → light/dark テーマ自動切替 | 148 |
-| | `hotkey.rs` | グローバルホットキー (Ctrl+Alt+Shift+R 等) | 258 |
-| | `autostart.rs` | `HKCU\...\Run` 自動起動レジストリ管理 | 274 |
-| | `single_instance.rs` | Named Mutex による多重起動防止 + 既存インスタンスへ表示要求 | 171 |
-| | `appusermodel.rs` | AppUserModelID 登録 (Win トースト発信元) | 40 |
-| | `accessibility.rs` | マウスソナー / ハイコントラスト / カーソル拡大の検出 | 140 |
-| | `environment.rs` | RDP / Citrix / Sandbox など動作対象外環境の検出 | 115 |
-| **観測** | `logging.rs` | tracing 初期化 + `redact_path` / `short_hash` PII helper | 158 |
+| カテゴリ | モジュール | 主な役割 |
+|---|---|---|
+| **IPC 表玄関** | `commands/` | 49 個の `#[tauri::command]` を 8 サブモジュールに分割。`mod.rs` の `get_command_handlers()` が全コマンドをまとめて `tauri::generate_handler!` に渡す。サブモジュール: `theme` / `cursor_build` / `cursor_io` / `keystore` / `marketplace` / `profile` / `system` / `windows_scheme` |
+| **設定 / 状態** | `config.rs` | `AppConfig` / `ConfigManager` (RwLock + 自動 schema migration + バックアップ) |
+| | `errors.rs` | `AppError` / `AppResult` 共通型 |
+| **カーソル生成パイプライン** | `cursor/` | 4 サブモジュール: `image` (リサイズ / hotspot / メタデータ剥離) / `cur_build` (PNG → 6 解像度 .cur) / `ico_cur` (ICO/CUR 解析) / `ani` (RIFF/ACON ANI 解析)。`mod.rs` で全シンボルを `pub use` 再エクスポート |
+| | `cursor_watcher.rs` | コントロールパネル等で外部に書き換えられたら `cursor-changed` を発火 |
+| **レジストリ操作** | `registry.rs` | `HKCU\Control Panel\Cursors` 適用/復元、Scheme 列挙、トランザクションログ、初期スナップショット |
+| **テーマパッケージ** | `theme/` | 3 ファイル: `types` (DTO + 内部 helper) / `sanitize` (path traversal 対策) / `mod.rs` (`ThemeManager` impl 本体)。`.cursorpack` の作成・解凍・バリデーション、theme.json 管理、孤児カーソル復旧 |
+| | `bulk_import.rs` | ファイル / フォルダ / cursorpack の一括取り込み (リサンプル並列化, キャンセル可能) |
+| | `backup.rs` | `.cursorprofile` (config + 全テーマの ZIP) の export/import |
+| **マーケットプレース** | `marketplace.rs` | HTTP インデックス取得、SHA-256 + Ed25519 検証、ダウンロードサイズ上限 |
+| | `keystore.rs` | クリエイター用 Ed25519 鍵ペア (DPAPI 暗号化), `.cfkey` import/export, key_id 計算 |
+| **信頼性 / 復旧** | `health.rs` | 起動連続失敗カウンタ + ロールバック対象バージョン算出 |
+| | `crash.rs` | panic フック + `crash-reports/` ディレクトリの retention |
+| **OS 統合** | `tray.rs` | システムトレイ常駐 / メインウィンドウ再生成 |
+| | `darkmode.rs` | OS テーマ変更監視 → light/dark テーマ自動切替 |
+| | `hotkey.rs` | グローバルホットキー (Ctrl+Alt+Shift+R 等) |
+| | `autostart.rs` | `HKCU\...\Run` 自動起動レジストリ管理 |
+| | `single_instance.rs` | Named Mutex による多重起動防止 + 既存インスタンスへ表示要求 |
+| | `appusermodel.rs` | AppUserModelID 登録 (Win トースト発信元) |
+| | `accessibility.rs` | マウスソナー / ハイコントラスト / カーソル拡大の検出 |
+| | `environment.rs` | RDP / Citrix / Sandbox など動作対象外環境の検出 |
+| **観測** | `logging.rs` | tracing 初期化 + `redact_path` / `short_hash` PII helper |
 
 ### IPC 一覧 (49 commands)
 
@@ -142,13 +143,13 @@ app/
 
 ### 巨大ファイルの状態 (リファクタ追跡用)
 
-**Rust top 5**
+**Rust 残作業**
 
-1. `cursor.rs` 1289 行 — 画像処理 + ICO/CUR/ANI parse。**分割候補**: image_resize / cur_build / ico_cur_parse / ani_parse
-2. `theme.rs` ~1255 行 — 大きい `impl ThemeManager`。**分割候補**: 検証, 保存/読込, 一覧, 削除/複製
-3. `commands.rs` 1229 行 — 49 IPC を 1 ファイルに集約。**分割候補**: theme / keystore / cursorpack / system / windows_scheme
-4. `registry.rs` 1020 行 — Scheme / Cursors / Snapshot / SPI を兼任。**分割候補**: scheme / cursors_apply / snapshot
-5. `bulk_import.rs` 703 行 — 並列パイプ + cancel。比較的責務が単一。
+1. ✅ `commands.rs` 1229 行 → `commands/` 8 サブモジュール (mod.rs 96 行) — 完了
+2. ✅ `cursor.rs` 1289 行 → `cursor/` 4 サブモジュール (mod.rs 26 行) — 完了
+3. ✅ `theme.rs` 1255 行 → `theme/` 3 ファイル (types / sanitize / mod) — 完了 (impl ThemeManager は分割せず維持)
+4. ⏳ `registry.rs` 1020 行 — Scheme / Cursors / Snapshot / SPI を兼任。**分割候補**: scheme / cursors_apply / snapshot (未着手)
+5. `bulk_import.rs` 703 行 — 並列パイプ + cancel。比較的責務が単一なので分割優先度低。
 
 **Vue top 3**
 
