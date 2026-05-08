@@ -964,144 +964,22 @@ async function onFileChange(e: Event) {
         </button>
       </div>
 
-      <!-- メタデータタブ -->
-      <div v-if="activeTab === 'metadata'" class="metadata-pane">
-        <div class="metadata-grid">
-          <div class="prop-section">
-            <div class="prop-head">{{ t('creator.metaTitle') }}</div>
-            <div class="prop-body" style="padding: 4px 16px">
-              <SettingsRow :label="t('creator.metaNameJa')" :desc="t('creator.metaNameJaDesc')">
-                <input
-                  v-model="metaName"
-                  class="input"
-                  style="width: 280px"
-                  placeholder="Neon Glow"
-                />
-              </SettingsRow>
-              <SettingsRow :label="t('creator.metaNameEn')" :desc="t('creator.metaNameEnDesc')">
-                <input
-                  v-model="metaNameEn"
-                  class="input"
-                  style="width: 280px"
-                  placeholder="Neon Glow"
-                />
-              </SettingsRow>
-              <SettingsRow :label="t('creator.metaAuthor')" :desc="t('creator.metaAuthorDesc')">
-                <input
-                  v-model="metaAuthor"
-                  class="input"
-                  style="width: 280px"
-                  placeholder="@username"
-                />
-              </SettingsRow>
-              <SettingsRow :label="t('creator.metaVersion')" :desc="t('creator.metaVersionDesc')">
-                <input
-                  v-model="metaVersion"
-                  class="input mono"
-                  style="width: 140px"
-                  placeholder="1.0.0"
-                />
-              </SettingsRow>
-              <SettingsRow :label="t('creator.metaShadow')" :desc="t('creator.metaShadowDesc')">
-                <SettingsToggle v-model="shadowEnabled" />
-              </SettingsRow>
-            </div>
-          </div>
-
-          <div class="prop-section">
-            <div class="prop-head">{{ t('creator.metaDescTitle') }}</div>
-            <div class="prop-body" style="padding: 12px 16px">
-              <textarea
-                v-model="metaDescription"
-                class="input"
-                rows="6"
-                style="width: 100%; font-family: var(--font-body); resize: vertical"
-                :placeholder="t('creator.metaDescPlaceholder')"
-              />
-            </div>
-          </div>
-
-          <div class="prop-section">
-            <div class="prop-head">{{ t('creator.metaExportStatus') }}</div>
-            <div class="prop-body" style="padding: 4px 16px">
-              <SettingsRow :label="t('creator.metaAssignedRoles')">
-                <span class="tag" :class="{ ok: arrowAssigned }">{{ assignedRoleCount }} / 17</span>
-              </SettingsRow>
-              <SettingsRow :label="t('creator.metaArrowRequired')">
-                <span class="tag" :class="arrowAssigned ? 'ok' : ''">
-                  {{ arrowAssigned ? t('creator.metaAssigned') : t('creator.metaUnassigned') }}
-                </span>
-              </SettingsRow>
-            </div>
-          </div>
-        </div>
-
-        <Transition name="fade">
-          <div v-if="exportMessage" class="import-banner" role="status">
-            <UiIcon
-              :name="exportMessage.startsWith('エクスポート失敗') ? 'Alert' : 'Check'"
-              :size="13"
-            />
-            <span>{{ exportMessage }}</span>
-            <button
-              class="btn ghost"
-              style="margin-left: auto; height: 24px"
-              @click="exportMessage = null"
-            >
-              <UiIcon name="X" :size="11" />
-            </button>
-          </div>
-        </Transition>
-
-        <!-- ストリームエクスポート中の進捗バー + キャンセルボタン -->
-        <Transition name="fade">
-          <div
-            v-if="exportProgress && exportProgress.stage !== 'done'"
-            class="export-progress"
-            role="status"
-            aria-live="polite"
-          >
-            <div class="export-progress-row">
-              <span class="export-progress-label">
-                <template v-if="exportProgress.stage === 'role'">
-                  {{ exportProgress.message ?? '' }} ({{ exportProgress.current }}/{{
-                    exportProgress.total
-                  }})
-                </template>
-                <template v-else-if="exportProgress.stage === 'sign'">{{
-                  t('creatorStart.exportStageSign')
-                }}</template>
-                <template v-else-if="exportProgress.stage === 'package'">{{
-                  t('creatorStart.exportStagePackage')
-                }}</template>
-                <template v-else-if="exportProgress.stage === 'cancelled'">{{
-                  t('creatorStart.exportStageCancelled')
-                }}</template>
-                <template v-else>{{ t('creatorStart.exportStageWorking') }}</template>
-              </span>
-              <button
-                v-if="exportBusy && exportProgress.stage !== 'cancelled'"
-                class="btn ghost"
-                style="height: 24px; margin-left: auto"
-                @click="cancelExport"
-              >
-                <UiIcon name="X" :size="11" />キャンセル
-              </button>
-            </div>
-            <div class="export-progress-bar">
-              <div
-                class="export-progress-fill"
-                :style="{
-                  width:
-                    exportProgress.total > 0
-                      ? `${(exportProgress.current / exportProgress.total) * 100}%`
-                      : '0%',
-                }"
-              />
-            </div>
-          </div>
-        </Transition>
-      </div>
+      <CreatorMetadataPane
+        v-if="activeTab === 'metadata'"
+        v-model:meta-name="metaName"
+        v-model:meta-name-en="metaNameEn"
+        v-model:meta-author="metaAuthor"
+        v-model:meta-version="metaVersion"
+        v-model:meta-description="metaDescription"
+        v-model:shadow-enabled="shadowEnabled"
+        :arrow-assigned="arrowAssigned"
+        :assigned-role-count="assignedRoleCount"
+        :export-message="exportMessage"
+        :export-progress="exportProgress"
+        :export-busy="exportBusy"
+        @dismiss-export-message="exportMessage = null"
+        @cancel-export="cancelExport"
+      />
 
       <!-- 3 カラムグリッド (assign タブのみ) -->
       <div v-if="activeTab === 'assign'" class="creator-grid">
