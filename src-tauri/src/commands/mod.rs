@@ -2,6 +2,13 @@
 //!
 //! フロントエンド (Nuxt) から呼び出し可能なコマンドを定義する。
 //! 各コマンドは Tauri の `#[tauri::command]` マクロで公開される。
+//!
+//! 責務別にサブモジュール分割している:
+//! - [`keystore`] — Ed25519 鍵ペア管理 (生成 / 削除 / Export / Import)
+//!
+//! 残りのコマンドは段階的に切り出し中。新規追加時は適切なサブモジュールへ。
+
+pub mod keystore;
 
 use crate::accessibility::AccessibilityConflicts;
 use crate::autostart;
@@ -15,7 +22,6 @@ use crate::darkmode;
 use crate::environment::EnvironmentReport;
 use crate::errors::AppError;
 use crate::health::is_major_bump;
-use crate::keystore::{Keystore, KeystoreInfo};
 use crate::marketplace::{MarketplaceClient, MarketplaceIndex, MarketplaceInstallRequest};
 use crate::registry::{CursorRole, RegistryManager, WindowsScheme};
 use crate::theme::{
@@ -122,53 +128,6 @@ pub fn apply_theme(config: State<'_, ConfigManager>, theme_id: String) -> Result
 pub fn clear_cursor_cache() {
     clear_resize_cache();
     tracing::info!("リサイズキャッシュをクリアしました");
-}
-
-/// 鍵ペアの状態を返す。秘密鍵は DPAPI 暗号化されているので復号せずファイル存在のみ確認。
-#[tauri::command]
-pub fn keystore_info() -> Result<KeystoreInfo, AppError> {
-    Keystore::info()
-}
-
-/// 新規 Ed25519 鍵ペアを生成して保存する。
-/// `force=true` なら既存鍵を上書き。
-#[tauri::command]
-pub fn keystore_generate(force: bool) -> Result<KeystoreInfo, AppError> {
-    Keystore::generate(force)
-}
-
-/// 鍵ペアを削除する (PC 移行や再発行のため)。
-#[tauri::command]
-pub fn keystore_delete() -> Result<(), AppError> {
-    Keystore::delete()
-}
-
-/// 秘密鍵をパスフレーズ付きでエクスポートして指定パスに書き出す。
-/// XChaCha20-Poly1305 + Argon2id でフォーマット化された不透明バイト列を保存。
-#[tauri::command]
-pub fn keystore_export(passphrase: String, output_path: String) -> Result<u64, AppError> {
-    let blob = Keystore::export_private_key(&passphrase)?;
-    let path = std::path::PathBuf::from(&output_path);
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    std::fs::write(&path, &blob)?;
-    Ok(blob.len() as u64)
-}
-
-/// パスフレーズ付きエクスポートデータを読み込んで秘密鍵をインポート。
-/// 既存鍵があれば上書きする。
-#[tauri::command]
-pub fn keystore_import(passphrase: String, input_path: String) -> Result<KeystoreInfo, AppError> {
-    let path = std::path::PathBuf::from(&input_path);
-    if !path.exists() {
-        return Err(AppError::Theme(format!(
-            "ファイルが見つかりません: {}",
-            input_path
-        )));
-    }
-    let blob = std::fs::read(&path)?;
-    Keystore::import_private_key(&blob, &passphrase)
 }
 
 /// クリエイターから渡された PNG バイト列を 6 サイズ .cur に変換し、
@@ -1159,11 +1118,6 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         inspect_cursorpack,
         import_cursorpack,
         build_cursor_file,
-        keystore_info,
-        keystore_generate,
-        keystore_delete,
-        keystore_export,
-        keystore_import,
         clear_cursor_cache,
         export_cursorpack,
         export_profile,
@@ -1196,6 +1150,11 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         delete_theme,
         duplicate_theme,
         repackage_theme,
+        keystore::keystore_info,
+        keystore::keystore_generate,
+        keystore::keystore_delete,
+        keystore::keystore_export,
+        keystore::keystore_import,
         crate::bulk_import::bulk_resolve_assets,
         crate::bulk_import::cancel_bulk_import,
         crate::bulk_import::parse_cursorpack_for_creator,
