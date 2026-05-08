@@ -303,8 +303,6 @@ const importMessage = ref<string | null>(null)
 const sanitizedRemovals = ref<string[]>([])
 /** プレビュー用 URL (Object URL or data URL) */
 const importedPreviewUrl = ref<string | null>(null)
-/** ビルドに送る PNG バイト列。SVG インポート時は Canvas 経由で PNG 化したものを保持。 */
-const importedPngBytes = ref<Uint8Array | null>(null)
 
 const fileInput = ref<HTMLInputElement | null>(null)
 
@@ -344,7 +342,6 @@ async function pickRasterFromPath(path: string, ext: string) {
  * `pickRasterFromPath` と `onFileChange` (HTML input フォールバック) で共有。
  */
 function applyImportedRaster(png: Uint8Array, primarySize: number) {
-  importedPngBytes.value = png
   if (importedPreviewUrl.value && importedPreviewUrl.value.startsWith('blob:')) {
     URL.revokeObjectURL(importedPreviewUrl.value)
   }
@@ -382,7 +379,6 @@ async function pickCursorFromPath(picked: string) {
   if (!result) throw new Error('IPC 結果が空でした')
 
   const png = new Uint8Array(result.pngBytes)
-  importedPngBytes.value = png
   if (importedPreviewUrl.value && importedPreviewUrl.value.startsWith('blob:')) {
     URL.revokeObjectURL(importedPreviewUrl.value)
   }
@@ -408,9 +404,7 @@ async function pickCursorFromPath(picked: string) {
   importMessage.value = `${kind} を取り込みました (${result.width}x${result.height}, 含解像度: ${sizeList})`
 }
 
-// --- ビルド & パッケージエクスポート ---
-const buildBusy = ref(false)
-const buildMessage = ref<string | null>(null)
+// --- パッケージエクスポート ---
 const exportBusy = ref(false)
 const exportMessage = ref<string | null>(null)
 
@@ -512,38 +506,6 @@ async function exportCursorpack(opts: { sign: boolean }) {
     setTimeout(() => {
       if (!exportBusy.value) exportProgress.value = null
     }, 3000)
-  }
-}
-
-async function buildAndSave() {
-  if (!importedPngBytes.value) {
-    buildMessage.value = 'まず PNG/SVG 画像を読み込んでください'
-    return
-  }
-  buildBusy.value = true
-  buildMessage.value = null
-  try {
-    const { save } = await import('@tauri-apps/plugin-dialog')
-    const target = await save({
-      defaultPath: `${activeRole.value.id}.cur`,
-      filters: [{ name: 'Cursor', extensions: ['cur'] }],
-    })
-    if (!target) return
-
-    const written = await invokeTauri<number>('build_cursor_file', {
-      req: {
-        pngBytes: Array.from(importedPngBytes.value),
-        hotspotX: hotspotX.value,
-        hotspotY: hotspotY.value,
-        resample: resample.value,
-        outputPath: target,
-      },
-    })
-    buildMessage.value = `.cur をビルドしました (${written ?? '?'} bytes) → ${target}`
-  } catch (err) {
-    buildMessage.value = `ビルド失敗: ${err instanceof Error ? err.message : String(err)}`
-  } finally {
-    buildBusy.value = false
   }
 }
 
@@ -763,9 +725,7 @@ function resetCreator() {
     URL.revokeObjectURL(importedPreviewUrl.value)
   }
   importedPreviewUrl.value = null
-  importedPngBytes.value = null
   importMessage.value = null
-  buildMessage.value = null
   exportMessage.value = null
   exportProgress.value = null
   activeTab.value = 'assign'
@@ -862,6 +822,7 @@ async function onFileChange(e: Event) {
     }
 
     const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
+    let pngBytes: Uint8Array | null = null
     if (ext === 'svg') {
       const text = await file.text()
       const { sanitized, removed } = sanitizeSvg(text)
@@ -870,7 +831,7 @@ async function onFileChange(e: Event) {
       const blob = new Blob([sanitized], { type: 'image/svg+xml' })
       importedPreviewUrl.value = URL.createObjectURL(blob)
       // SVG → 256px PNG にラスタライズして Rust 側ビルダー用に保持
-      importedPngBytes.value = await rasterizeSvgToPng(sanitized, 256)
+      pngBytes = await rasterizeSvgToPng(sanitized, 256)
       importMessage.value =
         removed.length > 0
           ? `SVG を sanitize しました (除去: ${removed.length} 件)`
@@ -887,7 +848,7 @@ async function onFileChange(e: Event) {
       ) {
         throw new Error('PNG ヘッダーが不正です (Magic Byte 不一致)')
       }
-      importedPngBytes.value = fullBytes
+      pngBytes = fullBytes
       importedPreviewUrl.value = URL.createObjectURL(file)
       importMessage.value = 'PNG をインポートしました'
     } else {
@@ -906,11 +867,11 @@ async function onFileChange(e: Event) {
     // 新しい primarySize (= 256) 基準の px 値に変換する。
     // ref サイズは「既存アセットの primarySize」優先、なければ activeSize (UI 入力時の基準)。
     // これにより画像サイズが大きく変わっても見た目のホットスポット位置がずれない。
-    if (importedPngBytes.value) {
+    if (pngBytes) {
       const fromSize = hotspotReferenceSize.value
       const finalHotspot = scaleHotspot({ x: hotspotX.value, y: hotspotY.value }, fromSize, 256)
       setAsset(activeRoleId.value, {
-        primary: importedPngBytes.value,
+        primary: pngBytes,
         primarySize: 256,
         hotspot: finalHotspot,
         source: 'manual',
@@ -940,12 +901,9 @@ async function onFileChange(e: Event) {
         :meta-version="metaVersion"
         :has-keystore-signing="hasKeystoreSigning"
         :export-busy="exportBusy"
-        :build-busy="buildBusy"
         :arrow-assigned="arrowAssigned"
-        :imported-png-bytes="importedPngBytes"
         @reset="resetCreator"
         @export="exportCursorpack"
-        @build="buildAndSave"
       />
 
       <!-- タブバー -->
@@ -1028,24 +986,6 @@ async function onFileChange(e: Event) {
                 class="btn ghost"
                 style="margin-left: auto; height: 24px"
                 @click="importMessage = null"
-              >
-                <UiIcon name="X" :size="11" />
-              </button>
-            </div>
-          </Transition>
-
-          <!-- ビルド結果メッセージ -->
-          <Transition name="fade">
-            <div v-if="buildMessage" class="import-banner" role="status">
-              <UiIcon
-                :name="buildMessage.startsWith('ビルド失敗') ? 'Alert' : 'Check'"
-                :size="13"
-              />
-              <span>{{ buildMessage }}</span>
-              <button
-                class="btn ghost"
-                style="margin-left: auto; height: 24px"
-                @click="buildMessage = null"
               >
                 <UiIcon name="X" :size="11" />
               </button>

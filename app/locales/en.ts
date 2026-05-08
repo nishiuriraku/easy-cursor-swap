@@ -106,8 +106,6 @@ export default {
     advancedSection: 'Advanced',
     advancedHint: 'Override per resolution',
     perResolutionLabel: 'Per-resolution assets',
-    buildExport: 'Build & save',
-    buildBusy: 'Building...',
     exportPack: 'Export',
     exportBusy: 'Exporting...',
     exportSign: 'Sign & Export',

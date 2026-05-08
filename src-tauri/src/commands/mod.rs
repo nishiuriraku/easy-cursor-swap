@@ -49,7 +49,6 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         theme::duplicate_theme,
         theme::repackage_theme,
         // .cur / .cursorpack ビルド
-        cursor_build::build_cursor_file,
         cursor_build::export_cursorpack,
         cursor_build::export_cursorpack_streamed,
         cursor_build::cancel_build,

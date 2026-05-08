@@ -1,9 +1,9 @@
 <script setup lang="ts">
 /**
- * Creator のツールバー (パンくず + クリアボタン + 署名状態タグ + Export/Build ボタン)。
+ * Creator のツールバー (パンくず + クリアボタン + 署名状態タグ + Export ボタン)。
  *
- * メタデータ表示 (テーマ名 / バージョン) と build/export 状態を props で受け取り、
- * アクション 3 種 (clear / export / build) を emit で親に通知する。
+ * メタデータ表示 (テーマ名 / バージョン) と export 状態を props で受け取り、
+ * アクション 2 種 (clear / export) を emit で親に通知する。
  */
 import { useI18n } from '~/composables/useI18n'
 
@@ -14,15 +14,12 @@ defineProps<{
   metaVersion: string
   hasKeystoreSigning: boolean
   exportBusy: boolean
-  buildBusy: boolean
   arrowAssigned: boolean
-  importedPngBytes: Uint8Array | null
 }>()
 
 defineEmits<{
   (e: 'reset'): void
   (e: 'export', payload: { sign: boolean }): void
-  (e: 'build'): void
 }>()
 </script>
 
@@ -69,16 +66,6 @@ defineEmits<{
         @click="$emit('export', { sign: true })"
       >
         <UiIcon name="Shield" :size="14" />{{ t('creator.exportSign') }}
-      </button>
-      <button
-        v-else
-        class="btn primary"
-        :disabled="buildBusy || !importedPngBytes"
-        @click="$emit('build')"
-      >
-        <span v-if="buildBusy" class="spinner" style="width: 13px; height: 13px" />
-        <UiIcon v-else name="Check" :size="14" />
-        {{ buildBusy ? t('creator.buildBusy') : t('creator.buildExport') }}
       </button>
     </div>
   </div>

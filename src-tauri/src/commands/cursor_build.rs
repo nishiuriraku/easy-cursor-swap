@@ -3,7 +3,6 @@
 //! クリエイターから渡された PNG / メタ情報を 17 役割 × 6 サイズの `.cur` バイナリへ
 //! 変換し、theme.json と一緒に zip に固める。
 //!
-//! - [`build_cursor_file`] — 単一 PNG → 単一 `.cur` (1 役割 1 サイズ)
 //! - [`export_cursorpack`] — 役割パス → `.cursorpack` (同期)
 //! - [`export_cursorpack_streamed`] — 進捗イベント付きビルド (UI からの主流ルート)
 //! - [`cancel_build`] — `export_cursorpack_streamed` を中止
@@ -16,43 +15,6 @@ use crate::theme::{CursorDefinition, LocalizedString, ThemeManager, ThemeMetadat
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
 use std::sync::OnceLock;
-
-/// クリエイターから渡された PNG バイト列を 6 サイズ .cur に変換し、
-/// 指定パスへ書き出す。`resample` は "lanczos" / "nearest" / "auto"。
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BuildCurRequest {
-    /// PNG ファイルのバイト列 (Tauri は Vec<u8> を Number 配列として渡せる)
-    pub png_bytes: Vec<u8>,
-    /// 元画像でのホットスポット座標
-    pub hotspot_x: u32,
-    pub hotspot_y: u32,
-    /// リサンプル: "lanczos" / "nearest" / "auto"
-    pub resample: String,
-    /// 書き出し先ファイルパス
-    pub output_path: String,
-}
-
-#[tauri::command]
-pub fn build_cursor_file(req: BuildCurRequest) -> Result<u64, AppError> {
-    let resample = match req.resample.as_str() {
-        "auto" => ResizeMethod::Lanczos, // 自動判定は build_cur_from_png 内で行う
-        other => ResizeMethod::from_str(other),
-    };
-    let bin = build_cur_from_png(&req.png_bytes, req.hotspot_x, req.hotspot_y, resample, None)?;
-
-    let path = std::path::PathBuf::from(&req.output_path);
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    std::fs::write(&path, &bin)?;
-    tracing::info!(
-        "build_cursor_file: wrote {} bytes to {}",
-        bin.len(),
-        crate::logging::redact_path(&path)
-    );
-    Ok(bin.len() as u64)
-}
 
 /// `.cursorpack` をエクスポートする際のリクエスト。
 /// `cursors` は役割名 → ファイルパス (Rust 側でファイル読込) で渡す。

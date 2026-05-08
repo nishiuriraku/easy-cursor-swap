@@ -105,8 +105,6 @@ export default {
     advancedSection: '詳細設定',
     advancedHint: '解像度ごとに画像を上書き',
     perResolutionLabel: '解像度別 アセット',
-    buildExport: 'ビルド & 出力',
-    buildBusy: 'ビルド中...',
     exportPack: 'エクスポート',
     exportBusy: '書き出し中...',
     exportSign: '署名 & エクスポート',
