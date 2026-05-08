@@ -156,3 +156,86 @@ pub fn short_hash(bytes: &[u8]) -> String {
     use sha2::{Digest, Sha256};
     hex::encode(Sha256::digest(bytes))[..12].to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn short_hash_returns_12_hex_chars() {
+        let h = short_hash(b"hello world");
+        assert_eq!(h.len(), 12);
+        // hex のみ
+        assert!(h.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn short_hash_is_deterministic() {
+        // 同一入力は常に同一出力
+        assert_eq!(short_hash(b"foo"), short_hash(b"foo"));
+        // 異なる入力は (高確率で) 異なる出力
+        assert_ne!(short_hash(b"foo"), short_hash(b"bar"));
+    }
+
+    #[test]
+    fn short_hash_known_sha256_prefix() {
+        // SHA-256("") の先頭 12 文字 = "e3b0c44298fc"
+        assert_eq!(short_hash(b""), "e3b0c44298fc");
+        // SHA-256("abc") の先頭 12 文字 = "ba7816bf8f01"
+        assert_eq!(short_hash(b"abc"), "ba7816bf8f01");
+    }
+
+    #[test]
+    fn short_hash_handles_binary_data() {
+        // バイナリも問題なく処理できる (UTF-8 縛りなし)
+        let h = short_hash(&[0x00, 0xff, 0x80, 0x7f]);
+        assert_eq!(h.len(), 12);
+    }
+
+    #[test]
+    fn redact_path_keeps_paths_outside_home_unchanged() {
+        // ホーム配下でないパスはそのまま返る
+        let p = Path::new("C:\\Windows\\System32\\cursor.cur");
+        let redacted = redact_path(p);
+        assert!(redacted.contains("Windows"));
+        // ~/ で始まらない (ユーザー名を含まない)
+        assert!(!redacted.starts_with("~/"));
+    }
+
+    #[test]
+    fn redact_path_strips_home_prefix() {
+        // ホーム配下のパスは ~/ に置換される
+        let home = match dirs::home_dir() {
+            Some(h) => h,
+            None => {
+                eprintln!("skipping: home_dir unavailable on this platform");
+                return;
+            }
+        };
+        let target = home.join(".custom_cursors").join("test.cur");
+        let redacted = redact_path(&target);
+        assert!(
+            redacted.starts_with("~/"),
+            "expected ~/ prefix, got: {}",
+            redacted
+        );
+        // ホームディレクトリ自体 (= ユーザー名) は含まない
+        let username = home.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        if !username.is_empty() {
+            assert!(
+                !redacted.contains(username) || redacted == format!("~/{}", username),
+                "redacted path should not leak username: {}",
+                redacted
+            );
+        }
+        // 末尾は元の相対パスを含む (区切りは OS 依存なので両方許容)
+        assert!(redacted.contains(".custom_cursors"));
+        assert!(redacted.contains("test.cur"));
+    }
+
+    #[test]
+    fn redact_path_handles_empty_path() {
+        // 空パスでも panic しない
+        let _ = redact_path(Path::new(""));
+    }
+}

@@ -413,3 +413,73 @@ fn dpapi_encrypt(_plain: &[u8]) -> AppResult<Vec<u8>> {
 fn dpapi_decrypt(_cipher: &[u8]) -> AppResult<Vec<u8>> {
     Err(AppError::Theme("DPAPI は Windows 専用です".to_string()))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn compute_key_id_returns_16_lowercase_hex() {
+        let pk = base64::engine::general_purpose::STANDARD.encode([0xABu8; 32]);
+        let id = compute_key_id(&pk).unwrap();
+        assert_eq!(id.len(), 16);
+        assert!(id
+            .chars()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_uppercase()));
+    }
+
+    #[test]
+    fn compute_key_id_same_input_same_output() {
+        let pk = base64::engine::general_purpose::STANDARD.encode([1u8; 32]);
+        assert_eq!(compute_key_id(&pk).unwrap(), compute_key_id(&pk).unwrap());
+    }
+
+    #[test]
+    fn compute_key_id_distinct_inputs_distinct_outputs() {
+        let a = base64::engine::general_purpose::STANDARD.encode([1u8; 32]);
+        let b = base64::engine::general_purpose::STANDARD.encode([2u8; 32]);
+        assert_ne!(compute_key_id(&a).unwrap(), compute_key_id(&b).unwrap());
+    }
+
+    #[test]
+    fn compute_key_id_matches_marketplace_implementation() {
+        // keystore::compute_key_id と marketplace::compute_key_id は別実装
+        // (前者は鍵ペア生成時、後者は MarketplaceClient::install 時に使用) だが、
+        // 同じ仕様 = 「公開鍵バイトの SHA-256 先頭 16 文字」のはず。
+        let pk = base64::engine::general_purpose::STANDARD.encode([42u8; 32]);
+        assert_eq!(
+            compute_key_id(&pk).unwrap(),
+            crate::marketplace::compute_key_id(&pk).unwrap()
+        );
+    }
+
+    #[test]
+    fn compute_key_id_rejects_invalid_base64() {
+        assert!(compute_key_id("!!!not base64!!!").is_err());
+    }
+
+    #[test]
+    fn derive_key_from_passphrase_is_deterministic() {
+        // 同じパスフレーズと salt で何度呼んでも同じ 32 byte 鍵が得られる。
+        let salt = [0u8; 16];
+        let k1 = derive_key_from_passphrase("hunter2", &salt).unwrap();
+        let k2 = derive_key_from_passphrase("hunter2", &salt).unwrap();
+        assert_eq!(k1, k2);
+    }
+
+    #[test]
+    fn derive_key_from_passphrase_changes_with_salt() {
+        // salt を変えると別の鍵が出る (rainbow table 防御)。
+        let k1 = derive_key_from_passphrase("hunter2", &[0u8; 16]).unwrap();
+        let k2 = derive_key_from_passphrase("hunter2", &[1u8; 16]).unwrap();
+        assert_ne!(k1, k2);
+    }
+
+    #[test]
+    fn derive_key_from_passphrase_changes_with_passphrase() {
+        let salt = [7u8; 16];
+        let k1 = derive_key_from_passphrase("alpha", &salt).unwrap();
+        let k2 = derive_key_from_passphrase("beta", &salt).unwrap();
+        assert_ne!(k1, k2);
+    }
+}

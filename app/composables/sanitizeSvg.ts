@@ -8,6 +8,9 @@
  *       現状は Tauri バイナリサイズを抑えるため最小実装。
  */
 
+// SVG タグ名は仕様上 camelCase だが、本サニタイザーは比較時に lowercase 化するので
+// この Set のエントリも全て lowercase で持つ (clipPath / linearGradient 等)。
+// 大文字混在で書くと比較が外れて誤除去が発生する (回帰テスト済み)。
 const ALLOWED_TAGS = new Set([
   'svg',
   'g',
@@ -19,10 +22,10 @@ const ALLOWED_TAGS = new Set([
   'polyline',
   'line',
   'defs',
-  'linearGradient',
-  'radialGradient',
+  'lineargradient',
+  'radialgradient',
   'stop',
-  'clipPath',
+  'clippath',
   'mask',
   'use',
   'title',

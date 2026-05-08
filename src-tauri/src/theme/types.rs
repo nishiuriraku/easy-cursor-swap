@@ -236,3 +236,106 @@ pub(super) fn zip_dir_recursive<W: std::io::Write + std::io::Seek>(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ja_en_de_map() -> LocalizedString {
+        let mut m = HashMap::new();
+        m.insert("ja".into(), "日本語名".into());
+        m.insert("en".into(), "English Name".into());
+        m.insert("de".into(), "Deutscher Name".into());
+        LocalizedString::Localized(m)
+    }
+
+    #[test]
+    fn simple_returns_value_for_any_locale() {
+        // Simple variant はロケールに関係なく同じ値を返す
+        let s = LocalizedString::Simple("Universal".into());
+        assert_eq!(s.get("ja"), "Universal");
+        assert_eq!(s.get("en"), "Universal");
+        assert_eq!(s.get("zz"), "Universal");
+    }
+
+    #[test]
+    fn localized_returns_exact_match() {
+        let s = ja_en_de_map();
+        assert_eq!(s.get("ja"), "日本語名");
+        assert_eq!(s.get("en"), "English Name");
+        assert_eq!(s.get("de"), "Deutscher Name");
+    }
+
+    #[test]
+    fn localized_falls_back_to_default_then_en() {
+        // 未定義ロケール (fr) → "default" 不在 → "en" にフォールバック
+        let s = ja_en_de_map();
+        assert_eq!(s.get("fr"), "English Name");
+    }
+
+    #[test]
+    fn localized_prefers_default_over_en() {
+        // "default" が存在する場合は en より優先
+        let mut m = HashMap::new();
+        m.insert("default".into(), "Default Value".into());
+        m.insert("en".into(), "English Value".into());
+        let s = LocalizedString::Localized(m);
+        assert_eq!(s.get("zz"), "Default Value");
+    }
+
+    #[test]
+    fn localized_falls_back_to_first_value_when_no_default_or_en() {
+        // ja のみ → fr 要求時は ja を返す (どれもなければ最初の値)
+        let mut m = HashMap::new();
+        m.insert("ja".into(), "唯一の値".into());
+        let s = LocalizedString::Localized(m);
+        assert_eq!(s.get("fr"), "唯一の値");
+    }
+
+    #[test]
+    fn localized_returns_empty_string_for_empty_map() {
+        // 空マップでも panic しない
+        let s = LocalizedString::Localized(HashMap::new());
+        assert_eq!(s.get("ja"), "");
+    }
+
+    #[test]
+    fn localized_exact_match_takes_precedence_over_fallback() {
+        // ja を求めて ja があれば、default や en が両方あっても ja を返す
+        let mut m = HashMap::new();
+        m.insert("ja".into(), "JA".into());
+        m.insert("default".into(), "DEFAULT".into());
+        m.insert("en".into(), "EN".into());
+        let s = LocalizedString::Localized(m);
+        assert_eq!(s.get("ja"), "JA");
+    }
+
+    #[test]
+    fn clone_with_suffix_appends_to_localized_map() {
+        // 主要ユースケース: Localized マップの全ロケール値にサフィックス付与
+        let original = ja_en_de_map();
+        let copied = clone_with_suffix(&original, " (Copy)");
+        assert_eq!(copied.get("ja"), "日本語名 (Copy)");
+        assert_eq!(copied.get("en"), "English Name (Copy)");
+        assert_eq!(copied.get("de"), "Deutscher Name (Copy)");
+    }
+
+    #[test]
+    fn clone_with_suffix_keeps_simple_unchanged() {
+        // 仕様上の既知の制限: Simple variant は serde_json で string になり
+        // as_object_mut() で None が返るためサフィックスが付かない。
+        // ライブラリは Localized が既定なので実害はないが、テストで挙動を固定しておく。
+        let original = LocalizedString::Simple("Theme".into());
+        let copied = clone_with_suffix(&original, " (Copy)");
+        assert_eq!(copied.get("any"), "Theme");
+    }
+
+    #[test]
+    fn clone_with_suffix_handles_empty_suffix() {
+        // 空サフィックスは Localized でも内容不変
+        let original = ja_en_de_map();
+        let copied = clone_with_suffix(&original, "");
+        assert_eq!(copied.get("ja"), "日本語名");
+        assert_eq!(copied.get("en"), "English Name");
+    }
+}

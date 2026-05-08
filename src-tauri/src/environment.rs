@@ -113,3 +113,68 @@ fn product_name() -> Option<String> {
 fn product_name() -> Option<String> {
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn detect_returns_serializable_report() {
+        // detect() は実環境を見るので結果は不定だが、報告型を必ず返す。
+        // serialize 可能 (JSON 化できる) ことが UI 連携の最低保証。
+        let report = EnvironmentReport::detect();
+        let json = serde_json::to_string(&report).expect("serialize ok");
+        assert!(json.contains("\"is_remote_session\""));
+        assert!(json.contains("\"is_server_sku\""));
+        assert!(json.contains("\"level\""));
+    }
+
+    #[test]
+    fn detect_level_is_one_of_known_values() {
+        let report = EnvironmentReport::detect();
+        assert!(
+            matches!(report.level.as_str(), "ok" | "warn" | "error"),
+            "unknown level: {}",
+            report.level
+        );
+    }
+
+    #[test]
+    fn detect_attaches_message_when_remote_or_server() {
+        let report = EnvironmentReport::detect();
+        // 警告が立っていればメッセージは Some、それ以外は None という対応関係。
+        if report.is_remote_session || report.is_server_sku {
+            assert!(
+                report.message.is_some(),
+                "warn 状態でメッセージなし: {:?}",
+                report
+            );
+            assert_eq!(report.level, "warn");
+        } else {
+            assert_eq!(report.level, "ok");
+            assert!(report.message.is_none());
+        }
+    }
+
+    #[test]
+    fn detect_message_is_non_empty_when_present() {
+        let report = EnvironmentReport::detect();
+        if let Some(msg) = &report.message {
+            assert!(!msg.trim().is_empty(), "メッセージが空白のみ");
+        }
+    }
+
+    /// 非 Windows プラットフォームでは false を返すスタブが効くべき。
+    /// CI で Linux 上のテストを通すための保険。
+    #[cfg(not(windows))]
+    #[test]
+    fn non_windows_stubs_return_safe_defaults() {
+        assert!(!is_remote_session());
+        assert!(!is_server_sku());
+        assert!(product_name().is_none());
+        // detect() は ok レベルになる
+        let report = EnvironmentReport::detect();
+        assert_eq!(report.level, "ok");
+        assert!(report.message.is_none());
+    }
+}

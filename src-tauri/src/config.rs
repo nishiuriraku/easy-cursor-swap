@@ -397,3 +397,116 @@ impl ConfigManager {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_uses_current_schema_version() {
+        let cfg = AppConfig::default();
+        assert_eq!(cfg.schema_version, CURRENT_SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn default_has_sane_security_thresholds() {
+        // 仕様書 §「セキュリティ」: 50/200/10/1024 MB の固定上限
+        let cfg = AppConfig::default();
+        assert_eq!(cfg.security.max_pack_compressed_size, 50 * 1024 * 1024);
+        assert_eq!(cfg.security.max_pack_uncompressed_size, 200 * 1024 * 1024);
+        assert_eq!(cfg.security.max_image_file_size, 10 * 1024 * 1024);
+        assert_eq!(cfg.security.storage_warning_threshold, 1024 * 1024 * 1024);
+    }
+
+    #[test]
+    fn default_panic_hotkey_is_ctrl_alt_shift_r() {
+        // パニックボタンの既定は仕様で固定。ユーザーが変更する前は必ずこの値。
+        let cfg = AppConfig::default();
+        assert_eq!(cfg.general.panic_hotkey, "Ctrl+Alt+Shift+R");
+    }
+
+    #[test]
+    fn default_dark_mode_is_disabled_with_no_pairing() {
+        // ペアリング未設定で勝手に切替えないため、初期状態は enabled=false。
+        let cfg = AppConfig::default();
+        assert!(!cfg.dark_mode.enabled);
+        assert!(cfg.dark_mode.light_theme_id.is_none());
+        assert!(cfg.dark_mode.dark_theme_id.is_none());
+    }
+
+    #[test]
+    fn default_crash_reporting_is_opt_in() {
+        // プライバシー優先で既定は false。ユーザーが明示 ON にしないと送信しない。
+        let cfg = AppConfig::default();
+        assert!(!cfg.general.crash_reporting);
+    }
+
+    #[test]
+    fn json_roundtrip_preserves_all_fields() {
+        // serde で書き出して読み戻して同一になることを確認する。
+        let original = AppConfig::default();
+        let json = serde_json::to_string(&original).unwrap();
+        let restored: AppConfig = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(restored.schema_version, original.schema_version);
+        assert_eq!(restored.general.auto_start, original.general.auto_start);
+        assert_eq!(restored.general.language, original.general.language);
+        assert_eq!(restored.general.panic_hotkey, original.general.panic_hotkey);
+        assert_eq!(
+            restored.general.crash_reporting,
+            original.general.crash_reporting
+        );
+        assert_eq!(
+            restored.security.max_pack_compressed_size,
+            original.security.max_pack_compressed_size
+        );
+        assert_eq!(
+            restored.logging.retention_days,
+            original.logging.retention_days
+        );
+    }
+
+    #[test]
+    fn deserialize_accepts_missing_crash_reporting() {
+        // 旧スキーマ (crash_reporting が無い) からの後方互換: serde(default) で false
+        let json = r#"{
+            "schema_version": 1,
+            "general": {
+                "auto_start": true,
+                "auto_update": true,
+                "language": "ja",
+                "active_theme_id": null,
+                "panic_hotkey": "Ctrl+Alt+Shift+R"
+            },
+            "dark_mode": {
+                "enabled": false,
+                "light_theme_id": null,
+                "dark_theme_id": null
+            },
+            "security": {
+                "max_pack_compressed_size": 52428800,
+                "max_pack_uncompressed_size": 209715200,
+                "max_image_file_size": 10485760,
+                "storage_warning_threshold": 1073741824
+            },
+            "logging": {
+                "level": "INFO",
+                "retention_days": 14,
+                "max_total_size": 104857600
+            }
+        }"#;
+        let cfg: AppConfig = serde_json::from_str(json).expect("legacy schema should parse");
+        assert!(!cfg.general.crash_reporting);
+        assert_eq!(cfg.general.language, "ja");
+    }
+
+    #[test]
+    fn cursors_dir_is_under_home() {
+        // ~/.custom_cursors/ をホーム配下に解決できる。
+        let dir = ConfigManager::cursors_dir().unwrap();
+        assert!(dir.ends_with(".custom_cursors"));
+        if let Some(home) = dirs::home_dir() {
+            assert!(dir.starts_with(&home));
+        }
+    }
+}
