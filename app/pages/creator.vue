@@ -17,6 +17,7 @@ import { invokeTauri } from '~/composables/useTauri'
 import { useKeystore } from '~/composables/useKeystore'
 import { useI18n } from '~/composables/useI18n'
 import { useCreatorAssets, scaleHotspot } from '~/composables/useCreatorAssets'
+import { initialHotspotFor } from '~/composables/useHotspotDefaults'
 import {
   useBulkImport,
   type ResolvedAsset,
@@ -351,8 +352,15 @@ function applyImportedRaster(png: Uint8Array, primarySize: number) {
   if (!map.includes(activeSize.value)) {
     filledSizesByRole.value[activeRoleId.value] = [...map, activeSize.value]
   }
+  // 新規ロールかつホットスポット未編集 (デフォ 4,4) の場合のみ中央既定値を適用。
+  // PNG/SVG はホットスポット情報を持たないので、ロールに応じて中央 or 左上を選ぶ。
+  const isNewRole = !creatorAssets.hasAsset(activeRoleId.value)
+  const isDefault = hotspotX.value === 4 && hotspotY.value === 4
   const fromSize = hotspotReferenceSize.value
-  const finalHotspot = scaleHotspot({ x: hotspotX.value, y: hotspotY.value }, fromSize, primarySize)
+  const finalHotspot =
+    isNewRole && isDefault
+      ? initialHotspotFor(activeRoleId.value, primarySize)
+      : scaleHotspot({ x: hotspotX.value, y: hotspotY.value }, fromSize, primarySize)
   setAsset(activeRoleId.value, {
     primary: png,
     primarySize,
@@ -389,12 +397,20 @@ async function pickCursorFromPath(picked: string) {
   if (!map.includes(activeSize.value)) {
     filledSizesByRole.value[activeRoleId.value] = [...map, activeSize.value]
   }
-  hotspotX.value = result.hotspotX
-  hotspotY.value = result.hotspotY
+  // .cur/.ico に埋め込まれた hotspot が (0, 0) かつロール新規なら中央既定値を適用。
+  // それ以外は元ファイルのホットスポット情報を尊重する。
+  const isNewRole = !creatorAssets.hasAsset(activeRoleId.value)
+  const noEmbeddedHotspot = result.hotspotX === 0 && result.hotspotY === 0
+  const finalHotspot =
+    isNewRole && noEmbeddedHotspot
+      ? initialHotspotFor(activeRoleId.value, result.width)
+      : { x: result.hotspotX, y: result.hotspotY }
+  hotspotX.value = finalHotspot.x
+  hotspotY.value = finalHotspot.y
   setAsset(activeRoleId.value, {
     primary: png,
     primarySize: result.width,
-    hotspot: { x: result.hotspotX, y: result.hotspotY },
+    hotspot: finalHotspot,
     source: 'manual',
   })
   const sizeList = result.availableSizes.length > 0 ? result.availableSizes.join('/') : '?'
@@ -866,8 +882,13 @@ async function onFileChange(e: Event) {
     // ref サイズは「既存アセットの primarySize」優先、なければ activeSize (UI 入力時の基準)。
     // これにより画像サイズが大きく変わっても見た目のホットスポット位置がずれない。
     if (pngBytes) {
+      const isNewRole = !creatorAssets.hasAsset(activeRoleId.value)
+      const isDefault = hotspotX.value === 4 && hotspotY.value === 4
       const fromSize = hotspotReferenceSize.value
-      const finalHotspot = scaleHotspot({ x: hotspotX.value, y: hotspotY.value }, fromSize, 256)
+      const finalHotspot =
+        isNewRole && isDefault
+          ? initialHotspotFor(activeRoleId.value, 256)
+          : scaleHotspot({ x: hotspotX.value, y: hotspotY.value }, fromSize, 256)
       setAsset(activeRoleId.value, {
         primary: pngBytes,
         primarySize: 256,

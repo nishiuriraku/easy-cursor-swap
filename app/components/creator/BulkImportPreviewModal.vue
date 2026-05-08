@@ -9,6 +9,7 @@ import {
 import { CURSOR_ROLES } from '~/components/icons/CursorIcons'
 import type { ResolvedAsset, ParsedCursorpack } from '~/composables/useBulkImport'
 import type { RoleAsset } from '~/composables/useCreatorAssets'
+import { initialHotspotFor } from '~/composables/useHotspotDefaults'
 import { useI18n } from '~/composables/useI18n'
 import BulkImportRoleRow from './BulkImportRoleRow.vue'
 
@@ -178,11 +179,24 @@ const allRoleRows = computed(() => {
   })
 })
 
-function toRoleAsset(asset: ResolvedAsset, source: RoleAsset['source']): RoleAsset {
+function toRoleAsset(
+  roleId: string,
+  asset: ResolvedAsset,
+  source: RoleAsset['source'],
+  isNewRole: boolean,
+): RoleAsset {
+  // PNG/SVG 由来のアセットは hotspot 情報を持たず、useBulkImport が (4,4) を
+  // ハードコードで埋めている。ロール新規かつホットスポットがデフォ値なら
+  // 中央既定ロールに対して中央 (primarySize/2) で初期化する。
+  const isDefault = asset.hotspotX === 4 && asset.hotspotY === 4
+  const finalHotspot =
+    isNewRole && isDefault
+      ? initialHotspotFor(roleId, asset.nativeSize)
+      : { x: asset.hotspotX, y: asset.hotspotY }
   return {
     primary: new Uint8Array(asset.pngBytes),
     primarySize: asset.nativeSize,
-    hotspot: { x: asset.hotspotX, y: asset.hotspotY },
+    hotspot: finalHotspot,
     sized: undefined,
     source,
   }
@@ -215,11 +229,22 @@ function apply() {
       (props.resolved?.length ?? 0) > 1 ? 'bulk-folder' : 'bulk-file'
     for (const m of matches.value) {
       if (m.decision !== 'apply') continue
-      roleAssets.push({ roleId: m.role, asset: toRoleAsset(m.asset, sourceTag) })
+      roleAssets.push({
+        roleId: m.role,
+        asset: toRoleAsset(m.role, m.asset, sourceTag, !props.existingRoles.has(m.role)),
+      })
     }
     for (const u of unmatched.value) {
       if (!u.manuallyAssignedRole) continue
-      roleAssets.push({ roleId: u.manuallyAssignedRole, asset: toRoleAsset(u.asset, sourceTag) })
+      roleAssets.push({
+        roleId: u.manuallyAssignedRole,
+        asset: toRoleAsset(
+          u.manuallyAssignedRole,
+          u.asset,
+          sourceTag,
+          !props.existingRoles.has(u.manuallyAssignedRole),
+        ),
+      })
     }
   }
 
