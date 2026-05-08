@@ -25,11 +25,11 @@ const { t } = useI18n()
         <SettingsRow :label="t('settings.homepageLabel')" mono>
           <a
             class="btn ghost"
-            href="https://github.com/easycursorswap"
+            href="https://github.com/nishiuriraku/easy-cursor-swap"
             target="_blank"
             rel="noopener"
           >
-            <UiIcon name="Globe" :size="13" />github.com/easycursorswap
+            <UiIcon name="Globe" :size="13" />github.com/nishiuriraku/easy-cursor-swap
           </a>
         </SettingsRow>
         <SettingsRow :label="t('settings.issuesLabel')" mono>
