@@ -890,66 +890,18 @@ async function onFileChange(e: Event) {
       @duplicate-existing="onStartNew"
     />
     <template v-else>
-      <!-- ツールバー -->
-      <div class="toolbar">
-        <div class="bcrumb">
-          <span class="crumb">{{ t('creator.breadcrumb') }}</span>
-          <span class="sep">/</span>
-          <span class="crumb active">
-            {{ metaName || 'Untitled' }}
-            <span class="draft-tag">v{{ metaVersion }} · {{ t('creator.draft') }}</span>
-          </span>
-        </div>
-        <div />
-        <div class="tb-actions">
-          <button
-            class="btn ghost"
-            aria-label="クリアして初期画面に戻る"
-            title="編集中のアセットを破棄して初期画面に戻る"
-            @click="resetCreator"
-          >
-            <UiIcon name="X" :size="13" />クリア
-          </button>
-          <span v-if="hasKeystoreSigning" class="tag ok">
-            <UiIcon name="Shield" :size="11" />{{ t('creator.signedTag') }}
-          </span>
-          <span
-            v-else
-            class="tag"
-            style="color: var(--rose); border-color: rgba(255, 107, 138, 0.3)"
-          >
-            <UiIcon name="Alert" :size="11" />{{ t('creator.unsignedTag') }}
-          </span>
-          <button
-            class="btn ghost"
-            :disabled="exportBusy || !arrowAssigned"
-            title=".cursorpack"
-            @click="exportCursorpack({ sign: false })"
-          >
-            <span v-if="exportBusy" class="spinner" style="width: 13px; height: 13px" />
-            <UiIcon v-else name="Export" :size="14" />
-            {{ exportBusy ? t('creator.exportBusy') : t('creator.exportPack') }}
-          </button>
-          <button
-            v-if="hasKeystoreSigning"
-            class="btn primary"
-            :disabled="exportBusy || !arrowAssigned"
-            @click="exportCursorpack({ sign: true })"
-          >
-            <UiIcon name="Shield" :size="14" />{{ t('creator.exportSign') }}
-          </button>
-          <button
-            v-else
-            class="btn primary"
-            :disabled="buildBusy || !importedPngBytes"
-            @click="buildAndSave"
-          >
-            <span v-if="buildBusy" class="spinner" style="width: 13px; height: 13px" />
-            <UiIcon v-else name="Check" :size="14" />
-            {{ buildBusy ? t('creator.buildBusy') : t('creator.buildExport') }}
-          </button>
-        </div>
-      </div>
+      <CreatorToolbar
+        :meta-name="metaName"
+        :meta-version="metaVersion"
+        :has-keystore-signing="hasKeystoreSigning"
+        :export-busy="exportBusy"
+        :build-busy="buildBusy"
+        :arrow-assigned="arrowAssigned"
+        :imported-png-bytes="importedPngBytes"
+        @reset="resetCreator"
+        @export="exportCursorpack"
+        @build="buildAndSave"
+      />
 
       <!-- タブバー -->
       <div class="tabs">
