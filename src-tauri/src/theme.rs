@@ -45,6 +45,10 @@ pub struct ThemeMetadata {
     /// 署名 (将来の検証用)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signature: Option<String>,
+    /// テーマタグ (ライブラリ一覧の chip 表示・分類用。例: "animated", "dark", "minimal")
+    /// 旧スキーマとの互換のため `serde(default)` で空配列にフォールバック。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
 }
 
 /// 多言語対応文字列
@@ -163,6 +167,14 @@ pub struct ThemeSummary {
     pub included_roles: Vec<String>,
     /// テーマディレクトリのパス
     pub path: String,
+    /// テーマタグ (theme.json の `tags` フィールドをそのまま転送)
+    pub tags: Vec<String>,
+    /// テーマディレクトリ全体の合計サイズ (bytes)。一覧表示で「2.1 MB」のように出す用途。
+    pub size_bytes: u64,
+    /// 署名済みか (`metadata.signature` が存在するかどうかのみで判定)。
+    /// 一覧の「署名」列で Ed25519 / 未署名 のピル色分けに使う。
+    /// **検証結果ではない** — 検証は marketplace::verify_signature が別途行う。
+    pub signed: bool,
 }
 
 /// テーママネージャー
@@ -559,6 +571,7 @@ impl ThemeManager {
             description: None,
             min_app_version: None,
             signature: None,
+            tags: Vec::new(),
         };
 
         if let Some(parent) = output_path.parent() {
@@ -601,6 +614,9 @@ impl ThemeManager {
 
         let included_roles: Vec<String> = metadata.cursors.keys().cloned().collect();
         let is_active = active_id == Some(metadata.id);
+        let tags = metadata.tags.clone();
+        let size_bytes = Self::dir_size_bytes(theme_dir);
+        let signed = metadata.signature.is_some();
 
         Ok(ThemeSummary {
             id: metadata.id,
@@ -613,7 +629,31 @@ impl ThemeManager {
             apply_count: 0,     // TODO: config の usage 統計から判定
             included_roles,
             path: theme_dir.to_string_lossy().to_string(),
+            tags,
+            size_bytes,
+            signed,
         })
+    }
+
+    /// テーマディレクトリ全体のバイト合計を再帰的に計算する。
+    /// 読めないエントリ (権限エラー等) は静かにスキップする — UI 表示用なので厳密性より頑健性。
+    fn dir_size_bytes(dir: &std::path::Path) -> u64 {
+        let mut total: u64 = 0;
+        let entries = match std::fs::read_dir(dir) {
+            Ok(e) => e,
+            Err(_) => return 0,
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() {
+                if let Ok(meta) = entry.metadata() {
+                    total = total.saturating_add(meta.len());
+                }
+            } else if path.is_dir() {
+                total = total.saturating_add(Self::dir_size_bytes(&path));
+            }
+        }
+        total
     }
 
     /// `.cursorpack` (ZIP) のバイト列を `~/.custom_cursors/<UUID>/` に展開する。

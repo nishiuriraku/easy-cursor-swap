@@ -28,4 +28,16 @@ export interface ThemeCardData {
   includedRoles: string[]
   /** テーマソース。デフォルトは `local`。 */
   kind?: ThemeKind
+  /**
+   * テーマタグ (一覧表示の chip 用。例: ["animated", "dark"])。
+   * Windows システムスキームには付与されない (常に空配列扱い)。
+   */
+  tags?: string[]
+  /**
+   * テーマディレクトリ全体のバイト合計。一覧の「サイズ」列で `formatSize` 越しに表示する。
+   * Windows システムスキームには概念が無いので未指定 (`undefined`) になり得る。
+   */
+  sizeBytes?: number
+  /** 署名済みかどうか (Ed25519)。未取得時は `undefined` でフォールバック表示。 */
+  signed?: boolean
 }

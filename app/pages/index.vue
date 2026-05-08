@@ -20,12 +20,20 @@ const { t } = useI18n()
 // UiIcon / ThemeCard / ApplyModal / AppStatusbar は Nuxt の自動インポートで解決される。
 
 type FilterChip = 'all' | 'favorites' | 'recent' | 'unsigned'
-type SortKey = 'name' | 'updated' | 'applied'
+/** 並び替えキー。
+ *  - `updated` / `name` / `applied`: グリッド・一覧表示の両方で使う既存キー
+ *  - `coverage` / `size`: 一覧表示のヘッダクリック用に追加
+ *  なお Q2 で「sortKey/sortDir はグリッドと一覧で共有」と決定したため、
+ *  グリッド側のソート巡回ボタンも増えたキーを順番に巡回する。 */
+type SortKey = 'name' | 'updated' | 'applied' | 'coverage' | 'size'
+type SortDir = 'asc' | 'desc'
 
 const themes = ref<ThemeCardData[]>([])
 const searchQuery = ref('')
 const filter = ref<FilterChip>('all')
 const sortKey = ref<SortKey>('updated')
+/** ソート方向。一覧の列ヘッダクリックでトグル、グリッドの cycleSort では `desc` 固定。 */
+const sortDir = ref<SortDir>('desc')
 const viewMode = ref<'grid' | 'list'>('grid')
 const isLoading = ref(true)
 const showDrop = ref(false)
@@ -60,6 +68,9 @@ interface ConflictPending {
 const conflictDialog = ref<ConflictPending | null>(null)
 
 // --- デモデータ (将来は invoke('get_themes')) ---
+// design/library-list.jsx の demo データに合わせて tags / size / signed を追加。
+// 実機では Rust の get_themes が ThemeSummary 経由でこれらを返すので、ここはあくまで
+// Tauri 未起動時 (web preview) のフォールバック表示。
 const demoThemes: ThemeCardData[] = [
   {
     id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
@@ -71,6 +82,9 @@ const demoThemes: ThemeCardData[] = [
     isFavorite: true,
     isActive: true,
     includedRoles: ['Arrow', 'Help', 'AppStarting', 'Wait', 'IBeam', 'Hand', 'No', 'SizeNS', 'SizeWE', 'SizeNWSE', 'SizeNESW', 'SizeAll'],
+    tags: ['animated', 'dark'],
+    sizeBytes: 2_202_009,
+    signed: true,
   },
   {
     id: 'b2c3d4e5-f6a7-8901-bcde-f23456789012',
@@ -82,6 +96,9 @@ const demoThemes: ThemeCardData[] = [
     isFavorite: false,
     isActive: false,
     includedRoles: ['Arrow', 'Wait', 'IBeam', 'Hand', 'No'],
+    tags: ['minimal', 'light'],
+    sizeBytes: 419_430,
+    signed: true,
   },
   {
     id: 'c3d4e5f6-a7b8-9012-cdef-345678901234',
@@ -93,6 +110,9 @@ const demoThemes: ThemeCardData[] = [
     isFavorite: true,
     isActive: false,
     includedRoles: ['Arrow', 'Help', 'AppStarting', 'Wait', 'Crosshair', 'IBeam', 'NWPen', 'No', 'SizeNS', 'SizeWE', 'SizeNWSE', 'SizeNESW', 'SizeAll', 'UpArrow', 'Hand', 'Pin', 'Person'],
+    tags: ['pixel', 'retro'],
+    sizeBytes: 943_718,
+    signed: true,
   },
   {
     id: 'd4e5f6a7-b8c9-0123-defa-456789012345',
@@ -104,6 +124,9 @@ const demoThemes: ThemeCardData[] = [
     isFavorite: false,
     isActive: false,
     includedRoles: ['Arrow', 'Help', 'Wait', 'IBeam', 'Hand', 'No', 'SizeNS', 'SizeWE'],
+    tags: ['seasonal', 'soft'],
+    sizeBytes: 1_363_148,
+    signed: true,
   },
   {
     id: 'e5f6a7b8-c9d0-1234-efab-567890123456',
@@ -115,6 +138,9 @@ const demoThemes: ThemeCardData[] = [
     isFavorite: true,
     isActive: false,
     includedRoles: ['Arrow', 'Help', 'AppStarting', 'Wait', 'Crosshair', 'IBeam', 'No', 'SizeNS', 'SizeWE', 'SizeNWSE', 'SizeNESW', 'SizeAll', 'Hand'],
+    tags: ['animated', 'neon'],
+    sizeBytes: 4_928_307,
+    signed: true,
   },
   {
     id: 'f6a7b8c9-d0e1-2345-fabc-678901234567',
@@ -126,6 +152,9 @@ const demoThemes: ThemeCardData[] = [
     isFavorite: false,
     isActive: false,
     includedRoles: ['Arrow', 'Wait', 'IBeam', 'Hand', 'No', 'SizeAll', 'SizeNS', 'SizeWE', 'Crosshair', 'Help'],
+    tags: ['draft'],
+    sizeBytes: 209_715,
+    signed: false,
   },
 ]
 
@@ -143,15 +172,28 @@ const filteredThemes = computed(() => {
   if (filter.value === 'favorites') result = result.filter((t) => t.isFavorite)
   // `recent` / `unsigned` は将来の API で追加。現状は all と同じ。
 
+  // Q2: sortKey/sortDir はグリッドと一覧で共有。sortDir で昇降を切替。
+  const dirSign = sortDir.value === 'asc' ? 1 : -1
   result.sort((a, b) => {
+    let cmp = 0
     switch (sortKey.value) {
       case 'name':
-        return a.name.localeCompare(b.name, 'ja')
+        cmp = a.name.localeCompare(b.name, 'ja')
+        break
       case 'updated':
-        return b.date.localeCompare(a.date)
+        cmp = a.date.localeCompare(b.date)
+        break
       case 'applied':
-        return b.applyCount - a.applyCount
+        cmp = a.applyCount - b.applyCount
+        break
+      case 'coverage':
+        cmp = a.includedRoles.length - b.includedRoles.length
+        break
+      case 'size':
+        cmp = (a.sizeBytes ?? 0) - (b.sizeBytes ?? 0)
+        break
     }
+    return dirSign * cmp
   })
 
   return result
@@ -435,16 +477,35 @@ async function openImportDialog() {
   }
 }
 
-const sortLabel = computed(() => ({
-  name: t('library.sortName'),
-  updated: t('library.sortUpdated'),
-  applied: t('library.sortApplied'),
-}[sortKey.value]))
+const sortLabel = computed(() => {
+  const map: Record<SortKey, string> = {
+    name: t('library.sortName'),
+    updated: t('library.sortUpdated'),
+    applied: t('library.sortApplied'),
+    coverage: t('library.colCoverage'),
+    size: t('library.colSize'),
+  }
+  return map[sortKey.value]
+})
 
+/** グリッド側のソートボタン: 主要 3 キーを巡回。新キー (coverage/size) は
+ *  一覧側の列ヘッダクリックでのみ立てる。グリッド表示中に列ヘッダで coverage 等を
+ *  選んでも、ボタン押下で巡回するときは元の 3 キーに戻る挙動。 */
 function cycleSort() {
   const order: SortKey[] = ['updated', 'name', 'applied']
   const idx = order.indexOf(sortKey.value)
   sortKey.value = order[(idx + 1) % order.length]!
+  sortDir.value = 'desc'
+}
+
+/** 一覧表示の列ヘッダクリック: 同じキーなら方向トグル、別キーなら desc から開始。 */
+function sortBy(key: SortKey) {
+  if (sortKey.value === key) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortKey.value = key
+    sortDir.value = 'desc'
+  }
 }
 
 /** Rust から `get_themes` を取得し、UI 形状にマップする */
@@ -459,6 +520,12 @@ interface IpcThemeSummary {
   apply_count: number
   included_roles: string[]
   path: string
+  /** theme.json の `tags` フィールドをそのまま転送 (Phase 5-3 一覧表示で chip 描画) */
+  tags: string[]
+  /** テーマディレクトリ全体のバイト合計 (一覧の「サイズ」列用) */
+  size_bytes: number
+  /** `metadata.signature.is_some()` の結果 (検証ではなく存在判定のみ) */
+  signed: boolean
 }
 
 /** `list_windows_schemes` のレスポンス。Windows レジストリ HKCU\Cursors\Schemes 由来。 */
@@ -494,6 +561,11 @@ function mapWindowsSchemeToCard(s: IpcWindowsScheme): ThemeCardData {
     isActive: s.is_active === true,
     includedRoles,
     kind: 'system',
+    // Windows システムスキームに付随しない情報。一覧表示では tags = []、
+    // sizeBytes = undefined ('—' 表示)、signed = true (システム提供なので信頼) として扱う。
+    tags: [],
+    sizeBytes: undefined,
+    signed: true,
   }
 }
 
@@ -524,6 +596,9 @@ async function loadThemes() {
       isActive: t.is_active,
       includedRoles: t.included_roles,
       kind: 'local' as const,
+      tags: t.tags,
+      sizeBytes: t.size_bytes,
+      signed: t.signed,
     }))
 
     // EasyCursorSwap が register_scheme で書き込んだスキームはローカルテーマと
@@ -761,8 +836,76 @@ onUnmounted(() => {
       </div>
 
       <!-- テーマグリッド -->
-      <div v-else class="grid">
+      <div v-else-if="viewMode === 'grid'" class="grid">
         <ThemeCard
+          v-for="theme in filteredThemes"
+          :key="theme.id"
+          :theme="theme"
+          @apply="requestApply"
+          @toggle-favorite="toggleFavorite"
+          @show-details="showDetails"
+        />
+      </div>
+
+      <!-- テーマ一覧 (Phase 5-3 / design/library-list.jsx) -->
+      <div v-else class="lib-table" role="table" :aria-label="t('library.title')">
+        <div class="lib-row lib-head" role="row">
+          <div class="lt-col lt-fav" role="columnheader" />
+          <div class="lt-col lt-preview" role="columnheader">{{ t('library.colPreview') }}</div>
+          <div
+            :class="['lt-col', 'lt-name', 'lt-sortable', { active: sortKey === 'name' }]"
+            role="columnheader"
+            :aria-sort="sortKey === 'name' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'"
+            tabindex="0"
+            @click="sortBy('name')"
+            @keydown.enter.prevent="sortBy('name')"
+            @keydown.space.prevent="sortBy('name')"
+          >
+            {{ t('library.colNameAuthor') }}
+            <span v-if="sortKey === 'name'" class="sort-dir">{{ sortDir === 'asc' ? '↑' : '↓' }}</span>
+          </div>
+          <div
+            :class="['lt-col', 'lt-cov', 'lt-sortable', { active: sortKey === 'coverage' }]"
+            role="columnheader"
+            :aria-sort="sortKey === 'coverage' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'"
+            tabindex="0"
+            @click="sortBy('coverage')"
+            @keydown.enter.prevent="sortBy('coverage')"
+            @keydown.space.prevent="sortBy('coverage')"
+          >
+            {{ t('library.colCoverage') }}
+            <span v-if="sortKey === 'coverage'" class="sort-dir">{{ sortDir === 'asc' ? '↑' : '↓' }}</span>
+          </div>
+          <div class="lt-col lt-ver" role="columnheader">{{ t('library.colVersion') }}</div>
+          <div
+            :class="['lt-col', 'lt-date', 'lt-sortable', { active: sortKey === 'updated' }]"
+            role="columnheader"
+            :aria-sort="sortKey === 'updated' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'"
+            tabindex="0"
+            @click="sortBy('updated')"
+            @keydown.enter.prevent="sortBy('updated')"
+            @keydown.space.prevent="sortBy('updated')"
+          >
+            {{ t('library.colUpdated') }}
+            <span v-if="sortKey === 'updated'" class="sort-dir">{{ sortDir === 'asc' ? '↑' : '↓' }}</span>
+          </div>
+          <div
+            :class="['lt-col', 'lt-size', 'lt-sortable', { active: sortKey === 'size' }]"
+            role="columnheader"
+            :aria-sort="sortKey === 'size' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'"
+            tabindex="0"
+            @click="sortBy('size')"
+            @keydown.enter.prevent="sortBy('size')"
+            @keydown.space.prevent="sortBy('size')"
+          >
+            {{ t('library.colSize') }}
+            <span v-if="sortKey === 'size'" class="sort-dir">{{ sortDir === 'asc' ? '↑' : '↓' }}</span>
+          </div>
+          <div class="lt-col lt-sig" role="columnheader">{{ t('library.colSignature') }}</div>
+          <div class="lt-col lt-act" role="columnheader" />
+        </div>
+
+        <ThemeRow
           v-for="theme in filteredThemes"
           :key="theme.id"
           :theme="theme"

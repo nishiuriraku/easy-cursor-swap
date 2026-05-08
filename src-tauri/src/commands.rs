@@ -299,6 +299,7 @@ pub fn export_cursorpack(req: ExportCursorpackRequest) -> Result<ExportResult, A
         description: None,
         min_app_version: None,
         signature: None,
+        tags: Vec::new(),
     };
 
     // 3) 署名 (rの場合)
@@ -537,6 +538,7 @@ pub fn export_cursorpack_streamed(
         description: None,
         min_app_version: None,
         signature: None,
+        tags: Vec::new(),
     };
 
     // 3) 署名
