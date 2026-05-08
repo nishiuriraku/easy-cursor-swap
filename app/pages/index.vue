@@ -740,31 +740,7 @@ onUnmounted(() => {
 
 <template>
   <div class="library-host">
-    <!-- ツールバー -->
-    <div class="toolbar">
-      <div class="bcrumb">
-        <span class="crumb">{{ t('library.breadcrumbWorkspace') }}</span>
-        <span class="sep">/</span>
-        <span class="crumb active">{{ t('library.title') }}</span>
-      </div>
-      <div class="search">
-        <UiIcon name="Search" :size="14" style="color: var(--fg-mute)" />
-        <input
-          v-model="searchQuery"
-          :placeholder="t('library.searchPlaceholder')"
-          :aria-label="t('common.search')"
-        />
-        <span class="kbd">⌘K</span>
-      </div>
-      <div class="tb-actions">
-        <button class="btn ghost" @click="openImportDialog">
-          <UiIcon name="Import" :size="14" />{{ t('common.import') }}
-        </button>
-        <NuxtLink class="btn primary" to="/creator">
-          <UiIcon name="Plus" :size="14" />{{ t('library.new') }}
-        </NuxtLink>
-      </div>
-    </div>
+    <LibraryToolbar v-model:search-query="searchQuery" @open-import="openImportDialog" />
 
     <!-- メインコンテンツ -->
     <div class="content">
