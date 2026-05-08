@@ -11,6 +11,7 @@
 pub mod keystore;
 pub mod marketplace;
 pub mod profile;
+pub mod windows_scheme;
 
 use crate::accessibility::AccessibilityConflicts;
 use crate::autostart;
@@ -23,7 +24,7 @@ use crate::darkmode;
 use crate::environment::EnvironmentReport;
 use crate::errors::AppError;
 use crate::health::is_major_bump;
-use crate::registry::{CursorRole, RegistryManager, WindowsScheme};
+use crate::registry::{CursorRole, RegistryManager};
 use crate::theme::{
     CursorDefinition, CursorpackInspection, LocalizedString, ThemeManager, ThemeMetadata,
     ThemeSummary,
@@ -950,75 +951,6 @@ pub fn clear_crash_reports() -> Result<usize, AppError> {
 
 /// 指定 Windows スキームのロール毎 PNG プレビューを返す。
 ///
-/// `list_windows_schemes` で得たスキーム名を渡すと、各 `.cur` / `.ani` /
-/// `.ico` を最大解像度 PNG に変換して `HashMap<role, PNG bytes>` で返す。
-/// ファイルが見つからないロールはスキップ (1 つの欠損で全体表示を諦めない)。
-#[tauri::command]
-pub fn get_windows_scheme_previews(
-    name: String,
-) -> Result<std::collections::HashMap<String, Vec<u8>>, AppError> {
-    let schemes = RegistryManager::list_windows_schemes()?;
-    let scheme = schemes
-        .into_iter()
-        .find(|s| s.name == name)
-        .ok_or_else(|| AppError::Registry(format!("スキーム '{}' が見つかりません", name)))?;
-    Ok(ThemeManager::render_paths_as_previews(&scheme.cursor_paths))
-}
-
-/// 指定 Windows スキームを `.cursorpack` として書き出す。
-///
-/// `HKCU\Cursors\Schemes` の値が指す各カーソルファイル (.cur / .ani / .ico) を
-/// 拡張子を保ったまま zip 化し、theme.json を自動生成する。クリエイターを
-/// 通さず、ユーザーが既に Windows 側で構築した配色を共有・バックアップできる。
-#[derive(Debug, Serialize)]
-pub struct ExportSchemeResult {
-    pub theme_id: String,
-    pub size_bytes: u64,
-}
-
-#[tauri::command]
-pub fn export_windows_scheme_as_cursorpack(
-    name: String,
-    output_path: String,
-) -> Result<ExportSchemeResult, AppError> {
-    let schemes = RegistryManager::list_windows_schemes()?;
-    let scheme = schemes
-        .into_iter()
-        .find(|s| s.name == name)
-        .ok_or_else(|| AppError::Registry(format!("スキーム '{}' が見つかりません", name)))?;
-    let path = std::path::PathBuf::from(&output_path);
-    let (id, size) =
-        ThemeManager::export_scheme_as_cursorpack(&scheme.name, &scheme.cursor_paths, &path, None)?;
-    Ok(ExportSchemeResult {
-        theme_id: id.to_string(),
-        size_bytes: size,
-    })
-}
-
-/// `HKCU\Control Panel\Cursors\Schemes` に保存されたカーソルスキーム一覧を返す。
-///
-/// ライブラリ画面に「Windows のマウスのプロパティに保存済みのスキーム」を
-/// マージ表示するために使う。EasyCursorSwap で適用済みのテーマも同じキー配下に
-/// 入っているが、それらは `get_themes` 側で重複除去すべき (UI 層で判断)。
-#[tauri::command]
-pub fn list_windows_schemes() -> Result<Vec<WindowsScheme>, AppError> {
-    RegistryManager::list_windows_schemes()
-}
-
-/// 指定された Windows スキームをシステムに適用する。
-///
-/// `apply_theme` (`.cursorpack` 形式の独自テーマ) と区別するため別コマンドにしている。
-/// スキームは編集・エクスポート・署名検証の対象外で、適用のみが許される。
-#[tauri::command]
-pub fn apply_windows_scheme(name: String) -> Result<(), AppError> {
-    let schemes = RegistryManager::list_windows_schemes()?;
-    let scheme = schemes
-        .into_iter()
-        .find(|s| s.name == name)
-        .ok_or_else(|| AppError::Registry(format!("スキーム '{}' が見つかりません", name)))?;
-    RegistryManager::apply_windows_scheme(&scheme)
-}
-
 /// 指定 ID のテーマを ~/.custom_cursors/<UUID>/ ごと完全削除する。
 ///
 /// 削除されたテーマがアクティブだった場合、呼び出し側 (UI) は config の
@@ -1096,10 +1028,10 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         cancel_build,
         list_crash_reports,
         clear_crash_reports,
-        list_windows_schemes,
-        apply_windows_scheme,
-        get_windows_scheme_previews,
-        export_windows_scheme_as_cursorpack,
+        windows_scheme::list_windows_schemes,
+        windows_scheme::apply_windows_scheme,
+        windows_scheme::get_windows_scheme_previews,
+        windows_scheme::export_windows_scheme_as_cursorpack,
         delete_theme,
         duplicate_theme,
         repackage_theme,
