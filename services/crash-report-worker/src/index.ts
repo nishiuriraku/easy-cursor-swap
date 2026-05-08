@@ -22,6 +22,12 @@ export interface Env {
   GITHUB_OWNER: string
   GITHUB_REPO: string
   ALLOWED_ORIGIN: string
+  /**
+   * Cloudflare Turnstile secret key (optional).
+   * 設定されている場合のみ X-Turnstile-Token ヘッダを検証する。
+   * 未設定の Worker は従来通り app token + rate limit のみで動作する。
+   */
+  TURNSTILE_SECRET?: string
   RATE_LIMIT_KV: KVNamespace
   DEDUP_KV: KVNamespace
 }
@@ -65,8 +71,22 @@ export default {
       return cors(json({ error: 'unauthorized' }, 401))
     }
 
-    // Rate limit by IP
+    // IP はレート制限と Turnstile remoteip の両方で使用
     const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown'
+
+    // Turnstile 検証 (secret が設定されている場合のみ)
+    if (env.TURNSTILE_SECRET) {
+      const turnstileToken = request.headers.get('X-Turnstile-Token') ?? ''
+      if (!turnstileToken) {
+        return cors(json({ error: 'turnstile token missing' }, 400))
+      }
+      const turnstileOk = await verifyTurnstile(env.TURNSTILE_SECRET, turnstileToken, ip)
+      if (!turnstileOk.ok) {
+        return cors(json({ error: `turnstile: ${turnstileOk.reason}` }, 403))
+      }
+    }
+
+    // Rate limit by IP
     const rlKey = `rl:${ip}:${hourBucket()}`
     const rlCount = parseInt((await env.RATE_LIMIT_KV.get(rlKey)) ?? '0', 10)
     if (rlCount >= RATE_LIMIT_PER_HOUR) {
@@ -253,7 +273,60 @@ function cors(res: Response): Response {
   const h = new Headers(res.headers)
   h.set('Access-Control-Allow-Origin', '*')
   h.set('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  h.set('Access-Control-Allow-Headers', 'Content-Type, X-App-Token')
+  h.set('Access-Control-Allow-Headers', 'Content-Type, X-App-Token, X-Turnstile-Token')
   h.set('Access-Control-Max-Age', '86400')
   return new Response(res.body, { status: res.status, headers: h })
+}
+
+/**
+ * Cloudflare Turnstile siteverify エンドポイントでトークンを検証する。
+ *
+ * Turnstile はクライアント (Tauri webview) で 1 回チャレンジを表示してトークンを発行し、
+ * Worker 側でこの関数によって `secret + token + remoteip` を POST して検証する。
+ * secret はクライアントに渡してはならない (Worker のみが保持)。
+ *
+ * 戻り値:
+ *   - { ok: true }  検証成功
+ *   - { ok: false, reason } 失敗 (reason は siteverify の error-codes 抜粋)
+ *
+ * Cloudflare 公式 API のため、このエンドポイントが落ちたら全リクエストが弾かれる。
+ * 万一の障害時は TURNSTILE_SECRET を unset することで一時的に無効化できる。
+ */
+async function verifyTurnstile(
+  secret: string,
+  token: string,
+  ip: string,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const form = new URLSearchParams()
+  form.set('secret', secret)
+  form.set('response', token)
+  if (ip && ip !== 'unknown') form.set('remoteip', ip)
+
+  let res: Response
+  try {
+    res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: form.toString(),
+      signal: AbortSignal.timeout(10_000),
+    })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return { ok: false, reason: `network: ${msg}` }
+  }
+
+  if (!res.ok) {
+    return { ok: false, reason: `http ${res.status}` }
+  }
+
+  let body: { success?: boolean; 'error-codes'?: string[] }
+  try {
+    body = await res.json()
+  } catch {
+    return { ok: false, reason: 'parse_error' }
+  }
+
+  if (body.success === true) return { ok: true }
+  const codes = body['error-codes'] ?? []
+  return { ok: false, reason: codes.join(',') || 'verification_failed' }
 }

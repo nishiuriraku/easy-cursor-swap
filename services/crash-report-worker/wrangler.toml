@@ -21,5 +21,8 @@ binding = "DEDUP_KV"
 id = "65f65da516694ee19184a7c93e3aad11"
 
 # secrets (set via `wrangler secret put`):
-#   GITHUB_TOKEN     repo (issues:write) PAT
-#   ALLOWED_ORIGIN   Tauri 側 X-App-Token と一致させる任意トークン
+#   GITHUB_TOKEN      repo (issues:write) PAT
+#   ALLOWED_ORIGIN    Tauri 側 X-App-Token と一致させる任意トークン
+#   TURNSTILE_SECRET  (任意) Cloudflare Turnstile secret key。
+#                     設定すると X-Turnstile-Token ヘッダ検証を有効化する。
+#                     未設定なら従来どおり app token + rate limit のみ。
