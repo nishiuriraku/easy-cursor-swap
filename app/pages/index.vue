@@ -848,50 +848,10 @@ onUnmounted(() => {
         <div v-for="i in 6" :key="i" class="card skeleton-card" />
       </div>
 
-      <!-- 空状態 (design/empty-states.jsx の LibraryEmpty を移植) -->
-      <div v-else-if="filteredThemes.length === 0 && !searchQuery" class="es-stage">
-        <div class="es-bg" />
-        <div class="es-empty">
-          <div class="es-empty-icon">
-            <UiIcon name="Library" :size="32" style="color: var(--accent)" />
-            <span class="es-empty-zero">0</span>
-          </div>
-
-          <div class="es-eyebrow" style="color: var(--fg-mute)">EMPTY · NO THEMES</div>
-          <h1>{{ t('library.emptyTitle') }}</h1>
-          <p>
-            <code>.cursorpack</code> をこのウィンドウへドラッグするか、
-            公式インデックスから取り込み、または Creator で新しく作りましょう。
-          </p>
-
-          <div class="es-cta-row">
-            <NuxtLink class="btn primary es-cta-primary" to="/creator">
-              <UiIcon name="Plus" :size="14" />新規作成
-            </NuxtLink>
-            <button class="btn" @click="openImportDialog">
-              <UiIcon name="Import" :size="13" />.cursorpack をインポート
-            </button>
-            <NuxtLink class="btn ghost" to="/marketplace">
-              <UiIcon name="Globe" :size="13" />インデックスを開く
-            </NuxtLink>
-          </div>
-
-          <div class="es-drop">
-            <div class="es-drop-inner">
-              <UiIcon name="Import" :size="20" style="color: var(--accent)" />
-              <div>
-                <div class="es-drop-t">.cursorpack をここにドロップ</div>
-                <div class="es-drop-s">{{ t('drop.autoVerify') }}</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="es-foot-tip">
-            <UiIcon name="Shield" :size="11" style="color: var(--accent)" />
-            <span>{{ t('drop.footTip') }}</span>
-          </div>
-        </div>
-      </div>
+      <LibraryEmptyState
+        v-else-if="filteredThemes.length === 0 && !searchQuery"
+        @open-import="openImportDialog"
+      />
 
       <!-- 検索一致なし (空ライブラリではなく、検索 0 件) -->
       <div v-else-if="filteredThemes.length === 0" class="empty-state">
