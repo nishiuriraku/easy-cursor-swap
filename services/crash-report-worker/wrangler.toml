@@ -8,7 +8,7 @@ account_id = "ac974a750251c79fc7d40daeacf8a5b3"
 # 通常時の vars (secret は wrangler secret put で別管理)
 [vars]
 GITHUB_OWNER = "nishiuriraku"
-GITHUB_REPO  = "easy-cursor-swap-index"
+GITHUB_REPO  = "easy-cursor-swap"
 
 # wrangler kv:namespace create RATE_LIMIT_KV / DEDUP_KV で生成し、
 # 出力された ID をここに貼り付けて再デプロイする。

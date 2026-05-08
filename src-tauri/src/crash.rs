@@ -11,7 +11,7 @@
 //!   `logging::redact_path` で `~/...` に正規化する。
 //! - **fail-safe**: ファイル書き込みが失敗しても panic は通常通り伝搬させる。
 //! - **送信先**: `services/crash-report-worker/` に Cloudflare Worker を用意
-//!   (POST /crash → `nishiuriraku/easy-cursor-swap-index` の Issue 化)。
+//!   (POST /crash → `nishiuriraku/easy-cursor-swap` の Issue 化)。
 //!   `submit_pending_reports` で Worker に投げる実装は Phase 7-1 残課題。
 //!
 //! ## レコードサイズ

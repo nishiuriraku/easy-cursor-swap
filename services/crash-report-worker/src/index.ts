@@ -4,14 +4,14 @@
  * 役割:
  *   1. Tauri アプリから匿名 POST /crash で送られてくる JSON を検証
  *   2. SHA-256 デデュープ + IP レート制限 (KV)
- *   3. nishiuriraku/easy-cursor-swap-index/issues に Issue を作成
+ *   3. nishiuriraku/easy-cursor-swap/issues に Issue を作成
  *
  * 既存 Issue (同シグネチャ) があればコメント追記、なければ新規作成。
  *
  * Env vars / bindings (wrangler.toml で定義):
  *   - GITHUB_TOKEN  : repo:issues 権限を持つ PAT (secret)
  *   - GITHUB_OWNER  : "nishiuriraku"
- *   - GITHUB_REPO   : "easy-cursor-swap-index"
+ *   - GITHUB_REPO   : "easy-cursor-swap"
  *   - ALLOWED_ORIGIN: アプリ識別用の任意トークン (Tauri 側で X-App-Token に同じ値)
  *   - RATE_LIMIT_KV : KV 名前空間バインディング (IP × 時間ウィンドウ)
  *   - DEDUP_KV      : KV 名前空間バインディング (signature → issue number)

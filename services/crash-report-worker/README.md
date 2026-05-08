@@ -1,8 +1,12 @@
 # EasyCursorSwap Crash Report Worker
 
 EasyCursorSwap の **オプトイン** クラッシュレポートを匿名 POST で受け、
-[`nishiuriraku/easy-cursor-swap-index`](https://github.com/nishiuriraku/easy-cursor-swap-index)
+[`nishiuriraku/easy-cursor-swap`](https://github.com/nishiuriraku/easy-cursor-swap)
 の Issue として転送する Cloudflare Worker。
+
+> 送信先はテーマライブラリ (`easy-cursor-swap-index`) ではなく、
+> アプリ本体リポジトリ (`easy-cursor-swap`) の Issues。
+> クラッシュは「アプリのバグ」なので本体側で追跡する。
 
 匿名 GitHub API への直 POST はできないので、本 Worker が PAT を保持し
 クライアント側からは PAT を見せないように仲介する設計。
@@ -32,7 +36,7 @@ EasyCursorSwap の **オプトイン** クラッシュレポートを匿名 POST
 
 設定 → Developer settings → Fine-grained PAT で以下を発行:
 
-- **Repository access**: `nishiuriraku/easy-cursor-swap-index` のみ
+- **Repository access**: `nishiuriraku/easy-cursor-swap` のみ
 - **Repository permissions**: `Issues: Read and write`
 - 有効期限: 1 年など
 
