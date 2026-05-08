@@ -1,101 +1,15 @@
-//! クリエイターモードの一括インポート機能。
+//! 単一ファイル / フォルダ走査による画像アセット解決。
 //!
-//! - `bulk_resolve_assets`: 複数ファイル / フォルダから対応形式を読み取り、
-//!   PNG bytes / SVG テキスト / メタデータを正規化して返す。
-//! - キャンセル可能 (job_id 単位)。
-//! - SVG sanitize は責務分離のため JS 側で実施 (ここでは生テキストを返す)。
+//! Creator の「画像をまとめて選択」「フォルダから読み込む」フローで使う。
+//! PNG / SVG / .cur / .ico を対応形式として扱い、`ResolvedAsset` に正規化する。
 
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use super::{
+    AssetKind, BulkImportProgress, BulkResolveRequest, BulkResolveResult, CancelRegistry,
+    ResolveFailure, ResolvedAsset, MAX_FILE_BYTES, MAX_TOTAL_BYTES,
+};
+use crate::errors::AppError;
 use std::path::Path;
-use std::sync::Mutex;
-
-/// 一括解決対象の最大ファイルサイズ。これを超えるファイルは failures 行きにする。
-pub const MAX_FILE_BYTES: u64 = 10 * 1024 * 1024;
-
-/// バッチ全体の合計サイズ上限 (メモリ保護)。
-pub const MAX_TOTAL_BYTES: u64 = 200 * 1024 * 1024;
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BulkResolveRequest {
-    pub paths: Vec<String>,
-    #[serde(default)]
-    pub recursive: bool,
-    pub job_id: String,
-}
-
-#[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum AssetKind {
-    Png,
-    Svg,
-    Cur,
-    Ico,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ResolvedAsset {
-    pub source_file: String,
-    pub source_path: String,
-    pub kind: AssetKind,
-    pub png_bytes: Vec<u8>,
-    pub svg_text: Option<String>,
-    pub native_size: u32,
-    pub hotspot_x: u32,
-    pub hotspot_y: u32,
-    pub available_sizes: Vec<u32>,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ResolveFailure {
-    pub source_path: String,
-    pub reason: String,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BulkResolveResult {
-    pub assets: Vec<ResolvedAsset>,
-    pub failures: Vec<ResolveFailure>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BulkImportProgress {
-    pub job_id: String,
-    pub stage: &'static str,
-    pub current: u32,
-    pub total: u32,
-    pub message: Option<String>,
-}
-
-/// 進行中の job_id 集合。キャンセル時は false に下げる。
-#[derive(Default)]
-pub struct CancelRegistry {
-    inner: Mutex<HashMap<String, bool>>,
-}
-
-impl CancelRegistry {
-    pub fn register(&self, job_id: &str) {
-        self.inner.lock().unwrap().insert(job_id.to_string(), true);
-    }
-    pub fn cancel(&self, job_id: &str) {
-        if let Some(v) = self.inner.lock().unwrap().get_mut(job_id) {
-            *v = false;
-        }
-    }
-    /// 指定 job_id が登録済みかつキャンセルされていなければ true。未登録の job_id は false を返す（不明 = 非アクティブ扱い）。
-    /// ワーカーが poll する前に必ず `register` を先行させること。
-    pub fn is_active(&self, job_id: &str) -> bool {
-        *self.inner.lock().unwrap().get(job_id).unwrap_or(&false)
-    }
-    pub fn drop_job(&self, job_id: &str) {
-        self.inner.lock().unwrap().remove(job_id);
-    }
-}
+use tauri::{AppHandle, Emitter, Manager, State};
 
 const SUPPORTED_EXTS: &[&str] = &["png", "svg", "cur", "ico"];
 
@@ -140,8 +54,6 @@ fn walk_dir(dir: &Path, recursive: bool, out: &mut Vec<String>) {
         }
     }
 }
-
-use crate::errors::AppError;
 
 /// 単一ファイルを `ResolvedAsset` に変換する。
 pub fn resolve_one(path: &str) -> Result<ResolvedAsset, AppError> {
@@ -239,8 +151,6 @@ fn resolve_cur_or_ico(
     })
 }
 
-use tauri::{AppHandle, Emitter, Manager, State};
-
 /// 複数の入力パスから対応形式のファイルを集めて `ResolvedAsset` のバッチを生成する。
 /// `on_progress` が `Some` の場合、各ファイル処理ごとに進捗イベントを発火する。
 /// 合計サイズが `MAX_TOTAL_BYTES` を超えた場合は break して以降を `failures` 行きとはせずに打ち切る。
@@ -337,224 +247,6 @@ pub fn cancel_bulk_import(
 ) -> Result<(), AppError> {
     registry.cancel(&job_id);
     Ok(())
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ParseCursorpackRequest {
-    pub path: String,
-    pub job_id: String,
-}
-
-#[derive(Debug, Serialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct CursorpackMetadata {
-    pub name_ja: Option<String>,
-    pub name_en: Option<String>,
-    pub author: Option<String>,
-    pub version: Option<String>,
-    pub description: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ParsedRole {
-    pub primary_size: u32,
-    pub primary_png_bytes: Vec<u8>,
-    pub hotspot_x: u32,
-    pub hotspot_y: u32,
-    pub sized_png_bytes: HashMap<u32, Vec<u8>>,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ParsedCursorpack {
-    pub metadata: CursorpackMetadata,
-    pub roles: HashMap<String, ParsedRole>,
-}
-
-use std::io::Read;
-use zip::ZipArchive;
-
-/// `.cursorpack` の theme.json から CursorpackMetadata を組み立てる。
-fn metadata_from_theme(meta: &crate::theme::ThemeMetadata) -> CursorpackMetadata {
-    use crate::theme::LocalizedString;
-    let name_ja = match &meta.name {
-        LocalizedString::Simple(s) => Some(s.clone()),
-        LocalizedString::Localized(m) => m.get("ja").or_else(|| m.get("default")).cloned(),
-    };
-    let name_en = match &meta.name {
-        LocalizedString::Simple(_) => None,
-        LocalizedString::Localized(m) => m.get("en").cloned(),
-    };
-    let description = meta.description.as_ref().and_then(|d| match d {
-        LocalizedString::Simple(s) => Some(s.clone()),
-        LocalizedString::Localized(m) => m
-            .get("ja")
-            .or_else(|| m.get("en"))
-            .or_else(|| m.get("default"))
-            .cloned(),
-    });
-    CursorpackMetadata {
-        name_ja,
-        name_en,
-        author: meta.author.clone(),
-        version: Some(meta.version.clone()),
-        description,
-    }
-}
-
-/// `ParsedIcoCurEntry.image` を PNG バイト列にエンコード。
-fn encode_entry_to_png(entry: &crate::cursor::ParsedIcoCurEntry) -> Result<Vec<u8>, AppError> {
-    let mut buf = Vec::new();
-    let encoder = image::codecs::png::PngEncoder::new(&mut buf);
-    image::ImageEncoder::write_image(
-        encoder,
-        entry.image.as_raw(),
-        entry.image.width(),
-        entry.image.height(),
-        image::ExtendedColorType::Rgba8,
-    )
-    .map_err(|e| AppError::ImageProcessing(format!("PNG エンコード失敗: {}", e)))?;
-    Ok(buf)
-}
-
-pub fn parse_cursorpack_inner(bytes: &[u8]) -> Result<ParsedCursorpack, AppError> {
-    let cursor = std::io::Cursor::new(bytes);
-    let mut archive = ZipArchive::new(cursor).map_err(|e| AppError::InvalidCursorpack {
-        reason: format!("ZIP オープン失敗: {}", e),
-    })?;
-
-    // theme.json を読む
-    let theme: crate::theme::ThemeMetadata = {
-        let mut entry = archive
-            .by_name("theme.json")
-            .map_err(|_| AppError::InvalidCursorpack {
-                reason: "theme.json が見つかりません".to_string(),
-            })?;
-        let mut buf = String::new();
-        entry
-            .read_to_string(&mut buf)
-            .map_err(|e| AppError::InvalidCursorpack {
-                reason: format!("theme.json 読み込み失敗: {}", e),
-            })?;
-        serde_json::from_str(&buf).map_err(|e| AppError::InvalidCursorpack {
-            reason: format!("theme.json 解析失敗: {}", e),
-        })?
-    };
-
-    let metadata = metadata_from_theme(&theme);
-
-    // 各ロールを抽出
-    let mut roles: HashMap<String, ParsedRole> = HashMap::new();
-    for (role_id, def) in &theme.cursors {
-        // primary ファイルを読む
-        let primary_bytes = {
-            let mut entry =
-                archive
-                    .by_name(&def.file)
-                    .map_err(|_| AppError::InvalidCursorpack {
-                        reason: format!(
-                            "ロール {} のファイル {} が ZIP 内にありません",
-                            role_id, def.file
-                        ),
-                    })?;
-            let mut buf = Vec::new();
-            entry
-                .read_to_end(&mut buf)
-                .map_err(|e| AppError::InvalidCursorpack {
-                    reason: format!("ロール {} のファイル読み込み失敗: {}", role_id, e),
-                })?;
-            buf
-        };
-
-        let parsed = crate::cursor::parse_ico_cur(&primary_bytes)?;
-        let (largest, primary_png) = crate::cursor::pick_largest_as_png(&parsed)?;
-
-        // primary 内の各解像度を sized_png_bytes に詰める
-        let mut sized: HashMap<u32, Vec<u8>> = HashMap::new();
-        for entry in &parsed.entries {
-            if let Ok(png) = encode_entry_to_png(entry) {
-                sized.insert(entry.width, png);
-            }
-        }
-
-        // size_overrides の各解像度も追加で読む
-        if let Some(overrides) = &def.size_overrides {
-            for (size_str, ov) in overrides {
-                if let Ok(size) = size_str.parse::<u32>() {
-                    let mut entry = match archive.by_name(&ov.file) {
-                        Ok(e) => e,
-                        Err(_) => continue,
-                    };
-                    let mut buf = Vec::new();
-                    if entry.read_to_end(&mut buf).is_err() {
-                        continue;
-                    }
-                    if let Ok(parsed_ov) = crate::cursor::parse_ico_cur(&buf) {
-                        if let Some(matching) = parsed_ov.entries.iter().find(|e| e.width == size) {
-                            if let Ok(png) = encode_entry_to_png(matching) {
-                                sized.insert(size, png);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        roles.insert(
-            role_id.clone(),
-            ParsedRole {
-                primary_size: largest.width,
-                primary_png_bytes: primary_png,
-                hotspot_x: def.hotspot_x,
-                hotspot_y: def.hotspot_y,
-                sized_png_bytes: sized,
-            },
-        );
-    }
-
-    Ok(ParsedCursorpack { metadata, roles })
-}
-
-#[tauri::command]
-pub async fn parse_cursorpack_for_creator(
-    app: AppHandle,
-    req: ParseCursorpackRequest,
-) -> Result<ParsedCursorpack, AppError> {
-    let job_id = req.job_id.clone();
-    let app_clone = app.clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        let _ = app_clone.emit(
-            "bulk-import-progress",
-            BulkImportProgress {
-                job_id: job_id.clone(),
-                stage: "extract",
-                current: 0,
-                total: 1,
-                message: None,
-            },
-        );
-        let bytes = std::fs::read(&req.path).map_err(|e| AppError::InvalidCursorpack {
-            reason: format!("読み込み失敗: {}", e),
-        })?;
-        let r = parse_cursorpack_inner(&bytes)?;
-        let _ = app_clone.emit(
-            "bulk-import-progress",
-            BulkImportProgress {
-                job_id,
-                stage: "done",
-                current: 1,
-                total: 1,
-                message: None,
-            },
-        );
-        Ok(r)
-    })
-    .await
-    .map_err(|e| AppError::InvalidCursorpack {
-        reason: format!("join 失敗: {}", e),
-    })?
 }
 
 #[cfg(test)]
@@ -664,30 +356,13 @@ mod tests {
     }
 
     #[test]
-    fn parse_cursorpack_basic_returns_roles() {
-        let mut p = fixture_dir();
-        p.push("easy-cursor-swap-mint.cursorpack");
-        if !p.is_file() {
-            eprintln!("skipping: cursorpack fixture not present");
-            return;
-        }
-        let bytes = std::fs::read(&p).expect("fixture must exist");
-        let parsed = parse_cursorpack_inner(&bytes).expect("parse should succeed");
-        assert!(!parsed.roles.is_empty(), "should extract at least 1 role");
-        assert!(
-            parsed.roles.contains_key("Arrow"),
-            "Arrow role should be present"
-        );
-    }
-
-    #[test]
     fn bulk_resolve_with_oversize_collects_failure() {
         let tmp = tempfile::tempdir().unwrap();
         let path = tmp.path().join("big.png");
         std::fs::write(&path, vec![0u8; (MAX_FILE_BYTES + 1) as usize]).unwrap();
         let small = tmp.path().join("ok.png");
         // 1x1 PNG (8byte signature + IHDR + IDAT + IEND の最小限)
-        let one_pix = include_bytes!("../tests/fixtures/1x1.png");
+        let one_pix = include_bytes!("../../tests/fixtures/1x1.png");
         std::fs::write(&small, one_pix).unwrap();
 
         let result = bulk_resolve_inner(
