@@ -420,50 +420,13 @@ function selectSection(id: SectionId) {
 
       <div class="settings-content">
         <!-- 一般 -->
-        <section v-if="section === 'general'">
-          <header class="section-head">
-            <h1>{{ t('settings.sectionGeneral') }}</h1>
-            <p>{{ t('settings.descGeneral') }}</p>
-          </header>
-          <div class="prop-section">
-            <div class="prop-head">
-              {{ t('settings.groupDisplayLanguage') }}
-            </div>
-            <div class="prop-body">
-              <SettingsRow :label="t('settings.languageLabel')" :desc="t('settings.languageDesc')">
-                <UiSelect
-                  v-model="general.language"
-                  width="140px"
-                  :options="[
-                    { value: 'ja', label: '日本語' },
-                    { value: 'en', label: 'English' },
-                  ]"
-                />
-              </SettingsRow>
-            </div>
-          </div>
-
-          <div class="prop-section">
-            <div class="prop-head">{{ t('settings.groupNotifications') }}</div>
-            <div class="prop-body">
-              <SettingsRow
-                :label="t('settings.showApplyToastLabel')"
-                :desc="t('settings.showApplyToastDesc')"
-              >
-                <SettingsToggle v-model="general.showApplyToast" />
-              </SettingsRow>
-              <SettingsRow
-                :label="t('settings.applyShadowControlLabel')"
-                :desc="t('settings.applyShadowControlDesc')"
-              >
-                <SettingsToggle v-model="general.applyShadowControl" />
-              </SettingsRow>
-            </div>
-          </div>
-
-          <!-- バックアップが存在する場合のみ復旧パネルを表示 -->
-          <ConfigRecoveryPanel @restored="onConfigRestored" />
-        </section>
+        <GeneralSection
+          v-if="section === 'general'"
+          v-model:language="general.language"
+          v-model:show-apply-toast="general.showApplyToast"
+          v-model:apply-shadow-control="general.applyShadowControl"
+          @config-restored="onConfigRestored"
+        />
 
         <StartupSection
           v-else-if="section === 'startup'"
@@ -487,103 +450,18 @@ function selectSection(id: SectionId) {
           v-model:warn-unsigned-import="security.warnUnsignedImport"
         />
 
-        <!-- 署名鍵 -->
-        <section v-else-if="section === 'keys'">
-          <header class="section-head">
-            <h1>{{ t('settings.sectionKeys') }}</h1>
-            <p>{{ t('settings.descKeys') }}</p>
-          </header>
-          <div class="prop-section">
-            <div class="prop-head">
-              {{ t('settings.groupKeyPair') }}
-              <span class="head-hint">{{ t('settings.keyPairHint') }}</span>
-            </div>
-            <div class="prop-body">
-              <template v-if="keystoreInfo.has_keypair">
-                <SettingsRow :label="t('settings.keyIdLabel')" mono>
-                  <span class="tag ok">{{ keystoreInfo.key_id ?? '—' }}</span>
-                </SettingsRow>
-                <SettingsRow
-                  v-if="keystoreInfo.public_key_b64"
-                  :label="t('settings.publicKeyLabel')"
-                  :desc="t('settings.publicKeyDesc')"
-                  mono
-                >
-                  <span
-                    class="tag"
-                    style="
-                      max-width: 320px;
-                      overflow: hidden;
-                      text-overflow: ellipsis;
-                      white-space: nowrap;
-                      display: inline-block;
-                    "
-                  >
-                    {{ keystoreInfo.public_key_b64 }}
-                  </span>
-                </SettingsRow>
-                <SettingsRow
-                  :label="t('settings.exportPrivateLabel')"
-                  :desc="t('settings.exportPrivateDesc')"
-                >
-                  <button class="btn" :disabled="keystoreBusy" @click="onKeystoreExport">
-                    <UiIcon name="Export" :size="13" />{{ t('common.export') }}
-                  </button>
-                </SettingsRow>
-                <SettingsRow
-                  :label="t('settings.regenerateLabel')"
-                  :desc="t('settings.regenerateDesc')"
-                >
-                  <button class="btn danger" :disabled="keystoreBusy" @click="onKeystoreRegenerate">
-                    <span v-if="keystoreBusy" class="spinner" style="width: 13px; height: 13px" />
-                    <UiIcon v-else name="Alert" :size="13" />{{ t('settings.btnRegenerate') }}
-                  </button>
-                </SettingsRow>
-                <SettingsRow
-                  :label="t('settings.deleteKeyLabel')"
-                  :desc="t('settings.deleteKeyDesc')"
-                >
-                  <button class="btn danger" :disabled="keystoreBusy" @click="onKeystoreDelete">
-                    <UiIcon name="X" :size="13" />{{ t('common.delete') }}
-                  </button>
-                </SettingsRow>
-              </template>
-              <template v-else>
-                <SettingsRow
-                  :label="t('settings.generateLabel')"
-                  :desc="t('settings.generateDesc')"
-                >
-                  <button class="btn primary" :disabled="keystoreBusy" @click="onKeystoreGenerate">
-                    <span v-if="keystoreBusy" class="spinner" style="width: 13px; height: 13px" />
-                    <UiIcon v-else name="Plus" :size="13" />{{ t('settings.btnGenerate') }}
-                  </button>
-                </SettingsRow>
-                <SettingsRow
-                  :label="t('settings.importExistingLabel')"
-                  :desc="t('settings.importExistingDesc')"
-                >
-                  <button class="btn" :disabled="keystoreBusy" @click="onKeystoreImport">
-                    <UiIcon name="Import" :size="13" />{{ t('common.import') }}
-                  </button>
-                </SettingsRow>
-              </template>
-              <div v-if="keystoreMessage" class="profile-msg">
-                {{ keystoreMessage }}
-              </div>
-              <div
-                v-if="keystoreError"
-                class="profile-msg"
-                style="
-                  background: rgba(255, 107, 138, 0.06);
-                  border-color: rgba(255, 107, 138, 0.4);
-                  color: #ffb8c5;
-                "
-              >
-                {{ keystoreError }}
-              </div>
-            </div>
-          </div>
-        </section>
+        <KeysSection
+          v-else-if="section === 'keys'"
+          :keystore-info="keystoreInfo"
+          :keystore-busy="keystoreBusy"
+          :keystore-error="keystoreError"
+          :keystore-message="keystoreMessage"
+          @generate="onKeystoreGenerate"
+          @regenerate="onKeystoreRegenerate"
+          @delete="onKeystoreDelete"
+          @export="onKeystoreExport"
+          @import="onKeystoreImport"
+        />
 
         <LoggingSection
           v-else-if="section === 'logging'"
