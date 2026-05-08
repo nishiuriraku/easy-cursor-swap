@@ -293,3 +293,133 @@ fn walkdir(root: &Path) -> AppResult<Vec<AppResult<PathBuf>>> {
         .filter(|r| r.as_ref().map_or(true, |p| p != root))
         .collect())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_envelope() -> ProfileEnvelope {
+        ProfileEnvelope {
+            schema_version: PROFILE_SCHEMA_VERSION,
+            exported_at: "2026-05-08T12:34:56Z".to_string(),
+            app_version: "0.1.0".to_string(),
+            config: AppConfig::default(),
+        }
+    }
+
+    #[test]
+    fn envelope_serde_roundtrip() {
+        // ProfileEnvelope を JSON にして読み戻したら同等になる
+        let original = sample_envelope();
+        let json = serde_json::to_string_pretty(&original).unwrap();
+        let restored: ProfileEnvelope = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.schema_version, original.schema_version);
+        assert_eq!(restored.exported_at, original.exported_at);
+        assert_eq!(restored.app_version, original.app_version);
+        assert_eq!(
+            restored.config.general.panic_hotkey,
+            original.config.general.panic_hotkey
+        );
+    }
+
+    #[test]
+    fn envelope_uses_current_schema_version() {
+        // 仕様: 新規エクスポート時は必ず最新 PROFILE_SCHEMA_VERSION で書く
+        let env = sample_envelope();
+        assert_eq!(env.schema_version, PROFILE_SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn import_rejects_future_schema_version() {
+        // 未対応の新スキーマ (= 将来のアプリで作られた .cursorprofile) を
+        // 渡したら拒否されることを確認する。実際の Zip 読み込みパスを通すため、
+        // tempfile に最小限の Zip を書いて import を呼ぶ。
+        use std::io::Write as _;
+
+        let tmp = tempfile::tempdir().unwrap();
+        let zip_path = tmp.path().join("future.cursorprofile");
+
+        // schema_version を意図的に大きくして書く
+        let mut envelope = sample_envelope();
+        envelope.schema_version = PROFILE_SCHEMA_VERSION + 100;
+        let envelope_json = serde_json::to_vec_pretty(&envelope).unwrap();
+
+        let file = std::fs::File::create(&zip_path).unwrap();
+        let mut zip = zip::ZipWriter::new(file);
+        let opts: zip::write::SimpleFileOptions = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated);
+        zip.start_file(PROFILE_JSON_NAME, opts).unwrap();
+        zip.write_all(&envelope_json).unwrap();
+        zip.finish().unwrap();
+
+        let err = BackupManager::import(&zip_path, true).unwrap_err();
+        // メッセージに「対応範囲外」が含まれること
+        let msg = format!("{}", err);
+        assert!(
+            msg.contains("対応範囲外") || msg.contains("schema"),
+            "unexpected error message: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn import_rejects_missing_profile_json() {
+        // profile.json を含まない Zip を渡したら明示的にエラー
+        let tmp = tempfile::tempdir().unwrap();
+        let zip_path = tmp.path().join("no-profile.cursorprofile");
+
+        let file = std::fs::File::create(&zip_path).unwrap();
+        let mut zip = zip::ZipWriter::new(file);
+        let opts: zip::write::SimpleFileOptions = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated);
+        // 別の何かだけ入れる
+        zip.start_file("readme.txt", opts).unwrap();
+        std::io::Write::write_all(&mut zip, b"hello").unwrap();
+        zip.finish().unwrap();
+
+        let err = BackupManager::import(&zip_path, true).unwrap_err();
+        let msg = format!("{}", err);
+        assert!(msg.contains("profile.json"), "unexpected error: {}", msg);
+    }
+
+    #[test]
+    fn import_rejects_non_json_profile() {
+        // profile.json があるが中身が JSON ではないケース
+        let tmp = tempfile::tempdir().unwrap();
+        let zip_path = tmp.path().join("bad-json.cursorprofile");
+
+        let file = std::fs::File::create(&zip_path).unwrap();
+        let mut zip = zip::ZipWriter::new(file);
+        let opts: zip::write::SimpleFileOptions = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated);
+        zip.start_file(PROFILE_JSON_NAME, opts).unwrap();
+        std::io::Write::write_all(&mut zip, b"this is not json").unwrap();
+        zip.finish().unwrap();
+
+        let err = BackupManager::import(&zip_path, true).unwrap_err();
+        // serde_json or our magic-byte check のどちらかで弾かれる
+        let _ = err; // 失敗していれば OK
+    }
+
+    #[test]
+    fn walkdir_excludes_root_itself() {
+        // walkdir はルートディレクトリ自体を返さない (archive_dir で別途出力するため)
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().to_path_buf();
+        std::fs::write(root.join("a.txt"), b"x").unwrap();
+        std::fs::create_dir(root.join("sub")).unwrap();
+        std::fs::write(root.join("sub").join("b.txt"), b"y").unwrap();
+
+        let entries: Vec<PathBuf> = walkdir(&root)
+            .unwrap()
+            .into_iter()
+            .filter_map(Result::ok)
+            .collect();
+        // ルート自体は出ない
+        assert!(!entries.contains(&root));
+        // サブパスは出る
+        assert!(entries.iter().any(|p| p.ends_with("a.txt")));
+        assert!(entries.iter().any(|p| p.ends_with("sub")));
+        assert!(entries.iter().any(|p| p.ends_with("b.txt")));
+    }
+}

@@ -201,9 +201,83 @@ mod tests {
     }
 
     #[test]
+    fn is_major_bump_returns_false_for_same_version() {
+        // 同一バージョン (= 再インストール) は major bump ではない
+        assert!(!is_major_bump("1.0.0", "1.0.0"));
+        assert!(!is_major_bump("0.1.0", "0.1.0"));
+    }
+
+    #[test]
+    fn is_major_bump_returns_false_for_downgrade() {
+        // ダウングレードは「メジャー跨ぎ警告」の対象ではない (旧版インストーラ)
+        assert!(!is_major_bump("2.0.0", "1.9.9"));
+        assert!(!is_major_bump("3.0.0", "1.0.0"));
+    }
+
+    #[test]
+    fn is_major_bump_handles_minor_with_no_patch() {
+        // "1.2" → "1.3" は minor のみ変化、major は同じ
+        assert!(!is_major_bump("1.2", "1.3"));
+        // "1" → "2" は major
+        assert!(is_major_bump("1", "2"));
+    }
+
+    #[test]
+    fn is_major_bump_handles_pre_release_suffix() {
+        // 現実装は最初の `.` 区切り → parse なので、0.1.0-rc.1 は "0" として扱う
+        // major 部だけ見ているのでサフィックス付きでも誤判定しない
+        assert!(!is_major_bump("0.1.0-rc.1", "0.1.0"));
+        assert!(is_major_bump("0.9.0", "1.0.0-rc.1"));
+    }
+
+    #[test]
+    fn is_major_bump_returns_false_for_garbage_input() {
+        // どちらか/両方が parse できなければ false (跨ぎなし扱いで安全側)
+        assert!(!is_major_bump("not-a-version", "still-not"));
+        assert!(!is_major_bump("1.0.0", "abc"));
+        assert!(!is_major_bump("", ""));
+    }
+
+    #[test]
+    fn is_major_bump_handles_large_major_numbers() {
+        // u64 範囲ぎりぎりまで扱える
+        assert!(is_major_bump("99.0.0", "100.0.0"));
+        assert!(!is_major_bump("100.0.0", "99.0.0"));
+    }
+
+    #[test]
+    fn major_of_extracts_first_segment() {
+        // 内部 helper の境界条件
+        assert_eq!(major_of("1.2.3"), Some(1));
+        assert_eq!(major_of("0"), Some(0));
+        assert_eq!(major_of("v1.0.0"), None); // v プレフィックスは未対応
+        assert_eq!(major_of(""), None);
+        assert_eq!(major_of("abc"), None);
+    }
+
+    #[test]
     fn installer_url_has_correct_format() {
         let url = installer_url_for("1.2.3");
         assert!(url.contains("/v1.2.3/"));
         assert!(url.ends_with("_x64-setup.exe"));
+    }
+
+    #[test]
+    fn installer_url_uses_https_github() {
+        // フィッシング防止: ホスト名は github.com 系列に固定
+        let url = installer_url_for("1.0.0");
+        assert!(
+            url.starts_with("https://github.com/"),
+            "unexpected base: {}",
+            url
+        );
+    }
+
+    #[test]
+    fn installer_url_embeds_exact_version() {
+        // バージョン文字列がそのまま埋め込まれる (path traversal 等は呼出側責任)
+        let url = installer_url_for("0.1.0");
+        assert!(url.contains("v0.1.0"));
+        assert!(url.contains("EasyCursorSwap_0.1.0"));
     }
 }
