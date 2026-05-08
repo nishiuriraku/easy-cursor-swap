@@ -100,8 +100,6 @@ export default {
     unsignedTag: '未署名',
     tabAssign: '割り当て',
     tabMetadata: 'メタデータ',
-    tabPreview: 'プレビュー',
-    tabPublish: '公開',
     advancedSection: '詳細設定',
     advancedHint: '解像度ごとに画像を上書き',
     perResolutionLabel: '解像度別 アセット',

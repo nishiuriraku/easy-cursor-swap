@@ -39,7 +39,7 @@ type RoleStatus = 'filled' | 'partial' | 'empty'
 type ResampleMode = 'lanczos' | 'nearest' | 'auto'
 
 const SIZES = [32, 48, 64, 96, 128, 256] as const
-type TabId = 'assign' | 'metadata' | 'preview' | 'publish'
+type TabId = 'assign' | 'metadata'
 
 /**
  * Creator のセッションステージ。
@@ -155,8 +155,6 @@ const filledCount = computed(() => filledRoles.size)
 const tabs = computed<Array<{ id: TabId; label: string; count?: string }>>(() => [
   { id: 'assign', label: t('creator.tabAssign'), count: `${filledCount.value}/17` },
   { id: 'metadata', label: t('creator.tabMetadata') },
-  { id: 'preview', label: t('creator.tabPreview') },
-  { id: 'publish', label: t('creator.tabPublish') },
 ])
 const filledSizes = computed(() => filledSizesByRole.value[activeRoleId.value] ?? [])
 const sizesCovered = computed(() => filledSizes.value.length)

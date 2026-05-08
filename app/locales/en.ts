@@ -101,8 +101,6 @@ export default {
     unsignedTag: 'Unsigned',
     tabAssign: 'Assign',
     tabMetadata: 'Metadata',
-    tabPreview: 'Preview',
-    tabPublish: 'Publish',
     advancedSection: 'Advanced',
     advancedHint: 'Override per resolution',
     perResolutionLabel: 'Per-resolution assets',
