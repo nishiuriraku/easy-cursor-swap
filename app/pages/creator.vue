@@ -308,48 +308,6 @@ const importedPngBytes = ref<Uint8Array | null>(null)
 
 const fileInput = ref<HTMLInputElement | null>(null)
 
-/**
- * PNG / SVG / .cur / .ico を一つの Tauri ダイアログで選ばせる統合エントリ。
- *
- * 拡張子で内部分岐:
- *   - .cur / .ico → Rust 側 `import_cursor_file` でパース (ホットスポット情報を保持)
- *   - .png        → そのまま読み込み
- *   - .svg        → sanitize して 256px PNG にラスタライズ
- *
- * Tauri 開発時は plugin-fs 経由で読むため `<input type="file">` 経路は不要だが、
- * Web プレビュー (Tauri 外) では plugin-fs が無いので、その場合は HTML input にフォールバック。
- */
-async function pickAnyAsset() {
-  importBusy.value = true
-  importMessage.value = null
-  sanitizedRemovals.value = []
-  try {
-    const { open } = await import('@tauri-apps/plugin-dialog')
-    const picked = await open({
-      multiple: false,
-      filters: [
-        {
-          name: '画像 / カーソル',
-          extensions: ['png', 'svg', 'cur', 'ico'],
-        },
-      ],
-    })
-    if (!picked || typeof picked !== 'string') return
-    const ext = picked.split('.').pop()?.toLowerCase() ?? ''
-    if (ext === 'cur' || ext === 'ico') {
-      await pickCursorFromPath(picked)
-    } else if (ext === 'png' || ext === 'svg') {
-      await pickRasterFromPath(picked, ext)
-    } else {
-      throw new Error(`未対応の拡張子: .${ext}`)
-    }
-  } catch (err) {
-    importMessage.value = `失敗: ${err instanceof Error ? err.message : String(err)}`
-  } finally {
-    importBusy.value = false
-  }
-}
-
 /** Tauri plugin-fs でファイルを読み込み、PNG / SVG として現在のロールに反映する。 */
 async function pickRasterFromPath(path: string, ext: string) {
   const { readFile } = await import('@tauri-apps/plugin-fs')
@@ -657,11 +615,47 @@ async function pickBulkFolder() {
  * 拡張子分岐の本体。`pickBulkAuto` から、または将来のドラッグ&ドロップから呼ばれる想定。
  *
  * 設計判断:
+ *  - 単一ファイル (1 件) で `.cursorpack` 以外 (= png/svg/cur/ico) の場合は、
+ *    bulk preview を経由せず **現在編集中のロールに直接代入** する fast-path に流す。
+ *    これは旧「画像 / カーソルを取込」ボタンの挙動を維持するためで、エディタ内で
+ *    特定ロールを選んで素早く差し替えるワークフローを壊さない
  *  - `.cursorpack` は他のファイルと一緒に取り込む意味的整合性が無い (パッケージ単位の取込なので)
  *    ため、混在時は通常ファイルのみ取り込み、cursorpack 部分は無視する
  *  - 複数 `.cursorpack` の同時取込もサポートしない (ロール衝突解決が複雑になるため)
  */
 async function dispatchBulkPaths(paths: string[]) {
+  // Fast-path: 1 件かつ非 cursorpack なら現在ロールに直接代入
+  if (paths.length === 1) {
+    const p = paths[0]!
+    const ext = p.split('.').pop()?.toLowerCase() ?? ''
+    if (ext === 'cur' || ext === 'ico') {
+      importBusy.value = true
+      importMessage.value = null
+      try {
+        await pickCursorFromPath(p)
+      } catch (err) {
+        importMessage.value = `失敗: ${err instanceof Error ? err.message : String(err)}`
+      } finally {
+        importBusy.value = false
+      }
+      return
+    }
+    if (ext === 'png' || ext === 'svg') {
+      importBusy.value = true
+      importMessage.value = null
+      sanitizedRemovals.value = []
+      try {
+        await pickRasterFromPath(p, ext)
+      } catch (err) {
+        importMessage.value = `失敗: ${err instanceof Error ? err.message : String(err)}`
+      } finally {
+        importBusy.value = false
+      }
+      return
+    }
+    // .cursorpack は下の bulk preview ロジックに fallthrough
+  }
+
   const packs = paths.filter((p) => p.toLowerCase().endsWith('.cursorpack'))
   const others = paths.filter((p) => !p.toLowerCase().endsWith('.cursorpack'))
 
@@ -1014,10 +1008,6 @@ async function onFileChange(e: Event) {
               </div>
             </div>
             <div style="display: flex; gap: 6px">
-              <button class="btn ghost" :disabled="importBusy" @click="pickAnyAsset">
-                <span v-if="importBusy" class="spinner" style="width: 13px; height: 13px" />
-                <UiIcon v-else name="Import" :size="13" />{{ t('creator.addAsset') }}
-              </button>
               <BulkImportButton @bulk-auto="pickBulkAuto" @bulk-folder="pickBulkFolder" />
               <input
                 ref="fileInput"

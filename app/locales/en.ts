@@ -103,7 +103,6 @@ export default {
     tabMetadata: 'Metadata',
     tabPreview: 'Preview',
     tabPublish: 'Publish',
-    addAsset: 'Import image / cursor',
     advancedSection: 'Advanced',
     advancedHint: 'Override per resolution',
     perResolutionLabel: 'Per-resolution assets',
