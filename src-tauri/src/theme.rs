@@ -1019,28 +1019,6 @@ impl ThemeManager {
         Ok(())
     }
 
-    #[allow(dead_code)]
-    /// テーマ名のサニタイズ
-    /// レジストリキーとして安全な文字列に変換
-    pub fn sanitize_theme_name(name: &str) -> String {
-        name.chars()
-            .filter(|c| {
-                c.is_alphanumeric()
-                    || *c == ' '
-                    || *c == '-'
-                    || *c == '_'
-                    || *c == '.'
-                    // 日本語文字も許可
-                    || (*c >= '\u{3000}' && *c <= '\u{9FFF}')
-                    || (*c >= '\u{F900}' && *c <= '\u{FAFF}')
-            })
-            // NULLバイトとバックスラッシュを完全除去
-            .filter(|c| *c != '\0' && *c != '\\')
-            .collect::<String>()
-            .trim()
-            .to_string()
-    }
-
     /// 指定 ID のテーマディレクトリ (`~/.custom_cursors/<UUID>/`) を完全削除する。
     ///
     /// アクティブテーマを削除した場合、レジストリ側は EasyCursorSwap が書いたパスが
