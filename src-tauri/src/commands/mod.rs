@@ -88,6 +88,7 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         system::get_autostart_status,
         system::list_crash_reports,
         system::clear_crash_reports,
+        system::submit_crash_reports,
         // 一括取り込み (実装本体は crate::bulk_import::{assets,cursorpack} 側)
         crate::bulk_import::assets::bulk_resolve_assets,
         crate::bulk_import::assets::cancel_bulk_import,

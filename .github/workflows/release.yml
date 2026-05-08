@@ -7,6 +7,12 @@ name: Release
 #   TAURI_SIGNING_PRIVATE_KEY       : src-tauri/signing/easycursorswap の内容 (base64)
 #   TAURI_SIGNING_PRIVATE_KEY_PASSWORD: 鍵のパスフレーズ (パスなしなら設定不要)
 #
+# オプション (クラッシュレポート Cloudflare Worker 連携):
+#   EASY_CURSOR_SWAP_CRASH_REPORT_ENDPOINT : Worker URL
+#                                            (例: https://easy-cursor-swap-crash-report.<sub>.workers.dev/crash)
+#   EASY_CURSOR_SWAP_CRASH_REPORT_APP_TOKEN: Worker `wrangler secret put ALLOWED_ORIGIN` した値と同一の文字列
+#   未設定でビルドした場合は送信機能ごと無効化される (config.crash_reporting=true でも skip)。
+#
 # オプション (コードサイニング):
 #   WINDOWS_SIGNING_CERT_PFX_BASE64 : PFX 証明書 (base64)
 #   WINDOWS_SIGNING_CERT_PASSWORD   : PFX パスワード
@@ -72,6 +78,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # クラッシュレポート送信用 credentials (option_env! で .rodata にリテラル埋め込み)。
+          # GitHub Secrets で未設定なら空文字 → option_env! が Some("") を返す → embedded_credentials() が None で skip。
+          # 設定方法: Repo Settings → Secrets and variables → Actions → New repository secret
+          EASY_CURSOR_SWAP_CRASH_REPORT_ENDPOINT: ${{ secrets.EASY_CURSOR_SWAP_CRASH_REPORT_ENDPOINT }}
+          EASY_CURSOR_SWAP_CRASH_REPORT_APP_TOKEN: ${{ secrets.EASY_CURSOR_SWAP_CRASH_REPORT_APP_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'EasyCursorSwap ${{ github.ref_name }}'

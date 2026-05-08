@@ -209,3 +209,27 @@ pub fn list_crash_reports() -> Result<Vec<crate::crash::CrashReport>, AppError> 
 pub fn clear_crash_reports() -> Result<usize, AppError> {
     crate::crash::clear_reports()
 }
+
+/// 保留中のクラッシュレポートを Cloudflare Worker に送信する (オプトイン UI ボタン用)。
+///
+/// 起動時の自動送信 (`main.rs` の setup) と同じロジックを手動トリガーで呼び出す。
+/// 以下のいずれかに該当すると `Ok(SubmitSummary::default())` を返し、ネットワーク発呼しない:
+///
+/// - `general.crash_reporting == false` (オプトイン無効)
+/// - ビルド時 env 未設定 (`embedded_credentials()` が `None`)
+///
+/// それ以外は [`crate::crash::submit_pending_reports`] に委譲する。
+/// 戻り値の `sent / failed / skipped` を UI 側でトースト表示するなどに使う。
+#[tauri::command]
+pub async fn submit_crash_reports(
+    config: State<'_, ConfigManager>,
+) -> Result<crate::crash::SubmitSummary, AppError> {
+    let cfg = config.get()?;
+    if !cfg.general.crash_reporting {
+        return Ok(crate::crash::SubmitSummary::default());
+    }
+    let Some((endpoint, token)) = crate::crash::embedded_credentials() else {
+        return Ok(crate::crash::SubmitSummary::default());
+    };
+    crate::crash::submit_pending_reports(endpoint, token).await
+}

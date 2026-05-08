@@ -9,8 +9,27 @@ export interface GeneralConfig {
   language: string
   active_theme_id: string | null
   panic_hotkey: string
-  /** クラッシュレポート送信オプトイン (デフォルト false) */
+  /**
+   * クラッシュレポート送信オプトイン (デフォルト false)。
+   *
+   * 送信先 URL / App Token はビルド時に環境変数
+   * `EASY_CURSOR_SWAP_CRASH_REPORT_ENDPOINT` / `_APP_TOKEN` で埋め込まれる。
+   * env 未設定でビルドされたアプリでは本フラグが true でも送信は行われない。
+   */
   crash_reporting: boolean
+}
+
+/**
+ * `submit_crash_reports` (Tauri command) の戻り値。
+ * 起動時の自動送信と UI ボタンから呼び出される。
+ */
+export interface CrashSubmitSummary {
+  /** 送信成功 → ローカル削除した件数 */
+  sent: number
+  /** 送信試行したが失敗した件数 (HTTP エラー / ネットワークエラー) */
+  failed: number
+  /** 件数上限などで今回送らなかった件数 (次回再試行) */
+  skipped: number
 }
 
 export interface DarkModeConfig {

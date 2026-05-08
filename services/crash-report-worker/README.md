@@ -79,8 +79,47 @@ npx wrangler deploy
 > 実 `wrangler deploy` / `wrangler secret put` は本番投入時のみ手動で実行する。
 
 デプロイすると `https://easy-cursor-swap-crash-report.<sub>.workers.dev` の
-URL が払い出される。アプリ側の `submit_pending_reports` (Phase 7-1) で
-このエンドポイントに POST する。
+URL が払い出される。
+
+## アプリ (Tauri) 側 credentials の埋め込み
+
+Worker 払い出し URL と `ALLOWED_ORIGIN` は **アプリのバイナリにビルド時 env で
+埋め込まれる**。ユーザーが `config.json` を編集したり UI で入力する必要はない。
+
+ローカルビルドでクラッシュ送信を有効にしたい場合 — repo root の
+`.env.example` を `.env` にコピーして値を埋めるだけ:
+
+```bash
+# repo root (cursor-forge/) で
+cp .env.example .env
+# .env を編集
+#   EASY_CURSOR_SWAP_CRASH_REPORT_ENDPOINT=https://easy-cursor-swap-crash-report.<sub>.workers.dev/crash
+#   EASY_CURSOR_SWAP_CRASH_REPORT_APP_TOKEN=<ALLOWED_ORIGIN と同じ値>
+npm run tauri:build
+```
+
+`src-tauri/build.rs` が dotenvy で `.env` を読み、`cargo:rustc-env=` 経由で
+rustc に渡し、`option_env!` で `.rodata` に埋め込まれる。`.env` を編集すると
+`cargo:rerun-if-changed` が再ビルドをトリガーするので毎回 clean は不要。
+
+シェル env (`$env:X = ...` や CI の `env:`) で同名変数が既に設定されていれば
+そちらが優先される (`.env` が CI を壊さないための互換設計)。
+
+CI (GitHub Actions) のリリースビルドでは `.github/workflows/release.yml` が
+GitHub Secrets `EASY_CURSOR_SWAP_CRASH_REPORT_ENDPOINT` /
+`EASY_CURSOR_SWAP_CRASH_REPORT_APP_TOKEN` を `tauri-action` に渡す。
+Repo Settings → Secrets and variables → Actions に同名で登録すれば
+次回タグ push のリリースに反映される。
+
+env 未設定でビルドされたアプリは送信機能ごと無効化される
+(ユーザーがオプトインを true にしても何も起きない、debug ログで skip 通知)。
+これにより PR ビルドや fork ビルドが他人のエンドポイントに勝手に送らない。
+
+> **App Token はバイナリの `.rodata` に平文で乗る** (`strings <exe>` で抽出可能)。
+> 「誰でも野良 POST で Issue 量産」を防ぐ程度の緩いゲートでしかなく、
+> 真の防御は Worker 側のレート制限 / Turnstile / WAF。
+> リリースごとのトークンローテーション (本 README 末尾) を併用すると
+> 多少の延命にはなるが、絶対的な秘匿は期待しないこと。
 
 ## 動作確認
 

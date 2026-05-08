@@ -60,8 +60,11 @@ pub struct GeneralConfig {
     pub panic_hotkey: String,
     /// クラッシュレポート送信オプトイン (デフォルト false)
     ///
-    /// 有効にしても `nishiuriraku/easy-cursor-swap-index` のサーバー側エンドポイントが
-    /// 整備されるまでは収集のみ。`crash::list_reports` で UI に表示する。
+    /// 有効にすると、ビルド時に環境変数で埋め込まれた送信先エンドポイント / App Token
+    /// (`EASY_CURSOR_SWAP_CRASH_REPORT_ENDPOINT` / `_APP_TOKEN`) を用いて
+    /// `services/crash-report-worker/` (Cloudflare Worker) に POST し、
+    /// `nishiuriraku/easy-cursor-swap` の Issue として転送される。
+    /// 環境変数未設定でビルドされた場合は本フラグが true でも送信は行われない。
     #[serde(default)]
     pub crash_reporting: bool,
 }

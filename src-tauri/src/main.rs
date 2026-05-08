@@ -379,6 +379,47 @@ fn main() {
                 }
             }
 
+            // クラッシュレポート自動送信。発火条件:
+            //   1. ビルド時 env で endpoint+token が埋め込まれている (release/CI ビルドのみ)
+            //   2. ユーザーが crash_reporting オプトインを true にしている
+            // ベストエフォート: 失敗してもアプリ動作には影響しない。
+            if let Some((endpoint, token)) = crash::embedded_credentials() {
+                let submit_handle = handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    use tauri::Manager;
+                    let cfg_state: tauri::State<ConfigManager> = submit_handle.state();
+                    let cfg = match cfg_state.get() {
+                        Ok(c) => c,
+                        Err(err) => {
+                            tracing::debug!("crash-submit: config 取得失敗 (skip): {}", err);
+                            return;
+                        }
+                    };
+                    if !cfg.general.crash_reporting {
+                        return;
+                    }
+                    match crash::submit_pending_reports(endpoint, token).await {
+                        Ok(s) => {
+                            if s.sent + s.failed + s.skipped > 0 {
+                                tracing::info!(
+                                    "crash-submit: sent={} failed={} skipped={}",
+                                    s.sent,
+                                    s.failed,
+                                    s.skipped
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            tracing::debug!("crash-submit: 起動時送信エラー (silent): {}", e);
+                        }
+                    }
+                });
+            } else {
+                tracing::debug!(
+                    "crash-submit: ビルド時 env 未設定のため自動送信を無効化 (機能ごと skip)"
+                );
+            }
+
             tracing::info!("EasyCursorSwap が正常に起動しました");
             Ok(())
         })
