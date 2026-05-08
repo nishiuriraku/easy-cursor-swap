@@ -1,7 +1,7 @@
 /**
  * CreatorToolbar テスト。
  *
- * パンくず + Clear ボタン + 署名状態タグ + Export/Build ボタン。
+ * パンくず + Clear ボタン + 署名状態タグ + Export ボタン。
  * Export ボタンは sign フラグ付き payload を emit するので、
  * 「sign=true / false の使い分け」を 2 つの異なるボタンで生成する点を確認。
  */
@@ -18,9 +18,7 @@ const baseProps = {
   metaVersion: '1.0.0',
   hasKeystoreSigning: false,
   exportBusy: false,
-  buildBusy: false,
   arrowAssigned: true,
-  importedPngBytes: new Uint8Array([1, 2, 3]),
 }
 
 describe('CreatorToolbar', () => {
@@ -87,17 +85,6 @@ describe('CreatorToolbar', () => {
     expect(wrapper.emitted('export')).toEqual([[{ sign: true }]])
   })
 
-  it('emits build (not export) when no keystore and primary clicked', async () => {
-    const wrapper = mount(CreatorToolbar, {
-      props: { ...baseProps, hasKeystoreSigning: false },
-      global: { stubs },
-    })
-    const primary = wrapper.find('button.primary')
-    await primary.trigger('click')
-    expect(wrapper.emitted('build')).toHaveLength(1)
-    expect(wrapper.emitted('export')).toBeUndefined()
-  })
-
   it('disables export button when arrowAssigned=false', () => {
     const wrapper = mount(CreatorToolbar, {
       props: { ...baseProps, arrowAssigned: false },
@@ -105,15 +92,6 @@ describe('CreatorToolbar', () => {
     })
     const exportBtn = wrapper.findAll('button').find((b) => b.attributes('title') === '.cursorpack')
     expect(exportBtn?.attributes('disabled')).toBeDefined()
-  })
-
-  it('disables build button when no importedPngBytes', () => {
-    const wrapper = mount(CreatorToolbar, {
-      props: { ...baseProps, hasKeystoreSigning: false, importedPngBytes: null },
-      global: { stubs },
-    })
-    const primary = wrapper.find('button.primary')
-    expect(primary.attributes('disabled')).toBeDefined()
   })
 
   it('disables export when exportBusy=true', () => {
