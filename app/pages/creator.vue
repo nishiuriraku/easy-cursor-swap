@@ -983,29 +983,13 @@ async function onFileChange(e: Event) {
 
       <!-- 3 カラムグリッド (assign タブのみ) -->
       <div v-if="activeTab === 'assign'" class="creator-grid">
-        <!-- 左: 役割リスト -->
-        <div class="cpane left">
-          <div class="pane-head">
-            <h6>{{ t('creator.rolesPaneTitle') }}</h6>
-            <span class="tag">{{ filledCount }} / 17</span>
-          </div>
-          <div
-            class="role-list"
-            role="listbox"
-            :aria-label="t('creator.rolesPaneTitle')"
-            @keydown="onRoleListKeydown"
-          >
-            <RoleListItem
-              v-for="(role, i) in CURSOR_ROLES"
-              :key="role.id"
-              :role="role"
-              :index="i"
-              :status="statusOf(role.id)"
-              :active="activeRoleId === role.id"
-              @select="selectRole"
-            />
-          </div>
-        </div>
+        <CreatorRoleList
+          :filled-count="filledCount"
+          :active-role-id="activeRoleId"
+          :status-of="statusOf"
+          @select="selectRole"
+          @keydown="onRoleListKeydown"
+        />
 
         <!-- 中央: エディタ -->
         <div class="editor">
