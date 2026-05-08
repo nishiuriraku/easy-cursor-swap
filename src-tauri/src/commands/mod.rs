@@ -9,10 +9,11 @@
 //! 残りのコマンドは段階的に切り出し中。新規追加時は適切なサブモジュールへ。
 
 pub mod keystore;
+pub mod marketplace;
+pub mod profile;
 
 use crate::accessibility::AccessibilityConflicts;
 use crate::autostart;
-use crate::backup::{BackupManager, ProfileEnvelope};
 use crate::config::{AppConfig, BackupInfo, ConfigManager};
 use crate::cursor::{
     build_cur_from_png, clear_resize_cache, parse_ani, parse_ico_cur, pick_largest_as_png,
@@ -22,7 +23,6 @@ use crate::darkmode;
 use crate::environment::EnvironmentReport;
 use crate::errors::AppError;
 use crate::health::is_major_bump;
-use crate::marketplace::{MarketplaceClient, MarketplaceIndex, MarketplaceInstallRequest};
 use crate::registry::{CursorRole, RegistryManager, WindowsScheme};
 use crate::theme::{
     CursorDefinition, CursorpackInspection, LocalizedString, ThemeManager, ThemeMetadata,
@@ -617,53 +617,6 @@ pub fn import_cursorpack(path: String) -> Result<String, AppError> {
     Ok(id.to_string())
 }
 
-/// `.cursorprofile` (設定 + 全テーマ) を指定パスに書き出す。
-#[tauri::command]
-pub fn export_profile(config: State<'_, ConfigManager>, path: String) -> Result<(), AppError> {
-    let cfg = config.get()?;
-    let target = std::path::PathBuf::from(&path);
-    BackupManager::export(&target, &cfg)
-}
-
-/// `.cursorprofile` を読み込んで設定と全テーマを復元する。
-/// `merge=true` なら既存テーマを保持し新規分のみ反映、`false` なら完全上書き。
-#[tauri::command]
-pub fn import_profile(
-    config: State<'_, ConfigManager>,
-    path: String,
-    merge: bool,
-) -> Result<ProfileEnvelope, AppError> {
-    let buf = std::path::PathBuf::from(&path);
-    if !buf.exists() {
-        return Err(AppError::Theme(format!(
-            "ファイルが見つかりません: {}",
-            path
-        )));
-    }
-    let envelope = BackupManager::import(&buf, merge)?;
-    // 設定もファイル経由で復元
-    config.update(|c| {
-        *c = envelope.config.clone();
-    })?;
-    Ok(envelope)
-}
-
-/// 公式インデックス (Marketplace) のメタデータを取得する。
-/// `nishiuriraku/easy-cursor-swap-index` リポジトリの `index.json` を HTTPS + rustls で取得。
-#[tauri::command]
-pub async fn marketplace_fetch_index() -> Result<MarketplaceIndex, AppError> {
-    MarketplaceClient::fetch_index().await
-}
-
-/// 公式インデックスから指定エントリをダウンロード→検証→展開する。
-/// (1) ダウンロード, (2) SHA-256 整合性, (3) Ed25519 署名検証, (4) ZIP 展開。
-/// 戻り値はインポートしたテーマ ID (UUID 文字列)。
-#[tauri::command]
-pub async fn marketplace_install(req: MarketplaceInstallRequest) -> Result<String, AppError> {
-    let id = MarketplaceClient::install(req).await?;
-    Ok(id.to_string())
-}
-
 /// Windows 既定カーソルにリセットする（パニックボタン）
 #[tauri::command]
 pub fn reset_to_default() -> Result<(), AppError> {
@@ -1120,10 +1073,10 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         build_cursor_file,
         clear_cursor_cache,
         export_cursorpack,
-        export_profile,
-        import_profile,
-        marketplace_fetch_index,
-        marketplace_install,
+        profile::export_profile,
+        profile::import_profile,
+        marketplace::marketplace_fetch_index,
+        marketplace::marketplace_install,
         reset_to_default,
         reset_to_initial,
         get_dark_mode_status,
