@@ -62,14 +62,17 @@ cargo bench --manifest-path src-tauri/Cargo.toml                                
 
 ### Verification gate (run before committing — see auto-memory note)
 
+**コミット前は必ず `scripts/verify-gate.sh` を実行する。** このスクリプトが正準の検証ゲートで、内訳は以下:
+
 ```bash
-cargo fmt   --manifest-path src-tauri/Cargo.toml --all -- --check
-cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
-cargo test  --manifest-path src-tauri/Cargo.toml --lib
-npx vue-tsc --noEmit
-node scripts/check-i18n.mjs
-npm run tauri:build
+bash scripts/verify-gate.sh
+# 内訳:
+#   cargo fmt --check / cargo clippy -D warnings / cargo test --lib
+#   prettier --check / vue-tsc --noEmit
+#   node scripts/check-i18n.mjs / npm test (vitest)
 ```
+
+ゲート手順を変更したい場合は、CLAUDE.md ではなく `scripts/verify-gate.sh` を直接編集すること (CI と挙動を揃える)。インストーラまで含めて検証する場合は `npm run tauri:build` を追加で実行する。
 
 ## Architecture
 
@@ -122,9 +125,17 @@ Vue (UI) ──invoke()──▶ Tauri command (commands.rs) ──▶ Rust modu
 - IPC payload types live in `app/types/` and must mirror `serde`-derived Rust structs in `commands.rs` / module files.
 - Filenames in `components/` are referenced without directory prefix — keep names globally unique.
 
+## Implementation policy
+
+新規機能・リファクタ・バグ修正に着手するときは、以下を**必ず**この順で実施する。
+
+1. **必要な skill を使用する。** タスクに該当しそうな skill が 1% でもあれば `Skill` ツールで起動する (例: ブレストは `superpowers:brainstorming`、TDD は `superpowers:test-driven-development`、デバッグは `superpowers:systematic-debugging`、Rust の所有権/並行性エラーは `rust-skills:m01-ownership` 等、Cloudflare/Tauri/Nuxt 固有作業は対応 skill)。判断に迷ったら起動して、合わなければ捨てる。
+2. **既存の実装を確認してから書く。** 触る領域の `app/` / `src-tauri/src/` / `composables/` / `commands.rs` を先に読み、命名・型・IPC の前例に揃える。`scripts/check-i18n.mjs` が落ちないよう `locales/{ja,en}.ts` 双方を更新。重複コードを新設せず、既存の composable / module を拡張する方を優先。
+3. **検証ゲートは `scripts/verify-gate.sh` を使う。** コミット直前に `bash scripts/verify-gate.sh` を実行し、緑になることを確認する。インライン版 (`cargo fmt` 〜 `npm run tauri:build`) は使わない — スクリプトが正準。
+
 ## Workflow rule (auto-memory)
 
-One feature = one commit. Run the **verification gate** above (`cargo check` + `cargo test` + `npm run tauri:build`) and confirm it passes before committing.
+One feature = one commit. Run `bash scripts/verify-gate.sh` and confirm it passes before committing.
 
 ## CI workflows
 
