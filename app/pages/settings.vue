@@ -824,43 +824,7 @@ function selectSection(id: SectionId) {
         </section>
 
         <!-- About -->
-        <section v-else>
-          <header class="section-head">
-            <h1>{{ t('settings.sectionAbout') }}</h1>
-            <p>{{ t('settings.descAbout') }}</p>
-          </header>
-          <div class="prop-section">
-            <div class="prop-head">
-              {{ t('app.name') }}
-              <span class="head-hint">{{ t('settings.aboutAppHint', { version: '1.0.0' }) }}</span>
-            </div>
-            <div class="prop-body">
-              <SettingsRow :label="t('settings.homepageLabel')" mono>
-                <a
-                  class="btn ghost"
-                  href="https://github.com/easycursorswap"
-                  target="_blank"
-                  rel="noopener"
-                >
-                  <UiIcon name="Globe" :size="13" />github.com/easycursorswap
-                </a>
-              </SettingsRow>
-              <SettingsRow :label="t('settings.issuesLabel')" mono>
-                <a
-                  class="btn ghost"
-                  href="https://github.com/nishiuriraku/easy-cursor-swap/issues"
-                  target="_blank"
-                  rel="noopener"
-                >
-                  <UiIcon name="Alert" :size="13" />Issues
-                </a>
-              </SettingsRow>
-              <SettingsRow :label="t('settings.ossLicenseLabel')">
-                <button class="btn">{{ t('settings.btnView') }}</button>
-              </SettingsRow>
-            </div>
-          </div>
-        </section>
+        <AboutSection v-else />
       </div>
     </div>
 
