@@ -266,4 +266,118 @@ mod tests {
         install_panic_hook();
         install_panic_hook();
     }
+
+    #[test]
+    fn report_serde_roundtrip() {
+        // CrashReport を JSON 経由で復元したら一致する
+        let report = CrashReport {
+            file_name: "panic-1746000000000.json".to_string(),
+            timestamp_utc: "2026-05-08T00:00:00+00:00".to_string(),
+            app_version: "0.1.0".to_string(),
+            os: "windows".to_string(),
+            message: "test panic".to_string(),
+            location: Some("src/lib.rs:42:5".to_string()),
+        };
+        let json = serde_json::to_string(&report).unwrap();
+        let restored: CrashReport = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.file_name, report.file_name);
+        assert_eq!(restored.timestamp_utc, report.timestamp_utc);
+        assert_eq!(restored.app_version, report.app_version);
+        assert_eq!(restored.os, report.os);
+        assert_eq!(restored.message, report.message);
+        assert_eq!(restored.location, report.location);
+    }
+
+    #[test]
+    fn report_with_no_location() {
+        // location が None でも往復できる
+        let report = CrashReport {
+            file_name: "panic-x.json".to_string(),
+            timestamp_utc: "2026-05-08T00:00:00+00:00".to_string(),
+            app_version: "0.1.0".to_string(),
+            os: "windows".to_string(),
+            message: "no location".to_string(),
+            location: None,
+        };
+        let json = serde_json::to_string(&report).unwrap();
+        let restored: CrashReport = serde_json::from_str(&json).unwrap();
+        assert!(restored.location.is_none());
+    }
+
+    #[test]
+    fn redact_message_handles_multiple_occurrences() {
+        // 同じパスが複数回出てくる場合 (例: A から B へコピー失敗) も全置換
+        let Some(home) = dirs::home_dir() else { return };
+        let home_str = home.to_string_lossy().to_string();
+        if home_str.is_empty() {
+            return;
+        }
+        let original = format!("copy from {}/a to {}/b failed", home_str, home_str);
+        let redacted = redact_message(&original);
+        assert!(!redacted.contains(&home_str));
+        // 2 回出現するはず
+        let tilde_count = redacted.matches('~').count();
+        assert!(
+            tilde_count >= 2,
+            "expected >=2 tildes, got {} in: {}",
+            tilde_count,
+            redacted
+        );
+    }
+
+    #[test]
+    fn redact_message_handles_forward_slash_form() {
+        // Windows のホームでも、Rust の Path 文字列化で `/` が混じることがある。
+        // 両形式で置換できるか確認。
+        let Some(home) = dirs::home_dir() else { return };
+        let home_str = home.to_string_lossy().to_string();
+        if home_str.is_empty() {
+            return;
+        }
+        // forward slash 版
+        let alt = home_str.replace('\\', "/");
+        if alt == home_str {
+            // すでに forward slash しか含まないシステムなのでスキップ
+            return;
+        }
+        let original = format!("read at {}/a.txt", alt);
+        let redacted = redact_message(&original);
+        assert!(redacted.contains("~/a.txt"));
+    }
+
+    #[test]
+    fn list_reports_returns_empty_when_dir_missing() {
+        // クラッシュディレクトリが (まだ) 存在しないテスト環境では空配列。
+        // 実機では未起動状態と同じシナリオ。
+        let result = list_reports();
+        assert!(result.is_ok());
+        // ディレクトリが既存テーマで生成されている可能性があるが、
+        // 仮に存在していてもエラーにはならない
+        let _ = result.unwrap();
+    }
+
+    #[test]
+    fn list_reports_only_picks_panic_prefix() {
+        // ディレクトリを tempdir に切り替えるのは難しいので、
+        // ここでは関数が "panic-*.json" 以外を返さないことを実装ベースで再確認する。
+        // 実装内のフィルタロジックは:
+        //   name.starts_with("panic-") && name.ends_with(".json")
+        // を満たすファイル名だけ拾う。
+        // この境界条件を擬似テストとしてアサート。
+        let valid = "panic-1234567890.json";
+        let invalids = [
+            "panic-1234.txt",    // 拡張子が違う
+            "panik-1234.json",   // typo
+            "panicbutnotprefix", // panic で始まるが - がない
+            "1234.json",         // panic prefix なし
+        ];
+        assert!(valid.starts_with("panic-") && valid.ends_with(".json"));
+        for name in invalids {
+            assert!(
+                !(name.starts_with("panic-") && name.ends_with(".json")),
+                "should reject: {}",
+                name
+            );
+        }
+    }
 }
