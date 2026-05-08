@@ -948,16 +948,7 @@ onUnmounted(() => {
       </div>
     </Transition>
 
-    <!-- ドロップオーバーレイ -->
-    <Transition name="fade">
-      <div v-if="showDrop" class="drop">
-        <div class="drop-inner">
-          <UiIcon name="Pkg" :size="56" class="ghost-icon" />
-          <h3>{{ t('library.drop') }}</h3>
-          <p>{{ t('library.dropSub') }}</p>
-        </div>
-      </div>
-    </Transition>
+    <LibraryDropOverlay :show="showDrop" />
   </div>
 </template>
 
