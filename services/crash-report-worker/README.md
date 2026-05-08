@@ -42,11 +42,19 @@ EasyCursorSwap の **オプトイン** クラッシュレポートを匿名 POST
 
 KV 名前空間 (`RATE_LIMIT_KV` / `DEDUP_KV`) は Cloudflare MCP 経由で
 作成済みで、`wrangler.toml` に既に ID が反映されています。
-あとは認証 → secret 設定 → デプロイの 3 手順:
+事前検証 → 認証 → secret 設定 → デプロイの順で実行:
 
 ```bash
 cd services/crash-report-worker
-npm install
+
+# 0. 事前検証 (ローカル / CI でも実行可能、Cloudflare には何も送らない)
+#    - npm install (silent)
+#    - npx tsc --noEmit
+#    - npx wrangler deploy --dry-run --outdir=dist
+#    バンドルサイズ目安: 8.23 KiB / gzip 2.84 KiB (2026-05-08 時点)
+bash scripts/predeploy-check.sh
+# Windows (PowerShell 7+) の場合:
+#   pwsh ./scripts/predeploy-check.ps1
 
 # 1. Cloudflare 認証 (初回のみ)
 npx wrangler login
@@ -61,6 +69,10 @@ npx wrangler secret put TURNSTILE_SECRET # Cloudflare Turnstile の secret key
 # 3. デプロイ
 npx wrangler deploy
 ```
+
+> `predeploy-check.{sh,ps1}` は `wrangler deploy --dry-run` までしか呼ばないため、
+> 認証情報も実 secret も不要。CI でも回せる。
+> 実 `wrangler deploy` / `wrangler secret put` は本番投入時のみ手動で実行する。
 
 デプロイすると `https://easy-cursor-swap-crash-report.<sub>.workers.dev` の
 URL が払い出される。アプリ側の `submit_pending_reports` (Phase 7-1) で
