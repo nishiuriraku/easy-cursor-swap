@@ -94,19 +94,40 @@ function levenshtein(a: string, b: string): number {
   return dp[a.length][b.length]
 }
 
-export function scoreRole(filename: string, roleId: string): number {
+/**
+ * 内部用: スコアと「ヒットした alias の文字数」を一緒に返す。
+ *
+ * 文字数情報は `matchAssetToRole` の同点 tie-break に使う。
+ * 例えば `右上矢印` は Arrow alias `矢印` (len=2) と UpArrow alias `上矢印` (len=3) の
+ * どちらも suffix-match して 0.95 でタイするので、より長い alias を持つ UpArrow を勝たせる。
+ * これにより 17 ロール辞書順イテレーションの偶然で Arrow が勝ってしまうバグを防ぐ。
+ */
+function scoreRoleDetailed(
+  filename: string,
+  roleId: string,
+): { score: number, matchedLen: number } {
   const normFile = normalize(filename)
   const aliases = [roleId.toLowerCase(), ...(ROLE_ALIASES[roleId] ?? [])]
 
   let best = 0
+  let bestLen = 0
   for (const alias of aliases) {
-    if (normFile === alias) return 1.0
-    if (normFile.endsWith(alias)) best = Math.max(best, 0.95)
-    else if (normFile.startsWith(alias)) best = Math.max(best, 0.90)
-    else if (normFile.includes(alias)) best = Math.max(best, 0.80)
-    else if (alias.length >= 4 && levenshtein(normFile, alias) <= 1) best = Math.max(best, 0.70)
+    let s = 0
+    if (normFile === alias) s = 1.0
+    else if (normFile.endsWith(alias)) s = 0.95
+    else if (normFile.startsWith(alias)) s = 0.90
+    else if (normFile.includes(alias)) s = 0.80
+    else if (alias.length >= 4 && levenshtein(normFile, alias) <= 1) s = 0.70
+    if (s > best || (s === best && alias.length > bestLen)) {
+      best = s
+      bestLen = alias.length
+    }
   }
-  return best
+  return { score: best, matchedLen: bestLen }
+}
+
+export function scoreRole(filename: string, roleId: string): number {
+  return scoreRoleDetailed(filename, roleId).score
 }
 
 export interface RoleMatch {
@@ -125,14 +146,20 @@ export interface MatchCandidate {
 const MATCH_THRESHOLD = 0.7
 
 export function matchAssetToRole(filename: string): RoleMatch | null {
-  let best: RoleMatch | null = null
+  let best: { role: string, score: number, matchedLen: number } | null = null
   for (const roleId of CURSOR_ROLE_IDS) {
-    const score = scoreRole(filename, roleId)
-    if (score > 0 && (!best || score > best.score)) {
-      best = { role: roleId, score }
-    }
+    const { score, matchedLen } = scoreRoleDetailed(filename, roleId)
+    if (score <= 0) continue
+    // 同点時はより長い alias を優先 (例: `上矢印` (UpArrow, len=3) > `矢印` (Arrow, len=2))。
+    // これによりロール辞書順 (Arrow が先) の偶然で短い alias が勝ってしまうのを防ぐ。
+    const better = !best
+      || score > best.score
+      || (score === best.score && matchedLen > best.matchedLen)
+    if (better) best = { role: roleId, score, matchedLen }
   }
-  return best && best.score >= MATCH_THRESHOLD ? best : null
+  return best && best.score >= MATCH_THRESHOLD
+    ? { role: best.role, score: best.score }
+    : null
 }
 
 /**

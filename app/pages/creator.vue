@@ -20,6 +20,7 @@ import { useCreatorAssets, scaleHotspot } from '~/composables/useCreatorAssets'
 import { useBulkImport, type ResolvedAsset, type ParsedCursorpack } from '~/composables/useBulkImport'
 import BulkImportButton from '~/components/creator/BulkImportButton.vue'
 import BulkImportPreviewModal, { type ApplyPayload } from '~/components/creator/BulkImportPreviewModal.vue'
+import NewThemeStartModal, { type ConfirmPayload as NewThemeConfirm } from '~/components/creator/NewThemeStartModal.vue'
 
 const { t } = useI18n()
 
@@ -42,6 +43,21 @@ type TabId = 'assign' | 'metadata' | 'preview' | 'publish'
  */
 type CreatorStage = 'start' | 'editing'
 const stage = ref<CreatorStage>('start')
+
+/**
+ * 新規作成モーダル (画像選択 → 編集画面) の開閉制御。
+ * デザイン要件: 「新規作成」を押したらまずモーダルでベース画像を選ばせ、
+ * Arrow ロールに割り当ててから編集画面に遷移する。
+ */
+const newThemeModalOpen = ref(false)
+
+/**
+ * 解像度ごとに別画像を割り当てる詳細フローのトグル。
+ *
+ * 1 枚画像から 6 解像度を自動生成するのが基本。詳細設定を ON にすると
+ * SizeStrip と Per-size Hotspot トグルが現れて、サイズ別の上書きができる。
+ */
+const showAdvancedResolutions = ref(false)
 
 // useSeoMeta は Tauri アプリでは document.title 等の最小用途。Nuxt ページ規約に従って
 // title / description / ogImage を定義しておく。
@@ -273,6 +289,139 @@ const fileInput = ref<HTMLInputElement | null>(null)
 
 function pickImage() {
   fileInput.value?.click()
+}
+
+/**
+ * PNG / SVG / .cur / .ico を一つの Tauri ダイアログで選ばせる統合エントリ。
+ *
+ * 拡張子で内部分岐:
+ *   - .cur / .ico → Rust 側 `import_cursor_file` でパース (ホットスポット情報を保持)
+ *   - .png        → そのまま読み込み
+ *   - .svg        → sanitize して 256px PNG にラスタライズ
+ *
+ * Tauri 開発時は plugin-fs 経由で読むため `<input type="file">` 経路は不要だが、
+ * Web プレビュー (Tauri 外) では plugin-fs が無いので、その場合は HTML input にフォールバック。
+ */
+async function pickAnyAsset() {
+  importBusy.value = true
+  importMessage.value = null
+  sanitizedRemovals.value = []
+  try {
+    const { open } = await import('@tauri-apps/plugin-dialog')
+    const picked = await open({
+      multiple: false,
+      filters: [{
+        name: '画像 / カーソル',
+        extensions: ['png', 'svg', 'cur', 'ico'],
+      }],
+    })
+    if (!picked || typeof picked !== 'string') return
+    const ext = picked.split('.').pop()?.toLowerCase() ?? ''
+    if (ext === 'cur' || ext === 'ico') {
+      await pickCursorFromPath(picked)
+    } else if (ext === 'png' || ext === 'svg') {
+      await pickRasterFromPath(picked, ext)
+    } else {
+      throw new Error(`未対応の拡張子: .${ext}`)
+    }
+  } catch (err) {
+    importMessage.value = `失敗: ${err instanceof Error ? err.message : String(err)}`
+  } finally {
+    importBusy.value = false
+  }
+}
+
+/** Tauri plugin-fs でファイルを読み込み、PNG / SVG として現在のロールに反映する。 */
+async function pickRasterFromPath(path: string, ext: string) {
+  const { readFile } = await import('@tauri-apps/plugin-fs')
+  const data = await readFile(path)
+  const bytes = data instanceof Uint8Array ? data : new Uint8Array(data)
+  if (ext === 'svg') {
+    const text = new TextDecoder().decode(bytes)
+    const { sanitized, removed } = sanitizeSvg(text)
+    if (!sanitized) throw new Error('SVG が解析できません: ' + removed.join(', '))
+    sanitizedRemovals.value = removed
+    const png = await rasterizeSvgToPng(sanitized, 256)
+    applyImportedRaster(png, 256)
+    importMessage.value = removed.length > 0
+      ? `SVG を sanitize しました (除去: ${removed.length} 件)`
+      : `SVG をインポートしました`
+  } else {
+    if (bytes.length < 8 || bytes[0] !== 0x89 || bytes[1] !== 0x50 || bytes[2] !== 0x4e || bytes[3] !== 0x47) {
+      throw new Error('PNG ヘッダーが不正です')
+    }
+    applyImportedRaster(bytes, 256)
+    importMessage.value = 'PNG をインポートしました'
+  }
+}
+
+/**
+ * 取り込んだ raster バイト列を「現在の activeRole」に反映する共通ロジック。
+ * `pickRasterFromPath` と `onFileChange` (HTML input フォールバック) で共有。
+ */
+function applyImportedRaster(png: Uint8Array, primarySize: number) {
+  importedPngBytes.value = png
+  if (importedPreviewUrl.value && importedPreviewUrl.value.startsWith('blob:')) {
+    URL.revokeObjectURL(importedPreviewUrl.value)
+  }
+  importedPreviewUrl.value = URL.createObjectURL(new Blob([png.slice().buffer], { type: 'image/png' }))
+  filledRoles.add(activeRoleId.value)
+  const map = filledSizesByRole.value[activeRoleId.value] ?? []
+  if (!map.includes(activeSize.value)) {
+    filledSizesByRole.value[activeRoleId.value] = [...map, activeSize.value]
+  }
+  const fromSize = hotspotReferenceSize.value
+  const finalHotspot = scaleHotspot(
+    { x: hotspotX.value, y: hotspotY.value },
+    fromSize,
+    primarySize,
+  )
+  setAsset(activeRoleId.value, {
+    primary: png,
+    primarySize,
+    hotspot: finalHotspot,
+    source: 'manual',
+  })
+  hotspotX.value = finalHotspot.x
+  hotspotY.value = finalHotspot.y
+}
+
+/** `.cur` / `.ico` ファイルをパスから直接 Rust 側でパースする (ダイアログを開かない版)。 */
+async function pickCursorFromPath(picked: string) {
+  const result = await invokeTauri<{
+    isCur: boolean
+    width: number
+    height: number
+    hotspotX: number
+    hotspotY: number
+    pngBytes: number[]
+    availableSizes: number[]
+  }>('import_cursor_file', { path: picked })
+  if (!result) throw new Error('IPC 結果が空でした')
+
+  const png = new Uint8Array(result.pngBytes)
+  importedPngBytes.value = png
+  if (importedPreviewUrl.value && importedPreviewUrl.value.startsWith('blob:')) {
+    URL.revokeObjectURL(importedPreviewUrl.value)
+  }
+  importedPreviewUrl.value = URL.createObjectURL(new Blob([png.slice().buffer], { type: 'image/png' }))
+
+  filledRoles.add(activeRoleId.value)
+  const map = filledSizesByRole.value[activeRoleId.value] ?? []
+  if (!map.includes(activeSize.value)) {
+    filledSizesByRole.value[activeRoleId.value] = [...map, activeSize.value]
+  }
+  hotspotX.value = result.hotspotX
+  hotspotY.value = result.hotspotY
+  setAsset(activeRoleId.value, {
+    primary: png,
+    primarySize: result.width,
+    hotspot: { x: result.hotspotX, y: result.hotspotY },
+    source: 'manual',
+  })
+  const sizeList = result.availableSizes.length > 0 ? result.availableSizes.join('/') : '?'
+  const kind = result.isCur ? '.cur' : '.ico'
+  importMessage.value = `${kind} を取り込みました (${result.width}x${result.height}, 含解像度: ${sizeList})`
 }
 
 /** `.cur` / `.ico` ファイルを Tauri ダイアログで選び、Rust 側でパースして PNG を取得する。 */
@@ -629,9 +778,60 @@ function resetCreator() {
   stage.value = 'start'
 }
 
-/** ヒーロー画面の「新規作成」CTA ハンドラ。空のテーマを開く。 */
+/**
+ * ヒーロー画面の「新規作成」CTA ハンドラ。
+ * モーダルを開いてベース画像を選ばせる (デザイン要件) → Arrow ロールに割り当てて編集画面へ。
+ */
 function onStartNew() {
+  newThemeModalOpen.value = true
+}
+
+/**
+ * モーダルでベース画像が確定されたら、対象ロールに割り当てて編集画面へ進む。
+ *
+ * TODO(設計判断): 適用先ロールの戦略を決める。デフォルトは ['Arrow'] (必須ロールのみ) だが、
+ * 全 17 ロール / 主要 4 ロール (Arrow / IBeam / Hand / Wait) など複数の案がある。
+ * 下記の `targetRoles` 配列を変えるだけで切替可能。Arrow は必須なので必ず含める。
+ */
+function onNewThemeConfirm(payload: NewThemeConfirm) {
+  importedPngBytes.value = payload.png
+  if (importedPreviewUrl.value && importedPreviewUrl.value.startsWith('blob:')) {
+    URL.revokeObjectURL(importedPreviewUrl.value)
+  }
+  importedPreviewUrl.value = payload.previewUrl
+
+  // ★ ここでロール戦略を決める (案 A=現状 / B / C のいずれか)
+  const targetRoles: string[] = ['Arrow']
+
+  for (const roleId of targetRoles) {
+    setAsset(roleId, {
+      primary: payload.png,
+      primarySize: payload.primarySize,
+      hotspot: payload.hotspot,
+      source: 'manual',
+    })
+    filledRoles.add(roleId)
+    filledSizesByRole.value = { ...filledSizesByRole.value, [roleId]: [payload.primarySize] }
+  }
+  activeRoleId.value = 'Arrow'
+  hotspotX.value = payload.hotspot.x
+  hotspotY.value = payload.hotspot.y
+  newThemeModalOpen.value = false
   stage.value = 'editing'
+  const noun = payload.fromCursorFile ? 'カーソルファイル' : '画像'
+  importMessage.value = targetRoles.length === 1
+    ? `${noun}を Arrow ロールに割り当てました`
+    : `${noun}を ${targetRoles.length} 個のロールに割り当てました`
+}
+
+/** モーダルから「画像なしで開始」を選んだ場合は従来通りの空エディタに遷移。 */
+function onNewThemeStartEmpty() {
+  newThemeModalOpen.value = false
+  stage.value = 'editing'
+}
+
+function onNewThemeCancel() {
+  newThemeModalOpen.value = false
 }
 
 /** ヒーロー画面の「.cursorpack をインポート」CTA ハンドラ。 */
@@ -940,12 +1140,9 @@ async function onFileChange(e: Event) {
             </div>
           </div>
           <div style="display: flex; gap: 6px">
-            <button class="btn ghost" :disabled="importBusy" @click="pickImage">
+            <button class="btn ghost" :disabled="importBusy" @click="pickAnyAsset">
               <span v-if="importBusy" class="spinner" style="width: 13px; height: 13px" />
-              <UiIcon v-else name="Import" :size="13" />{{ t('creator.addImage') }}
-            </button>
-            <button class="btn ghost" :disabled="importBusy" @click="pickCursorFile">
-              <UiIcon name="Pkg" :size="13" />{{ t('creator.importCursor') }}
+              <UiIcon v-else name="Import" :size="13" />{{ t('creator.addAsset') }}
             </button>
             <BulkImportButton
               @bulk-files="handleBulkFiles"
@@ -1022,30 +1219,48 @@ async function onFileChange(e: Event) {
               <div class="preview-meta tr">hotspot {{ hotspotX }},{{ hotspotY }}</div>
             </div>
 
-            <!-- 6 サイズストリップ -->
-            <SizeStrip
-              :sizes="[...SIZES]"
-              :filled-sizes="filledSizes"
-              :active-size="activeSize"
-              :role="activeRole.id"
-              @select="selectSize"
-            />
+            <!-- 詳細設定トグル: 解像度別ワークフローを ON/OFF -->
+            <div class="advanced-toggle-row">
+              <button
+                class="advanced-toggle"
+                :aria-expanded="showAdvancedResolutions"
+                @click="showAdvancedResolutions = !showAdvancedResolutions"
+              >
+                <UiIcon name="ChevD" :size="11" :style="{ transform: showAdvancedResolutions ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 160ms' }" />
+                {{ t('creator.advancedSection') }}
+                <span class="advanced-hint">{{ t('creator.advancedHint') }}</span>
+              </button>
 
-            <!-- リサンプル切替 -->
-            <div class="resample-row">
-              <span>RESAMPLE</span>
-              <div class="btn-group">
-                <button
-                  v-for="mode in (['lanczos', 'nearest', 'auto'] as ResampleMode[])"
-                  :key="mode"
-                  :class="['btn', { active: resample === mode }]"
-                  style="height: 26px; font-size: 11px"
-                  @click="resample = mode"
-                >
-                  {{ mode === 'lanczos' ? 'Lanczos' : mode === 'nearest' ? 'Nearest' : 'Auto' }}
-                </button>
+              <!-- リサンプル切替 (基本フローでも見せておく) -->
+              <div class="resample-row">
+                <span>RESAMPLE</span>
+                <div class="btn-group">
+                  <button
+                    v-for="mode in (['lanczos', 'nearest', 'auto'] as ResampleMode[])"
+                    :key="mode"
+                    :class="['btn', { active: resample === mode }]"
+                    style="height: 26px; font-size: 11px"
+                    @click="resample = mode"
+                  >
+                    {{ mode === 'lanczos' ? 'Lanczos' : mode === 'nearest' ? 'Nearest' : 'Auto' }}
+                  </button>
+                </div>
               </div>
             </div>
+
+            <!-- 詳細設定: 解像度別の上書きワークフロー -->
+            <Transition name="fade">
+              <div v-if="showAdvancedResolutions" class="advanced-panel">
+                <div class="advanced-label">{{ t('creator.perResolutionLabel') }}</div>
+                <SizeStrip
+                  :sizes="[...SIZES]"
+                  :filled-sizes="filledSizes"
+                  :active-size="activeSize"
+                  :role="activeRole.id"
+                  @select="selectSize"
+                />
+              </div>
+            </Transition>
           </div>
         </div>
       </div>
@@ -1067,7 +1282,7 @@ async function onFileChange(e: Event) {
               <label>{{ t('creatorStart.propHotspotY') }}</label>
               <input v-model.number="hotspotY" type="number" class="input mono" min="0" />
             </div>
-            <div class="prop-row">
+            <div v-if="showAdvancedResolutions" class="prop-row">
               <label>{{ t('creatorStart.propPerSize') }}</label>
               <button
                 :class="['toggle', { on: perSizeHotspot }]"
@@ -1153,6 +1368,18 @@ async function onFileChange(e: Event) {
       ]"
     />
     </template>
+
+    <!--
+      新規作成モーダルは v-if/v-else チェーンの外に置く。
+      間に挟むと v-if と v-else が直接の兄弟でなくなり Vue コンパイラが落ちるため。
+      モーダルは `:open` で表示制御するので stage に依存せずどちらでもマウントできる。
+    -->
+    <NewThemeStartModal
+      :open="newThemeModalOpen"
+      @confirm="onNewThemeConfirm"
+      @cancel="onNewThemeCancel"
+      @start-empty="onNewThemeStartEmpty"
+    />
   </div>
 </template>
 
@@ -1294,6 +1521,48 @@ async function onFileChange(e: Event) {
   display: flex;
   flex-direction: column;
   gap: 18px;
+}
+
+.advanced-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.advanced-toggle {
+  background: transparent;
+  border: 1px dashed var(--line);
+  color: var(--fg-mute);
+  padding: 6px 10px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 11.5px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  transition: color 160ms ease, border-color 160ms ease;
+}
+.advanced-toggle:hover { color: var(--fg); border-color: var(--accent-line); }
+.advanced-toggle[aria-expanded="true"] { color: var(--accent); border-color: var(--accent-line); }
+.advanced-hint { color: var(--fg-dim); font-family: var(--font-body); font-size: 10.5px; margin-left: 4px; }
+
+.advanced-panel {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(124, 242, 212, 0.02);
+}
+.advanced-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--fg-mute);
+  margin-bottom: 8px;
 }
 
 </style>

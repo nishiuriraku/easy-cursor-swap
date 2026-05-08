@@ -135,6 +135,18 @@ describe('Japanese filename matching', () => {
   it('returns null for irrelevant Japanese words', () => {
     expect(matchAssetToRole('ロゴ.png')).toBeNull()
   })
+
+  it('does not let Arrow steal UpArrow files (alias-length tie-break)', () => {
+    // `右上矢印` は Arrow alias `矢印` と UpArrow alias `上矢印` がどちらも suffix-match で
+    // 0.95 にタイ。alias 長が長い `上矢印` を勝たせる必要がある。
+    expect(matchAssetToRole('右上矢印.cur')?.role).toBe('UpArrow')
+    // `代替選択` は UpArrow に exact 一致するので 1.0 → 即勝ち
+    expect(matchAssetToRole('代替選択.cur')?.role).toBe('UpArrow')
+    // `up_arrow_64.png` は normalize で 'uparrow' になり UpArrow alias 'uparrow' に exact 一致
+    expect(matchAssetToRole('up_arrow_64.png')?.role).toBe('UpArrow')
+    // `Up Arrow.cur` (空白区切り) も同様に exact 一致
+    expect(matchAssetToRole('Up Arrow.cur')?.role).toBe('UpArrow')
+  })
 })
 
 describe('matchAssetWithContext', () => {
