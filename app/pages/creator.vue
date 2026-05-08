@@ -1175,92 +1175,16 @@ async function onFileChange(e: Event) {
           </div>
         </div>
 
-        <!-- 右: プロパティ -->
-        <div class="cpane right">
-          <!-- Hotspot -->
-          <div class="prop-section">
-            <div class="prop-head">
-              {{ t('creator.propsHotspot') }}
-              <span class="tag ok">px</span>
-            </div>
-            <div class="prop-body">
-              <div class="prop-row">
-                <label>{{ t('creatorStart.propHotspotX') }}</label>
-                <input v-model.number="hotspotX" type="number" class="input mono" min="0" />
-              </div>
-              <div class="prop-row">
-                <label>{{ t('creatorStart.propHotspotY') }}</label>
-                <input v-model.number="hotspotY" type="number" class="input mono" min="0" />
-              </div>
-              <div v-if="showAdvancedResolutions" class="prop-row">
-                <label>{{ t('creatorStart.propPerSize') }}</label>
-                <button
-                  :class="['toggle', { on: perSizeHotspot }]"
-                  :aria-pressed="perSizeHotspot"
-                  @click="perSizeHotspot = !perSizeHotspot"
-                >
-                  <span class="knob" />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- アセット -->
-          <div class="prop-section">
-            <div class="prop-head">{{ t('creator.propsAsset') }}</div>
-            <div class="prop-body">
-              <div class="prop-row">
-                <label>{{ t('creatorStart.propAssetFormat') }}</label>
-                <span class="tag">PNG · 24bit · α</span>
-              </div>
-              <div class="prop-row">
-                <label>{{ t('creatorStart.propAssetColor') }}</label>
-                <div class="color-chips">
-                  <span class="cc" style="background: #7cf2d4" />
-                  <span class="cc" style="background: #0a0b0f" />
-                  <span class="cc" style="background: #ffffff" />
-                </div>
-              </div>
-              <div class="prop-row">
-                <label>{{ t('creatorStart.propAssetShadow') }}</label>
-                <button
-                  :class="['toggle', { on: shadowEnabled }]"
-                  :aria-pressed="shadowEnabled"
-                  @click="shadowEnabled = !shadowEnabled"
-                >
-                  <span class="knob" />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Validation -->
-          <div class="prop-section">
-            <div class="prop-head">
-              {{ t('creator.propsValidation') }}
-              <span class="tag ok"><UiIcon name="Check" :size="10" />pass</span>
-            </div>
-            <div class="prop-body validation-body">
-              <div class="vrow">
-                <span>magic-byte</span>
-                <span :class="importedPreviewUrl ? 'ok' : 'dim'">
-                  {{ importedPreviewUrl ? 'OK' : '—' }}
-                </span>
-              </div>
-              <div class="vrow">
-                <span>svg-sanitize</span>
-                <span :class="sanitizedRemovals.length === 0 ? 'ok' : 'warn'">
-                  {{
-                    sanitizedRemovals.length === 0 ? 'clean' : `removed ${sanitizedRemovals.length}`
-                  }}
-                </span>
-              </div>
-              <div class="vrow">
-                <span>resample-strategy</span><span class="dim">{{ resample }}3</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <CreatorPropertiesPane
+          v-model:hotspot-x="hotspotX"
+          v-model:hotspot-y="hotspotY"
+          v-model:per-size-hotspot="perSizeHotspot"
+          v-model:shadow-enabled="shadowEnabled"
+          :show-advanced-resolutions="showAdvancedResolutions"
+          :imported-preview-url="importedPreviewUrl"
+          :sanitized-removals="sanitizedRemovals"
+          :resample="resample"
+        />
       </div>
 
       <BulkImportPreviewModal
