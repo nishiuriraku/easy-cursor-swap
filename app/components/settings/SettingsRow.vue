@@ -32,7 +32,9 @@ defineProps<{
   padding: 12px 0;
   border-bottom: 1px solid var(--line);
 }
-.settings-row:last-child { border-bottom: none; }
+.settings-row:last-child {
+  border-bottom: none;
+}
 .row-label {
   font-size: 13px;
   font-weight: 500;

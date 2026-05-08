@@ -38,11 +38,11 @@ describe('scoreRole', () => {
   })
 
   it('returns 0.90 for prefix match', () => {
-    expect(scoreRole('arrow_decoration.png', 'Arrow')).toBe(0.90)
+    expect(scoreRole('arrow_decoration.png', 'Arrow')).toBe(0.9)
   })
 
   it('returns 0.80 for substring match', () => {
-    expect(scoreRole('my-cursor-arrow-icon.png', 'Arrow')).toBe(0.80)
+    expect(scoreRole('my-cursor-arrow-icon.png', 'Arrow')).toBe(0.8)
   })
 
   it('matches via aliases', () => {
@@ -56,7 +56,7 @@ describe('scoreRole', () => {
 
   it('returns 0.70 for typo with levenshtein distance 1', () => {
     // 'arrov' → alias 'arrow' (1 substitution)
-    expect(scoreRole('arrov.png', 'Arrow')).toBe(0.70)
+    expect(scoreRole('arrov.png', 'Arrow')).toBe(0.7)
   })
 
   it('returns 0 for unrelated names', () => {
@@ -78,7 +78,7 @@ describe('matchAssetToRole', () => {
 describe('resolveCollisions', () => {
   it('picks the highest resolution when scores tie', () => {
     const cands: MatchCandidate[] = [
-      { sourceFile: 'arrow_64.png',  nativeSize: 64,  match: { role: 'Arrow', score: 0.95 } },
+      { sourceFile: 'arrow_64.png', nativeSize: 64, match: { role: 'Arrow', score: 0.95 } },
       { sourceFile: 'arrow_256.png', nativeSize: 256, match: { role: 'Arrow', score: 0.95 } },
     ]
     const { winners, demoted } = resolveCollisions(cands)
@@ -90,8 +90,8 @@ describe('resolveCollisions', () => {
 
   it('picks the higher score over higher resolution', () => {
     const cands: MatchCandidate[] = [
-      { sourceFile: 'arrow.png',       nativeSize: 64,  match: { role: 'Arrow', score: 1.0 } },
-      { sourceFile: 'arrow_decor.png', nativeSize: 256, match: { role: 'Arrow', score: 0.90 } },
+      { sourceFile: 'arrow.png', nativeSize: 64, match: { role: 'Arrow', score: 1.0 } },
+      { sourceFile: 'arrow_decor.png', nativeSize: 256, match: { role: 'Arrow', score: 0.9 } },
     ]
     const { winners } = resolveCollisions(cands)
     expect(winners[0].sourceFile).toBe('arrow.png')

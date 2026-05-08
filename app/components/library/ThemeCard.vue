@@ -43,9 +43,7 @@ function onCardKeydown(e: KeyboardEvent) {
   }
 }
 
-const coveragePct = computed(() =>
-  Math.round((props.theme.includedRoles.length / 17) * 100),
-)
+const coveragePct = computed(() => Math.round((props.theme.includedRoles.length / 17) * 100))
 
 const displayDate = computed(() => {
   // ISO8601 が来たら先頭 10 文字 (YYYY-MM-DD) にトリム
@@ -101,9 +99,11 @@ watch(() => props.theme.id, fetchPreview)
         <button
           v-if="!isSystem"
           :class="['star', { on: theme.isFavorite }]"
-          :aria-label="theme.isFavorite
-            ? t('library.filterFavorites') + 'から削除'
-            : t('library.filterFavorites') + 'に追加'"
+          :aria-label="
+            theme.isFavorite
+              ? t('library.filterFavorites') + 'から削除'
+              : t('library.filterFavorites') + 'に追加'
+          "
           :aria-pressed="theme.isFavorite"
           @click="emit('toggleFavorite', theme.id)"
         >
@@ -125,7 +125,7 @@ watch(() => props.theme.id, fetchPreview)
           class="btn"
           disabled
           :aria-label="`${theme.name} — ${t('common.apply')}済み`"
-          style="opacity: 0.6; cursor: default;"
+          style="opacity: 0.6; cursor: default"
         >
           <UiIcon name="Check" :size="13" aria-hidden="true" />{{ t('common.apply') }}済み
         </button>
@@ -137,11 +137,7 @@ watch(() => props.theme.id, fetchPreview)
         >
           {{ t('common.apply') }}
         </button>
-        <button
-          class="btn icon"
-          :aria-label="`${theme.name} の詳細を開く`"
-          @click="openDetail"
-        >
+        <button class="btn icon" :aria-label="`${theme.name} の詳細を開く`" @click="openDetail">
           <UiIcon name="ChevD" :size="13" aria-hidden="true" />
         </button>
       </div>

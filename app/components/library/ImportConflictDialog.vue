@@ -85,10 +85,24 @@ function onBackdrop(e: MouseEvent) {
 </script>
 
 <template>
-  <div class="modal-page" role="dialog" aria-modal="true" aria-labelledby="conflict-modal-title" @click="onBackdrop">
+  <div
+    class="modal-page"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="conflict-modal-title"
+    @click="onBackdrop"
+  >
     <div class="modal conflict-modal" @click.stop>
       <div class="modal-head">
-        <div class="modal-icon" aria-hidden="true" :style="{ borderColor: `${headerAccent}59`, color: headerAccent, background: `${headerAccent}1f` }">
+        <div
+          class="modal-icon"
+          aria-hidden="true"
+          :style="{
+            borderColor: `${headerAccent}59`,
+            color: headerAccent,
+            background: `${headerAccent}1f`,
+          }"
+        >
           <UiIcon name="Alert" :size="20" />
         </div>
         <div style="flex: 1; min-width: 0">
@@ -110,13 +124,24 @@ function onBackdrop(e: MouseEvent) {
           </div>
 
           <div class="arrow" :style="{ color: headerAccent }">
-            <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 22 22"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
               <path d="M3 11h16M14 5l5 6-5 6" />
             </svg>
           </div>
 
           <div class="col" :style="{ borderColor: headerAccent }">
-            <div class="col-head" :style="{ color: headerAccent }">{{ t('conflict.colImport') }}</div>
+            <div class="col-head" :style="{ color: headerAccent }">
+              {{ t('conflict.colImport') }}
+            </div>
             <div class="diff-name">{{ info.name }}</div>
             <div class="diff-meta">
               <span class="m" :style="{ color: headerAccent }">v{{ info.version }}</span>
@@ -154,7 +179,9 @@ function onBackdrop(e: MouseEvent) {
 </template>
 
 <style scoped>
-.conflict-modal { width: 580px; }
+.conflict-modal {
+  width: 580px;
+}
 
 .diff-grid {
   display: grid;
@@ -191,9 +218,15 @@ function onBackdrop(e: MouseEvent) {
   align-items: center;
   gap: 0;
 }
-.diff-meta .m { padding: 0 8px; }
-.diff-meta .m:first-child { padding-left: 0; }
-.diff-meta .m + .m { border-left: 1px solid var(--line); }
+.diff-meta .m {
+  padding: 0 8px;
+}
+.diff-meta .m:first-child {
+  padding-left: 0;
+}
+.diff-meta .m + .m {
+  border-left: 1px solid var(--line);
+}
 
 .arrow {
   display: grid;
@@ -214,6 +247,11 @@ function onBackdrop(e: MouseEvent) {
   font-size: 11px;
   color: var(--fg-dim);
 }
-.id-label { color: var(--fg-mute); }
-.id-value { color: var(--fg); word-break: break-all; }
+.id-label {
+  color: var(--fg-mute);
+}
+.id-value {
+  color: var(--fg);
+  word-break: break-all;
+}
 </style>

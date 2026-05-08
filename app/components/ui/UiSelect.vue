@@ -181,10 +181,7 @@ function onTriggerKeydown(e: KeyboardEvent) {
 function onDocumentMouseDown(e: MouseEvent) {
   const target = e.target as Node | null
   if (!target) return
-  if (
-    triggerRef.value?.contains(target) ||
-    listboxRef.value?.contains(target)
-  ) {
+  if (triggerRef.value?.contains(target) || listboxRef.value?.contains(target)) {
     return
   }
   close()
@@ -216,7 +213,9 @@ onBeforeUnmount(() => {
       :aria-haspopup="'listbox'"
       :aria-expanded="open"
       :aria-controls="listboxId"
-      :aria-activedescendant="open && highlightedIndex >= 0 ? `${uid}-opt-${highlightedIndex}` : undefined"
+      :aria-activedescendant="
+        open && highlightedIndex >= 0 ? `${uid}-opt-${highlightedIndex}` : undefined
+      "
       :disabled="disabled"
       @click="toggle"
       @keydown="onTriggerKeydown"
@@ -358,11 +357,11 @@ html.light .ui-select-listbox {
   user-select: none;
 }
 .ui-select-item.highlighted {
-  background: rgba(124, 242, 212, 0.10);
+  background: rgba(124, 242, 212, 0.1);
   color: var(--accent);
 }
 html.light .ui-select-item.highlighted {
-  background: rgba(15, 168, 133, 0.10);
+  background: rgba(15, 168, 133, 0.1);
   color: var(--accent);
 }
 .ui-select-item.selected {

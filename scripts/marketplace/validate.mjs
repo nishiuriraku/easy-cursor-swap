@@ -59,15 +59,25 @@ function loadJson(path) {
 }
 
 function isUuid(s) {
-  return typeof s === 'string'
-    && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
+  return (
+    typeof s === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
+  )
 }
 
 function validateSchema(entry) {
   const err = []
   const required = [
-    'id', 'name', 'author', 'author_github', 'author_pubkey_id',
-    'sha256', 'signature', 'download_url', 'version', 'included_roles',
+    'id',
+    'name',
+    'author',
+    'author_github',
+    'author_pubkey_id',
+    'sha256',
+    'signature',
+    'download_url',
+    'version',
+    'included_roles',
   ]
   for (const f of required) {
     if (!(f in entry)) err.push(`missing field: ${f}`)
@@ -79,8 +89,11 @@ function validateSchema(entry) {
   if (entry.included_roles && !Array.isArray(entry.included_roles)) {
     err.push('included_roles must be array')
   }
-  if (entry.included_roles && Array.isArray(entry.included_roles)
-      && !entry.included_roles.includes('Arrow')) {
+  if (
+    entry.included_roles &&
+    Array.isArray(entry.included_roles) &&
+    !entry.included_roles.includes('Arrow')
+  ) {
     err.push('Arrow ロールは必須です')
   }
   return err
@@ -121,8 +134,7 @@ function verifySignature(entry, authorRecord) {
   let pubkeyB64 = null
   if (currentKid === entry.author_pubkey_id) {
     pubkeyB64 = authorRecord.public_key
-  } else if (authorRecord.historical_keys
-      && authorRecord.historical_keys[entry.author_pubkey_id]) {
+  } else if (authorRecord.historical_keys && authorRecord.historical_keys[entry.author_pubkey_id]) {
     pubkeyB64 = authorRecord.historical_keys[entry.author_pubkey_id]
   } else {
     return { ok: false, error: `key_id ${entry.author_pubkey_id} が著者鍵と一致しません` }
@@ -306,7 +318,9 @@ async function main() {
     }
 
     const vtLabel = vtApiKey ? ' [VT✓]' : ''
-    console.log(`  OK: ${entry.name} (${entry.version}) ${pack.size}B sha=${pack.sha.slice(0, 12)}...${vtLabel}`)
+    console.log(
+      `  OK: ${entry.name} (${entry.version}) ${pack.size}B sha=${pack.sha.slice(0, 12)}...${vtLabel}`,
+    )
   }
 
   if (errors > 0) {

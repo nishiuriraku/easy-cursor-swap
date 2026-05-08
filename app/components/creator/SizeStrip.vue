@@ -25,10 +25,7 @@ function tileIconSize(s: number): number {
     <button
       v-for="s in props.sizes"
       :key="s"
-      :class="[
-        'size-tile',
-        { active: s === activeSize, empty: !filledSizes.includes(s) },
-      ]"
+      :class="['size-tile', { active: s === activeSize, empty: !filledSizes.includes(s) }]"
       @click="$emit('select', s)"
     >
       <CursorIcon

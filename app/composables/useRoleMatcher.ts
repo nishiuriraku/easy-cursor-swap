@@ -23,57 +23,99 @@
  *  - toLowerCase は ASCII 大小だけが対象 (日本語には影響しない)
  */
 export function normalize(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/\.[a-z0-9]+$/, '')
-    .replace(/v\d+(\.\d+)*/g, '')
-    .replace(/\d+x\d+/g, '')
-    // サイズサフィックスは 2 桁以上のみ ( `_64`, `_128px` ) を剥がす。
-    // 単一桁を残すことで、日本語ロール識別子の `斜め1` `斜め2` `対角1` 等を保護する
-    .replace(/\d{2,}(?:px)?(?=[._\s\-]|$)/g, '')
-    // ASCII セパレータ + 全角空白 (U+3000) + 中黒 (・) + 全角ハイフン系
-    .replace(/[\s_\-.　・ーｰ‐‑–—]+/g, '')
+  return (
+    name
+      .toLowerCase()
+      .replace(/\.[a-z0-9]+$/, '')
+      .replace(/v\d+(\.\d+)*/g, '')
+      .replace(/\d+x\d+/g, '')
+      // サイズサフィックスは 2 桁以上のみ ( `_64`, `_128px` ) を剥がす。
+      // 単一桁を残すことで、日本語ロール識別子の `斜め1` `斜め2` `対角1` 等を保護する
+      .replace(/\d{2,}(?:px)?(?=[._\s\-]|$)/g, '')
+      // ASCII セパレータ + 全角空白 (U+3000) + 中黒 (・) + 全角ハイフン系
+      .replace(/[\s_\-.　・ーｰ‐‑–—]+/g, '')
+  )
 }
 
 export const ROLE_ALIASES: Record<string, string[]> = {
   // 英語+日本語 (Windows マウスのプロパティ表記 + 略称) を併記。
   // どのエイリアスも `normalize` 後の表現で書く必要がある (空白/区切り無し)。
-  Arrow:       ['arrow', 'pointer', 'normal', 'select', 'default',
-                '通常', '通常の選択', 'ポインター', '矢印'],
-  Help:        ['help', 'helpsel', 'question', 'whatsthis',
-                'ヘルプ', 'ヘルプの選択', '質問'],
-  AppStarting: ['appstarting', 'starting', 'working', 'busy', 'loading',
-                'バックグラウンドで作業中', 'バックグラウンド', '作業中', '読み込み中'],
-  Wait:        ['wait', 'busy', 'spinner', 'hourglass',
-                '待ち状態', '待機', '砂時計', 'ビジー'],
-  Crosshair:   ['crosshair', 'cross', 'precision',
-                '領域の選択', '領域', '十字', '精密'],
+  Arrow: [
+    'arrow',
+    'pointer',
+    'normal',
+    'select',
+    'default',
+    '通常',
+    '通常の選択',
+    'ポインター',
+    '矢印',
+  ],
+  Help: ['help', 'helpsel', 'question', 'whatsthis', 'ヘルプ', 'ヘルプの選択', '質問'],
+  AppStarting: [
+    'appstarting',
+    'starting',
+    'working',
+    'busy',
+    'loading',
+    'バックグラウンドで作業中',
+    'バックグラウンド',
+    '作業中',
+    '読み込み中',
+  ],
+  Wait: ['wait', 'busy', 'spinner', 'hourglass', '待ち状態', '待機', '砂時計', 'ビジー'],
+  Crosshair: ['crosshair', 'cross', 'precision', '領域の選択', '領域', '十字', '精密'],
   // `カーソル` は日本語カーソルファイル名に頻出する汎用語のためエイリアスから除外
   // (例: `手書きカーソル.ani` を IBeam に誤マッチさせない)
-  IBeam:       ['ibeam', 'text', 'caret', 'insert',
-                'テキストの選択', 'テキスト', 'アイビーム'],
-  NWPen:       ['nwpen', 'pen', 'handwriting', 'ink',
-                '手書き', 'ペン', 'インク'],
-  No:          ['no', 'unavailable', 'forbidden', 'block', 'denied',
-                '利用不可', '禁止', '使用不可'],
-  SizeNS:      ['sizens', 'ns', 'verticalresize', 'rowresize', 'updown',
-                '上下に拡大縮小', '上下', '縦', '縦方向'],
-  SizeWE:      ['sizewe', 'we', 'horizontalresize', 'colresize', 'leftright',
-                '左右に拡大縮小', '左右', '横', '横方向'],
-  SizeNWSE:    ['sizenwse', 'nwse', 'diagonalresize1', 'diagresize',
-                '斜めに拡大縮小1', '斜め1', '対角1', '左上右下'],
-  SizeNESW:    ['sizenesw', 'nesw', 'diagonalresize2',
-                '斜めに拡大縮小2', '斜め2', '対角2', '右上左下'],
-  SizeAll:     ['sizeall', 'all', 'move', 'fleur',
-                '移動', '全方向', '全方向に拡大縮小'],
-  UpArrow:     ['uparrow', 'up', 'alternateselect',
-                '代替選択', '代替', '上矢印'],
-  Hand:        ['hand', 'link', 'pointinghand', 'grab', 'finger',
-                'リンクの選択', 'リンク', '手', '指'],
-  Pin:         ['pin', 'location', 'marker',
-                '場所の選択', '場所', 'ピン', 'マーカー'],
-  Person:      ['person', 'user', 'avatar',
-                '人の選択', '人', 'ユーザー', 'アバター'],
+  IBeam: ['ibeam', 'text', 'caret', 'insert', 'テキストの選択', 'テキスト', 'アイビーム'],
+  NWPen: ['nwpen', 'pen', 'handwriting', 'ink', '手書き', 'ペン', 'インク'],
+  No: ['no', 'unavailable', 'forbidden', 'block', 'denied', '利用不可', '禁止', '使用不可'],
+  SizeNS: [
+    'sizens',
+    'ns',
+    'verticalresize',
+    'rowresize',
+    'updown',
+    '上下に拡大縮小',
+    '上下',
+    '縦',
+    '縦方向',
+  ],
+  SizeWE: [
+    'sizewe',
+    'we',
+    'horizontalresize',
+    'colresize',
+    'leftright',
+    '左右に拡大縮小',
+    '左右',
+    '横',
+    '横方向',
+  ],
+  SizeNWSE: [
+    'sizenwse',
+    'nwse',
+    'diagonalresize1',
+    'diagresize',
+    '斜めに拡大縮小1',
+    '斜め1',
+    '対角1',
+    '左上右下',
+  ],
+  SizeNESW: [
+    'sizenesw',
+    'nesw',
+    'diagonalresize2',
+    '斜めに拡大縮小2',
+    '斜め2',
+    '対角2',
+    '右上左下',
+  ],
+  SizeAll: ['sizeall', 'all', 'move', 'fleur', '移動', '全方向', '全方向に拡大縮小'],
+  UpArrow: ['uparrow', 'up', 'alternateselect', '代替選択', '代替', '上矢印'],
+  Hand: ['hand', 'link', 'pointinghand', 'grab', 'finger', 'リンクの選択', 'リンク', '手', '指'],
+  Pin: ['pin', 'location', 'marker', '場所の選択', '場所', 'ピン', 'マーカー'],
+  Person: ['person', 'user', 'avatar', '人の選択', '人', 'ユーザー', 'アバター'],
 }
 
 export const CURSOR_ROLE_IDS = Object.keys(ROLE_ALIASES)
@@ -105,7 +147,7 @@ function levenshtein(a: string, b: string): number {
 function scoreRoleDetailed(
   filename: string,
   roleId: string,
-): { score: number, matchedLen: number } {
+): { score: number; matchedLen: number } {
   const normFile = normalize(filename)
   const aliases = [roleId.toLowerCase(), ...(ROLE_ALIASES[roleId] ?? [])]
 
@@ -115,9 +157,9 @@ function scoreRoleDetailed(
     let s = 0
     if (normFile === alias) s = 1.0
     else if (normFile.endsWith(alias)) s = 0.95
-    else if (normFile.startsWith(alias)) s = 0.90
-    else if (normFile.includes(alias)) s = 0.80
-    else if (alias.length >= 4 && levenshtein(normFile, alias) <= 1) s = 0.70
+    else if (normFile.startsWith(alias)) s = 0.9
+    else if (normFile.includes(alias)) s = 0.8
+    else if (alias.length >= 4 && levenshtein(normFile, alias) <= 1) s = 0.7
     if (s > best || (s === best && alias.length > bestLen)) {
       best = s
       bestLen = alias.length
@@ -146,20 +188,17 @@ export interface MatchCandidate {
 const MATCH_THRESHOLD = 0.7
 
 export function matchAssetToRole(filename: string): RoleMatch | null {
-  let best: { role: string, score: number, matchedLen: number } | null = null
+  let best: { role: string; score: number; matchedLen: number } | null = null
   for (const roleId of CURSOR_ROLE_IDS) {
     const { score, matchedLen } = scoreRoleDetailed(filename, roleId)
     if (score <= 0) continue
     // 同点時はより長い alias を優先 (例: `上矢印` (UpArrow, len=3) > `矢印` (Arrow, len=2))。
     // これによりロール辞書順 (Arrow が先) の偶然で短い alias が勝ってしまうのを防ぐ。
-    const better = !best
-      || score > best.score
-      || (score === best.score && matchedLen > best.matchedLen)
+    const better =
+      !best || score > best.score || (score === best.score && matchedLen > best.matchedLen)
     if (better) best = { role: roleId, score, matchedLen }
   }
-  return best && best.score >= MATCH_THRESHOLD
-    ? { role: best.role, score: best.score }
-    : null
+  return best && best.score >= MATCH_THRESHOLD ? { role: best.role, score: best.score } : null
 }
 
 /**
@@ -172,10 +211,7 @@ export function matchAssetToRole(filename: string): RoleMatch | null {
  * フォルダー由来のヒットは Filename ほど信頼できないので score を 0.85 倍に
  * 落として返す (下限 0.7 = `MATCH_THRESHOLD`)。
  */
-export function matchAssetWithContext(
-  filename: string,
-  sourcePath?: string,
-): RoleMatch | null {
+export function matchAssetWithContext(filename: string, sourcePath?: string): RoleMatch | null {
   const direct = matchAssetToRole(filename)
   if (direct) return direct
   if (!sourcePath) return null
@@ -211,10 +247,7 @@ export function resolveCollisions(candidates: MatchCandidate[]): {
   const winners: MatchCandidate[] = []
   const demoted: MatchCandidate[] = []
   for (const [, group] of byRole) {
-    group.sort((a, b) =>
-      b.match.score - a.match.score ||
-      b.nativeSize - a.nativeSize,
-    )
+    group.sort((a, b) => b.match.score - a.match.score || b.nativeSize - a.nativeSize)
     winners.push(group[0])
     demoted.push(...group.slice(1))
   }

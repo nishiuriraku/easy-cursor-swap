@@ -1,0 +1,24 @@
+# build output
+.output
+.nuxt
+dist
+src-tauri/target
+src-tauri/gen
+
+# generated / external assets
+node_modules
+package-lock.json
+*.lock
+
+# 設計エクスポート (Claude Design からの一括上書き)
+design/
+
+# locale ファイルは整列を維持したいので除外 (i18n parity チェックは別途)
+app/locales/
+
+# テスト fixtures (フィクスチャの整形が壊れないように)
+**/__fixtures__
+
+# Markdown は手動レイアウト維持
+docs/
+README.md

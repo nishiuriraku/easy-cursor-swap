@@ -26,9 +26,7 @@ defineEmits<{
   change: []
 }>()
 
-const coveragePct = computed(
-  () => Math.round((props.theme.includedRoles.length / 17) * 100),
-)
+const coveragePct = computed(() => Math.round((props.theme.includedRoles.length / 17) * 100))
 </script>
 
 <template>
@@ -57,7 +55,14 @@ const coveragePct = computed(
         </button>
       </div>
       <div class="coverage">
-        <div class="bar"><i :style="{ width: coveragePct + '%', background: `linear-gradient(90deg, ${accent}, ${accent}cc)` }" /></div>
+        <div class="bar">
+          <i
+            :style="{
+              width: coveragePct + '%',
+              background: `linear-gradient(90deg, ${accent}, ${accent}cc)`,
+            }"
+          />
+        </div>
         <span class="num">{{ theme.includedRoles.length }}/17</span>
       </div>
     </div>

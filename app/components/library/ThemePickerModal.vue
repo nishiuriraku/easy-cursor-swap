@@ -37,9 +37,7 @@ const filtered = computed(() => {
   const q = query.value.trim().toLowerCase()
   if (!q) return props.themes
   return props.themes.filter(
-    (t) =>
-      t.name.toLowerCase().includes(q) ||
-      (t.author?.toLowerCase().includes(q) ?? false),
+    (t) => t.name.toLowerCase().includes(q) || (t.author?.toLowerCase().includes(q) ?? false),
   )
 })
 
@@ -59,13 +57,21 @@ function onBackdrop(e: MouseEvent) {
 </script>
 
 <template>
-  <div class="modal-page" role="dialog" aria-modal="true" aria-labelledby="picker-modal-title" @click="onBackdrop">
+  <div
+    class="modal-page"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="picker-modal-title"
+    @click="onBackdrop"
+  >
     <div class="modal picker-modal" @click.stop>
       <div class="modal-head">
         <div
           class="modal-icon"
           aria-hidden="true"
-          :style="accent ? { background: `${accent}1f`, borderColor: `${accent}59`, color: accent } : {}"
+          :style="
+            accent ? { background: `${accent}1f`, borderColor: `${accent}59`, color: accent } : {}
+          "
         >
           <UiIcon name="Library" :size="20" />
         </div>
@@ -109,7 +115,9 @@ function onBackdrop(e: MouseEvent) {
             </div>
             <div class="pi-meta">
               <div class="pi-name">{{ t.name }}</div>
-              <div class="pi-sub">@{{ t.author ?? 'unknown' }} · v{{ t.version }} · {{ t.includedRoles.length }}/17</div>
+              <div class="pi-sub">
+                @{{ t.author ?? 'unknown' }} · v{{ t.version }} · {{ t.includedRoles.length }}/17
+              </div>
             </div>
             <UiIcon
               v-if="modelValue === t.id"
@@ -174,7 +182,9 @@ function onBackdrop(e: MouseEvent) {
   border-radius: 8px;
   border: 1px solid transparent;
   cursor: pointer;
-  transition: background 0.12s, border-color 0.12s;
+  transition:
+    background 0.12s,
+    border-color 0.12s;
 }
 .picker-item:hover {
   background: rgba(255, 255, 255, 0.04);

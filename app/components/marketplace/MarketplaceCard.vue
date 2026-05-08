@@ -18,9 +18,7 @@ const emit = defineEmits<{
   install: [id: string]
 }>()
 
-const coveragePct = computed(() =>
-  Math.round((props.entry.includedRoles.length / 17) * 100),
-)
+const coveragePct = computed(() => Math.round((props.entry.includedRoles.length / 17) * 100))
 
 const fmtDownloads = computed(() => props.entry.downloadCount.toLocaleString('ja-JP'))
 </script>

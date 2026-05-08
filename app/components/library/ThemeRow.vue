@@ -33,9 +33,7 @@ const emit = defineEmits<{
  *  (= Arrow / Help / AppStarting / Wait / Crosshair / IBeam / NWPen / No)。 */
 const previewRoles = CURSOR_ROLES.slice(0, 8)
 
-const coveragePct = computed(() =>
-  Math.round((props.theme.includedRoles.length / 17) * 100),
-)
+const coveragePct = computed(() => Math.round((props.theme.includedRoles.length / 17) * 100))
 
 const isSystem = computed(() => props.theme.kind === 'system')
 
@@ -88,9 +86,11 @@ function onDetail() {
       <button
         v-if="!isSystem"
         :class="['star', { on: theme.isFavorite }]"
-        :aria-label="theme.isFavorite
-          ? t('library.filterFavorites') + 'から削除'
-          : t('library.filterFavorites') + 'に追加'"
+        :aria-label="
+          theme.isFavorite
+            ? t('library.filterFavorites') + 'から削除'
+            : t('library.filterFavorites') + 'に追加'
+        "
         :aria-pressed="theme.isFavorite"
         @click="onFav"
       >
@@ -100,18 +100,17 @@ function onDetail() {
 
     <!-- プレビュー (8 セル → 狭幅では Arrow のみ) -->
     <div class="lt-col lt-preview" role="cell">
-      <div class="lt-mini" :aria-label="t('library.coverage', { filled: theme.includedRoles.length })">
+      <div
+        class="lt-mini"
+        :aria-label="t('library.coverage', { filled: theme.includedRoles.length })"
+      >
         <div
           v-for="role in previewRoles"
           :key="role.id"
           :class="['lt-cell', { empty: !theme.includedRoles.includes(role.id) }]"
           :title="role.jp"
         >
-          <CursorIcon
-            v-if="theme.includedRoles.includes(role.id)"
-            :role="role.id"
-            :size="11"
-          />
+          <CursorIcon v-if="theme.includedRoles.includes(role.id)" :role="role.id" :size="11" />
         </div>
       </div>
     </div>
@@ -124,11 +123,7 @@ function onDetail() {
           <span v-if="theme.isActive" class="lt-active-pill">
             <span class="pulse" aria-hidden="true" />{{ t('library.activeTag') }}
           </span>
-          <span
-            v-for="tag in theme.tags ?? []"
-            :key="tag"
-            class="lt-tag"
-          >{{ tag }}</span>
+          <span v-for="tag in theme.tags ?? []" :key="tag" class="lt-tag">{{ tag }}</span>
         </div>
         <div class="lt-author">@{{ theme.author ?? 'unknown' }}</div>
       </div>
@@ -175,7 +170,7 @@ function onDetail() {
         disabled
         aria-disabled="true"
         :aria-label="`${theme.name} — ${applyLabel}`"
-        style="opacity: 0.6; cursor: default; height: 28px;"
+        style="opacity: 0.6; cursor: default; height: 28px"
       >
         <UiIcon name="Check" :size="12" aria-hidden="true" />{{ applyLabel }}
       </button>
@@ -183,7 +178,7 @@ function onDetail() {
         v-else
         class="btn primary"
         :aria-label="`${theme.name} を${t('common.apply')}`"
-        style="height: 28px;"
+        style="height: 28px"
         @click="onApply"
       >
         {{ applyLabel }}
@@ -191,7 +186,7 @@ function onDetail() {
       <button
         class="btn icon"
         :aria-label="`${theme.name} の詳細を開く`"
-        style="height: 28px; width: 28px;"
+        style="height: 28px; width: 28px"
         @click="onDetail"
       >
         <UiIcon name="ChevD" :size="12" aria-hidden="true" />

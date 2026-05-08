@@ -17,10 +17,18 @@ import { invokeTauri } from '~/composables/useTauri'
 import { useKeystore } from '~/composables/useKeystore'
 import { useI18n } from '~/composables/useI18n'
 import { useCreatorAssets, scaleHotspot } from '~/composables/useCreatorAssets'
-import { useBulkImport, type ResolvedAsset, type ParsedCursorpack } from '~/composables/useBulkImport'
+import {
+  useBulkImport,
+  type ResolvedAsset,
+  type ParsedCursorpack,
+} from '~/composables/useBulkImport'
 import BulkImportButton from '~/components/creator/BulkImportButton.vue'
-import BulkImportPreviewModal, { type ApplyPayload } from '~/components/creator/BulkImportPreviewModal.vue'
-import NewThemeStartModal, { type ConfirmPayload as NewThemeConfirm } from '~/components/creator/NewThemeStartModal.vue'
+import BulkImportPreviewModal, {
+  type ApplyPayload,
+} from '~/components/creator/BulkImportPreviewModal.vue'
+import NewThemeStartModal, {
+  type ConfirmPayload as NewThemeConfirm,
+} from '~/components/creator/NewThemeStartModal.vue'
 
 const { t } = useI18n()
 
@@ -72,12 +80,22 @@ useSeoMeta({
  * CreatorStartScreen と編集 UI を切替える。useSeoMeta 設定はファイル冒頭で完結している。
  * ====================================================================================== */
 
-
 // --- ダミーステート (実装は将来の IPC 連携で置換) ---
-const filledRoles = reactive(new Set<string>([
-  'Arrow', 'Help', 'Wait', 'IBeam', 'Hand', 'No', 'Crosshair',
-  'SizeNS', 'SizeWE', 'SizeAll', 'NWPen',
-]))
+const filledRoles = reactive(
+  new Set<string>([
+    'Arrow',
+    'Help',
+    'Wait',
+    'IBeam',
+    'Hand',
+    'No',
+    'Crosshair',
+    'SizeNS',
+    'SizeWE',
+    'SizeAll',
+    'NWPen',
+  ]),
+)
 const partialRoles = new Set<string>(['AppStarting', 'SizeNWSE'])
 
 const activeTab = ref<TabId>('assign')
@@ -118,8 +136,8 @@ const bulkSourceLabel = ref('')
 const existingRolesSet = computed(() => new Set(Object.keys(assigned.value)))
 
 // --- 計算プロパティ ---
-const activeRole = computed<CursorRoleDef>(() =>
-  CURSOR_ROLES.find((r) => r.id === activeRoleId.value) ?? CURSOR_ROLES[0]!,
+const activeRole = computed<CursorRoleDef>(
+  () => CURSOR_ROLES.find((r) => r.id === activeRoleId.value) ?? CURSOR_ROLES[0]!,
 )
 
 function statusOf(id: string): RoleStatus {
@@ -129,15 +147,13 @@ function statusOf(id: string): RoleStatus {
 }
 
 const filledCount = computed(() => filledRoles.size)
-const tabs = computed<Array<{ id: TabId, label: string, count?: string }>>(() => [
+const tabs = computed<Array<{ id: TabId; label: string; count?: string }>>(() => [
   { id: 'assign', label: t('creator.tabAssign'), count: `${filledCount.value}/17` },
   { id: 'metadata', label: t('creator.tabMetadata') },
   { id: 'preview', label: t('creator.tabPreview') },
   { id: 'publish', label: t('creator.tabPublish') },
 ])
-const filledSizes = computed(
-  () => filledSizesByRole.value[activeRoleId.value] ?? [],
-)
+const filledSizes = computed(() => filledSizesByRole.value[activeRoleId.value] ?? [])
 const sizesCovered = computed(() => filledSizes.value.length)
 
 function selectRole(id: string) {
@@ -160,7 +176,7 @@ function onRoleListKeydown(e: KeyboardEvent) {
 
 // 各ロールの primary バイト列から Blob URL を派生し、ロール切替時に正しいプレビューを表示する。
 // ロール毎にキャッシュして、リスト中のロール切替で URL を毎回作り直さない。
-const roleBlobCache = new Map<string, { url: string, ref: Uint8Array }>()
+const roleBlobCache = new Map<string, { url: string; ref: Uint8Array }>()
 function ensureRoleBlobUrl(roleId: string, bytes: Uint8Array): string {
   const cached = roleBlobCache.get(roleId)
   if (cached && cached.ref === bytes) return cached.url
@@ -180,8 +196,8 @@ const activePreviewUrl = computed<string | null>(() => {
 })
 
 /** ホットスポットの基準サイズ。アセットがあればその primarySize、なければ現在の activeSize。 */
-const hotspotReferenceSize = computed(() =>
-  assigned.value[activeRoleId.value]?.primarySize ?? activeSize.value,
+const hotspotReferenceSize = computed(
+  () => assigned.value[activeRoleId.value]?.primarySize ?? activeSize.value,
 )
 
 /** ロールが切り替わったら、そのロールの保存済みホットスポットを反映する。 */
@@ -310,10 +326,12 @@ async function pickAnyAsset() {
     const { open } = await import('@tauri-apps/plugin-dialog')
     const picked = await open({
       multiple: false,
-      filters: [{
-        name: '画像 / カーソル',
-        extensions: ['png', 'svg', 'cur', 'ico'],
-      }],
+      filters: [
+        {
+          name: '画像 / カーソル',
+          extensions: ['png', 'svg', 'cur', 'ico'],
+        },
+      ],
     })
     if (!picked || typeof picked !== 'string') return
     const ext = picked.split('.').pop()?.toLowerCase() ?? ''
@@ -343,11 +361,18 @@ async function pickRasterFromPath(path: string, ext: string) {
     sanitizedRemovals.value = removed
     const png = await rasterizeSvgToPng(sanitized, 256)
     applyImportedRaster(png, 256)
-    importMessage.value = removed.length > 0
-      ? `SVG を sanitize しました (除去: ${removed.length} 件)`
-      : `SVG をインポートしました`
+    importMessage.value =
+      removed.length > 0
+        ? `SVG を sanitize しました (除去: ${removed.length} 件)`
+        : `SVG をインポートしました`
   } else {
-    if (bytes.length < 8 || bytes[0] !== 0x89 || bytes[1] !== 0x50 || bytes[2] !== 0x4e || bytes[3] !== 0x47) {
+    if (
+      bytes.length < 8 ||
+      bytes[0] !== 0x89 ||
+      bytes[1] !== 0x50 ||
+      bytes[2] !== 0x4e ||
+      bytes[3] !== 0x47
+    ) {
       throw new Error('PNG ヘッダーが不正です')
     }
     applyImportedRaster(bytes, 256)
@@ -364,18 +389,16 @@ function applyImportedRaster(png: Uint8Array, primarySize: number) {
   if (importedPreviewUrl.value && importedPreviewUrl.value.startsWith('blob:')) {
     URL.revokeObjectURL(importedPreviewUrl.value)
   }
-  importedPreviewUrl.value = URL.createObjectURL(new Blob([png.slice().buffer], { type: 'image/png' }))
+  importedPreviewUrl.value = URL.createObjectURL(
+    new Blob([png.slice().buffer], { type: 'image/png' }),
+  )
   filledRoles.add(activeRoleId.value)
   const map = filledSizesByRole.value[activeRoleId.value] ?? []
   if (!map.includes(activeSize.value)) {
     filledSizesByRole.value[activeRoleId.value] = [...map, activeSize.value]
   }
   const fromSize = hotspotReferenceSize.value
-  const finalHotspot = scaleHotspot(
-    { x: hotspotX.value, y: hotspotY.value },
-    fromSize,
-    primarySize,
-  )
+  const finalHotspot = scaleHotspot({ x: hotspotX.value, y: hotspotY.value }, fromSize, primarySize)
   setAsset(activeRoleId.value, {
     primary: png,
     primarySize,
@@ -404,7 +427,9 @@ async function pickCursorFromPath(picked: string) {
   if (importedPreviewUrl.value && importedPreviewUrl.value.startsWith('blob:')) {
     URL.revokeObjectURL(importedPreviewUrl.value)
   }
-  importedPreviewUrl.value = URL.createObjectURL(new Blob([png.slice().buffer], { type: 'image/png' }))
+  importedPreviewUrl.value = URL.createObjectURL(
+    new Blob([png.slice().buffer], { type: 'image/png' }),
+  )
 
   filledRoles.add(activeRoleId.value)
   const map = filledSizesByRole.value[activeRoleId.value] ?? []
@@ -714,9 +739,7 @@ function applyBulkImport(payload: ApplyPayload) {
   for (const { roleId, asset } of payload.roleAssets) {
     setAsset(roleId, asset)
     // filledSizesByRole も更新 (UI バッジ用)
-    const sizes = asset.sized
-      ? Array.from(asset.sized.keys())
-      : [asset.primarySize]
+    const sizes = asset.sized ? Array.from(asset.sized.keys()) : [asset.primarySize]
     filledSizesByRole.value = { ...filledSizesByRole.value, [roleId]: sizes }
     filledRoles.add(roleId)
   }
@@ -819,9 +842,10 @@ function onNewThemeConfirm(payload: NewThemeConfirm) {
   newThemeModalOpen.value = false
   stage.value = 'editing'
   const noun = payload.fromCursorFile ? 'カーソルファイル' : '画像'
-  importMessage.value = targetRoles.length === 1
-    ? `${noun}を Arrow ロールに割り当てました`
-    : `${noun}を ${targetRoles.length} 個のロールに割り当てました`
+  importMessage.value =
+    targetRoles.length === 1
+      ? `${noun}を Arrow ロールに割り当てました`
+      : `${noun}を ${targetRoles.length} 個のロールに割り当てました`
 }
 
 /** モーダルから「画像なしで開始」を選んだ場合は従来通りの空エディタに遷移。 */
@@ -866,13 +890,20 @@ async function onFileChange(e: Event) {
       importedPreviewUrl.value = URL.createObjectURL(blob)
       // SVG → 256px PNG にラスタライズして Rust 側ビルダー用に保持
       importedPngBytes.value = await rasterizeSvgToPng(sanitized, 256)
-      importMessage.value = removed.length > 0
-        ? `SVG を sanitize しました (除去: ${removed.length} 件)`
-        : `SVG をインポートしました`
+      importMessage.value =
+        removed.length > 0
+          ? `SVG を sanitize しました (除去: ${removed.length} 件)`
+          : `SVG をインポートしました`
     } else if (ext === 'png') {
       // PNG は magic byte の弱検証のみ (89 50 4E 47)
       const fullBytes = new Uint8Array(await file.arrayBuffer())
-      if (fullBytes.length < 8 || fullBytes[0] !== 0x89 || fullBytes[1] !== 0x50 || fullBytes[2] !== 0x4e || fullBytes[3] !== 0x47) {
+      if (
+        fullBytes.length < 8 ||
+        fullBytes[0] !== 0x89 ||
+        fullBytes[1] !== 0x50 ||
+        fullBytes[2] !== 0x4e ||
+        fullBytes[3] !== 0x47
+      ) {
         throw new Error('PNG ヘッダーが不正です (Magic Byte 不一致)')
       }
       importedPngBytes.value = fullBytes
@@ -896,11 +927,7 @@ async function onFileChange(e: Event) {
     // これにより画像サイズが大きく変わっても見た目のホットスポット位置がずれない。
     if (importedPngBytes.value) {
       const fromSize = hotspotReferenceSize.value
-      const finalHotspot = scaleHotspot(
-        { x: hotspotX.value, y: hotspotY.value },
-        fromSize,
-        256,
-      )
+      const finalHotspot = scaleHotspot({ x: hotspotX.value, y: hotspotY.value }, fromSize, 256)
       setAsset(activeRoleId.value, {
         primary: importedPngBytes.value,
         primarySize: 256,
@@ -928,445 +955,519 @@ async function onFileChange(e: Event) {
       @duplicate-existing="onStartNew"
     />
     <template v-else>
-    <!-- ツールバー -->
-    <div class="toolbar">
-      <div class="bcrumb">
-        <span class="crumb">{{ t('creator.breadcrumb') }}</span>
-        <span class="sep">/</span>
-        <span class="crumb active">
-          {{ metaName || 'Untitled' }}
-          <span class="draft-tag">v{{ metaVersion }} · {{ t('creator.draft') }}</span>
-        </span>
-      </div>
-      <div />
-      <div class="tb-actions">
-        <button
-          class="btn ghost"
-          aria-label="クリアして初期画面に戻る"
-          title="編集中のアセットを破棄して初期画面に戻る"
-          @click="resetCreator"
-        >
-          <UiIcon name="X" :size="13" />クリア
-        </button>
-        <span v-if="hasKeystoreSigning" class="tag ok">
-          <UiIcon name="Shield" :size="11" />{{ t('creator.signedTag') }}
-        </span>
-        <span v-else class="tag" style="color: var(--rose); border-color: rgba(255,107,138,0.3);">
-          <UiIcon name="Alert" :size="11" />{{ t('creator.unsignedTag') }}
-        </span>
-        <button
-          class="btn ghost"
-          :disabled="exportBusy || !arrowAssigned"
-          title=".cursorpack"
-          @click="exportCursorpack({ sign: false })"
-        >
-          <span v-if="exportBusy" class="spinner" style="width: 13px; height: 13px" />
-          <UiIcon v-else name="Export" :size="14" />
-          {{ exportBusy ? t('creator.exportBusy') : t('creator.exportPack') }}
-        </button>
-        <button
-          v-if="hasKeystoreSigning"
-          class="btn primary"
-          :disabled="exportBusy || !arrowAssigned"
-          @click="exportCursorpack({ sign: true })"
-        >
-          <UiIcon name="Shield" :size="14" />{{ t('creator.exportSign') }}
-        </button>
-        <button
-          v-else
-          class="btn primary"
-          :disabled="buildBusy || !importedPngBytes"
-          @click="buildAndSave"
-        >
-          <span v-if="buildBusy" class="spinner" style="width: 13px; height: 13px" />
-          <UiIcon v-else name="Check" :size="14" />
-          {{ buildBusy ? t('creator.buildBusy') : t('creator.buildExport') }}
-        </button>
-      </div>
-    </div>
-
-    <!-- タブバー -->
-    <div class="tabs">
-      <button
-        v-for="t in tabs"
-        :key="t.id"
-        :class="['tab', { active: activeTab === t.id }]"
-        @click="activeTab = t.id"
-      >
-        {{ t.label }}
-        <span v-if="t.count" class="num">{{ t.count }}</span>
-      </button>
-    </div>
-
-    <!-- メタデータタブ -->
-    <div v-if="activeTab === 'metadata'" class="metadata-pane">
-      <div class="metadata-grid">
-        <div class="prop-section">
-          <div class="prop-head">{{ t('creator.metaTitle') }}</div>
-          <div class="prop-body" style="padding: 4px 16px;">
-            <SettingsRow :label="t('creator.metaNameJa')" :desc="t('creator.metaNameJaDesc')">
-              <input v-model="metaName" class="input" style="width: 280px" placeholder="Neon Glow" />
-            </SettingsRow>
-            <SettingsRow :label="t('creator.metaNameEn')" :desc="t('creator.metaNameEnDesc')">
-              <input v-model="metaNameEn" class="input" style="width: 280px" placeholder="Neon Glow" />
-            </SettingsRow>
-            <SettingsRow :label="t('creator.metaAuthor')" :desc="t('creator.metaAuthorDesc')">
-              <input v-model="metaAuthor" class="input" style="width: 280px" placeholder="@username" />
-            </SettingsRow>
-            <SettingsRow :label="t('creator.metaVersion')" :desc="t('creator.metaVersionDesc')">
-              <input v-model="metaVersion" class="input mono" style="width: 140px" placeholder="1.0.0" />
-            </SettingsRow>
-            <SettingsRow :label="t('creator.metaShadow')" :desc="t('creator.metaShadowDesc')">
-              <SettingsToggle v-model="shadowEnabled" />
-            </SettingsRow>
-          </div>
+      <!-- ツールバー -->
+      <div class="toolbar">
+        <div class="bcrumb">
+          <span class="crumb">{{ t('creator.breadcrumb') }}</span>
+          <span class="sep">/</span>
+          <span class="crumb active">
+            {{ metaName || 'Untitled' }}
+            <span class="draft-tag">v{{ metaVersion }} · {{ t('creator.draft') }}</span>
+          </span>
         </div>
-
-        <div class="prop-section">
-          <div class="prop-head">{{ t('creator.metaDescTitle') }}</div>
-          <div class="prop-body" style="padding: 12px 16px;">
-            <textarea
-              v-model="metaDescription"
-              class="input"
-              rows="6"
-              style="width: 100%; font-family: var(--font-body); resize: vertical;"
-              :placeholder="t('creator.metaDescPlaceholder')"
-            />
-          </div>
-        </div>
-
-        <div class="prop-section">
-          <div class="prop-head">{{ t('creator.metaExportStatus') }}</div>
-          <div class="prop-body" style="padding: 4px 16px;">
-            <SettingsRow :label="t('creator.metaAssignedRoles')">
-              <span class="tag" :class="{ ok: arrowAssigned }">{{ assignedRoleCount }} / 17</span>
-            </SettingsRow>
-            <SettingsRow :label="t('creator.metaArrowRequired')">
-              <span class="tag" :class="arrowAssigned ? 'ok' : ''">
-                {{ arrowAssigned ? t('creator.metaAssigned') : t('creator.metaUnassigned') }}
-              </span>
-            </SettingsRow>
-          </div>
-        </div>
-      </div>
-
-      <Transition name="fade">
-        <div v-if="exportMessage" class="import-banner" role="status">
-          <UiIcon :name="exportMessage.startsWith('エクスポート失敗') ? 'Alert' : 'Check'" :size="13" />
-          <span>{{ exportMessage }}</span>
-          <button class="btn ghost" style="margin-left: auto; height: 24px" @click="exportMessage = null">
-            <UiIcon name="X" :size="11" />
+        <div />
+        <div class="tb-actions">
+          <button
+            class="btn ghost"
+            aria-label="クリアして初期画面に戻る"
+            title="編集中のアセットを破棄して初期画面に戻る"
+            @click="resetCreator"
+          >
+            <UiIcon name="X" :size="13" />クリア
+          </button>
+          <span v-if="hasKeystoreSigning" class="tag ok">
+            <UiIcon name="Shield" :size="11" />{{ t('creator.signedTag') }}
+          </span>
+          <span
+            v-else
+            class="tag"
+            style="color: var(--rose); border-color: rgba(255, 107, 138, 0.3)"
+          >
+            <UiIcon name="Alert" :size="11" />{{ t('creator.unsignedTag') }}
+          </span>
+          <button
+            class="btn ghost"
+            :disabled="exportBusy || !arrowAssigned"
+            title=".cursorpack"
+            @click="exportCursorpack({ sign: false })"
+          >
+            <span v-if="exportBusy" class="spinner" style="width: 13px; height: 13px" />
+            <UiIcon v-else name="Export" :size="14" />
+            {{ exportBusy ? t('creator.exportBusy') : t('creator.exportPack') }}
+          </button>
+          <button
+            v-if="hasKeystoreSigning"
+            class="btn primary"
+            :disabled="exportBusy || !arrowAssigned"
+            @click="exportCursorpack({ sign: true })"
+          >
+            <UiIcon name="Shield" :size="14" />{{ t('creator.exportSign') }}
+          </button>
+          <button
+            v-else
+            class="btn primary"
+            :disabled="buildBusy || !importedPngBytes"
+            @click="buildAndSave"
+          >
+            <span v-if="buildBusy" class="spinner" style="width: 13px; height: 13px" />
+            <UiIcon v-else name="Check" :size="14" />
+            {{ buildBusy ? t('creator.buildBusy') : t('creator.buildExport') }}
           </button>
         </div>
-      </Transition>
-
-      <!-- ストリームエクスポート中の進捗バー + キャンセルボタン -->
-      <Transition name="fade">
-        <div
-          v-if="exportProgress && exportProgress.stage !== 'done'"
-          class="export-progress"
-          role="status"
-          aria-live="polite"
-        >
-          <div class="export-progress-row">
-            <span class="export-progress-label">
-              <template v-if="exportProgress.stage === 'role'">
-                {{ exportProgress.message ?? '' }} ({{ exportProgress.current }}/{{ exportProgress.total }})
-              </template>
-              <template v-else-if="exportProgress.stage === 'sign'">{{ t('creatorStart.exportStageSign') }}</template>
-              <template v-else-if="exportProgress.stage === 'package'">{{ t('creatorStart.exportStagePackage') }}</template>
-              <template v-else-if="exportProgress.stage === 'cancelled'">{{ t('creatorStart.exportStageCancelled') }}</template>
-              <template v-else>{{ t('creatorStart.exportStageWorking') }}</template>
-            </span>
-            <button
-              v-if="exportBusy && exportProgress.stage !== 'cancelled'"
-              class="btn ghost"
-              style="height: 24px; margin-left: auto"
-              @click="cancelExport"
-            >
-              <UiIcon name="X" :size="11" />キャンセル
-            </button>
-          </div>
-          <div class="export-progress-bar">
-            <div
-              class="export-progress-fill"
-              :style="{
-                width: exportProgress.total > 0
-                  ? `${(exportProgress.current / exportProgress.total) * 100}%`
-                  : '0%',
-              }"
-            />
-          </div>
-        </div>
-      </Transition>
-    </div>
-
-    <!-- 3 カラムグリッド (assign タブのみ) -->
-    <div v-if="activeTab === 'assign'" class="creator-grid">
-      <!-- 左: 役割リスト -->
-      <div class="cpane left">
-        <div class="pane-head">
-          <h6>{{ t('creator.rolesPaneTitle') }}</h6>
-          <span class="tag">{{ filledCount }} / 17</span>
-        </div>
-        <div class="role-list" role="listbox" :aria-label="t('creator.rolesPaneTitle')" @keydown="onRoleListKeydown">
-          <RoleListItem
-            v-for="(role, i) in CURSOR_ROLES"
-            :key="role.id"
-            :role="role"
-            :index="i"
-            :status="statusOf(role.id)"
-            :active="activeRoleId === role.id"
-            @select="selectRole"
-          />
-        </div>
       </div>
 
-      <!-- 中央: エディタ -->
-      <div class="editor">
-        <div class="editor-head">
-          <div>
-            <h2>
-              {{ activeRole.jp }}
-              <span class="role-key">{{ activeRole.id }}</span>
-            </h2>
-            <div class="desc">
-              <template v-if="isRequired(activeRole.id)">
-                {{ t('creator.requiredRoleNote', { required: '' }).split('{required}')[0] }}<b style="color: var(--accent)">{{ t('creator.requiredMark') }}</b>{{ t('creator.requiredRoleNote', { required: '' }).split('{required}')[1] }}
-              </template>
-              <template v-else>
-                {{ t('creator.optionalRoleNote', { en: activeRole.en }) }}
-              </template>
+      <!-- タブバー -->
+      <div class="tabs">
+        <button
+          v-for="t in tabs"
+          :key="t.id"
+          :class="['tab', { active: activeTab === t.id }]"
+          @click="activeTab = t.id"
+        >
+          {{ t.label }}
+          <span v-if="t.count" class="num">{{ t.count }}</span>
+        </button>
+      </div>
+
+      <!-- メタデータタブ -->
+      <div v-if="activeTab === 'metadata'" class="metadata-pane">
+        <div class="metadata-grid">
+          <div class="prop-section">
+            <div class="prop-head">{{ t('creator.metaTitle') }}</div>
+            <div class="prop-body" style="padding: 4px 16px">
+              <SettingsRow :label="t('creator.metaNameJa')" :desc="t('creator.metaNameJaDesc')">
+                <input
+                  v-model="metaName"
+                  class="input"
+                  style="width: 280px"
+                  placeholder="Neon Glow"
+                />
+              </SettingsRow>
+              <SettingsRow :label="t('creator.metaNameEn')" :desc="t('creator.metaNameEnDesc')">
+                <input
+                  v-model="metaNameEn"
+                  class="input"
+                  style="width: 280px"
+                  placeholder="Neon Glow"
+                />
+              </SettingsRow>
+              <SettingsRow :label="t('creator.metaAuthor')" :desc="t('creator.metaAuthorDesc')">
+                <input
+                  v-model="metaAuthor"
+                  class="input"
+                  style="width: 280px"
+                  placeholder="@username"
+                />
+              </SettingsRow>
+              <SettingsRow :label="t('creator.metaVersion')" :desc="t('creator.metaVersionDesc')">
+                <input
+                  v-model="metaVersion"
+                  class="input mono"
+                  style="width: 140px"
+                  placeholder="1.0.0"
+                />
+              </SettingsRow>
+              <SettingsRow :label="t('creator.metaShadow')" :desc="t('creator.metaShadowDesc')">
+                <SettingsToggle v-model="shadowEnabled" />
+              </SettingsRow>
             </div>
           </div>
-          <div style="display: flex; gap: 6px">
-            <button class="btn ghost" :disabled="importBusy" @click="pickAnyAsset">
-              <span v-if="importBusy" class="spinner" style="width: 13px; height: 13px" />
-              <UiIcon v-else name="Import" :size="13" />{{ t('creator.addAsset') }}
-            </button>
-            <BulkImportButton
-              @bulk-files="handleBulkFiles"
-              @bulk-folder="handleBulkFolder"
-              @bulk-cursorpack="handleBulkCursorpack"
-            />
-            <input
-              ref="fileInput"
-              type="file"
-              accept=".png,.svg,image/png,image/svg+xml"
-              hidden
-              @change="onFileChange"
-            >
+
+          <div class="prop-section">
+            <div class="prop-head">{{ t('creator.metaDescTitle') }}</div>
+            <div class="prop-body" style="padding: 12px 16px">
+              <textarea
+                v-model="metaDescription"
+                class="input"
+                rows="6"
+                style="width: 100%; font-family: var(--font-body); resize: vertical"
+                :placeholder="t('creator.metaDescPlaceholder')"
+              />
+            </div>
+          </div>
+
+          <div class="prop-section">
+            <div class="prop-head">{{ t('creator.metaExportStatus') }}</div>
+            <div class="prop-body" style="padding: 4px 16px">
+              <SettingsRow :label="t('creator.metaAssignedRoles')">
+                <span class="tag" :class="{ ok: arrowAssigned }">{{ assignedRoleCount }} / 17</span>
+              </SettingsRow>
+              <SettingsRow :label="t('creator.metaArrowRequired')">
+                <span class="tag" :class="arrowAssigned ? 'ok' : ''">
+                  {{ arrowAssigned ? t('creator.metaAssigned') : t('creator.metaUnassigned') }}
+                </span>
+              </SettingsRow>
+            </div>
           </div>
         </div>
 
-        <!-- インポート結果メッセージ -->
         <Transition name="fade">
-          <div v-if="importMessage" class="import-banner" role="status">
-            <UiIcon :name="importMessage.startsWith('失敗') ? 'Alert' : 'Check'" :size="13" />
-            <span>{{ importMessage }}</span>
-            <button class="btn ghost" style="margin-left: auto; height: 24px" @click="importMessage = null">
-              <UiIcon name="X" :size="11" />
-            </button>
-          </div>
-        </Transition>
-
-        <!-- ビルド結果メッセージ -->
-        <Transition name="fade">
-          <div v-if="buildMessage" class="import-banner" role="status">
-            <UiIcon :name="buildMessage.startsWith('ビルド失敗') ? 'Alert' : 'Check'" :size="13" />
-            <span>{{ buildMessage }}</span>
-            <button class="btn ghost" style="margin-left: auto; height: 24px" @click="buildMessage = null">
-              <UiIcon name="X" :size="11" />
-            </button>
-          </div>
-        </Transition>
-
-        <div class="canvas-area">
-          <div class="canvas-stage">
-            <!-- ビッグプレビュー (ホットスポット ドラッグ対応) -->
-            <div
-              ref="bigpreviewEl"
-              :class="['bigpreview', { dragging: hotspotDragging }]"
-              :title="t('creator.hotspotHint')"
-              @pointerdown="onHotspotPointerDown"
-              @pointermove="onHotspotPointerMove"
-              @pointerup="onHotspotPointerUp"
-              @pointercancel="onHotspotPointerUp"
+          <div v-if="exportMessage" class="import-banner" role="status">
+            <UiIcon
+              :name="exportMessage.startsWith('エクスポート失敗') ? 'Alert' : 'Check'"
+              :size="13"
+            />
+            <span>{{ exportMessage }}</span>
+            <button
+              class="btn ghost"
+              style="margin-left: auto; height: 24px"
+              @click="exportMessage = null"
             >
-              <div class="crosshair-h" />
-              <div class="crosshair-v" />
-              <img
-                v-if="activePreviewUrl"
-                :src="activePreviewUrl"
-                :alt="activeRole.jp"
-                draggable="false"
-                style="max-width: 90%; max-height: 90%; image-rendering: pixelated; pointer-events: none;"
+              <UiIcon name="X" :size="11" />
+            </button>
+          </div>
+        </Transition>
+
+        <!-- ストリームエクスポート中の進捗バー + キャンセルボタン -->
+        <Transition name="fade">
+          <div
+            v-if="exportProgress && exportProgress.stage !== 'done'"
+            class="export-progress"
+            role="status"
+            aria-live="polite"
+          >
+            <div class="export-progress-row">
+              <span class="export-progress-label">
+                <template v-if="exportProgress.stage === 'role'">
+                  {{ exportProgress.message ?? '' }} ({{ exportProgress.current }}/{{
+                    exportProgress.total
+                  }})
+                </template>
+                <template v-else-if="exportProgress.stage === 'sign'">{{
+                  t('creatorStart.exportStageSign')
+                }}</template>
+                <template v-else-if="exportProgress.stage === 'package'">{{
+                  t('creatorStart.exportStagePackage')
+                }}</template>
+                <template v-else-if="exportProgress.stage === 'cancelled'">{{
+                  t('creatorStart.exportStageCancelled')
+                }}</template>
+                <template v-else>{{ t('creatorStart.exportStageWorking') }}</template>
+              </span>
+              <button
+                v-if="exportBusy && exportProgress.stage !== 'cancelled'"
+                class="btn ghost"
+                style="height: 24px; margin-left: auto"
+                @click="cancelExport"
               >
-              <CursorIcon
-                v-else
-                :role="activeRole.id"
-                :size="90"
-                style="color: var(--fg); pointer-events: none;"
-              />
+                <UiIcon name="X" :size="11" />キャンセル
+              </button>
+            </div>
+            <div class="export-progress-bar">
               <div
-                class="hot"
+                class="export-progress-fill"
                 :style="{
-                  left: (hotspotX / hotspotReferenceSize) * 100 + '%',
-                  top: (hotspotY / hotspotReferenceSize) * 100 + '%',
+                  width:
+                    exportProgress.total > 0
+                      ? `${(exportProgress.current / exportProgress.total) * 100}%`
+                      : '0%',
                 }"
               />
-              <div class="preview-meta tl">{{ activeSize }} × {{ activeSize }}</div>
-              <div class="preview-meta tr">hotspot {{ hotspotX }},{{ hotspotY }}</div>
             </div>
+          </div>
+        </Transition>
+      </div>
 
-            <!-- 詳細設定トグル: 解像度別ワークフローを ON/OFF -->
-            <div class="advanced-toggle-row">
-              <button
-                class="advanced-toggle"
-                :aria-expanded="showAdvancedResolutions"
-                @click="showAdvancedResolutions = !showAdvancedResolutions"
-              >
-                <UiIcon name="ChevD" :size="11" :style="{ transform: showAdvancedResolutions ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 160ms' }" />
-                {{ t('creator.advancedSection') }}
-                <span class="advanced-hint">{{ t('creator.advancedHint') }}</span>
+      <!-- 3 カラムグリッド (assign タブのみ) -->
+      <div v-if="activeTab === 'assign'" class="creator-grid">
+        <!-- 左: 役割リスト -->
+        <div class="cpane left">
+          <div class="pane-head">
+            <h6>{{ t('creator.rolesPaneTitle') }}</h6>
+            <span class="tag">{{ filledCount }} / 17</span>
+          </div>
+          <div
+            class="role-list"
+            role="listbox"
+            :aria-label="t('creator.rolesPaneTitle')"
+            @keydown="onRoleListKeydown"
+          >
+            <RoleListItem
+              v-for="(role, i) in CURSOR_ROLES"
+              :key="role.id"
+              :role="role"
+              :index="i"
+              :status="statusOf(role.id)"
+              :active="activeRoleId === role.id"
+              @select="selectRole"
+            />
+          </div>
+        </div>
+
+        <!-- 中央: エディタ -->
+        <div class="editor">
+          <div class="editor-head">
+            <div>
+              <h2>
+                {{ activeRole.jp }}
+                <span class="role-key">{{ activeRole.id }}</span>
+              </h2>
+              <div class="desc">
+                <template v-if="isRequired(activeRole.id)">
+                  {{ t('creator.requiredRoleNote', { required: '' }).split('{required}')[0]
+                  }}<b style="color: var(--accent)">{{ t('creator.requiredMark') }}</b
+                  >{{ t('creator.requiredRoleNote', { required: '' }).split('{required}')[1] }}
+                </template>
+                <template v-else>
+                  {{ t('creator.optionalRoleNote', { en: activeRole.en }) }}
+                </template>
+              </div>
+            </div>
+            <div style="display: flex; gap: 6px">
+              <button class="btn ghost" :disabled="importBusy" @click="pickAnyAsset">
+                <span v-if="importBusy" class="spinner" style="width: 13px; height: 13px" />
+                <UiIcon v-else name="Import" :size="13" />{{ t('creator.addAsset') }}
               </button>
+              <BulkImportButton
+                @bulk-files="handleBulkFiles"
+                @bulk-folder="handleBulkFolder"
+                @bulk-cursorpack="handleBulkCursorpack"
+              />
+              <input
+                ref="fileInput"
+                type="file"
+                accept=".png,.svg,image/png,image/svg+xml"
+                hidden
+                @change="onFileChange"
+              />
+            </div>
+          </div>
 
-              <!-- リサンプル切替 (基本フローでも見せておく) -->
-              <div class="resample-row">
-                <span>RESAMPLE</span>
-                <div class="btn-group">
-                  <button
-                    v-for="mode in (['lanczos', 'nearest', 'auto'] as ResampleMode[])"
-                    :key="mode"
-                    :class="['btn', { active: resample === mode }]"
-                    style="height: 26px; font-size: 11px"
-                    @click="resample = mode"
-                  >
-                    {{ mode === 'lanczos' ? 'Lanczos' : mode === 'nearest' ? 'Nearest' : 'Auto' }}
-                  </button>
+          <!-- インポート結果メッセージ -->
+          <Transition name="fade">
+            <div v-if="importMessage" class="import-banner" role="status">
+              <UiIcon :name="importMessage.startsWith('失敗') ? 'Alert' : 'Check'" :size="13" />
+              <span>{{ importMessage }}</span>
+              <button
+                class="btn ghost"
+                style="margin-left: auto; height: 24px"
+                @click="importMessage = null"
+              >
+                <UiIcon name="X" :size="11" />
+              </button>
+            </div>
+          </Transition>
+
+          <!-- ビルド結果メッセージ -->
+          <Transition name="fade">
+            <div v-if="buildMessage" class="import-banner" role="status">
+              <UiIcon
+                :name="buildMessage.startsWith('ビルド失敗') ? 'Alert' : 'Check'"
+                :size="13"
+              />
+              <span>{{ buildMessage }}</span>
+              <button
+                class="btn ghost"
+                style="margin-left: auto; height: 24px"
+                @click="buildMessage = null"
+              >
+                <UiIcon name="X" :size="11" />
+              </button>
+            </div>
+          </Transition>
+
+          <div class="canvas-area">
+            <div class="canvas-stage">
+              <!-- ビッグプレビュー (ホットスポット ドラッグ対応) -->
+              <div
+                ref="bigpreviewEl"
+                :class="['bigpreview', { dragging: hotspotDragging }]"
+                :title="t('creator.hotspotHint')"
+                @pointerdown="onHotspotPointerDown"
+                @pointermove="onHotspotPointerMove"
+                @pointerup="onHotspotPointerUp"
+                @pointercancel="onHotspotPointerUp"
+              >
+                <div class="crosshair-h" />
+                <div class="crosshair-v" />
+                <img
+                  v-if="activePreviewUrl"
+                  :src="activePreviewUrl"
+                  :alt="activeRole.jp"
+                  draggable="false"
+                  style="
+                    max-width: 90%;
+                    max-height: 90%;
+                    image-rendering: pixelated;
+                    pointer-events: none;
+                  "
+                />
+                <CursorIcon
+                  v-else
+                  :role="activeRole.id"
+                  :size="90"
+                  style="color: var(--fg); pointer-events: none"
+                />
+                <div
+                  class="hot"
+                  :style="{
+                    left: (hotspotX / hotspotReferenceSize) * 100 + '%',
+                    top: (hotspotY / hotspotReferenceSize) * 100 + '%',
+                  }"
+                />
+                <div class="preview-meta tl">{{ activeSize }} × {{ activeSize }}</div>
+                <div class="preview-meta tr">hotspot {{ hotspotX }},{{ hotspotY }}</div>
+              </div>
+
+              <!-- 詳細設定トグル: 解像度別ワークフローを ON/OFF -->
+              <div class="advanced-toggle-row">
+                <button
+                  class="advanced-toggle"
+                  :aria-expanded="showAdvancedResolutions"
+                  @click="showAdvancedResolutions = !showAdvancedResolutions"
+                >
+                  <UiIcon
+                    name="ChevD"
+                    :size="11"
+                    :style="{
+                      transform: showAdvancedResolutions ? 'rotate(0deg)' : 'rotate(-90deg)',
+                      transition: 'transform 160ms',
+                    }"
+                  />
+                  {{ t('creator.advancedSection') }}
+                  <span class="advanced-hint">{{ t('creator.advancedHint') }}</span>
+                </button>
+
+                <!-- リサンプル切替 (基本フローでも見せておく) -->
+                <div class="resample-row">
+                  <span>RESAMPLE</span>
+                  <div class="btn-group">
+                    <button
+                      v-for="mode in ['lanczos', 'nearest', 'auto'] as ResampleMode[]"
+                      :key="mode"
+                      :class="['btn', { active: resample === mode }]"
+                      style="height: 26px; font-size: 11px"
+                      @click="resample = mode"
+                    >
+                      {{ mode === 'lanczos' ? 'Lanczos' : mode === 'nearest' ? 'Nearest' : 'Auto' }}
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <!-- 詳細設定: 解像度別の上書きワークフロー -->
-            <Transition name="fade">
-              <div v-if="showAdvancedResolutions" class="advanced-panel">
-                <div class="advanced-label">{{ t('creator.perResolutionLabel') }}</div>
-                <SizeStrip
-                  :sizes="[...SIZES]"
-                  :filled-sizes="filledSizes"
-                  :active-size="activeSize"
-                  :role="activeRole.id"
-                  @select="selectSize"
-                />
+              <!-- 詳細設定: 解像度別の上書きワークフロー -->
+              <Transition name="fade">
+                <div v-if="showAdvancedResolutions" class="advanced-panel">
+                  <div class="advanced-label">{{ t('creator.perResolutionLabel') }}</div>
+                  <SizeStrip
+                    :sizes="[...SIZES]"
+                    :filled-sizes="filledSizes"
+                    :active-size="activeSize"
+                    :role="activeRole.id"
+                    @select="selectSize"
+                  />
+                </div>
+              </Transition>
+            </div>
+          </div>
+        </div>
+
+        <!-- 右: プロパティ -->
+        <div class="cpane right">
+          <!-- Hotspot -->
+          <div class="prop-section">
+            <div class="prop-head">
+              {{ t('creator.propsHotspot') }}
+              <span class="tag ok">px</span>
+            </div>
+            <div class="prop-body">
+              <div class="prop-row">
+                <label>{{ t('creatorStart.propHotspotX') }}</label>
+                <input v-model.number="hotspotX" type="number" class="input mono" min="0" />
               </div>
-            </Transition>
+              <div class="prop-row">
+                <label>{{ t('creatorStart.propHotspotY') }}</label>
+                <input v-model.number="hotspotY" type="number" class="input mono" min="0" />
+              </div>
+              <div v-if="showAdvancedResolutions" class="prop-row">
+                <label>{{ t('creatorStart.propPerSize') }}</label>
+                <button
+                  :class="['toggle', { on: perSizeHotspot }]"
+                  :aria-pressed="perSizeHotspot"
+                  @click="perSizeHotspot = !perSizeHotspot"
+                >
+                  <span class="knob" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- アセット -->
+          <div class="prop-section">
+            <div class="prop-head">{{ t('creator.propsAsset') }}</div>
+            <div class="prop-body">
+              <div class="prop-row">
+                <label>{{ t('creatorStart.propAssetFormat') }}</label>
+                <span class="tag">PNG · 24bit · α</span>
+              </div>
+              <div class="prop-row">
+                <label>{{ t('creatorStart.propAssetColor') }}</label>
+                <div class="color-chips">
+                  <span class="cc" style="background: #7cf2d4" />
+                  <span class="cc" style="background: #0a0b0f" />
+                  <span class="cc" style="background: #ffffff" />
+                </div>
+              </div>
+              <div class="prop-row">
+                <label>{{ t('creatorStart.propAssetShadow') }}</label>
+                <button
+                  :class="['toggle', { on: shadowEnabled }]"
+                  :aria-pressed="shadowEnabled"
+                  @click="shadowEnabled = !shadowEnabled"
+                >
+                  <span class="knob" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Validation -->
+          <div class="prop-section">
+            <div class="prop-head">
+              {{ t('creator.propsValidation') }}
+              <span class="tag ok"><UiIcon name="Check" :size="10" />pass</span>
+            </div>
+            <div class="prop-body validation-body">
+              <div class="vrow">
+                <span>magic-byte</span>
+                <span :class="importedPreviewUrl ? 'ok' : 'dim'">
+                  {{ importedPreviewUrl ? 'OK' : '—' }}
+                </span>
+              </div>
+              <div class="vrow">
+                <span>svg-sanitize</span>
+                <span :class="sanitizedRemovals.length === 0 ? 'ok' : 'warn'">
+                  {{
+                    sanitizedRemovals.length === 0 ? 'clean' : `removed ${sanitizedRemovals.length}`
+                  }}
+                </span>
+              </div>
+              <div class="vrow">
+                <span>resample-strategy</span><span class="dim">{{ resample }}3</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- 右: プロパティ -->
-      <div class="cpane right">
-        <!-- Hotspot -->
-        <div class="prop-section">
-          <div class="prop-head">
-            {{ t('creator.propsHotspot') }}
-            <span class="tag ok">px</span>
-          </div>
-          <div class="prop-body">
-            <div class="prop-row">
-              <label>{{ t('creatorStart.propHotspotX') }}</label>
-              <input v-model.number="hotspotX" type="number" class="input mono" min="0" />
-            </div>
-            <div class="prop-row">
-              <label>{{ t('creatorStart.propHotspotY') }}</label>
-              <input v-model.number="hotspotY" type="number" class="input mono" min="0" />
-            </div>
-            <div v-if="showAdvancedResolutions" class="prop-row">
-              <label>{{ t('creatorStart.propPerSize') }}</label>
-              <button
-                :class="['toggle', { on: perSizeHotspot }]"
-                :aria-pressed="perSizeHotspot"
-                @click="perSizeHotspot = !perSizeHotspot"
-              >
-                <span class="knob" />
-              </button>
-            </div>
-          </div>
-        </div>
+      <BulkImportPreviewModal
+        :open="bulkModalOpen"
+        :resolved="bulkResolved"
+        :cursorpack="bulkCursorpack"
+        :existing-roles="existingRolesSet"
+        :source-label="bulkSourceLabel"
+        @apply="applyBulkImport"
+        @cancel="cancelBulkImport"
+      />
 
-        <!-- アセット -->
-        <div class="prop-section">
-          <div class="prop-head">{{ t('creator.propsAsset') }}</div>
-          <div class="prop-body">
-            <div class="prop-row">
-              <label>{{ t('creatorStart.propAssetFormat') }}</label>
-              <span class="tag">PNG · 24bit · α</span>
-            </div>
-            <div class="prop-row">
-              <label>{{ t('creatorStart.propAssetColor') }}</label>
-              <div class="color-chips">
-                <span class="cc" style="background: #7cf2d4" />
-                <span class="cc" style="background: #0a0b0f" />
-                <span class="cc" style="background: #ffffff" />
-              </div>
-            </div>
-            <div class="prop-row">
-              <label>{{ t('creatorStart.propAssetShadow') }}</label>
-              <button
-                :class="['toggle', { on: shadowEnabled }]"
-                :aria-pressed="shadowEnabled"
-                @click="shadowEnabled = !shadowEnabled"
-              >
-                <span class="knob" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Validation -->
-        <div class="prop-section">
-          <div class="prop-head">
-            {{ t('creator.propsValidation') }}
-            <span class="tag ok"><UiIcon name="Check" :size="10" />pass</span>
-          </div>
-          <div class="prop-body validation-body">
-            <div class="vrow">
-              <span>magic-byte</span>
-              <span :class="importedPreviewUrl ? 'ok' : 'dim'">
-                {{ importedPreviewUrl ? 'OK' : '—' }}
-              </span>
-            </div>
-            <div class="vrow">
-              <span>svg-sanitize</span>
-              <span :class="sanitizedRemovals.length === 0 ? 'ok' : 'warn'">
-                {{ sanitizedRemovals.length === 0 ? 'clean' : `removed ${sanitizedRemovals.length}` }}
-              </span>
-            </div>
-            <div class="vrow"><span>resample-strategy</span><span class="dim">{{ resample }}3</span></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <BulkImportPreviewModal
-      :open="bulkModalOpen"
-      :resolved="bulkResolved"
-      :cursorpack="bulkCursorpack"
-      :existing-roles="existingRolesSet"
-      :source-label="bulkSourceLabel"
-      @apply="applyBulkImport"
-      @cancel="cancelBulkImport"
-    />
-
-    <AppStatusbar
-      :items="[
-        { dot: true, text: '編集中: ' + (metaName || 'Untitled') },
-        { text: `${filledCount}/17 役割 · ${sizesCovered}/6 解像度` },
-        { text: '未保存の変更 3件' },
-        { text: 'WebView2 132.0.2957' },
-      ]"
-    />
+      <AppStatusbar
+        :items="[
+          { dot: true, text: '編集中: ' + (metaName || 'Untitled') },
+          { text: `${filledCount}/17 役割 · ${sizesCovered}/6 解像度` },
+          { text: '未保存の変更 3件' },
+          { text: 'WebView2 132.0.2957' },
+        ]"
+      />
     </template>
 
     <!--
@@ -1428,8 +1529,14 @@ async function onFileChange(e: Event) {
   font-family: var(--font-mono);
   font-size: 10px;
 }
-.preview-meta.tl { left: 12px; color: var(--fg-mute); }
-.preview-meta.tr { right: 12px; color: var(--accent); }
+.preview-meta.tl {
+  left: 12px;
+  color: var(--fg-mute);
+}
+.preview-meta.tr {
+  right: 12px;
+  color: var(--accent);
+}
 
 .resample-row {
   display: flex;
@@ -1462,9 +1569,15 @@ async function onFileChange(e: Event) {
   display: flex;
   justify-content: space-between;
 }
-.vrow .ok { color: var(--accent); }
-.vrow .warn { color: var(--amber); }
-.vrow .dim { color: var(--fg-dim); }
+.vrow .ok {
+  color: var(--accent);
+}
+.vrow .warn {
+  color: var(--amber);
+}
+.vrow .dim {
+  color: var(--fg-dim);
+}
 
 .import-banner {
   display: flex;
@@ -1543,11 +1656,24 @@ async function onFileChange(e: Event) {
   font-size: 11.5px;
   font-family: var(--font-mono);
   letter-spacing: 0.04em;
-  transition: color 160ms ease, border-color 160ms ease;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease;
 }
-.advanced-toggle:hover { color: var(--fg); border-color: var(--accent-line); }
-.advanced-toggle[aria-expanded="true"] { color: var(--accent); border-color: var(--accent-line); }
-.advanced-hint { color: var(--fg-dim); font-family: var(--font-body); font-size: 10.5px; margin-left: 4px; }
+.advanced-toggle:hover {
+  color: var(--fg);
+  border-color: var(--accent-line);
+}
+.advanced-toggle[aria-expanded='true'] {
+  color: var(--accent);
+  border-color: var(--accent-line);
+}
+.advanced-hint {
+  color: var(--fg-dim);
+  font-family: var(--font-body);
+  font-size: 10.5px;
+  margin-left: 4px;
+}
 
 .advanced-panel {
   margin-top: 8px;
@@ -1564,5 +1690,4 @@ async function onFileChange(e: Event) {
   color: var(--fg-mute);
   margin-bottom: 8px;
 }
-
 </style>

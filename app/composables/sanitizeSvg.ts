@@ -9,21 +9,44 @@
  */
 
 const ALLOWED_TAGS = new Set([
-  'svg', 'g', 'path', 'circle', 'rect', 'ellipse', 'polygon', 'polyline',
-  'line', 'defs', 'linearGradient', 'radialGradient', 'stop', 'clipPath',
-  'mask', 'use', 'title', 'desc', 'metadata', 'style',
+  'svg',
+  'g',
+  'path',
+  'circle',
+  'rect',
+  'ellipse',
+  'polygon',
+  'polyline',
+  'line',
+  'defs',
+  'linearGradient',
+  'radialGradient',
+  'stop',
+  'clipPath',
+  'mask',
+  'use',
+  'title',
+  'desc',
+  'metadata',
+  'style',
 ])
 
 /** 外部 URL を運ぶ可能性がある属性は完全に除去 */
-const FORBIDDEN_ATTRS = new Set([
-  'href', 'xlink:href', 'src', 'srcset',
-])
+const FORBIDDEN_ATTRS = new Set(['href', 'xlink:href', 'src', 'srcset'])
 
 const FORBIDDEN_ATTR_PREFIXES = ['on'] // onload, onclick, etc.
 
 const FORBIDDEN_TAGS = new Set([
-  'script', 'foreignObject', 'image', 'iframe', 'object', 'embed',
-  'animate', 'animateMotion', 'animateTransform', 'set', // SMIL アニメ経由のスクリプト実行
+  'script',
+  'foreignObject',
+  'image',
+  'iframe',
+  'object',
+  'embed',
+  'animate',
+  'animateMotion',
+  'animateTransform',
+  'set', // SMIL アニメ経由のスクリプト実行
 ])
 
 export interface SvgSanitizeResult {

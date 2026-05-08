@@ -33,7 +33,7 @@ const emit = defineEmits<{
 export interface ConfirmPayload {
   png: Uint8Array
   /** Hotspot は後でエディタで微調整できるが、デフォルト 4,4 を渡しておく */
-  hotspot: { x: number, y: number }
+  hotspot: { x: number; y: number }
   /** UI プレビュー用の Object URL。creator 側で revoke する責務。 */
   previewUrl: string
   /** 「.cur/.ico 由来でホットスポット情報を含む」場合は true。 */
@@ -68,10 +68,12 @@ async function pickViaTauri() {
     const { open } = await import('@tauri-apps/plugin-dialog')
     const picked = await open({
       multiple: false,
-      filters: [{
-        name: t('newTheme.fileFilterLabel'),
-        extensions: ['png', 'svg', 'cur', 'ico'],
-      }],
+      filters: [
+        {
+          name: t('newTheme.fileFilterLabel'),
+          extensions: ['png', 'svg', 'cur', 'ico'],
+        },
+      ],
     })
     if (!picked || typeof picked !== 'string') return
     const ext = picked.split('.').pop()?.toLowerCase() ?? ''
@@ -118,7 +120,14 @@ async function loadRasterOrSvgFromPath(path: string, ext: string) {
       if (!sanitized) throw new Error(t('newTheme.errorSvgParse'))
       const png = await rasterizeSvgToPng(sanitized, 256)
       const url = URL.createObjectURL(new Blob([png.slice().buffer], { type: 'image/png' }))
-      setPendingImageRaw(png, path.split(/[\\/]/).pop() ?? 'image.svg', 256, false, { x: 4, y: 4 }, url)
+      setPendingImageRaw(
+        png,
+        path.split(/[\\/]/).pop() ?? 'image.svg',
+        256,
+        false,
+        { x: 4, y: 4 },
+        url,
+      )
     } else {
       // PNG: magic-byte をざっと確認
       if (bytes.length < 8 || bytes[0] !== 0x89 || bytes[1] !== 0x50) {
@@ -175,11 +184,18 @@ function setPendingImage(
   pathOrName: string,
   primarySize: number,
   fromCursorFile: boolean,
-  hotspot: { x: number, y: number },
+  hotspot: { x: number; y: number },
 ) {
   clearPreview()
   const url = URL.createObjectURL(new Blob([png.slice().buffer], { type: 'image/png' }))
-  setPendingImageRaw(png, pathOrName.split(/[\\/]/).pop() ?? pathOrName, primarySize, fromCursorFile, hotspot, url)
+  setPendingImageRaw(
+    png,
+    pathOrName.split(/[\\/]/).pop() ?? pathOrName,
+    primarySize,
+    fromCursorFile,
+    hotspot,
+    url,
+  )
 }
 
 function setPendingImageRaw(
@@ -187,7 +203,7 @@ function setPendingImageRaw(
   filename: string,
   primarySize: number,
   fromCursorFile: boolean,
-  hotspot: { x: number, y: number },
+  hotspot: { x: number; y: number },
   url: string,
 ) {
   if (previewUrl.value && previewUrl.value.startsWith('blob:')) {
@@ -200,7 +216,7 @@ function setPendingImageRaw(
 
 const pending = ref<{
   png: Uint8Array
-  hotspot: { x: number, y: number }
+  hotspot: { x: number; y: number }
   fromCursorFile: boolean
   primarySize: number
 } | null>(null)
@@ -256,7 +272,10 @@ async function rasterizeSvgToPng(svgString: string, size: number): Promise<Uint8
     ctx.imageSmoothingQuality = 'high'
     ctx.drawImage(img, 0, 0, size, size)
     const pngBlob: Blob = await new Promise((resolve, reject) => {
-      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error(t('newTheme.errorEncode')))), 'image/png')
+      canvas.toBlob(
+        (b) => (b ? resolve(b) : reject(new Error(t('newTheme.errorEncode')))),
+        'image/png',
+      )
     })
     return new Uint8Array(await pngBlob.arrayBuffer())
   } finally {
@@ -301,7 +320,7 @@ async function rasterizeSvgToPng(svgString: string, size: number): Promise<Uint8
                 accept=".png,.svg,image/png,image/svg+xml"
                 hidden
                 @change="onFileChange"
-              >
+              />
             </div>
           </template>
           <template v-else>
@@ -344,10 +363,13 @@ async function rasterizeSvgToPng(svgString: string, size: number): Promise<Uint8
 
 <style scoped>
 .nt-overlay {
-  position: fixed; inset: 0;
+  position: fixed;
+  inset: 0;
   background: rgba(10, 11, 15, 0.7);
   backdrop-filter: blur(2px);
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   z-index: 100;
 }
 .nt-modal {
@@ -356,60 +378,119 @@ async function rasterizeSvgToPng(svgString: string, size: number): Promise<Uint8
   border-radius: 12px;
   width: min(560px, 96vw);
   max-height: 90vh;
-  display: flex; flex-direction: column;
+  display: flex;
+  flex-direction: column;
   box-shadow: 0 30px 60px rgba(0, 0, 0, 0.45);
 }
-.nt-head, .nt-foot {
+.nt-head,
+.nt-foot {
   padding: 14px 20px;
-  display: flex; align-items: flex-start; justify-content: space-between;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
 }
-.nt-head { border-bottom: 1px solid var(--line); }
-.nt-foot { border-top: 1px solid var(--line); align-items: center; }
-.nt-foot-r { display: flex; gap: 8px; }
-.nt-head h3 { margin: 4px 0 0; font-size: 16px; font-weight: 600; }
+.nt-head {
+  border-bottom: 1px solid var(--line);
+}
+.nt-foot {
+  border-top: 1px solid var(--line);
+  align-items: center;
+}
+.nt-foot-r {
+  display: flex;
+  gap: 8px;
+}
+.nt-head h3 {
+  margin: 4px 0 0;
+  font-size: 16px;
+  font-weight: 600;
+}
 .nt-eyebrow {
   font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.16em;
   color: var(--accent);
 }
-.nt-body { padding: 14px 20px 18px; overflow-y: auto; }
-.nt-desc { font-size: 12.5px; color: var(--fg-dim); margin: 0 0 14px; line-height: 1.55; }
+.nt-body {
+  padding: 14px 20px 18px;
+  overflow-y: auto;
+}
+.nt-desc {
+  font-size: 12.5px;
+  color: var(--fg-dim);
+  margin: 0 0 14px;
+  line-height: 1.55;
+}
 
 .nt-drop {
   border: 1.5px dashed var(--line);
   border-radius: 12px;
   padding: 24px;
-  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
   background: rgba(124, 242, 212, 0.02);
-  transition: border-color 160ms ease, background 160ms ease;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
 }
 .nt-drop.ready {
   border-style: solid;
   border-color: var(--accent-line);
   background: rgba(124, 242, 212, 0.05);
 }
-.nt-drop.busy { opacity: 0.6; pointer-events: none; }
-.nt-drop-icon { color: var(--accent); }
-.nt-drop-title { font-size: 13px; font-weight: 600; }
-.nt-drop-sub { font-size: 11.5px; color: var(--fg-mute); }
-.nt-cta-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; justify-content: center; }
+.nt-drop.busy {
+  opacity: 0.6;
+  pointer-events: none;
+}
+.nt-drop-icon {
+  color: var(--accent);
+}
+.nt-drop-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+.nt-drop-sub {
+  font-size: 11.5px;
+  color: var(--fg-mute);
+}
+.nt-cta-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
 .nt-preview {
-  max-width: 128px; max-height: 128px;
+  max-width: 128px;
+  max-height: 128px;
   image-rendering: pixelated;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.03);
   padding: 8px;
 }
 .nt-preview-meta {
-  display: flex; align-items: center; gap: 12px; margin-top: 8px;
-  font-size: 11.5px; color: var(--fg-dim);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: var(--fg-dim);
 }
-.nt-preview-name { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nt-preview-name {
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .nt-error {
-  display: flex; align-items: center; gap: 8px;
-  margin-top: 12px; padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 8px 12px;
   border: 1px solid rgba(255, 107, 138, 0.35);
   border-radius: 8px;
   font-size: 12px;
@@ -417,7 +498,11 @@ async function rasterizeSvgToPng(svgString: string, size: number): Promise<Uint8
   background: rgba(255, 107, 138, 0.06);
 }
 .nt-tip {
-  display: flex; align-items: center; gap: 6px;
-  margin: 14px 0 0; font-size: 11px; color: var(--fg-mute);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 14px 0 0;
+  font-size: 11px;
+  color: var(--fg-mute);
 }
 </style>

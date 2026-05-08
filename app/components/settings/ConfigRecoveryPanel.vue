@@ -36,10 +36,10 @@ async function load() {
 
 async function restore(backup: BackupInfo) {
   const { ask } = await import('@tauri-apps/plugin-dialog')
-  const ok = await ask(
-    t('settings.recoveryAskMsg', { name: backup.file_name }),
-    { title: t('settings.recoveryAskTitle'), kind: 'warning' },
-  )
+  const ok = await ask(t('settings.recoveryAskMsg', { name: backup.file_name }), {
+    title: t('settings.recoveryAskTitle'),
+    kind: 'warning',
+  })
   if (!ok) return
 
   busy.value = true
@@ -84,32 +84,22 @@ onMounted(load)
       <div class="prop-body">
         <p class="recovery-desc">{{ t('settings.recoveryDesc') }}</p>
 
-        <div
-          v-for="bk in backups"
-          :key="bk.file_name"
-          class="backup-row"
-        >
+        <div v-for="bk in backups" :key="bk.file_name" class="backup-row">
           <div class="backup-meta">
             <span class="backup-name">{{ bk.file_name }}</span>
             <span class="backup-kind" :class="bk.kind">{{ kindLabel(bk.kind) }}</span>
             <span class="backup-date">{{ formatDate(bk.modified_utc) }}</span>
-            <span class="backup-size">{{ t('settings.recoveryBytes', { size: bk.size_bytes.toLocaleString() }) }}</span>
+            <span class="backup-size">{{
+              t('settings.recoveryBytes', { size: bk.size_bytes.toLocaleString() })
+            }}</span>
           </div>
-          <button
-            class="btn"
-            :disabled="busy"
-            @click="restore(bk)"
-          >
+          <button class="btn" :disabled="busy" @click="restore(bk)">
             <span v-if="busy" class="spinner" style="width: 12px; height: 12px" />
             {{ busy ? t('settings.recoveryRestoring') : t('settings.recoveryRestoreLabel') }}
           </button>
         </div>
 
-        <div
-          v-if="message"
-          class="recovery-msg"
-          :class="{ error: !message.ok }"
-        >
+        <div v-if="message" class="recovery-msg" :class="{ error: !message.ok }">
           {{ message.text }}
         </div>
       </div>

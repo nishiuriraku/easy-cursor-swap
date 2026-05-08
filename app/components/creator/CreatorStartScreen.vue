@@ -61,10 +61,12 @@ const emit = defineEmits<{
 
       <div class="es-shortcuts">
         <span class="es-kb">
-          <span class="kbd">Ctrl</span><span class="kbd">N</span><span>{{ t('creatorStart.kbdNew') }}</span>
+          <span class="kbd">Ctrl</span><span class="kbd">N</span
+          ><span>{{ t('creatorStart.kbdNew') }}</span>
         </span>
         <span class="es-kb">
-          <span class="kbd">Ctrl</span><span class="kbd">O</span><span>{{ t('creatorStart.kbdOpen') }}</span>
+          <span class="kbd">Ctrl</span><span class="kbd">O</span
+          ><span>{{ t('creatorStart.kbdOpen') }}</span>
         </span>
       </div>
     </div>

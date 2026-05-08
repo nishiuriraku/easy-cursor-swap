@@ -44,7 +44,11 @@ function highlightLabel(h: MarketplaceEntry['highlight']): string {
         </span>
       </div>
     </div>
-    <button class="btn" :aria-label="`${entry.name} をインストール`" @click="emit('install', entry.id)">
+    <button
+      class="btn"
+      :aria-label="`${entry.name} をインストール`"
+      @click="emit('install', entry.id)"
+    >
       <UiIcon name="Import" :size="13" />
     </button>
   </div>

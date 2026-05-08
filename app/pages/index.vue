@@ -81,7 +81,20 @@ const demoThemes: ThemeCardData[] = [
     applyCount: 42,
     isFavorite: true,
     isActive: true,
-    includedRoles: ['Arrow', 'Help', 'AppStarting', 'Wait', 'IBeam', 'Hand', 'No', 'SizeNS', 'SizeWE', 'SizeNWSE', 'SizeNESW', 'SizeAll'],
+    includedRoles: [
+      'Arrow',
+      'Help',
+      'AppStarting',
+      'Wait',
+      'IBeam',
+      'Hand',
+      'No',
+      'SizeNS',
+      'SizeWE',
+      'SizeNWSE',
+      'SizeNESW',
+      'SizeAll',
+    ],
     tags: ['animated', 'dark'],
     sizeBytes: 2_202_009,
     signed: true,
@@ -109,7 +122,25 @@ const demoThemes: ThemeCardData[] = [
     applyCount: 7,
     isFavorite: true,
     isActive: false,
-    includedRoles: ['Arrow', 'Help', 'AppStarting', 'Wait', 'Crosshair', 'IBeam', 'NWPen', 'No', 'SizeNS', 'SizeWE', 'SizeNWSE', 'SizeNESW', 'SizeAll', 'UpArrow', 'Hand', 'Pin', 'Person'],
+    includedRoles: [
+      'Arrow',
+      'Help',
+      'AppStarting',
+      'Wait',
+      'Crosshair',
+      'IBeam',
+      'NWPen',
+      'No',
+      'SizeNS',
+      'SizeWE',
+      'SizeNWSE',
+      'SizeNESW',
+      'SizeAll',
+      'UpArrow',
+      'Hand',
+      'Pin',
+      'Person',
+    ],
     tags: ['pixel', 'retro'],
     sizeBytes: 943_718,
     signed: true,
@@ -137,7 +168,21 @@ const demoThemes: ThemeCardData[] = [
     applyCount: 56,
     isFavorite: true,
     isActive: false,
-    includedRoles: ['Arrow', 'Help', 'AppStarting', 'Wait', 'Crosshair', 'IBeam', 'No', 'SizeNS', 'SizeWE', 'SizeNWSE', 'SizeNESW', 'SizeAll', 'Hand'],
+    includedRoles: [
+      'Arrow',
+      'Help',
+      'AppStarting',
+      'Wait',
+      'Crosshair',
+      'IBeam',
+      'No',
+      'SizeNS',
+      'SizeWE',
+      'SizeNWSE',
+      'SizeNESW',
+      'SizeAll',
+      'Hand',
+    ],
     tags: ['animated', 'neon'],
     sizeBytes: 4_928_307,
     signed: true,
@@ -151,7 +196,18 @@ const demoThemes: ThemeCardData[] = [
     applyCount: 12,
     isFavorite: false,
     isActive: false,
-    includedRoles: ['Arrow', 'Wait', 'IBeam', 'Hand', 'No', 'SizeAll', 'SizeNS', 'SizeWE', 'Crosshair', 'Help'],
+    includedRoles: [
+      'Arrow',
+      'Wait',
+      'IBeam',
+      'Hand',
+      'No',
+      'SizeAll',
+      'SizeNS',
+      'SizeWE',
+      'Crosshair',
+      'Help',
+    ],
     tags: ['draft'],
     sizeBytes: 209_715,
     signed: false,
@@ -752,27 +808,35 @@ onUnmounted(() => {
             :aria-pressed="filter === 'favorites'"
             @click="filter = 'favorites'"
           >
-            <UiIcon name="Star" :size="11" aria-hidden="true" />{{ t('library.filterFavorites') }}<span class="num" aria-hidden="true">{{ counts.favorites }}</span>
+            <UiIcon name="Star" :size="11" aria-hidden="true" />{{ t('library.filterFavorites')
+            }}<span class="num" aria-hidden="true">{{ counts.favorites }}</span>
           </button>
           <button
             :class="['chip', { active: filter === 'recent' }]"
             :aria-pressed="filter === 'recent'"
             @click="filter = 'recent'"
           >
-            {{ t('library.filterRecent') }}<span class="num" aria-hidden="true">{{ counts.recent }}</span>
+            {{ t('library.filterRecent')
+            }}<span class="num" aria-hidden="true">{{ counts.recent }}</span>
           </button>
           <button
             :class="['chip', { active: filter === 'unsigned' }]"
             :aria-pressed="filter === 'unsigned'"
             @click="filter = 'unsigned'"
           >
-            {{ t('library.filterUnsigned') }}<span class="num" aria-hidden="true">{{ counts.unsigned }}</span>
+            {{ t('library.filterUnsigned')
+            }}<span class="num" aria-hidden="true">{{ counts.unsigned }}</span>
           </button>
         </div>
         <div class="spacer-x" />
         <div class="sort">
           <span class="lbl" aria-hidden="true">{{ t('library.sort') }}</span>
-          <button class="btn ghost" style="height: 28px" :aria-label="`${t('library.sort')}: ${sortLabel}`" @click="cycleSort">
+          <button
+            class="btn ghost"
+            style="height: 28px"
+            :aria-label="`${t('library.sort')}: ${sortLabel}`"
+            @click="cycleSort"
+          >
             <UiIcon name="Sort" :size="13" aria-hidden="true" />{{ sortLabel }}
             <UiIcon name="ChevD" :size="11" aria-hidden="true" />
           </button>
@@ -855,51 +919,67 @@ onUnmounted(() => {
           <div
             :class="['lt-col', 'lt-name', 'lt-sortable', { active: sortKey === 'name' }]"
             role="columnheader"
-            :aria-sort="sortKey === 'name' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'"
+            :aria-sort="
+              sortKey === 'name' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'
+            "
             tabindex="0"
             @click="sortBy('name')"
             @keydown.enter.prevent="sortBy('name')"
             @keydown.space.prevent="sortBy('name')"
           >
             {{ t('library.colNameAuthor') }}
-            <span v-if="sortKey === 'name'" class="sort-dir">{{ sortDir === 'asc' ? '↑' : '↓' }}</span>
+            <span v-if="sortKey === 'name'" class="sort-dir">{{
+              sortDir === 'asc' ? '↑' : '↓'
+            }}</span>
           </div>
           <div
             :class="['lt-col', 'lt-cov', 'lt-sortable', { active: sortKey === 'coverage' }]"
             role="columnheader"
-            :aria-sort="sortKey === 'coverage' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'"
+            :aria-sort="
+              sortKey === 'coverage' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'
+            "
             tabindex="0"
             @click="sortBy('coverage')"
             @keydown.enter.prevent="sortBy('coverage')"
             @keydown.space.prevent="sortBy('coverage')"
           >
             {{ t('library.colCoverage') }}
-            <span v-if="sortKey === 'coverage'" class="sort-dir">{{ sortDir === 'asc' ? '↑' : '↓' }}</span>
+            <span v-if="sortKey === 'coverage'" class="sort-dir">{{
+              sortDir === 'asc' ? '↑' : '↓'
+            }}</span>
           </div>
           <div class="lt-col lt-ver" role="columnheader">{{ t('library.colVersion') }}</div>
           <div
             :class="['lt-col', 'lt-date', 'lt-sortable', { active: sortKey === 'updated' }]"
             role="columnheader"
-            :aria-sort="sortKey === 'updated' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'"
+            :aria-sort="
+              sortKey === 'updated' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'
+            "
             tabindex="0"
             @click="sortBy('updated')"
             @keydown.enter.prevent="sortBy('updated')"
             @keydown.space.prevent="sortBy('updated')"
           >
             {{ t('library.colUpdated') }}
-            <span v-if="sortKey === 'updated'" class="sort-dir">{{ sortDir === 'asc' ? '↑' : '↓' }}</span>
+            <span v-if="sortKey === 'updated'" class="sort-dir">{{
+              sortDir === 'asc' ? '↑' : '↓'
+            }}</span>
           </div>
           <div
             :class="['lt-col', 'lt-size', 'lt-sortable', { active: sortKey === 'size' }]"
             role="columnheader"
-            :aria-sort="sortKey === 'size' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'"
+            :aria-sort="
+              sortKey === 'size' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'
+            "
             tabindex="0"
             @click="sortBy('size')"
             @keydown.enter.prevent="sortBy('size')"
             @keydown.space.prevent="sortBy('size')"
           >
             {{ t('library.colSize') }}
-            <span v-if="sortKey === 'size'" class="sort-dir">{{ sortDir === 'asc' ? '↑' : '↓' }}</span>
+            <span v-if="sortKey === 'size'" class="sort-dir">{{
+              sortDir === 'asc' ? '↑' : '↓'
+            }}</span>
           </div>
           <div class="lt-col lt-sig" role="columnheader">{{ t('library.colSignature') }}</div>
           <div class="lt-col lt-act" role="columnheader" />
@@ -965,7 +1045,11 @@ onUnmounted(() => {
       <div v-if="applyError" class="apply-error" role="alert">
         <UiIcon name="Alert" :size="14" />
         適用に失敗しました: {{ applyError }}
-        <button class="btn ghost" style="height: 24px; margin-left: auto" @click="applyError = null">
+        <button
+          class="btn ghost"
+          style="height: 24px; margin-left: auto"
+          @click="applyError = null"
+        >
           <UiIcon name="X" :size="11" />
         </button>
       </div>
@@ -1031,14 +1115,20 @@ onUnmounted(() => {
   animation: shimmer 1.4s ease-in-out infinite;
 }
 @keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
-.fade-enter-active, .fade-leave-active {
+.fade-enter-active,
+.fade-leave-active {
   transition: opacity 0.18s ease;
 }
-.fade-enter-from, .fade-leave-to {
+.fade-enter-from,
+.fade-leave-to {
   opacity: 0;
 }
 

@@ -81,7 +81,13 @@ function onBackdropClick(e: MouseEvent) {
 </script>
 
 <template>
-  <div class="modal-page" role="dialog" aria-modal="true" aria-labelledby="apply-modal-title" @click="onBackdropClick">
+  <div
+    class="modal-page"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="apply-modal-title"
+    @click="onBackdropClick"
+  >
     <div class="modal" @click.stop>
       <!-- ヘッダー -->
       <div class="modal-head">
@@ -125,8 +131,10 @@ function onBackdropClick(e: MouseEvent) {
                 <i class="b" :style="{ width: inheritPct + '%' }" />
               </div>
               <span style="font-family: var(--font-mono); font-size: 11px; color: var(--fg-dim)">
-                <span style="color: var(--accent)">{{ overridesCount }}</span> {{ t('apply.overrides') }} ·
-                <span style="color: var(--violet)">{{ inheritCount }}</span> {{ t('apply.inherit') }}
+                <span style="color: var(--accent)">{{ overridesCount }}</span>
+                {{ t('apply.overrides') }} ·
+                <span style="color: var(--violet)">{{ inheritCount }}</span>
+                {{ t('apply.inherit') }}
               </span>
             </div>
           </div>
@@ -147,7 +155,7 @@ function onBackdropClick(e: MouseEvent) {
                       :src="previewMap[role.id]"
                       :alt="role.jp"
                       class="mini-img"
-                    >
+                    />
                     <CursorIcon v-else :role="role.id" :size="14" />
                   </template>
                   <UiIcon v-else name="Plus" :size="10" />
@@ -158,7 +166,10 @@ function onBackdropClick(e: MouseEvent) {
 
           <div class="kv">
             <label>{{ t('apply.snapshot') }}</label>
-            <div class="val" style="font-family: var(--font-mono); font-size: 12px; color: var(--fg-dim)">
+            <div
+              class="val"
+              style="font-family: var(--font-mono); font-size: 12px; color: var(--fg-dim)"
+            >
               ~/.custom_cursors/_pending_apply.snapshot
             </div>
           </div>

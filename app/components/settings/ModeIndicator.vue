@@ -61,7 +61,9 @@ const props = defineProps<{
   color: var(--accent);
 }
 
-.mi-text { flex: 1; }
+.mi-text {
+  flex: 1;
+}
 .mi-title {
   font-family: var(--font-display);
   font-size: 14px;

@@ -26,11 +26,7 @@ export interface RoleAsset {
  *
  * `fromSize <= 0` の場合はゼロ除算を避けて元の値をそのまま返す。
  */
-export function scaleHotspot(
-  hotspot: Hotspot,
-  fromSize: number,
-  toSize: number,
-): Hotspot {
+export function scaleHotspot(hotspot: Hotspot, fromSize: number, toSize: number): Hotspot {
   if (fromSize <= 0 || toSize <= 0 || fromSize === toSize) return hotspot
   const ratioX = hotspot.x / fromSize
   const ratioY = hotspot.y / fromSize
@@ -76,9 +72,7 @@ export function useCreatorAssets() {
       hotspotY: a.hotspot.y,
       resample: resampleMode,
       sizedPngBytes: a.sized
-        ? Object.fromEntries(
-            Array.from(a.sized.entries()).map(([k, v]) => [k, Array.from(v)]),
-          )
+        ? Object.fromEntries(Array.from(a.sized.entries()).map(([k, v]) => [k, Array.from(v)]))
         : null,
     }))
   }

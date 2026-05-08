@@ -29,7 +29,7 @@ defineProps<{
           :src="previewMap[role.id]"
           :alt="role.jp"
           class="cell-img"
-        >
+        />
         <CursorIcon v-else :role="role.id" :size="14" />
       </template>
     </div>

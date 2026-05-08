@@ -30,15 +30,25 @@ const lastSync = ref('2分前')
 // --- デモデータ ---
 function makeDemo(): MarketplaceEntry[] {
   const allRoles = CURSOR_ROLES.map((r) => r.id)
-  const featured: Array<Pick<MarketplaceEntry, 'name' | 'author' | 'downloadCount' | 'highlight'>> = [
-    { name: 'Aurora Glass', author: 'studio.kane', downloadCount: 4821, highlight: 'new' },
-    { name: 'Pixel Pop 8bit', author: 'RetroPixel', downloadCount: 12404, highlight: 'popular' },
-    { name: 'Liquid Mercury', author: 'fluidlab', downloadCount: 2103, highlight: null },
-  ]
+  const featured: Array<Pick<MarketplaceEntry, 'name' | 'author' | 'downloadCount' | 'highlight'>> =
+    [
+      { name: 'Aurora Glass', author: 'studio.kane', downloadCount: 4821, highlight: 'new' },
+      { name: 'Pixel Pop 8bit', author: 'RetroPixel', downloadCount: 12404, highlight: 'popular' },
+      { name: 'Liquid Mercury', author: 'fluidlab', downloadCount: 2103, highlight: null },
+    ]
   const gridNames = [
-    'Aurora Glass', 'Pixel Pop 8bit', 'Liquid Mercury',
-    'Sumi 墨', 'Origami', 'Holograph', 'Northstar', 'Brutalist',
-    'Vapor Trail', 'Soft Tide', 'Mech Industrial', 'Honeycomb',
+    'Aurora Glass',
+    'Pixel Pop 8bit',
+    'Liquid Mercury',
+    'Sumi 墨',
+    'Origami',
+    'Holograph',
+    'Northstar',
+    'Brutalist',
+    'Vapor Trail',
+    'Soft Tide',
+    'Mech Industrial',
+    'Honeycomb',
   ]
   return gridNames.map((name, i) => {
     const f = featured.find((x) => x.name === name)
@@ -76,8 +86,7 @@ const filteredGrid = computed(() => {
   if (searchQuery.value.trim()) {
     const q = searchQuery.value.toLowerCase()
     result = result.filter(
-      (e) =>
-        e.name.toLowerCase().includes(q) || e.author.toLowerCase().includes(q),
+      (e) => e.name.toLowerCase().includes(q) || e.author.toLowerCase().includes(q),
     )
   }
 
@@ -116,7 +125,11 @@ async function installEntry(id: string) {
 function openGithub() {
   // 将来: invoke('open_external', { url: 'https://github.com/nishiuriraku/easy-cursor-swap-index' })
   if (typeof window !== 'undefined') {
-    window.open('https://github.com/nishiuriraku/easy-cursor-swap-index', '_blank', 'noopener,noreferrer')
+    window.open(
+      'https://github.com/nishiuriraku/easy-cursor-swap-index',
+      '_blank',
+      'noopener,noreferrer',
+    )
   }
 }
 
@@ -307,7 +320,11 @@ onMounted(async () => {
   animation: shimmer 1.4s ease-in-out infinite;
 }
 @keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 </style>

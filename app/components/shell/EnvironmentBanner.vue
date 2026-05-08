@@ -49,11 +49,7 @@ function close() {
 
 <template>
   <Transition name="fade">
-    <div
-      v-if="report && report.level !== 'ok' && !dismissed"
-      class="env-banner"
-      role="alert"
-    >
+    <div v-if="report && report.level !== 'ok' && !dismissed" class="env-banner" role="alert">
       <UiIcon name="Alert" :size="14" />
       <div class="env-text">
         <strong>{{ t('environment.unsupportedDetected') }}</strong>
@@ -72,7 +68,7 @@ function close() {
   align-items: center;
   gap: 12px;
   padding: 10px 16px;
-  background: rgba(245, 194, 107, 0.10);
+  background: rgba(245, 194, 107, 0.1);
   border-bottom: 1px solid rgba(245, 194, 107, 0.35);
   color: var(--amber);
   font-size: 12.5px;
@@ -103,10 +99,12 @@ function close() {
   flex-shrink: 0;
 }
 
-.fade-enter-active, .fade-leave-active {
+.fade-enter-active,
+.fade-leave-active {
   transition: opacity 0.18s ease;
 }
-.fade-enter-from, .fade-leave-to {
+.fade-enter-from,
+.fade-leave-to {
   opacity: 0;
 }
 </style>

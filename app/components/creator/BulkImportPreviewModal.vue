@@ -32,7 +32,7 @@ const emit = defineEmits<{
 
 export interface ApplyPayload {
   /** 確定したロール → アセット。useCreatorAssets.setAsset() で書き込む。 */
-  roleAssets: Array<{ roleId: string, asset: RoleAsset }>
+  roleAssets: Array<{ roleId: string; asset: RoleAsset }>
   metadataChoice: 'keep' | 'overwrite' | 'name-only'
   metadata: ParsedCursorpack['metadata'] | null
 }
@@ -79,65 +79,76 @@ function resetState() {
   skippedCount.value = 0
 }
 
-watch(() => props.open, (open) => {
-  if (!open) { resetState(); return }
-  resetState()
+watch(
+  () => props.open,
+  (open) => {
+    if (!open) {
+      resetState()
+      return
+    }
+    resetState()
 
-  if (props.cursorpack) {
-    // .cursorpack 経路: ロール ID は既に確定済み。全ロールを matches に詰める。
-    for (const [role, parsed] of Object.entries(props.cursorpack.roles)) {
-      const fakeAsset: ResolvedAsset = {
-        sourceFile: `${role}.cur`,
-        sourcePath: '',
-        kind: 'cur',
-        pngBytes: parsed.primaryPngBytes,
-        svgText: null,
-        nativeSize: parsed.primarySize,
-        hotspotX: parsed.hotspotX,
-        hotspotY: parsed.hotspotY,
-        availableSizes: Object.keys(parsed.sizedPngBytes).map(Number),
+    if (props.cursorpack) {
+      // .cursorpack 経路: ロール ID は既に確定済み。全ロールを matches に詰める。
+      for (const [role, parsed] of Object.entries(props.cursorpack.roles)) {
+        const fakeAsset: ResolvedAsset = {
+          sourceFile: `${role}.cur`,
+          sourcePath: '',
+          kind: 'cur',
+          pngBytes: parsed.primaryPngBytes,
+          svgText: null,
+          nativeSize: parsed.primarySize,
+          hotspotX: parsed.hotspotX,
+          hotspotY: parsed.hotspotY,
+          availableSizes: Object.keys(parsed.sizedPngBytes).map(Number),
+        }
+        const conflict = props.existingRoles.has(role) ? 'overwrite-existing' : 'none'
+        matches.value.push({
+          role,
+          asset: fakeAsset,
+          confidence: 1.0,
+          conflict,
+          decision: conflict === 'overwrite-existing' && protectExisting.value ? 'skip' : 'apply',
+          previewUrl: makePreview(fakeAsset),
+        })
       }
-      const conflict = props.existingRoles.has(role) ? 'overwrite-existing' : 'none'
-      matches.value.push({
-        role,
-        asset: fakeAsset,
-        confidence: 1.0,
-        conflict,
-        decision: conflict === 'overwrite-existing' && protectExisting.value ? 'skip' : 'apply',
-        previewUrl: makePreview(fakeAsset),
+      return
+    }
+
+    // 通常経路: ファイル名 + フォルダ名のファジーマッチ → 衝突解決 → 既存衝突判定。
+    // sourcePath を渡すことで `arrow/64.png` `通常/256.png` のように
+    // フォルダー名にロール名が含まれるケースもマッチさせる。
+    const candidates: Array<MatchCandidate & { asset: ResolvedAsset }> = []
+    for (const a of props.resolved ?? []) {
+      const m = matchAssetWithContext(a.sourceFile, a.sourcePath)
+      if (m) {
+        candidates.push({ sourceFile: a.sourceFile, nativeSize: a.nativeSize, match: m, asset: a })
+      } else {
+        unmatched.value.push({ asset: a, manuallyAssignedRole: null, previewUrl: makePreview(a) })
+      }
+    }
+    const { winners, demoted } = resolveCollisions(candidates)
+    for (const c of demoted as Array<(typeof candidates)[0]>) {
+      unmatched.value.push({
+        asset: c.asset,
+        manuallyAssignedRole: null,
+        previewUrl: makePreview(c.asset),
       })
     }
-    return
-  }
-
-  // 通常経路: ファイル名 + フォルダ名のファジーマッチ → 衝突解決 → 既存衝突判定。
-  // sourcePath を渡すことで `arrow/64.png` `通常/256.png` のように
-  // フォルダー名にロール名が含まれるケースもマッチさせる。
-  const candidates: Array<MatchCandidate & { asset: ResolvedAsset }> = []
-  for (const a of props.resolved ?? []) {
-    const m = matchAssetWithContext(a.sourceFile, a.sourcePath)
-    if (m) {
-      candidates.push({ sourceFile: a.sourceFile, nativeSize: a.nativeSize, match: m, asset: a })
-    } else {
-      unmatched.value.push({ asset: a, manuallyAssignedRole: null, previewUrl: makePreview(a) })
+    for (const w of winners as Array<(typeof candidates)[0]>) {
+      const conflict = props.existingRoles.has(w.match.role) ? 'overwrite-existing' : 'none'
+      matches.value.push({
+        role: w.match.role,
+        asset: w.asset,
+        confidence: w.match.score,
+        conflict,
+        decision: conflict === 'overwrite-existing' && protectExisting.value ? 'skip' : 'apply',
+        previewUrl: makePreview(w.asset),
+      })
     }
-  }
-  const { winners, demoted } = resolveCollisions(candidates)
-  for (const c of demoted as Array<typeof candidates[0]>) {
-    unmatched.value.push({ asset: c.asset, manuallyAssignedRole: null, previewUrl: makePreview(c.asset) })
-  }
-  for (const w of winners as Array<typeof candidates[0]>) {
-    const conflict = props.existingRoles.has(w.match.role) ? 'overwrite-existing' : 'none'
-    matches.value.push({
-      role: w.match.role,
-      asset: w.asset,
-      confidence: w.match.score,
-      conflict,
-      decision: conflict === 'overwrite-existing' && protectExisting.value ? 'skip' : 'apply',
-      previewUrl: makePreview(w.asset),
-    })
-  }
-}, { immediate: true })
+  },
+  { immediate: true },
+)
 
 watch(protectExisting, (v) => {
   for (const m of matches.value) {
@@ -148,16 +159,16 @@ watch(protectExisting, (v) => {
 })
 
 const summaryLine = computed(() => {
-  const auto = matches.value.filter(m => m.decision === 'apply').length
-  const conflicts = matches.value.filter(m => m.conflict !== 'none').length
+  const auto = matches.value.filter((m) => m.decision === 'apply').length
+  const conflicts = matches.value.filter((m) => m.conflict !== 'none').length
   return `自動 ${auto} 件 ・ 未マッチ ${unmatched.value.length} 件 ・ 衝突 ${conflicts} 件`
 })
 
 const allRoleRows = computed(() => {
-  const byRole = new Map(matches.value.map(m => [m.role, m]))
-  return CURSOR_ROLE_IDS.map(roleId => {
+  const byRole = new Map(matches.value.map((m) => [m.role, m]))
+  return CURSOR_ROLE_IDS.map((roleId) => {
     const m = byRole.get(roleId)
-    const def = CURSOR_ROLES.find(r => r.id === roleId)
+    const def = CURSOR_ROLES.find((r) => r.id === roleId)
     return {
       roleId,
       roleLabel: def?.jp ?? roleId,
@@ -178,7 +189,7 @@ function toRoleAsset(asset: ResolvedAsset, source: RoleAsset['source']): RoleAss
 }
 
 function apply() {
-  const roleAssets: Array<{ roleId: string, asset: RoleAsset }> = []
+  const roleAssets: Array<{ roleId: string; asset: RoleAsset }> = []
 
   if (props.cursorpack) {
     for (const m of matches.value) {
@@ -253,7 +264,9 @@ onUnmounted(resetState)
           @toggle="(v) => row.match && (row.match.decision = v)"
         />
 
-        <h4 v-if="unmatched.length">{{ t('bulkImport.unmatchedHeader', { count: unmatched.length }) }}</h4>
+        <h4 v-if="unmatched.length">
+          {{ t('bulkImport.unmatchedHeader', { count: unmatched.length }) }}
+        </h4>
         <div v-for="u in unmatched" :key="u.asset.sourcePath" class="bi-unmatched">
           <img :src="u.previewUrl" :alt="u.asset.sourceFile" />
           <span>{{ u.asset.sourceFile }} ({{ u.asset.nativeSize }}px)</span>
@@ -275,19 +288,32 @@ onUnmounted(resetState)
             {{ t('bulkImport.metadataAuthorLabel') }}: {{ cursorpack.metadata.author ?? '—' }} /
             {{ t('bulkImport.metadataVersionLabel') }}: {{ cursorpack.metadata.version ?? '—' }}
           </div>
-          <label><input v-model="metadataChoice" type="radio" value="keep" /> {{ t('bulkImport.metadataKeep') }}</label>
-          <label><input v-model="metadataChoice" type="radio" value="overwrite" /> {{ t('bulkImport.metadataOverwrite') }}</label>
-          <label><input v-model="metadataChoice" type="radio" value="name-only" /> {{ t('bulkImport.metadataNameOnly') }}</label>
+          <label
+            ><input v-model="metadataChoice" type="radio" value="keep" />
+            {{ t('bulkImport.metadataKeep') }}</label
+          >
+          <label
+            ><input v-model="metadataChoice" type="radio" value="overwrite" />
+            {{ t('bulkImport.metadataOverwrite') }}</label
+          >
+          <label
+            ><input v-model="metadataChoice" type="radio" value="name-only" />
+            {{ t('bulkImport.metadataNameOnly') }}</label
+          >
         </template>
       </div>
 
       <footer class="bi-foot">
         <button class="btn ghost" @click="emit('cancel')">{{ t('common.cancel') }}</button>
         <button class="btn primary" @click="apply">
-          ✓ {{ t('bulkImport.applyCount', {
-              count: matches.filter(m => m.decision === 'apply').length
-                   + unmatched.filter(u => u.manuallyAssignedRole !== null).length
-          }) }}
+          ✓
+          {{
+            t('bulkImport.applyCount', {
+              count:
+                matches.filter((m) => m.decision === 'apply').length +
+                unmatched.filter((u) => u.manuallyAssignedRole !== null).length,
+            })
+          }}
         </button>
       </footer>
     </div>
@@ -296,9 +322,12 @@ onUnmounted(resetState)
 
 <style scoped>
 .bi-overlay {
-  position: fixed; inset: 0;
+  position: fixed;
+  inset: 0;
   background: rgba(10, 11, 15, 0.7);
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   z-index: 100;
 }
 .bi-modal {
@@ -307,19 +336,61 @@ onUnmounted(resetState)
   border-radius: 12px;
   width: min(900px, 96vw);
   max-height: 90vh;
-  display: flex; flex-direction: column;
+  display: flex;
+  flex-direction: column;
 }
-.bi-head, .bi-foot {
+.bi-head,
+.bi-foot {
   padding: 12px 18px;
   border-bottom: 1px solid var(--line);
-  display: flex; justify-content: space-between; align-items: center;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
-.bi-foot { border-bottom: 0; border-top: 1px solid var(--line); gap: 8px; justify-content: flex-end; }
-.bi-body { padding: 12px 18px; overflow-y: auto; flex: 1; }
-.bi-source { font-size: 12px; color: var(--fg-mute); margin-bottom: 8px; }
-.bi-protect { display: inline-flex; gap: 6px; margin-bottom: 12px; font-size: 12px; }
-.bi-unmatched { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 12px; }
-.bi-unmatched img { width: 32px; height: 32px; object-fit: contain; }
-.bi-meta-info { font-size: 12px; color: var(--fg-mute); margin-bottom: 6px; }
-h4 { font-size: 11px; color: var(--fg-mute); margin: 12px 0 6px; letter-spacing: 0.1em; text-transform: uppercase; }
+.bi-foot {
+  border-bottom: 0;
+  border-top: 1px solid var(--line);
+  gap: 8px;
+  justify-content: flex-end;
+}
+.bi-body {
+  padding: 12px 18px;
+  overflow-y: auto;
+  flex: 1;
+}
+.bi-source {
+  font-size: 12px;
+  color: var(--fg-mute);
+  margin-bottom: 8px;
+}
+.bi-protect {
+  display: inline-flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+.bi-unmatched {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 12px;
+}
+.bi-unmatched img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+.bi-meta-info {
+  font-size: 12px;
+  color: var(--fg-mute);
+  margin-bottom: 6px;
+}
+h4 {
+  font-size: 11px;
+  color: var(--fg-mute);
+  margin: 12px 0 6px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
 </style>

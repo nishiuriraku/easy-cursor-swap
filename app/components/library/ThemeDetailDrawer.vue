@@ -131,11 +131,7 @@ const tags = computed<string[]>(() => {
               :title="role.jp"
               @click="selectRole(role.id)"
             >
-              <CursorIcon
-                v-if="includedSet.has(role.id)"
-                :role="role.id"
-                :size="14"
-              />
+              <CursorIcon v-if="includedSet.has(role.id)" :role="role.id" :size="14" />
               <span v-else class="td-rb-x">×</span>
             </button>
           </div>
@@ -150,12 +146,7 @@ const tags = computed<string[]>(() => {
                   draggable="false"
                   style="width: 64px; height: 64px; image-rendering: pixelated"
                 />
-                <CursorIcon
-                  v-else
-                  :role="activeRoleDef.id"
-                  :size="64"
-                  style="color: var(--fg)"
-                />
+                <CursorIcon v-else :role="activeRoleDef.id" :size="64" style="color: var(--fg)" />
                 <span class="td-rp-hot" />
               </template>
               <div v-else class="td-rp-missing">
@@ -165,7 +156,9 @@ const tags = computed<string[]>(() => {
             </div>
             <div class="td-rp-meta">
               <div class="td-rp-name">{{ activeRoleDef.jp }}</div>
-              <div class="td-rp-key"><code>{{ activeRoleDef.id }}</code></div>
+              <div class="td-rp-key">
+                <code>{{ activeRoleDef.id }}</code>
+              </div>
             </div>
           </div>
         </div>
@@ -190,9 +183,7 @@ const tags = computed<string[]>(() => {
         <div class="td-cell-k">
           SIGNATURE
           <span v-if="isSystem" class="td-pill">N/A</span>
-          <span v-else class="td-pill ok">
-            <UiIcon name="Shield" :size="9" />Ed25519
-          </span>
+          <span v-else class="td-pill ok"> <UiIcon name="Shield" :size="9" />Ed25519 </span>
         </div>
         <div class="td-cell-v mono trunc">
           {{ isSystem ? 'Windows OS スキーム' : 'key_id 検証中…' }}
@@ -294,12 +285,7 @@ const tags = computed<string[]>(() => {
         >
           <UiIcon name="Check" :size="13" />適用中
         </button>
-        <button
-          v-else
-          class="btn primary"
-          style="height: 32px"
-          @click="emit('apply', theme.id)"
-        >
+        <button v-else class="btn primary" style="height: 32px" @click="emit('apply', theme.id)">
           テーマを適用
         </button>
       </div>

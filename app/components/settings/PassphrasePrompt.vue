@@ -26,12 +26,15 @@ const emit = defineEmits<{
 const phrase = ref('')
 const phraseConfirm = ref('')
 
-watch(() => props.open, (v) => {
-  if (v) {
-    phrase.value = ''
-    phraseConfirm.value = ''
-  }
-})
+watch(
+  () => props.open,
+  (v) => {
+    if (v) {
+      phrase.value = ''
+      phraseConfirm.value = ''
+    }
+  },
+)
 
 const canConfirm = computed(() => {
   if (phrase.value.length < 8) return false
@@ -61,7 +64,14 @@ function confirm() {
 
 <template>
   <Transition name="fade">
-    <div v-if="open" class="modal-page" role="dialog" aria-modal="true" aria-labelledby="passphrase-modal-title" @click.self="close">
+    <div
+      v-if="open"
+      class="modal-page"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="passphrase-modal-title"
+      @click.self="close"
+    >
       <div class="modal pp-modal">
         <div class="modal-head">
           <div class="modal-icon" aria-hidden="true"><UiIcon name="Shield" :size="20" /></div>
@@ -82,7 +92,7 @@ function confirm() {
               class="input mono"
               autocomplete="new-password"
               @keydown.enter="confirm"
-            >
+            />
           </label>
           <label v-if="mode === 'export'" class="pp-row">
             <span class="pp-label">{{ t('passphrase.confirmLabel') }}</span>
@@ -92,7 +102,7 @@ function confirm() {
               class="input mono"
               autocomplete="new-password"
               @keydown.enter="confirm"
-            >
+            />
           </label>
           <p v-if="error" class="pp-error">{{ error }}</p>
           <p class="pp-note">
@@ -120,7 +130,9 @@ function confirm() {
 </template>
 
 <style scoped>
-.pp-modal { width: 460px; }
+.pp-modal {
+  width: 460px;
+}
 .pp-row {
   display: flex;
   flex-direction: column;
@@ -147,6 +159,12 @@ function confirm() {
   font-size: 11.5px;
   color: var(--fg-dim);
 }
-.fade-enter-active, .fade-leave-active { transition: opacity 0.18s ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.18s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
 </style>

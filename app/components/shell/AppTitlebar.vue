@@ -10,17 +10,24 @@ import { useI18n } from '~/composables/useI18n'
 
 const { t } = useI18n()
 
-withDefaults(defineProps<{
-  title?: string
-  version?: string
-}>(), {
-  title: 'EasyCursorSwap',
-  version: 'v1.0.0',
-})
+withDefaults(
+  defineProps<{
+    title?: string
+    version?: string
+  }>(),
+  {
+    title: 'EasyCursorSwap',
+    version: 'v1.0.0',
+  },
+)
 
 const { mode, cycle } = useUiTheme()
-const themeIcon = computed(() => (mode.value === 'light' ? 'Sun' : mode.value === 'auto' ? 'Globe' : 'Moon'))
-const themeLabel = computed(() => (mode.value === 'light' ? 'Light' : mode.value === 'auto' ? 'Auto' : 'Dark'))
+const themeIcon = computed(() =>
+  mode.value === 'light' ? 'Sun' : mode.value === 'auto' ? 'Globe' : 'Moon',
+)
+const themeLabel = computed(() =>
+  mode.value === 'light' ? 'Light' : mode.value === 'auto' ? 'Auto' : 'Dark',
+)
 
 // 最大化アイコンを Win11 既定動作に揃えるためにウィンドウ状態を購読する。
 const isMaximized = ref(false)
@@ -64,8 +71,7 @@ async function call(cmd: 'minimize' | 'toggleMaximize' | 'close') {
       await w.toggleMaximize()
       // 状態の永続化を待たずに即座に反映する。`onResized` も走るので二重更新になっても問題ない。
       isMaximized.value = await w.isMaximized()
-    }
-    else await w.close()
+    } else await w.close()
   } catch (err) {
     console.warn('[Titlebar] Tauri API unavailable:', err)
   }
@@ -125,7 +131,12 @@ async function onTitlebarMouseDown(e: MouseEvent) {
       >
         <UiIcon :name="themeIcon" :size="12" />
       </button>
-      <button type="button" class="tb-btn" :aria-label="t('titlebar.minimize')" @click="call('minimize')">
+      <button
+        type="button"
+        class="tb-btn"
+        :aria-label="t('titlebar.minimize')"
+        @click="call('minimize')"
+      >
         <UiIcon name="Min" :size="12" />
       </button>
       <button
@@ -136,7 +147,12 @@ async function onTitlebarMouseDown(e: MouseEvent) {
       >
         <UiIcon :name="isMaximized ? 'Restore' : 'Max'" :size="12" />
       </button>
-      <button type="button" class="tb-btn close" :aria-label="t('common.close')" @click="call('close')">
+      <button
+        type="button"
+        class="tb-btn close"
+        :aria-label="t('common.close')"
+        @click="call('close')"
+      >
         <UiIcon name="X" :size="12" />
       </button>
     </div>

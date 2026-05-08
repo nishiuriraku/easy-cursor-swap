@@ -32,10 +32,7 @@ const WINDOWS_PREFIX = 'windows:'
  * - UUID 形式 → ローカルテーマ (`get_theme_previews`)
  * - `windows:<scheme name>` → Windows レジストリスキーム (`get_windows_scheme_previews`)
  */
-async function fetchPreviews(
-  themeId: string,
-  roles?: string[],
-): Promise<PreviewCacheEntry | null> {
+async function fetchPreviews(themeId: string, roles?: string[]): Promise<PreviewCacheEntry | null> {
   const isWindowsScheme = themeId.startsWith(WINDOWS_PREFIX)
   if (!isWindowsScheme && !looksLikeUuid(themeId)) return null
   // 全ロール取得済みならキャッシュをそのまま返す。部分リクエストはキャッシュに合流させる。

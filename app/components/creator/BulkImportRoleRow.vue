@@ -75,16 +75,53 @@ const conflictTitle = computed(() => {
   border-bottom: 1px solid var(--line);
   font-size: 12px;
 }
-.bi-row.skip { opacity: 0.5; }
-.bi-row.conflict { background: rgba(255, 191, 0, 0.04); }
+.bi-row.skip {
+  opacity: 0.5;
+}
+.bi-row.conflict {
+  background: rgba(255, 191, 0, 0.04);
+}
 
-.role-id { font-family: var(--font-mono); font-weight: 500; }
-.req { color: var(--accent); margin: 0 4px; }
-.role-label { color: var(--fg-mute); margin-left: 6px; }
-.thumb-cell img { width: 48px; height: 48px; object-fit: contain; image-rendering: pixelated; }
-.dim { color: var(--fg-dim); font-size: 11px; }
-.src { font-family: var(--font-mono); font-size: 11px; color: var(--fg-dim); }
-.size { font-family: var(--font-mono); font-size: 10px; color: var(--fg-mute); margin-left: 6px; }
-.confidence { font-family: var(--font-mono); font-size: 10px; color: var(--accent); }
-.warn { color: var(--amber); margin-left: 4px; }
+.role-id {
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+.req {
+  color: var(--accent);
+  margin: 0 4px;
+}
+.role-label {
+  color: var(--fg-mute);
+  margin-left: 6px;
+}
+.thumb-cell img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+.dim {
+  color: var(--fg-dim);
+  font-size: 11px;
+}
+.src {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-dim);
+}
+.size {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fg-mute);
+  margin-left: 6px;
+}
+.confidence {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--accent);
+}
+.warn {
+  color: var(--amber);
+  margin-left: 4px;
+}
 </style>

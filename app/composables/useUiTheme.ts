@@ -22,9 +22,7 @@ let initialized = false
 function applyClass() {
   if (typeof document === 'undefined') return
   // prefers-color-scheme: dark に matches=true なら OS は暗色を好んでいる
-  const wantLight =
-    mode.value === 'light'
-    || (mode.value === 'auto' && mql ? !mql.matches : false)
+  const wantLight = mode.value === 'light' || (mode.value === 'auto' && mql ? !mql.matches : false)
   document.documentElement.classList.toggle('light', wantLight)
 }
 

@@ -146,7 +146,9 @@ watch(
         </div>
         <div class="right">
           <span class="tag ok">
-            <span class="watch-dot" />{{ detection.enabled ? t('appearance.monitoring') : t('appearance.paused') }}
+            <span class="watch-dot" />{{
+              detection.enabled ? t('appearance.monitoring') : t('appearance.paused')
+            }}
           </span>
         </div>
       </div>
@@ -175,7 +177,17 @@ watch(
           @change="openPicker('light')"
         />
         <div class="auto-switch">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
             <path d="M3 7h12M11 3l4 4-4 4M17 13H5M9 17l-4-4 4-4" />
           </svg>
           <span>Auto Switch</span>
@@ -326,10 +338,12 @@ watch(
   padding: 4px 16px !important;
 }
 
-.fade-enter-active, .fade-leave-active {
+.fade-enter-active,
+.fade-leave-active {
   transition: opacity 0.18s ease;
 }
-.fade-enter-from, .fade-leave-to {
+.fade-enter-from,
+.fade-leave-to {
   opacity: 0;
 }
 </style>

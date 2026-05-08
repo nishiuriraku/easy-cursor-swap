@@ -44,9 +44,7 @@ const startedAt = ref(0)
 const stageLabel = computed(() =>
   stage.value === 1 ? t('panic.stage1Label') : t('panic.stage2Label'),
 )
-const progressPct = computed(() =>
-  Math.round((completedRoles.value / CURSOR_ROLES.length) * 100),
-)
+const progressPct = computed(() => Math.round((completedRoles.value / CURSOR_ROLES.length) * 100))
 const remainingMs = computed(() => {
   if (phase.value !== 'running' || completedRoles.value === 0) return null
   const elapsed = Date.now() - startedAt.value
@@ -69,9 +67,7 @@ function selectStage(s: 1 | 2) {
 async function execute() {
   phase.value = 'running'
   startedAt.value = Date.now()
-  logs.value = [
-    { status: 'ok', text: 'HKCU\\Control Panel\\Cursors snapshot saved', t: '0' },
-  ]
+  logs.value = [{ status: 'ok', text: 'HKCU\\Control Panel\\Cursors snapshot saved', t: '0' }]
   completedRoles.value = 0
 
   // 進捗の擬似アニメ (実 IPC は ms オーダーで完了するため、UI 演出として)
@@ -136,7 +132,13 @@ function logMark(s: LogEntry['status']): string {
 
 <template>
   <Transition name="fade">
-    <div v-if="open" class="panic-overlay" role="dialog" aria-modal="true" aria-labelledby="panic-dialog-title">
+    <div
+      v-if="open"
+      class="panic-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="panic-dialog-title"
+    >
       <div class="panic-card">
         <header class="panic-head">
           <div class="panic-icon" aria-hidden="true">
@@ -183,11 +185,17 @@ function logMark(s: LogEntry['status']): string {
           <div class="trace-head">
             <span :class="['phase-dot', phase]" />
             <span class="phase-label">
-              {{ phase === 'running' ? t('panic.restoringLabel', { n: stage, label: stageLabel })
-                 : phase === 'done' ? t('panic.completeLabel', { n: stage })
-                 : t('panic.errorLabel') }}
+              {{
+                phase === 'running'
+                  ? t('panic.restoringLabel', { n: stage, label: stageLabel })
+                  : phase === 'done'
+                    ? t('panic.completeLabel', { n: stage })
+                    : t('panic.errorLabel')
+              }}
             </span>
-            <span class="role-count">{{ t('panic.keys', { done: completedRoles, total: CURSOR_ROLES.length }) }}</span>
+            <span class="role-count">{{
+              t('panic.keys', { done: completedRoles, total: CURSOR_ROLES.length })
+            }}</span>
           </div>
 
           <div class="progress-track">
@@ -195,11 +203,7 @@ function logMark(s: LogEntry['status']): string {
           </div>
 
           <div class="log-pane">
-            <div
-              v-for="(entry, i) in logs"
-              :key="i"
-              :class="['log-line', entry.status]"
-            >
+            <div v-for="(entry, i) in logs" :key="i" :class="['log-line', entry.status]">
               <span class="log-mark">{{ logMark(entry.status) }}</span>
               <span class="log-time">{{ entry.t ? `${entry.t}ms` : '' }}</span>
               <span class="log-text">{{ entry.text }}</span>
@@ -237,18 +241,10 @@ function logMark(s: LogEntry['status']): string {
             <button v-if="phase === 'idle'" class="btn ghost" @click="close">
               {{ t('common.cancel') }}
             </button>
-            <button
-              v-if="phase === 'idle'"
-              class="btn danger"
-              @click="execute"
-            >
+            <button v-if="phase === 'idle'" class="btn danger" @click="execute">
               <UiIcon name="Alert" :size="13" />{{ t('panic.runStage', { n: stage }) }}
             </button>
-            <button
-              v-else-if="phase === 'running'"
-              class="btn"
-              disabled
-            >
+            <button v-else-if="phase === 'running'" class="btn" disabled>
               <span class="spinner" style="width: 13px; height: 13px" />
               {{ t('panic.running') }}
             </button>
@@ -271,7 +267,7 @@ function logMark(s: LogEntry['status']): string {
   place-items: center;
   padding: 32px;
   background:
-    radial-gradient(900px 600px at 50% 30%, rgba(255, 107, 138, 0.10), transparent 60%),
+    radial-gradient(900px 600px at 50% 30%, rgba(255, 107, 138, 0.1), transparent 60%),
     radial-gradient(700px 400px at 80% 100%, rgba(139, 125, 255, 0.06), transparent 60%),
     rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(10px);
@@ -312,7 +308,10 @@ function logMark(s: LogEntry['status']): string {
   box-shadow: 0 0 20px rgba(255, 107, 138, 0.3);
   flex-shrink: 0;
 }
-.panic-title-block { flex: 1; min-width: 0; }
+.panic-title-block {
+  flex: 1;
+  min-width: 0;
+}
 .panic-title-block h2 {
   margin: 0;
   font-family: var(--font-display);
@@ -351,7 +350,9 @@ function logMark(s: LogEntry['status']): string {
   border-radius: 10px;
   background: rgba(0, 0, 0, 0.2);
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -402,7 +403,9 @@ function logMark(s: LogEntry['status']): string {
 }
 
 /* トレース */
-.trace-block { padding: 20px 26px; }
+.trace-block {
+  padding: 20px 26px;
+}
 .trace-head {
   display: flex;
   align-items: center;
@@ -470,17 +473,31 @@ function logMark(s: LogEntry['status']): string {
   display: flex;
   gap: 10px;
 }
-.log-line.pending { opacity: 0.5; }
-.log-mark { width: 12px; flex-shrink: 0; }
-.log-line.ok .log-mark { color: var(--accent); }
-.log-line.running .log-mark { color: var(--rose); }
-.log-line.pending .log-mark { color: var(--fg-faint); }
+.log-line.pending {
+  opacity: 0.5;
+}
+.log-mark {
+  width: 12px;
+  flex-shrink: 0;
+}
+.log-line.ok .log-mark {
+  color: var(--accent);
+}
+.log-line.running .log-mark {
+  color: var(--rose);
+}
+.log-line.pending .log-mark {
+  color: var(--fg-faint);
+}
 .log-time {
   color: var(--fg-mute);
   width: 56px;
   flex-shrink: 0;
 }
-.log-text { flex: 1; word-break: break-all; }
+.log-text {
+  flex: 1;
+  word-break: break-all;
+}
 
 .role-grid {
   display: grid;
@@ -504,7 +521,7 @@ function logMark(s: LogEntry['status']): string {
   position: relative;
 }
 .rg-cell.done {
-  background: rgba(124, 242, 212, 0.10);
+  background: rgba(124, 242, 212, 0.1);
   border-color: var(--accent-line);
   color: var(--accent);
 }

@@ -11,7 +11,9 @@ const emit = defineEmits<{
 }>()
 
 const open = ref(false)
-function close() { open.value = false }
+function close() {
+  open.value = false
+}
 
 function pick(action: 'files' | 'folder' | 'cursorpack') {
   close()
@@ -30,34 +32,52 @@ function pick(action: 'files' | 'folder' | 'cursorpack') {
     </button>
     <Transition name="fade">
       <div v-if="open" v-click-outside="close" class="bi-menu">
-        <button class="bi-menu-item" @click="pick('files')">{{ t('bulkImport.dropdownFiles') }}</button>
-        <button class="bi-menu-item" @click="pick('folder')">{{ t('bulkImport.dropdownFolder') }}</button>
-        <button class="bi-menu-item" @click="pick('cursorpack')">{{ t('bulkImport.dropdownPack') }}</button>
+        <button class="bi-menu-item" @click="pick('files')">
+          {{ t('bulkImport.dropdownFiles') }}
+        </button>
+        <button class="bi-menu-item" @click="pick('folder')">
+          {{ t('bulkImport.dropdownFolder') }}
+        </button>
+        <button class="bi-menu-item" @click="pick('cursorpack')">
+          {{ t('bulkImport.dropdownPack') }}
+        </button>
       </div>
     </Transition>
   </div>
 </template>
 
 <style scoped>
-.bi-btn-host { position: relative; display: inline-block; }
-.caret { font-size: 9px; margin-left: 4px; }
+.bi-btn-host {
+  position: relative;
+  display: inline-block;
+}
+.caret {
+  font-size: 9px;
+  margin-left: 4px;
+}
 .bi-menu {
-  position: absolute; top: 100%; right: 0;
+  position: absolute;
+  top: 100%;
+  right: 0;
   margin-top: 4px;
   background: var(--bg-1, #14161c);
   border: 1px solid var(--line);
   border-radius: 8px;
   min-width: 220px;
   z-index: 50;
-  display: flex; flex-direction: column;
+  display: flex;
+  flex-direction: column;
 }
 .bi-menu-item {
-  background: transparent; border: 0;
+  background: transparent;
+  border: 0;
   padding: 8px 12px;
   text-align: left;
   font-size: 12px;
   color: var(--fg);
   cursor: pointer;
 }
-.bi-menu-item:hover { background: rgba(124, 242, 212, 0.08); }
+.bi-menu-item:hover {
+  background: rgba(124, 242, 212, 0.08);
+}
 </style>

@@ -11,7 +11,8 @@ export interface CursorIconDef {
 
 export const CURSOR_ICONS: Record<string, CursorIconDef> = {
   Arrow: {
-    paths: '<path d="M5 3 L5 18 L9 14 L11.5 20 L14 19 L11.5 13 L17 13 Z" fill="currentColor" fill-opacity="0.18"/>',
+    paths:
+      '<path d="M5 3 L5 18 L9 14 L11.5 20 L14 19 L11.5 13 L17 13 Z" fill="currentColor" fill-opacity="0.18"/>',
   },
   Help: {
     paths: `
@@ -59,16 +60,19 @@ export const CURSOR_ICONS: Record<string, CursorIconDef> = {
     paths: '<path d="M19 5 L5 19 M15 5 H19 V9 M5 15 V19 H9"/>',
   },
   SizeAll: {
-    paths: '<path d="M12 4 V20 M4 12 H20 M9 7 L12 4 L15 7 M9 17 L12 20 L15 17 M7 9 L4 12 L7 15 M17 9 L20 12 L17 15"/>',
+    paths:
+      '<path d="M12 4 V20 M4 12 H20 M9 7 L12 4 L15 7 M9 17 L12 20 L15 17 M7 9 L4 12 L7 15 M17 9 L20 12 L17 15"/>',
   },
   UpArrow: {
     paths: '<path d="M12 4 V20 M7 9 L12 4 L17 9"/>',
   },
   Hand: {
-    paths: '<path d="M9 12 V6 a1.5 1.5 0 0 1 3 0 V12 M12 11 V5 a1.5 1.5 0 0 1 3 0 V12 M15 11 V6 a1.5 1.5 0 0 1 3 0 V14 a6 6 0 0 1 -6 6 H10 a3 3 0 0 1 -2.5 -1.5 L5 14 a1.5 1.5 0 0 1 2.5 -1.5 L9 14"/>',
+    paths:
+      '<path d="M9 12 V6 a1.5 1.5 0 0 1 3 0 V12 M12 11 V5 a1.5 1.5 0 0 1 3 0 V12 M15 11 V6 a1.5 1.5 0 0 1 3 0 V14 a6 6 0 0 1 -6 6 H10 a3 3 0 0 1 -2.5 -1.5 L5 14 a1.5 1.5 0 0 1 2.5 -1.5 L9 14"/>',
   },
   Pin: {
-    paths: '<path d="M12 21 C12 21 18 14.5 18 10 a6 6 0 0 0 -12 0 c0 4.5 6 11 6 11 Z"/><circle cx="12" cy="10" r="2.2"/>',
+    paths:
+      '<path d="M12 21 C12 21 18 14.5 18 10 a6 6 0 0 0 -12 0 c0 4.5 6 11 6 11 Z"/><circle cx="12" cy="10" r="2.2"/>',
   },
   Person: {
     paths: '<circle cx="12" cy="8" r="3.5"/><path d="M5 20 a7 7 0 0 1 14 0"/>',

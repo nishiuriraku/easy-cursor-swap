@@ -47,8 +47,8 @@ const step = ref<'select' | 'preview'>('select')
 const loading = ref(false)
 const copyDone = ref(false)
 
-const selectedTheme = computed(() =>
-  themes.value.find((t) => t.id === selectedThemeId.value) ?? null,
+const selectedTheme = computed(
+  () => themes.value.find((t) => t.id === selectedThemeId.value) ?? null,
 )
 
 // GitHub インデックスリポジトリのベース URL
@@ -65,7 +65,9 @@ const entryJson = computed(() => {
     author_pubkey_id: keystoreInfo.value.key_id ?? 'FILL_IN_KEY_ID',
     sha256: 'FILL_IN_SHA256_OF_CURSORPACK',
     signature: 'FILL_IN_ED25519_SIGNATURE',
-    download_url: downloadUrl.value || 'https://github.com/YOUR_USER/YOUR_REPO/releases/download/v1.0.0/YOUR_THEME.cursorpack',
+    download_url:
+      downloadUrl.value ||
+      'https://github.com/YOUR_USER/YOUR_REPO/releases/download/v1.0.0/YOUR_THEME.cursorpack',
     version: th.version,
     included_roles: th.included_roles,
     tags: [],
@@ -109,7 +111,9 @@ async function openGitHub() {
 async function copyJson() {
   await navigator.clipboard.writeText(entryJson.value)
   copyDone.value = true
-  setTimeout(() => { copyDone.value = false }, 2000)
+  setTimeout(() => {
+    copyDone.value = false
+  }, 2000)
 }
 
 function close() {
@@ -127,7 +131,14 @@ onMounted(async () => {
 
 <template>
   <Teleport to="body">
-    <div v-if="open" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="submit-dialog-title" @click.self="close">
+    <div
+      v-if="open"
+      class="modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="submit-dialog-title"
+      @click.self="close"
+    >
       <div class="modal">
         <div class="modal-header">
           <h2 id="submit-dialog-title">{{ t('marketplace.submitTitle') }}</h2>
@@ -147,10 +158,12 @@ onMounted(async () => {
                 v-model="selectedThemeId"
                 width="100%"
                 :placeholder="t('marketplace.submitSelectPlaceholder')"
-                :options="themes.map((th) => ({
-                  value: th.id,
-                  label: `${th.name} (v${th.version})`,
-                }))"
+                :options="
+                  themes.map((th) => ({
+                    value: th.id,
+                    label: `${th.name} (v${th.version})`,
+                  }))
+                "
               />
             </div>
 
@@ -192,12 +205,21 @@ onMounted(async () => {
         </div>
 
         <div class="modal-footer">
-          <button v-if="step === 'select'" class="btn" @click="close">{{ t('common.cancel') }}</button>
-          <button v-if="step === 'select'" class="btn primary" :disabled="!canProceed" @click="step = 'preview'">
+          <button v-if="step === 'select'" class="btn" @click="close">
+            {{ t('common.cancel') }}
+          </button>
+          <button
+            v-if="step === 'select'"
+            class="btn primary"
+            :disabled="!canProceed"
+            @click="step = 'preview'"
+          >
             {{ t('marketplace.submitPreviewBtn') }}
           </button>
 
-          <button v-if="step === 'preview'" class="btn" @click="step = 'select'">{{ t('common.back') }}</button>
+          <button v-if="step === 'preview'" class="btn" @click="step = 'select'">
+            {{ t('common.back') }}
+          </button>
           <button v-if="step === 'preview'" class="btn ghost" @click="copyJson">
             {{ copyDone ? t('common.copied') : t('common.copyJson') }}
           </button>

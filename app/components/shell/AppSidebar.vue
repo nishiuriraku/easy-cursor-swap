@@ -16,20 +16,23 @@ interface NavEntry {
   count?: number | null
 }
 
-const props = withDefaults(defineProps<{
-  active: string
-  themeCount?: number
-  marketplaceCount?: number
-  trayMemoryMb?: number
-}>(), {
-  themeCount: 0,
-  marketplaceCount: 0,
-  trayMemoryMb: 11.4,
-})
+const props = withDefaults(
+  defineProps<{
+    active: string
+    themeCount?: number
+    marketplaceCount?: number
+    trayMemoryMb?: number
+  }>(),
+  {
+    themeCount: 0,
+    marketplaceCount: 0,
+    trayMemoryMb: 11.4,
+  },
+)
 
 const emit = defineEmits<{
   'update:active': [id: string]
-  'panic': []
+  panic: []
 }>()
 
 const workspace = computed<NavEntry[]>(() => [
@@ -69,7 +72,12 @@ function navigate(id: string) {
       >
         <UiIcon :name="it.icon" aria-hidden="true" />
         <span>{{ it.label }}</span>
-        <span v-if="it.count !== null && it.count !== undefined" class="nav-count" :aria-label="`${it.count}件`">{{ it.count }}</span>
+        <span
+          v-if="it.count !== null && it.count !== undefined"
+          class="nav-count"
+          :aria-label="`${it.count}件`"
+          >{{ it.count }}</span
+        >
       </button>
     </nav>
 
