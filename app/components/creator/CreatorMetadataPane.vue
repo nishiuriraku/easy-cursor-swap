@@ -18,6 +18,9 @@ const metaAuthor = defineModel<string>('metaAuthor', { required: true })
 const metaVersion = defineModel<string>('metaVersion', { required: true })
 const metaDescription = defineModel<string>('metaDescription', { required: true })
 const shadowEnabled = defineModel<boolean>('shadowEnabled', { required: true })
+const hotspotX = defineModel<number>('hotspotX', { required: true })
+const hotspotY = defineModel<number>('hotspotY', { required: true })
+const perSizeHotspot = defineModel<boolean>('perSizeHotspot', { required: true })
 
 interface ExportProgress {
   buildId: string
@@ -33,6 +36,8 @@ defineProps<{
   exportMessage: string | null
   exportProgress: ExportProgress | null
   exportBusy: boolean
+  activeRoleJp: string
+  showAdvancedResolutions: boolean
 }>()
 
 defineEmits<{
@@ -103,6 +108,36 @@ defineEmits<{
             <span class="tag" :class="arrowAssigned ? 'ok' : ''">
               {{ arrowAssigned ? t('creator.metaAssigned') : t('creator.metaUnassigned') }}
             </span>
+          </SettingsRow>
+        </div>
+      </div>
+
+      <div class="prop-section">
+        <div class="prop-head">
+          {{ t('creator.metaHotspotTitle') }}
+          <span class="role-tag">{{ activeRoleJp }}</span>
+        </div>
+        <div class="prop-body" style="padding: 4px 16px">
+          <SettingsRow :label="t('creatorStart.propHotspotX')">
+            <input
+              v-model.number="hotspotX"
+              type="number"
+              class="input mono"
+              min="0"
+              style="width: 120px"
+            />
+          </SettingsRow>
+          <SettingsRow :label="t('creatorStart.propHotspotY')">
+            <input
+              v-model.number="hotspotY"
+              type="number"
+              class="input mono"
+              min="0"
+              style="width: 120px"
+            />
+          </SettingsRow>
+          <SettingsRow v-if="showAdvancedResolutions" :label="t('creatorStart.propPerSize')">
+            <SettingsToggle v-model="perSizeHotspot" />
           </SettingsRow>
         </div>
       </div>
@@ -317,5 +352,14 @@ defineEmits<{
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+.role-tag {
+  margin-left: 8px;
+  font-size: 11px;
+  color: var(--text-mute);
+  font-family: var(--font-mono);
+  font-weight: 400;
+  text-transform: none;
 }
 </style>

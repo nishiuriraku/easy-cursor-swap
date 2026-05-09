@@ -2,10 +2,10 @@
 /**
  * クリエイターモード (Phase 5-5)
  *
- * design/creator.jsx を Vue 化したもの。3 カラム構成:
+ * design/creator.jsx を Vue 化したもの。2 カラム構成 (Assign タブ):
  *  - 左:  17 役割リスト (filled/partial/empty ドット付き)
  *  - 中央: ビッグプレビュー + 6 サイズストリップ + リサンプル切替
- *  - 右:  Hotspot / アセット / Validation の各プロパティ
+ *  ※ ホットスポット / 影フラグはメタデータタブに集約し、右ペインは廃止。
  *
  * NOTE: 実際の画像アップロード / .cur ビルド / 署名生成は今回はスタブ。
  *       UI 構造とインタラクションのみ実装し、IPC 配線は後続タスクに委ねる。
@@ -1006,11 +1006,16 @@ async function onFileChange(e: Event) {
         v-model:meta-version="metaVersion"
         v-model:meta-description="metaDescription"
         v-model:shadow-enabled="shadowEnabled"
+        v-model:hotspot-x="hotspotX"
+        v-model:hotspot-y="hotspotY"
+        v-model:per-size-hotspot="perSizeHotspot"
         :arrow-assigned="arrowAssigned"
         :assigned-role-count="assignedRoleCount"
         :export-message="exportMessage"
         :export-progress="exportProgress"
         :export-busy="exportBusy"
+        :active-role-jp="activeRole.jp"
+        :show-advanced-resolutions="showAdvancedResolutions"
         @dismiss-export-message="exportMessage = null"
         @cancel-export="cancelExport"
       />
@@ -1168,17 +1173,6 @@ async function onFileChange(e: Event) {
             </div>
           </div>
         </div>
-
-        <CreatorPropertiesPane
-          v-model:hotspot-x="hotspotX"
-          v-model:hotspot-y="hotspotY"
-          v-model:per-size-hotspot="perSizeHotspot"
-          v-model:shadow-enabled="shadowEnabled"
-          :show-advanced-resolutions="showAdvancedResolutions"
-          :imported-preview-url="importedPreviewUrl"
-          :sanitized-removals="sanitizedRemovals"
-          :resample="resample"
-        />
       </div>
 
       <BulkImportPreviewModal
