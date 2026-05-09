@@ -7,6 +7,11 @@ license = "MIT"
 repository = ""
 edition = "2021"
 rust-version = "1.82.0"
+# `src/bin/sign_for_marketplace.rs` が追加されて bin ターゲットが 2 個になった結果、
+# `cargo run` (= `tauri dev` が打つコマンド) が「どちらを起動するか」決められず失敗する。
+# 通常起動はメインアプリなので default-run で固定する。CLI を起動したいときは
+# `cargo run --bin sign_for_marketplace -- ...` を明示する。
+default-run = "easy-cursor-swap"
 
 [lib]
 name = "app_lib"
