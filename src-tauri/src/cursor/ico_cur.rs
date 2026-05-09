@@ -1,13 +1,16 @@
 //! `.ico` / `.cur` インポーター — 既存ファイルから複数解像度を抽出。
 //!
-//! クリエイターモードで「既存カーソルを取り込む」ユースケース向け。
+//! クリエイターモードで「既存カーソルを取り込む」ユースケース、および
+//! ライブラリの「現在のスキーム」プレビューで使用。
 //!
 //! サポート範囲:
 //!   - PNG エンコード済みエントリ (256px の Vista 以降のフォーマット)
-//!   - 32bpp BMP DIB エントリ (BITMAPINFOHEADER + XOR mask)
-//!   - AND mask は不透明度を補強する目的でのみ参照 (32bpp ではアルファを優先)
+//!   - 32bpp BMP DIB エントリ (BITMAPINFOHEADER + XOR mask + α は XOR から)
+//!   - 24bpp BMP DIB エントリ (RGB + AND mask による透明化)
+//!   - 8/4/1bpp パレットエントリ (BITMAPINFOHEADER + 色テーブル + AND mask)
 //!
-//! 非対応: 1/4/8/24bpp の旧式パレットエントリ (生成側でも使われていない)
+//! 8bpp パレットは Aero などの Windows 標準スキームで現役なので必須サポート。
+//! AND mask は 1bpp 透明マスクで、各非 32bpp 形式に対する透明度の出所。
 
 use crate::errors::{AppError, AppResult};
 use image::RgbaImage;
@@ -129,31 +132,43 @@ fn decode_ico_cur_entry(data: &[u8], expected_w: u32, expected_h: u32) -> AppRes
     decode_dib_entry(data, expected_w, expected_h)
 }
 
-/// BITMAPINFOHEADER + XOR/AND マスクを 32bpp 想定で RGBA にデコードする。
-/// 非 32bpp は明示エラー。
+/// BITMAPINFOHEADER + XOR/AND マスクを 1/4/8/24/32bpp で RGBA にデコードする。
+///
+/// Windows 標準のレガシーカーソル (Aero など) は 8bpp パレット形式で配布されている
+/// ものが多く、ここで弾くとライブラリの「現在のスキーム」プレビューが全滅する。
+/// 1/4/8bpp はパレット参照、24/32bpp は直接ピクセル。透明度は 32bpp のときのみ
+/// XOR の α を使用し、それ以外は AND mask (1bpp) を参照する。
 fn decode_dib_entry(data: &[u8], expected_w: u32, expected_h: u32) -> AppResult<RgbaImage> {
     if data.len() < 40 {
         return Err(AppError::ImageProcessing(
             "BITMAPINFOHEADER が不足".to_string(),
         ));
     }
-    let header_size = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
-    if header_size < 40 {
+    let header_size_raw = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+    if header_size_raw < 40 {
         return Err(AppError::ImageProcessing(format!(
             "想定外の BITMAPINFOHEADER サイズ: {}",
-            header_size
+            header_size_raw
         )));
     }
     let dib_w = i32::from_le_bytes([data[4], data[5], data[6], data[7]]);
     let dib_h = i32::from_le_bytes([data[8], data[9], data[10], data[11]]);
     // ICO/CUR の DIB は通常 height = 実高さ × 2 (XOR + AND)
     let bit_count = u16::from_le_bytes([data[14], data[15]]);
-    if bit_count != 32 {
-        return Err(AppError::ImageProcessing(format!(
-            "未対応の bpp ({} bit)。32bpp の .ico/.cur のみ対応",
-            bit_count
-        )));
-    }
+
+    let palette_entries: usize = match bit_count {
+        1 => 2,
+        4 => 16,
+        8 => 256,
+        24 | 32 => 0,
+        other => {
+            return Err(AppError::ImageProcessing(format!(
+                "未対応の bpp ({} bit)。1/4/8/24/32 bit の .ico/.cur のみ対応",
+                other
+            )));
+        }
+    };
+
     let width = dib_w as u32;
     let real_height = dib_h.unsigned_abs() / 2;
     if width != expected_w || real_height != expected_h {
@@ -163,10 +178,21 @@ fn decode_dib_entry(data: &[u8], expected_w: u32, expected_h: u32) -> AppResult<
         )));
     }
 
-    let header_size = header_size as usize;
-    let pixel_off = header_size; // パレットなし (32bpp)
-    let row_bytes = (width * 4) as usize;
-    let xor_size = row_bytes * real_height as usize;
+    let header_size = header_size_raw as usize;
+    let palette_off = header_size;
+    let palette_size = palette_entries * 4;
+    let pixel_off = palette_off + palette_size;
+
+    // XOR mask 行サイズ (ストライドは 4-byte 整列)。
+    let xor_row_bytes: usize = match bit_count {
+        1 => width.div_ceil(32) as usize * 4,
+        4 => width.div_ceil(8) as usize * 4,
+        8 => width.div_ceil(4) as usize * 4,
+        24 => (width * 3).div_ceil(4) as usize * 4,
+        32 => (width * 4) as usize,
+        _ => unreachable!(),
+    };
+    let xor_size = xor_row_bytes * real_height as usize;
     if pixel_off + xor_size > data.len() {
         return Err(AppError::ImageProcessing(
             "XOR マスクが切り詰められています".to_string(),
@@ -174,19 +200,91 @@ fn decode_dib_entry(data: &[u8], expected_w: u32, expected_h: u32) -> AppResult<
     }
     let xor = &data[pixel_off..pixel_off + xor_size];
 
+    // パレット (1/4/8bpp 用)。色テーブルは BGRX 4 byte/エントリで、最後の 1 byte は予約。
+    let palette: Vec<[u8; 3]> = if palette_entries > 0 {
+        if palette_off + palette_size > data.len() {
+            return Err(AppError::ImageProcessing(
+                "パレットが切り詰められています".to_string(),
+            ));
+        }
+        (0..palette_entries)
+            .map(|i| {
+                let p = palette_off + i * 4;
+                [data[p + 2], data[p + 1], data[p]] // R, G, B
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    // AND mask (1bpp, 4-byte 整列)。32bpp では α を優先するので不要。
+    let and_row_bytes = width.div_ceil(32) as usize * 4;
+    let and_size = and_row_bytes * real_height as usize;
+    let and_mask: Option<&[u8]> = if bit_count != 32 {
+        let and_off = pixel_off + xor_size;
+        if and_off + and_size <= data.len() {
+            Some(&data[and_off..and_off + and_size])
+        } else {
+            // AND mask が無い場合は完全不透明扱い (致命的エラーにはしない)
+            None
+        }
+    } else {
+        None
+    };
+
     // BMP は通常ボトムアップ (dib_h > 0)。トップダウンは dib_h < 0。
     let bottom_up = dib_h > 0;
 
     let mut img = RgbaImage::new(width, real_height);
     for y in 0..real_height {
         let src_row = if bottom_up { real_height - 1 - y } else { y };
-        let row_off = src_row as usize * row_bytes;
+        let xor_row_off = src_row as usize * xor_row_bytes;
+        let and_row_off = src_row as usize * and_row_bytes;
         for x in 0..width {
-            let off = row_off + x as usize * 4;
-            let b = xor[off];
-            let g = xor[off + 1];
-            let r = xor[off + 2];
-            let a = xor[off + 3];
+            let xu = x as usize;
+            let (r, g, b, mut a) = match bit_count {
+                32 => {
+                    let off = xor_row_off + xu * 4;
+                    (xor[off + 2], xor[off + 1], xor[off], xor[off + 3])
+                }
+                24 => {
+                    let off = xor_row_off + xu * 3;
+                    (xor[off + 2], xor[off + 1], xor[off], 0xff)
+                }
+                8 => {
+                    let idx = xor[xor_row_off + xu] as usize;
+                    let p = palette[idx];
+                    (p[0], p[1], p[2], 0xff)
+                }
+                4 => {
+                    let byte_off = xor_row_off + xu / 2;
+                    let nibble = if xu & 1 == 0 {
+                        (xor[byte_off] >> 4) & 0x0f
+                    } else {
+                        xor[byte_off] & 0x0f
+                    };
+                    let p = palette[nibble as usize];
+                    (p[0], p[1], p[2], 0xff)
+                }
+                1 => {
+                    let byte_off = xor_row_off + xu / 8;
+                    let bit = 7 - (xu & 7) as u8;
+                    let on = (xor[byte_off] >> bit) & 1;
+                    let p = palette[on as usize];
+                    (p[0], p[1], p[2], 0xff)
+                }
+                _ => unreachable!(),
+            };
+
+            // 非 32bpp は AND mask の bit が 1 なら透明化。
+            if let Some(mask) = and_mask {
+                let byte_off = and_row_off + xu / 8;
+                let bit = 7 - (xu & 7) as u8;
+                if (mask[byte_off] >> bit) & 1 == 1 {
+                    a = 0;
+                }
+            }
+
             img.put_pixel(x, y, image::Rgba([r, g, b, a]));
         }
     }
@@ -255,6 +353,110 @@ mod tests {
         bytes.extend_from_slice(&[0u8; 16]);
         let err = parse_ico_cur(&bytes).unwrap_err();
         assert!(matches!(err, AppError::ImageProcessing(_)));
+    }
+
+    /// 8bpp パレット形式の DIB が正しく RGBA に展開されることを確認する。
+    /// Windows レガシースキーム (Aero など) は 8bpp が現役なのでここを担保しないと
+    /// ライブラリの「現在のスキーム」プレビューが全滅する。
+    #[test]
+    fn parse_ico_cur_decodes_8bpp_dib_with_palette_and_and_mask() {
+        // 4x4 8bpp CUR を手組みで構築する。
+        // パレット 0 = 透明位置で使う黒, 1 = 赤, 2 = 緑, 3 = 青。
+        let palette_size = 256 * 4;
+        let header_size: u32 = 40;
+        let xor_row_bytes: usize = 4; // 4px × 1byte = 4 (4-byte aligned)
+        let xor_size = xor_row_bytes * 4;
+        let and_row_bytes: usize = 4; // (4 + 31) / 32 * 4 = 4
+        let and_size = and_row_bytes * 4;
+
+        let dib_size = (header_size as usize) + palette_size + xor_size + and_size;
+
+        let mut dib: Vec<u8> = Vec::new();
+        // BITMAPINFOHEADER
+        dib.extend_from_slice(&header_size.to_le_bytes()); // size = 40
+        dib.extend_from_slice(&4i32.to_le_bytes()); // width = 4
+        dib.extend_from_slice(&8i32.to_le_bytes()); // height = real_height * 2 = 8
+        dib.extend_from_slice(&1u16.to_le_bytes()); // planes = 1
+        dib.extend_from_slice(&8u16.to_le_bytes()); // bit_count = 8
+        dib.extend_from_slice(&0u32.to_le_bytes()); // compression = BI_RGB
+        dib.extend_from_slice(&0u32.to_le_bytes()); // size_image
+        dib.extend_from_slice(&0i32.to_le_bytes()); // x_ppm
+        dib.extend_from_slice(&0i32.to_le_bytes()); // y_ppm
+        dib.extend_from_slice(&0u32.to_le_bytes()); // colors_used
+        dib.extend_from_slice(&0u32.to_le_bytes()); // colors_important
+                                                    // パレット (BGRX)
+        dib.extend_from_slice(&[0, 0, 0, 0]); // 0: 黒
+        dib.extend_from_slice(&[0, 0, 255, 0]); // 1: 赤 (R=255 → BGR=0,0,255)
+        dib.extend_from_slice(&[0, 255, 0, 0]); // 2: 緑
+        dib.extend_from_slice(&[255, 0, 0, 0]); // 3: 青
+        for _ in 4..256 {
+            dib.extend_from_slice(&[0, 0, 0, 0]);
+        }
+        // XOR (ボトムアップなので最終ロジカル行が先頭)。
+        // 論理的な見た目 (top→bottom):
+        //   row 0: 1 1 1 1 (赤、AND mask で透明)
+        //   row 1: 0 1 2 3 (黒, 赤, 緑, 青)
+        //   row 2: 2 2 2 2 (全部緑)
+        //   row 3: 3 3 3 3 (全部青)
+        // ボトムアップ書き込み (実ファイル): row3, row2, row1, row0
+        dib.extend_from_slice(&[3, 3, 3, 3]); // file row 0 = logical row 3
+        dib.extend_from_slice(&[2, 2, 2, 2]); // file row 1 = logical row 2
+        dib.extend_from_slice(&[0, 1, 2, 3]); // file row 2 = logical row 1
+        dib.extend_from_slice(&[1, 1, 1, 1]); // file row 3 = logical row 0 (透明予定)
+
+        // AND mask (1bpp, 4-byte 整列). ボトムアップ。
+        // 論理 row 0 のみ全部透明 (bit=1 = 透明), 他は不透明 (bit=0)。
+        // 各 1 行 4 byte。先頭 byte の上位 4 bit が x=0..3 を表す (MSB から)。
+        // file row 0..3 = logical row 3..0 の順なので、最後の row (index 3) が透明。
+        dib.extend_from_slice(&[0x00, 0, 0, 0]); // logical row 3: 不透明
+        dib.extend_from_slice(&[0x00, 0, 0, 0]); // logical row 2: 不透明
+        dib.extend_from_slice(&[0x00, 0, 0, 0]); // logical row 1: 不透明
+        dib.extend_from_slice(&[0xf0, 0, 0, 0]); // logical row 0: 上位 4 bit (= x=0..3) ON = 透明
+
+        assert_eq!(dib.len(), dib_size);
+
+        // CUR コンテナを組む: ICONDIR (6) + ICONDIRENTRY (16) + DIB
+        let dir_off = 6 + 16;
+        let mut cur: Vec<u8> = Vec::new();
+        cur.extend_from_slice(&0u16.to_le_bytes()); // reserved
+        cur.extend_from_slice(&2u16.to_le_bytes()); // type = CUR
+        cur.extend_from_slice(&1u16.to_le_bytes()); // count = 1
+                                                    // ICONDIRENTRY
+        cur.push(4); // width
+        cur.push(4); // height
+        cur.push(0); // colorCount
+        cur.push(0); // reserved
+        cur.extend_from_slice(&2u16.to_le_bytes()); // hotspot_x
+        cur.extend_from_slice(&3u16.to_le_bytes()); // hotspot_y
+        cur.extend_from_slice(&(dib_size as u32).to_le_bytes()); // bytes_in_res
+        cur.extend_from_slice(&(dir_off as u32).to_le_bytes()); // image_offset
+        cur.extend_from_slice(&dib);
+
+        let parsed = parse_ico_cur(&cur).expect("parse 8bpp CUR");
+        assert!(parsed.is_cur);
+        assert_eq!(parsed.entries.len(), 1);
+        let e = &parsed.entries[0];
+        assert_eq!((e.width, e.height), (4, 4));
+        assert_eq!((e.hotspot_x, e.hotspot_y), (2, 3));
+
+        // 透明 (logical row 0) — α = 0
+        for x in 0..4 {
+            assert_eq!(
+                e.image.get_pixel(x, 0).0,
+                [0xff, 0, 0, 0],
+                "row 0 x={x} should be transparent red",
+            );
+        }
+        // 不透明: row 1 各色
+        assert_eq!(e.image.get_pixel(0, 1).0, [0, 0, 0, 0xff]); // 黒
+        assert_eq!(e.image.get_pixel(1, 1).0, [0xff, 0, 0, 0xff]); // 赤
+        assert_eq!(e.image.get_pixel(2, 1).0, [0, 0xff, 0, 0xff]); // 緑
+        assert_eq!(e.image.get_pixel(3, 1).0, [0, 0, 0xff, 0xff]); // 青
+                                                                   // row 2 全緑 / row 3 全青
+        for x in 0..4 {
+            assert_eq!(e.image.get_pixel(x, 2).0, [0, 0xff, 0, 0xff]);
+            assert_eq!(e.image.get_pixel(x, 3).0, [0, 0, 0xff, 0xff]);
+        }
     }
 
     /// pick_largest_as_png は最大解像度を返すべき
