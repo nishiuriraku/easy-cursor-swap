@@ -240,7 +240,9 @@ function updateHotspotFromEvent(e: PointerEvent) {
 function onHotspotPointerDown(e: PointerEvent) {
   if (e.button !== 0) return
   hotspotDragging.value = true
-  ;(e.currentTarget as Element).setPointerCapture?.(e.pointerId)
+  const el = e.currentTarget as HTMLElement
+  el.setPointerCapture?.(e.pointerId)
+  el.focus({ preventScroll: true })
   updateHotspotFromEvent(e)
 }
 
@@ -254,6 +256,64 @@ function onHotspotPointerUp(e: PointerEvent) {
   hotspotDragging.value = false
   ;(e.currentTarget as Element).releasePointerCapture?.(e.pointerId)
   // 保存済みアセットがあればホットスポット値を反映する
+  const a = assigned.value[activeRoleId.value]
+  if (a) {
+    setAsset(activeRoleId.value, {
+      ...a,
+      hotspot: { x: hotspotX.value, y: hotspotY.value },
+    })
+  }
+}
+
+/**
+ * ビッグプレビューに focus がある状態で矢印キー / Home / End / PgUp / PgDn を
+ * ハンドリングしてホットスポットを 1 px 単位で移動する。Shift 同時押しで 10 px。
+ *
+ * テキスト入力中の矢印操作と衝突しないよう、event.target が input/textarea のときは
+ * 何もしない。bigpreviewEl 自身が tabindex=0 でフォーカス可能なので、
+ * クリックやドラッグ後にこのハンドラが優先される。
+ */
+function onHotspotKeydown(e: KeyboardEvent) {
+  const tag = (e.target as HTMLElement).tagName
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+
+  const ref = hotspotReferenceSize.value
+  const step = e.shiftKey ? 10 : 1
+  let nx = hotspotX.value
+  let ny = hotspotY.value
+
+  switch (e.key) {
+    case 'ArrowLeft':
+      nx -= step
+      break
+    case 'ArrowRight':
+      nx += step
+      break
+    case 'ArrowUp':
+      ny -= step
+      break
+    case 'ArrowDown':
+      ny += step
+      break
+    case 'Home':
+      nx = 0
+      break
+    case 'End':
+      nx = ref
+      break
+    case 'PageUp':
+      ny = 0
+      break
+    case 'PageDown':
+      ny = ref
+      break
+    default:
+      return
+  }
+  e.preventDefault()
+  hotspotX.value = clamp(nx, 0, ref)
+  hotspotY.value = clamp(ny, 0, ref)
+  // 既存アセットがあればホットスポット値を永続化する
   const a = assigned.value[activeRoleId.value]
   if (a) {
     setAsset(activeRoleId.value, {
@@ -1018,10 +1078,12 @@ async function onFileChange(e: Event) {
                 ref="bigpreviewEl"
                 :class="['bigpreview', { dragging: hotspotDragging }]"
                 :title="t('creator.hotspotHint')"
+                tabindex="0"
                 @pointerdown="onHotspotPointerDown"
                 @pointermove="onHotspotPointerMove"
                 @pointerup="onHotspotPointerUp"
                 @pointercancel="onHotspotPointerUp"
+                @keydown="onHotspotKeydown"
               >
                 <div class="crosshair-h" />
                 <div class="crosshair-v" />
@@ -1373,5 +1435,13 @@ async function onFileChange(e: Event) {
   text-transform: uppercase;
   color: var(--fg-mute);
   margin-bottom: 8px;
+}
+
+.bigpreview:focus {
+  outline: 2px solid var(--accent-line);
+  outline-offset: -2px;
+}
+.bigpreview:focus:not(:focus-visible) {
+  outline: none;
 }
 </style>
