@@ -323,6 +323,21 @@ function onHotspotKeydown(e: KeyboardEvent) {
   }
 }
 
+/**
+ * 現在ロールのホットスポットを画像中央 (primarySize / 2) に移動する。
+ * 既存アセットがあれば永続化、未割当なら UI 表示のみ更新。
+ */
+function centerHotspot() {
+  const ref = hotspotReferenceSize.value
+  const center = Math.round(ref / 2)
+  hotspotX.value = center
+  hotspotY.value = center
+  const a = assigned.value[activeRoleId.value]
+  if (a) {
+    setAsset(activeRoleId.value, { ...a, hotspot: { x: center, y: center } })
+  }
+}
+
 function selectSize(s: number) {
   activeSize.value = s
 }
@@ -1118,6 +1133,13 @@ async function onFileChange(e: Event) {
                   }"
                 />
                 <div class="preview-meta tl">{{ activeSize }} × {{ activeSize }}</div>
+                <button
+                  class="hotspot-center-btn"
+                  :title="t('creator.centerHotspot')"
+                  @click.stop="centerHotspot"
+                >
+                  <UiIcon name="Crosshair" :size="11" />
+                </button>
                 <div class="preview-meta tr">hotspot {{ hotspotX }},{{ hotspotY }}</div>
               </div>
 
@@ -1170,6 +1192,18 @@ async function onFileChange(e: Event) {
                   />
                 </div>
               </Transition>
+
+              <div class="next-step-row">
+                <button
+                  class="btn primary"
+                  :disabled="!arrowAssigned"
+                  :title="!arrowAssigned ? t('creator.requiredMark') : ''"
+                  @click="activeTab = 'metadata'"
+                >
+                  {{ t('creator.nextToMetadata') }}
+                  <UiIcon name="ChevD" :size="13" :style="{ transform: 'rotate(-90deg)' }" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1276,6 +1310,43 @@ async function onFileChange(e: Event) {
 .preview-meta.tr {
   right: 12px;
   color: var(--accent);
+}
+
+.hotspot-center-btn {
+  position: absolute;
+  bottom: 8px;
+  right: 78px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--accent-line);
+  background: rgba(0, 0, 0, 0.4);
+  color: var(--accent);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition:
+    background 120ms ease,
+    transform 120ms ease;
+}
+.hotspot-center-btn:hover {
+  background: rgba(124, 242, 212, 0.15);
+  transform: scale(1.08);
+}
+
+.next-step-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.next-step-row .btn.primary {
+  height: 36px;
+  padding: 0 18px;
+  font-size: 13px;
 }
 
 .resample-row {

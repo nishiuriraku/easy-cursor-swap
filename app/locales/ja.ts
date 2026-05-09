@@ -112,6 +112,8 @@ export default {
     metaDescTitle: '説明',
     metaExportStatus: 'エクスポート状況',
     metaHotspotTitle: 'ホットスポット (現在ロール)',
+    centerHotspot: 'ホットスポットを中央に配置',
+    nextToMetadata: '次へ: メタデータ',
     metaNameJa: '名前 (日本語)',
     metaNameJaDesc: '必須。設定アプリやライブラリで表示されます',
     metaNameEn: '名前 (英語)',

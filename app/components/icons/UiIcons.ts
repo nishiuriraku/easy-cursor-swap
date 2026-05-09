@@ -83,6 +83,10 @@ export const UI_ICONS: Record<string, UiIconDef> = {
     body: '<path d="m3 8 3.5 3.5L13 5"/>',
   },
   ChevD: { viewBox: '0 0 16 16', body: '<path d="m4 6 4 4 4-4"/>' },
+  Crosshair: {
+    viewBox: '0 0 16 16',
+    body: '<circle cx="8" cy="8" r="5.5"/><path d="M8 1v3M8 12v3M1 8h3M12 8h3"/>',
+  },
   Pkg: {
     viewBox: '0 0 24 24',
     body: '<path d="M12 3l8 4v10l-8 4-8-4V7z"/><path d="M4 7l8 4 8-4M12 11v12"/>',

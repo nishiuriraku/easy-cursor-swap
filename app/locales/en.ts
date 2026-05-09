@@ -113,6 +113,8 @@ export default {
     metaDescTitle: 'Description',
     metaExportStatus: 'Export status',
     metaHotspotTitle: 'Hotspot (current role)',
+    centerHotspot: 'Center hotspot',
+    nextToMetadata: 'Next: Metadata',
     metaNameJa: 'Name (Japanese)',
     metaNameJaDesc: 'Required. Shown in Settings and Library',
     metaNameEn: 'Name (English)',
