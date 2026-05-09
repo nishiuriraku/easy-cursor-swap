@@ -2103,10 +2103,10 @@ html.light .td-rp-stage {
   border-radius: 50%;
   background: rgba(124, 242, 212, 0.3);
   box-shadow: 0 0 10px var(--accent);
-  /* Centered + offset to suggest hotspot */
-  top: calc(50% - 28px);
-  left: calc(50% - 28px);
+  /* top/left は ThemeDetailDrawer.vue の hotspotStyle で動的指定。
+     未指定時は inline style 既定 (50%/50%) で画像中央。 */
   transform: translate(-50%, -50%);
+  pointer-events: none;
 }
 .td-rp-missing {
   display: flex;

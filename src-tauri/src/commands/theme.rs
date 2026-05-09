@@ -13,7 +13,7 @@ use crate::config::ConfigManager;
 use crate::cursor::clear_resize_cache;
 use crate::errors::AppError;
 use crate::registry::{CursorRole, RegistryManager};
-use crate::theme::{CursorpackInspection, ThemeManager, ThemeSummary};
+use crate::theme::{CursorpackInspection, RolePreview, ThemeManager, ThemeSummary};
 use serde::Serialize;
 use tauri::State;
 
@@ -116,6 +116,21 @@ pub fn get_theme_previews(
         .map_err(|e| AppError::Theme(format!("無効なテーマ ID: {}", e)))?;
     let filter: Option<&[String]> = if roles.is_empty() { None } else { Some(&roles) };
     ThemeManager::load_role_previews(id, filter)
+}
+
+/// [`get_theme_previews`] のリッチ版。各ロールに PNG + 寸法 + ホットスポット座標を返す。
+///
+/// テーマ詳細ドロワーで「ホットスポットの位置」を視覚化する用途のみ使用。
+/// 旧 [`get_theme_previews`] はテーマカードのサムネ等で使い続ける (ペイロード軽量)。
+#[tauri::command]
+pub fn get_theme_role_previews(
+    theme_id: String,
+    roles: Vec<String>,
+) -> Result<std::collections::HashMap<String, RolePreview>, AppError> {
+    let id = uuid::Uuid::parse_str(&theme_id)
+        .map_err(|e| AppError::Theme(format!("無効なテーマ ID: {}", e)))?;
+    let filter: Option<&[String]> = if roles.is_empty() { None } else { Some(&roles) };
+    ThemeManager::load_role_previews_with_hotspots(id, filter)
 }
 
 /// 指定 ID のテーマをシステムに適用する。

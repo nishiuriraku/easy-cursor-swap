@@ -41,6 +41,26 @@ function onPanic() {
   panicOpen.value = true
 }
 
+/**
+ * パニックリセット完了通知。
+ *
+ * Rust 側の `reset_to_default` / `reset_to_initial` も `cursor-changed`
+ * イベントを発火しているが、その経路は Tauri の listen に依存する。
+ * フロントエンド側の保険として `window` 上にも同名の CustomEvent を投げ、
+ * 各ページが「カーソルが外部更新された」前提で再ロードできるようにする。
+ *
+ * これにより:
+ *   - PanicFlow → default.vue: コンポーネント階層を介した直接通知
+ *   - reset_to_default IPC → cursor-changed: Tauri event 経由
+ *   - PanicFlow → window: DOM event 経由 (ページの listen に直結)
+ *
+ * のうちどれかが落ちてもアクティブテーマ表示が更新される。
+ */
+function onPanicDone(_stage: 1 | 2) {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent('easycs:cursors-changed'))
+}
+
 // グローバルパニックホットキー (Ctrl+Alt+Shift+R)
 function onKeydown(e: KeyboardEvent) {
   if (e.ctrlKey && e.altKey && e.shiftKey && (e.key === 'R' || e.key === 'r')) {
@@ -101,6 +121,6 @@ onUnmounted(() => {
     </div>
 
     <!-- パニックリセットフロー (グローバル) -->
-    <PanicFlow v-model:open="panicOpen" />
+    <PanicFlow v-model:open="panicOpen" @done="onPanicDone" />
   </div>
 </template>

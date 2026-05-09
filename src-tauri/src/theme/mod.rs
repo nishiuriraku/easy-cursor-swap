@@ -24,9 +24,33 @@ pub use types::{
 
 use crate::errors::AppResult;
 use sanitize::sanitize_archive_path;
+use serde::Serialize;
 use std::collections::HashMap;
 use types::{clone_with_suffix, copy_dir_recursive, zip_dir_recursive};
 use uuid::Uuid;
+
+/// 1 ロールあたりのプレビュー詳細。
+///
+/// テーマ詳細ドロワーやクリエイターの大型プレビューで「ホットスポット位置」を
+/// 正しく描画するために、PNG バイト列に加えて画像のネイティブ寸法と
+/// ホットスポット座標 (元画像 px) を返す。
+///
+/// `width` / `height` は実 PNG をデコードして得たピクセル寸法。
+/// `hotspot_x` / `hotspot_y` は theme.json の値 (`.cursorpack`) または
+/// `.cur` ヘッダ値 (Windows スキーム) を採用する。
+#[derive(Debug, Clone, Serialize)]
+pub struct RolePreview {
+    /// PNG バイト列。フロントは Blob 化して `<img>` の src に使う。
+    pub png: Vec<u8>,
+    /// PNG のネイティブ幅 (px)
+    pub width: u32,
+    /// PNG のネイティブ高さ (px)
+    pub height: u32,
+    /// ホットスポット X (元画像 px。`width` と同じ座標系)
+    pub hotspot_x: u32,
+    /// ホットスポット Y (元画像 px。`height` と同じ座標系)
+    pub hotspot_y: u32,
+}
 
 /// テーママネージャー
 pub struct ThemeManager;
@@ -233,6 +257,95 @@ impl ThemeManager {
         Ok(out)
     }
 
+    /// [`load_role_previews`] のリッチ版。各ロールに `RolePreview` (PNG + 寸法 + ホットスポット) を返す。
+    ///
+    /// テーマ詳細ドロワーで「ホットスポットの位置」を視覚化する用途のみ使用する。
+    /// PNG だけでよいプレビュー (テーマカードの 17 ロールサムネ等) は従来の
+    /// [`load_role_previews`] を使い続けて IPC ペイロードの肥大化を避ける。
+    pub fn load_role_previews_with_hotspots(
+        id: Uuid,
+        roles_filter: Option<&[String]>,
+    ) -> AppResult<HashMap<String, RolePreview>> {
+        use crate::config::ConfigManager;
+        use crate::cursor::{parse_ico_cur, pick_largest_as_png};
+
+        let cursors_dir = ConfigManager::cursors_dir()?;
+        let theme_dir = cursors_dir.join(id.to_string());
+        let theme_json_path = theme_dir.join("theme.json");
+        if !theme_json_path.is_file() {
+            return Err(crate::errors::AppError::Theme(format!(
+                "テーマ {} が見つかりません",
+                id
+            )));
+        }
+        let content = std::fs::read_to_string(&theme_json_path)?;
+        let metadata: ThemeMetadata = serde_json::from_str(&content)?;
+
+        let mut out: HashMap<String, RolePreview> = HashMap::new();
+        for (role, def) in &metadata.cursors {
+            if let Some(filter) = roles_filter {
+                if !filter.iter().any(|r| r == role) {
+                    continue;
+                }
+            }
+            let abs = theme_dir.join(&def.file);
+            if !abs.is_file() {
+                continue;
+            }
+            let bytes = match std::fs::read(&abs) {
+                Ok(b) => b,
+                Err(e) => {
+                    tracing::warn!("プレビュー読込失敗 ({}): {}", role, e);
+                    continue;
+                }
+            };
+            let ext = abs
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("")
+                .to_ascii_lowercase();
+            // PNG: ファイル寸法 = theme.json の hotspot 座標系。そのまま採用してよい。
+            // .cur / .ico: ファイル内に複数解像度が入っており、`pick_largest_as_png` は
+            //              通常 256x256 など primary より大きいエントリを返す。
+            //              theme.json の hotspot は primary サイズの座標系で書かれて
+            //              いるため、`entry.hotspot_x/y` (build 時に各エントリ向けに
+            //              scale 済み) を使わないと寸法と座標系がずれてしまい、
+            //              ホットスポットドットが画像の左上にずれて表示されるバグ
+            //              の原因になる。エントリヘッダの値を採用するのが正しい。
+            let preview = if ext == "png" {
+                match image::load_from_memory_with_format(&bytes, image::ImageFormat::Png) {
+                    Ok(img) => RolePreview {
+                        png: bytes,
+                        width: img.width(),
+                        height: img.height(),
+                        hotspot_x: def.hotspot_x,
+                        hotspot_y: def.hotspot_y,
+                    },
+                    Err(e) => {
+                        tracing::warn!("{} の PNG デコード失敗: {}", role, e);
+                        continue;
+                    }
+                }
+            } else {
+                match parse_ico_cur(&bytes).and_then(|p| pick_largest_as_png(&p)) {
+                    Ok((entry, png)) => RolePreview {
+                        png,
+                        width: entry.width,
+                        height: entry.height,
+                        hotspot_x: entry.hotspot_x,
+                        hotspot_y: entry.hotspot_y,
+                    },
+                    Err(e) => {
+                        tracing::warn!("{} の PNG 化に失敗: {}", role, e);
+                        continue;
+                    }
+                }
+            };
+            out.insert(role.clone(), preview);
+        }
+        Ok(out)
+    }
+
     /// 指定 ID のテーマが現在実際にレジストリに適用されているかを判定する。
     ///
     /// `theme.json` に書かれた各役割の絶対パスと、`HKCU\Control Panel\Cursors`
@@ -342,6 +455,109 @@ impl ThemeManager {
                     tracing::warn!("scheme preview {} のレンダリング失敗: {}", role, e);
                 }
             }
+        }
+        out
+    }
+
+    /// [`render_paths_as_previews`] のリッチ版。各ロールに [`RolePreview`] を返す。
+    ///
+    /// Windows システムスキーム (HKCU\Cursors\Schemes) のテーマ詳細ドロワーで
+    /// ホットスポット位置を視覚化する用途のみ使用。`.ani` 形式は先頭フレームの
+    /// 寸法のみ取り出し、ホットスポット情報は持たないので (0, 0) として返す。
+    pub fn render_paths_as_previews_with_hotspots(
+        cursor_paths: &HashMap<String, String>,
+    ) -> HashMap<String, RolePreview> {
+        use crate::cursor::{parse_ani, parse_ico_cur, pick_largest_as_png};
+
+        let mut out: HashMap<String, RolePreview> = HashMap::new();
+        for (role, raw) in cursor_paths {
+            if raw.is_empty() {
+                continue;
+            }
+            let path = std::path::PathBuf::from(raw);
+            if !path.is_file() {
+                continue;
+            }
+            let bytes = match std::fs::read(&path) {
+                Ok(b) => b,
+                Err(e) => {
+                    tracing::warn!("scheme preview 読込失敗 ({}): {}", role, e);
+                    continue;
+                }
+            };
+            let ext = path
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("")
+                .to_ascii_lowercase();
+            let preview = if ext == "png" {
+                match image::load_from_memory_with_format(&bytes, image::ImageFormat::Png) {
+                    Ok(img) => RolePreview {
+                        png: bytes,
+                        width: img.width(),
+                        height: img.height(),
+                        hotspot_x: 0,
+                        hotspot_y: 0,
+                    },
+                    Err(e) => {
+                        tracing::warn!("scheme preview {} の PNG デコード失敗: {}", role, e);
+                        continue;
+                    }
+                }
+            } else if ext == "ani" {
+                // .ani はホットスポット情報をフレームヘッダに持つが、ここでは
+                // 先頭フレームの寸法のみ取り出して中央既定として表示する。
+                match parse_ani(&bytes).and_then(|parsed| {
+                    let frame = parsed.frames.into_iter().next().ok_or_else(|| {
+                        crate::errors::AppError::ImageProcessing(
+                            ".ani にフレームがありません".to_string(),
+                        )
+                    })?;
+                    let mut png = Vec::new();
+                    let encoder = image::codecs::png::PngEncoder::new(&mut png);
+                    image::ImageEncoder::write_image(
+                        encoder,
+                        frame.image.as_raw(),
+                        frame.image.width(),
+                        frame.image.height(),
+                        image::ExtendedColorType::Rgba8,
+                    )
+                    .map_err(|e| {
+                        crate::errors::AppError::ImageProcessing(format!(
+                            "PNG エンコード失敗: {}",
+                            e
+                        ))
+                    })?;
+                    Ok((frame.image.width(), frame.image.height(), png))
+                }) {
+                    Ok((w, h, png)) => RolePreview {
+                        png,
+                        width: w,
+                        height: h,
+                        hotspot_x: 0,
+                        hotspot_y: 0,
+                    },
+                    Err(e) => {
+                        tracing::warn!("scheme preview {} の .ani 変換失敗: {}", role, e);
+                        continue;
+                    }
+                }
+            } else {
+                match parse_ico_cur(&bytes).and_then(|p| pick_largest_as_png(&p)) {
+                    Ok((entry, png)) => RolePreview {
+                        png,
+                        width: entry.width,
+                        height: entry.height,
+                        hotspot_x: entry.hotspot_x,
+                        hotspot_y: entry.hotspot_y,
+                    },
+                    Err(e) => {
+                        tracing::warn!("scheme preview {} の .cur/.ico 変換失敗: {}", role, e);
+                        continue;
+                    }
+                }
+            };
+            out.insert(role.clone(), preview);
         }
         out
     }

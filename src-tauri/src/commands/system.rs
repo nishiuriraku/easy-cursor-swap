@@ -12,18 +12,43 @@ use crate::errors::AppError;
 use crate::health::is_major_bump;
 use crate::registry::RegistryManager;
 use serde::Serialize;
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
 
 /// Windows 既定カーソルにリセットする（パニックボタン）
+///
+/// 副作用:
+///  - レジストリ `HKCU\Control Panel\Cursors` を Windows 既定に戻す
+///  - config の `active_theme_id` を `None` にクリア (アクティブテーマ解除)
+///  - `cursor-changed` イベントを発火 (UI 側で `is_active` バッジを再評価させる)
+///
+/// `cursor-changed` を明示発火する理由: cursor_watcher は `HWND_MESSAGE` で
+/// 作られた message-only window で WM_SETTINGCHANGE のブロードキャストを
+/// 受け取れない。SPI_SETCURSORS による即時反映だけでは UI に伝わらない。
 #[tauri::command]
-pub fn reset_to_default() -> Result<(), AppError> {
-    RegistryManager::reset_to_windows_default()
+pub fn reset_to_default(app: AppHandle, config: State<'_, ConfigManager>) -> Result<(), AppError> {
+    RegistryManager::reset_to_windows_default()?;
+    if let Err(err) = config.update(|c| c.general.active_theme_id = None) {
+        tracing::warn!("reset_to_default: active_theme_id クリア失敗: {}", err);
+    }
+    if let Err(err) = app.emit("cursor-changed", ()) {
+        tracing::warn!("reset_to_default: cursor-changed emit 失敗: {}", err);
+    }
+    Ok(())
 }
 
-/// インストール前の状態にリセットする
+/// インストール前の状態にリセットする。
+///
+/// `reset_to_default` と同じく `active_theme_id` クリア + `cursor-changed` 発火を行う。
 #[tauri::command]
-pub fn reset_to_initial() -> Result<(), AppError> {
-    RegistryManager::restore_from_initial_snapshot()
+pub fn reset_to_initial(app: AppHandle, config: State<'_, ConfigManager>) -> Result<(), AppError> {
+    RegistryManager::restore_from_initial_snapshot()?;
+    if let Err(err) = config.update(|c| c.general.active_theme_id = None) {
+        tracing::warn!("reset_to_initial: active_theme_id クリア失敗: {}", err);
+    }
+    if let Err(err) = app.emit("cursor-changed", ()) {
+        tracing::warn!("reset_to_initial: cursor-changed emit 失敗: {}", err);
+    }
+    Ok(())
 }
 
 /// 現在のダークモード状態を取得する

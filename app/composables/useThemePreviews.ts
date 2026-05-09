@@ -9,9 +9,37 @@
 import { ref } from 'vue'
 import { invokeTauri } from './useTauri'
 
+/**
+ * 個別ロールのプレビュー詳細。
+ *
+ * - `url`: PNG を Blob 化した ObjectURL (`<img>` の src に使う)
+ * - `hotspotX/Y`: 元画像のピクセル座標 (`width/height` と同じ座標系)
+ * - `width/height`: PNG のネイティブ寸法 (px)
+ *
+ * `width/height` が 0 のときはホットスポット位置を計算できないので、
+ * フロント側はフォールバック (中央表示) する。
+ */
+export interface RolePreviewDetail {
+  url: string
+  hotspotX: number
+  hotspotY: number
+  width: number
+  height: number
+}
+
 interface PreviewCacheEntry {
-  /** role → blob URL (ObjectURL) のマップ */
+  /** role → blob URL (ObjectURL) のマップ。後方互換のため維持。 */
   urls: Record<string, string>
+  /** role → 寸法 + ホットスポット詳細 */
+  details: Record<string, RolePreviewDetail>
+}
+
+interface IpcRolePreview {
+  png: number[]
+  width: number
+  height: number
+  hotspot_x: number
+  hotspot_y: number
 }
 
 const cache = new Map<string, PreviewCacheEntry>()
@@ -45,22 +73,34 @@ async function fetchPreviews(themeId: string, roles?: string[]): Promise<Preview
 
   const promise = (async () => {
     try {
+      // ホットスポット情報込みの新 IPC を優先利用。
+      // 単一の往復で url + 寸法 + hotspot を確定させ、テーマ詳細ドロワーの
+      // ホットスポット可視化と従来サムネ用 url の両方を 1 回でキャッシュする。
       const result = isWindowsScheme
-        ? await invokeTauri<Record<string, number[]>>('get_windows_scheme_previews', {
+        ? await invokeTauri<Record<string, IpcRolePreview>>('get_windows_scheme_role_previews', {
             name: themeId.slice(WINDOWS_PREFIX.length),
           })
-        : await invokeTauri<Record<string, number[]>>('get_theme_previews', {
+        : await invokeTauri<Record<string, IpcRolePreview>>('get_theme_role_previews', {
             themeId,
             roles: roles ?? [],
           })
       if (!result) return null
       const urls: Record<string, string> = {}
-      for (const [role, bytes] of Object.entries(result)) {
-        const u8 = new Uint8Array(bytes)
+      const details: Record<string, RolePreviewDetail> = {}
+      for (const [role, info] of Object.entries(result)) {
+        const u8 = new Uint8Array(info.png)
         const blob = new Blob([u8], { type: 'image/png' })
-        urls[role] = URL.createObjectURL(blob)
+        const url = URL.createObjectURL(blob)
+        urls[role] = url
+        details[role] = {
+          url,
+          hotspotX: info.hotspot_x,
+          hotspotY: info.hotspot_y,
+          width: info.width,
+          height: info.height,
+        }
       }
-      const entry: PreviewCacheEntry = { urls }
+      const entry: PreviewCacheEntry = { urls, details }
       cache.set(themeId, entry)
       return entry
     } catch (err) {
@@ -102,8 +142,21 @@ export function useThemePreviews() {
     return entry?.urls ?? null
   }
 
+  /**
+   * ホットスポット情報込みのプレビュー詳細を返す。
+   * テーマ詳細ドロワーで `<img>` の上に hot ドットを正しい位置に置くために使う。
+   */
+  async function getDetails(
+    themeId: string,
+    roles?: string[],
+  ): Promise<Record<string, RolePreviewDetail> | null> {
+    const entry = await fetchPreviews(themeId, roles)
+    return entry?.details ?? null
+  }
+
   return {
     getMap,
+    getDetails,
     invalidate,
     invalidateAll,
     lastError,

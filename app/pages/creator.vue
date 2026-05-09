@@ -204,6 +204,13 @@ const hotspotReferenceSize = computed(
   () => assigned.value[activeRoleId.value]?.primarySize ?? activeSize.value,
 )
 
+/**
+ * `.bigpreview` 内で `<img>` が占める最大寸法 (CSS の `max-width`/`max-height` と一致)。
+ * ホットスポットドットの位置とドラッグ範囲をこの「画像領域」に揃えるために使う。
+ * `global.css` の `.bigpreview img` スタイルを変えたら同期すること。
+ */
+const IMAGE_DISPLAY_PCT = 90
+
 /** ロールが切り替わったら、そのロールの保存済みホットスポットを反映する。 */
 watch(activeRoleId, (id) => {
   const a = assigned.value[id]
@@ -230,8 +237,17 @@ function updateHotspotFromEvent(e: PointerEvent) {
   const el = bigpreviewEl.value
   if (!el) return
   const rect = el.getBoundingClientRect()
-  const ratioX = clamp((e.clientX - rect.left) / rect.width, 0, 1)
-  const ratioY = clamp((e.clientY - rect.top) / rect.height, 0, 1)
+  // 画像は中央配置で 90% サイズなので、コンテナ左右に各 5% (px = rect.width * 0.05)
+  // の余白がある。ホットスポット 0 / refSize の境界を画像領域にそろえるため、
+  // ポインタ位置をその余白を引いた値で割合化し、0-1 にクランプする。
+  // ドット表示 (hotspotStyle) もこの座標系に合わせて 90% スケールしている。
+  const margin = (100 - IMAGE_DISPLAY_PCT) / 2 / 100 // 0.05
+  const innerLeft = rect.left + rect.width * margin
+  const innerTop = rect.top + rect.height * margin
+  const innerWidth = rect.width * (IMAGE_DISPLAY_PCT / 100)
+  const innerHeight = rect.height * (IMAGE_DISPLAY_PCT / 100)
+  const ratioX = clamp((e.clientX - innerLeft) / innerWidth, 0, 1)
+  const ratioY = clamp((e.clientY - innerTop) / innerHeight, 0, 1)
   const ref = hotspotReferenceSize.value
   hotspotX.value = Math.round(ratioX * ref)
   hotspotY.value = Math.round(ratioY * ref)
@@ -1125,11 +1141,19 @@ async function onFileChange(e: Event) {
                   :size="90"
                   style="color: var(--fg); pointer-events: none"
                 />
+                <!--
+                  画像は `max-width: 90%; max-height: 90%` で中央配置される。
+                  純粋に `(hotspotX / refSize) * 100%` で左/上を指定すると
+                  220px コンテナの端から計算されてしまい、5% (= 11px) 分の
+                  余白を含めてしまうため、実際のホットスポット位置からずれる。
+                  ここでは「コンテナ中央 ± 画像サイズの (比率 - 0.5)」で
+                  画像領域内の正しいピクセル位置に揃える。
+                -->
                 <div
                   class="hot"
                   :style="{
-                    left: (hotspotX / hotspotReferenceSize) * 100 + '%',
-                    top: (hotspotY / hotspotReferenceSize) * 100 + '%',
+                    left: `calc(50% + ${(hotspotX / hotspotReferenceSize - 0.5) * IMAGE_DISPLAY_PCT}%)`,
+                    top: `calc(50% + ${(hotspotY / hotspotReferenceSize - 0.5) * IMAGE_DISPLAY_PCT}%)`,
                   }"
                 />
                 <div class="preview-meta tl">{{ activeSize }} × {{ activeSize }}</div>

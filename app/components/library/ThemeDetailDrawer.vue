@@ -23,6 +23,7 @@ import { computed, ref } from 'vue'
 import type { ThemeCardData } from '~/types/theme'
 import { CURSOR_ROLES } from '~/components/icons/CursorIcons'
 import { useI18n } from '~/composables/useI18n'
+import type { RolePreviewDetail } from '~/composables/useThemePreviews'
 
 const { t } = useI18n()
 
@@ -30,6 +31,11 @@ const props = defineProps<{
   theme: ThemeCardData
   /** 役割名 → PNG Object URL のマップ。null のときは UiIcon のフォールバックを表示。 */
   previewMap: Record<string, string> | null
+  /**
+   * 役割名 → ホットスポット詳細 (寸法 + ホットスポット座標) のマップ。
+   * `previewMap` と組で渡されることを想定。null や未取得ロールはホットスポットドット非表示。
+   */
+  previewDetails?: Record<string, RolePreviewDetail> | null
 }>()
 
 const emit = defineEmits<{
@@ -44,17 +50,53 @@ const emit = defineEmits<{
 
 const isSystem = computed(() => props.theme.kind === 'system')
 
-// 17 ロールのうちアクティブにプレビュー中のロール
-const activeRole = ref<string>(props.theme.includedRoles[0] ?? 'Arrow')
-
 const includedSet = computed(() => new Set(props.theme.includedRoles))
 const coverage = computed(() => props.theme.includedRoles.length)
+
+// 17 ロールのうちアクティブにプレビュー中のロール。
+// `CURSOR_ROLES` の並び順 (= ロールカバレッジグリッドの並び順) で最初に
+// 含まれているロールを既定とする。`includedRoles[0]` をそのまま使うと
+// テーマパッケージ側の格納順に左右されて、UI のグリッド左上のボタンと
+// アクティブ表示がズレる (ユーザー体感: 「最初のものが選ばれない」)。
+const initialActiveRole =
+  CURSOR_ROLES.find((r) => includedSet.value.has(r.id))?.id ?? CURSOR_ROLES[0]!.id
+const activeRole = ref<string>(initialActiveRole)
 
 const activeRoleDef = computed(
   () => CURSOR_ROLES.find((r) => r.id === activeRole.value) ?? CURSOR_ROLES[0]!,
 )
 const activeIncluded = computed(() => includedSet.value.has(activeRole.value))
 const activePreviewUrl = computed(() => props.previewMap?.[activeRole.value] ?? null)
+const activePreviewDetail = computed<RolePreviewDetail | null>(
+  () => props.previewDetails?.[activeRole.value] ?? null,
+)
+
+/**
+ * ホットスポットドット位置スタイル。
+ *
+ * `<img>` は親 `.td-rp-stage` に対して 64x64 の固定サイズ + place-items: center
+ * で中央配置されている。ステージ寸法は CSS で 110px (高) なので、画像は
+ * stage 中央の 64x64 領域を占める。ドットは画像のホットスポット位置に
+ * 表示したいので、stage 中心からのオフセットを「画像表示サイズ × 比率」で算出。
+ *
+ * width/height = 0 (PNG デコード失敗) や詳細未取得時は中央 (50%/50%) フォールバック。
+ */
+const HOT_DOT_DISPLAY_SIZE = 64
+const hotspotStyle = computed(() => {
+  const detail = activePreviewDetail.value
+  if (!detail || detail.width <= 0 || detail.height <= 0) {
+    return { left: '50%', top: '50%' }
+  }
+  const ratioX = detail.hotspotX / detail.width
+  const ratioY = detail.hotspotY / detail.height
+  // 画像中心からの px オフセット (画像左上 = (-32, -32)、右下 = (+32, +32))
+  const offsetX = (ratioX - 0.5) * HOT_DOT_DISPLAY_SIZE
+  const offsetY = (ratioY - 0.5) * HOT_DOT_DISPLAY_SIZE
+  return {
+    left: `calc(50% + ${offsetX}px)`,
+    top: `calc(50% + ${offsetY}px)`,
+  }
+})
 
 function selectRole(id: string) {
   activeRole.value = id
@@ -147,7 +189,11 @@ const tags = computed<string[]>(() => {
                   style="width: 64px; height: 64px; image-rendering: pixelated"
                 />
                 <CursorIcon v-else :role="activeRoleDef.id" :size="64" style="color: var(--fg)" />
-                <span class="td-rp-hot" />
+                <span
+                  v-if="activePreviewUrl && activePreviewDetail"
+                  class="td-rp-hot"
+                  :style="hotspotStyle"
+                />
               </template>
               <div v-else class="td-rp-missing">
                 <UiIcon name="Alert" :size="20" />

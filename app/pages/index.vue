@@ -47,6 +47,10 @@ const applyError = ref<string | null>(null)
 // 詳細モーダル制御。モーダルは画面に同時に 1 つしか出さない。
 const detailTheme = ref<ThemeCardData | null>(null)
 const detailPreviewMap = ref<Record<string, string> | null>(null)
+const detailPreviewDetails = ref<Record<
+  string,
+  import('~/composables/useThemePreviews').RolePreviewDetail
+> | null>(null)
 const themePreviewCache = useThemePreviews()
 
 // インポート衝突ダイアログ用
@@ -377,10 +381,17 @@ async function showDetails(id: string) {
   if (!found) return
   detailTheme.value = found
   detailPreviewMap.value = null
+  detailPreviewDetails.value = null
   // Windows システムスキームには ID が `windows:` プレフィックス付きでローカルテーマ
   // のキャッシュキーと衝突しないので、そのまま渡す。実体取得が無い場合は null のまま。
+  // url 取得と詳細取得は同じキャッシュエントリを再利用する (in-flight 共有)。
   try {
-    detailPreviewMap.value = await themePreviewCache.getMap(id)
+    const [map, details] = await Promise.all([
+      themePreviewCache.getMap(id),
+      themePreviewCache.getDetails(id),
+    ])
+    detailPreviewMap.value = map
+    detailPreviewDetails.value = details
   } catch (err) {
     console.warn('[Library] preview load for detail failed:', err)
   }
@@ -389,6 +400,7 @@ async function showDetails(id: string) {
 function closeDetails() {
   detailTheme.value = null
   detailPreviewMap.value = null
+  detailPreviewDetails.value = null
 }
 
 /** 詳細モーダルから「適用」を選んだとき。確認モーダル経由で apply を実行する。 */
@@ -746,6 +758,29 @@ async function setupCursorChangeListener() {
   }
 }
 
+/**
+ * 「テーマ状態が変わったかも」というシグナルを 3 経路から拾う。
+ *
+ * 1. `easycs:cursors-changed` (DOM CustomEvent): default.vue の PanicFlow done フック
+ *    と同じウィンドウから dispatch される。Tauri の listen に依らない確実経路。
+ * 2. `focus` (window): 別ウィンドウやコントロールパネルでカーソルを変更後に
+ *    EasyCursorSwap へ戻ってきたタイミング。
+ * 3. `visibilitychange` (document): タブ非表示 → 表示時。focus と相補。
+ *
+ * いずれもデバウンスせずそのまま `loadThemes` を呼ぶ。`get_themes` 自体が
+ * in-flight 共有しているので連発しても安全。
+ */
+function onExternalCursorsMaybeChanged() {
+  void loadThemes()
+}
+function onWindowFocus() {
+  void loadThemes()
+}
+function onVisibilityChange() {
+  if (typeof document === 'undefined') return
+  if (document.visibilityState === 'visible') void loadThemes()
+}
+
 // --- Tauri v2 ウィンドウドラッグ&ドロップイベント購読 ---
 async function setupTauriDrop() {
   try {
@@ -778,6 +813,13 @@ onMounted(async () => {
   await loadThemes()
   await setupTauriDrop()
   await setupCursorChangeListener()
+  if (typeof window !== 'undefined') {
+    window.addEventListener('easycs:cursors-changed', onExternalCursorsMaybeChanged)
+    window.addEventListener('focus', onWindowFocus)
+  }
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', onVisibilityChange)
+  }
   // ステータスバーで `dark_mode.enabled` を表示するため、初回ロードのみ取りに行く。
   // 既に Settings 画面などで取得済みならキャッシュが返る。
   await appSettings.load().catch(() => null)
@@ -791,6 +833,13 @@ onUnmounted(() => {
   if (unlistenCursorChange) {
     unlistenCursorChange()
     unlistenCursorChange = null
+  }
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('easycs:cursors-changed', onExternalCursorsMaybeChanged)
+    window.removeEventListener('focus', onWindowFocus)
+  }
+  if (typeof document !== 'undefined') {
+    document.removeEventListener('visibilitychange', onVisibilityChange)
   }
 })
 </script>
@@ -957,6 +1006,7 @@ onUnmounted(() => {
     <ThemeDetailModal
       :theme="detailTheme"
       :preview-map="detailPreviewMap"
+      :preview-details="detailPreviewDetails"
       @close="closeDetails"
       @apply="applyFromDetail"
       @edit="editInCreator"

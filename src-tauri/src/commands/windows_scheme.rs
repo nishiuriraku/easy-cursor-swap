@@ -6,7 +6,7 @@
 
 use crate::errors::AppError;
 use crate::registry::{RegistryManager, WindowsScheme};
-use crate::theme::ThemeManager;
+use crate::theme::{RolePreview, ThemeManager};
 use serde::Serialize;
 
 /// 指定スキーム名のロール毎 PNG プレビューを返す。
@@ -24,6 +24,22 @@ pub fn get_windows_scheme_previews(
         .find(|s| s.name == name)
         .ok_or_else(|| AppError::Registry(format!("スキーム '{}' が見つかりません", name)))?;
     Ok(ThemeManager::render_paths_as_previews(&scheme.cursor_paths))
+}
+
+/// [`get_windows_scheme_previews`] のリッチ版。
+/// 各ロールに PNG + ネイティブ寸法 + `.cur` ヘッダ由来のホットスポット座標を返す。
+#[tauri::command]
+pub fn get_windows_scheme_role_previews(
+    name: String,
+) -> Result<std::collections::HashMap<String, RolePreview>, AppError> {
+    let schemes = RegistryManager::list_windows_schemes()?;
+    let scheme = schemes
+        .into_iter()
+        .find(|s| s.name == name)
+        .ok_or_else(|| AppError::Registry(format!("スキーム '{}' が見つかりません", name)))?;
+    Ok(ThemeManager::render_paths_as_previews_with_hotspots(
+        &scheme.cursor_paths,
+    ))
 }
 
 /// 指定 Windows スキームを `.cursorpack` として書き出す。

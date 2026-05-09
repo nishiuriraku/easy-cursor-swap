@@ -13,6 +13,7 @@
 import { computed, onBeforeUnmount, watch } from 'vue'
 import type { ThemeCardData } from '~/types/theme'
 import { useI18n } from '~/composables/useI18n'
+import type { RolePreviewDetail } from '~/composables/useThemePreviews'
 
 const { t } = useI18n()
 
@@ -21,6 +22,8 @@ const props = defineProps<{
   theme: ThemeCardData | null
   /** 役割名 → PNG Object URL のマップ。null のときは UiIcon フォールバック。 */
   previewMap: Record<string, string> | null
+  /** 役割名 → ホットスポット詳細。ホットスポットドット表示に使う。 */
+  previewDetails?: Record<string, RolePreviewDetail> | null
 }>()
 
 const emit = defineEmits<{
@@ -107,6 +110,7 @@ onBeforeUnmount(() => {
             <ThemeDetailDrawer
               :theme="theme"
               :preview-map="previewMap"
+              :preview-details="previewDetails"
               @apply="(id) => emit('apply', id)"
               @edit="(id) => emit('edit', id)"
               @duplicate="(id) => emit('duplicate', id)"

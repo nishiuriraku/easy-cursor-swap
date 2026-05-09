@@ -40,6 +40,7 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         theme::get_current_cursors,
         theme::get_themes,
         theme::get_theme_previews,
+        theme::get_theme_role_previews,
         theme::apply_theme,
         theme::set_theme_favorite,
         theme::clear_cursor_cache,
@@ -71,6 +72,7 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         windows_scheme::list_windows_schemes,
         windows_scheme::apply_windows_scheme,
         windows_scheme::get_windows_scheme_previews,
+        windows_scheme::get_windows_scheme_role_previews,
         windows_scheme::export_windows_scheme_as_cursorpack,
         // システム / 設定 / 診断
         system::reset_to_default,
