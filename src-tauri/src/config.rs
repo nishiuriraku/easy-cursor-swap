@@ -63,7 +63,7 @@ pub struct GeneralConfig {
     ///
     /// 有効にすると、ビルド時に環境変数で埋め込まれた送信先エンドポイント / App Token
     /// (`EASY_CURSOR_SWAP_CRASH_REPORT_ENDPOINT` / `_APP_TOKEN`) を用いて
-    /// `services/crash-report-worker/` (Cloudflare Worker) に POST し、
+    /// Cloudflare Worker (private repo: <https://github.com/nishiuriraku/easy-cursor-swap-crash-report-worker>) に POST し、
     /// `nishiuriraku/easy-cursor-swap` の Issue として転送される。
     /// 環境変数未設定でビルドされた場合は本フラグが true でも送信は行われない。
     #[serde(default)]

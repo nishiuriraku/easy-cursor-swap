@@ -662,7 +662,7 @@
    `list_crash_reports` / `clear_crash_reports` IPC は配線済。設定 → ログセクションに
    一覧 + 「履歴を消去」ボタンを追加するだけ。
 3. **📮 クラッシュレポート送信クライアント実装** (Phase 7-1 続き)
-   Worker は [services/crash-report-worker/](services/crash-report-worker/) で構築済。
+   Worker は別 private repo [easy-cursor-swap-crash-report-worker](https://github.com/nishiuriraku/easy-cursor-swap-crash-report-worker) (owner のみ可視) で構築済。
    Tauri 側 `submit_pending_reports` を実装し、設定画面に **送信エンドポイント URL** と
    **App Token** の入力欄を追加 (config 経由で永続化)。
 
@@ -695,7 +695,7 @@
 11. **🚀 Cloudflare Worker デプロイ** (Phase 7-1, ローカルから 1 回のみ)
     KV 名前空間は MCP 経由で作成済。`wrangler login` → `wrangler secret put GITHUB_TOKEN`
     - `ALLOWED_ORIGIN` → `wrangler deploy` の 3 ステップ。詳細は
-      [services/crash-report-worker/README.md](services/crash-report-worker/README.md)。
+      private repo の README ([easy-cursor-swap-crash-report-worker](https://github.com/nishiuriraku/easy-cursor-swap-crash-report-worker), owner のみ可視)。
 
 ### 👤 ユーザー手動が必要な残作業 (要対話 / 要外部権限)
 
@@ -709,7 +709,9 @@
 `10000: Authentication error` で拒否される。`wrangler` も未認証。
 
 ```bash
-cd services/crash-report-worker
+# private repo を sibling 位置に clone した前提:
+#   git -C <USER_HOME>/Workspace clone https://github.com/nishiuriraku/easy-cursor-swap-crash-report-worker.git
+cd ../easy-cursor-swap-crash-report-worker
 npm install
 npx wrangler login                       # 1. ブラウザ認証 (1 回のみ)
 npx wrangler secret put GITHUB_TOKEN     # 2. 下記の fine-grained PAT を貼り付け
@@ -718,7 +720,7 @@ npx wrangler deploy                      # 4. デプロイ
 ```
 
 KV 名前空間 (`RATE_LIMIT_KV` / `DEDUP_KV`) と `account_id` は
-[services/crash-report-worker/wrangler.toml](services/crash-report-worker/wrangler.toml) に反映済。
+private repo の `wrangler.toml` ([easy-cursor-swap-crash-report-worker](https://github.com/nishiuriraku/easy-cursor-swap-crash-report-worker), owner のみ可視) に反映済。
 
 #### B. GitHub Fine-grained PAT 発行 (Worker secret 用)
 

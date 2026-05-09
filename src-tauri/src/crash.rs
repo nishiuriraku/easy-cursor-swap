@@ -10,7 +10,7 @@
 //! - **PII 除外**: panic メッセージ / location 内のユーザーホームパスは
 //!   `logging::redact_path` で `~/...` に正規化する。
 //! - **fail-safe**: ファイル書き込みが失敗しても panic は通常通り伝搬させる。
-//! - **送信先**: `services/crash-report-worker/` (Cloudflare Worker) に
+//! - **送信先**: Cloudflare Worker (private repo: <https://github.com/nishiuriraku/easy-cursor-swap-crash-report-worker>) に
 //!   POST /crash → `nishiuriraku/easy-cursor-swap` の Issue 化。
 //!   送信は [`submit_pending_reports`] が担当し、ビルド時に環境変数
 //!   `EASY_CURSOR_SWAP_CRASH_REPORT_ENDPOINT` / `_APP_TOKEN` で埋め込まれた

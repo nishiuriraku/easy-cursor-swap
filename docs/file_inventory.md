@@ -136,7 +136,7 @@
 
 | ディレクトリ | 役割 |
 |---|---|
-| [services/crash-report-worker/](../services/crash-report-worker/) | Cloudflare Workers + KV（dedup / rate limit）— **未デプロイ** |
+| [easy-cursor-swap-crash-report-worker (private)](https://github.com/nishiuriraku/easy-cursor-swap-crash-report-worker) | Cloudflare Workers + KV（dedup / rate limit） / 別 private repo に切り出し済 (2026-05-09) |
 | [scripts/check-i18n.mjs](../scripts/check-i18n.mjs) | ja/en parity CI |
 | [scripts/marketplace/validate.mjs](../scripts/marketplace/validate.mjs) | スキーマ + SHA-256 + Ed25519 + VirusTotal v3 |
 | [scripts/marketplace/malware-hashes.txt](../scripts/marketplace/malware-hashes.txt) | マルウェアハッシュ DB |
