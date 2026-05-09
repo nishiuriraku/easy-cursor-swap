@@ -1314,9 +1314,11 @@ async function onFileChange(e: Event) {
 }
 
 .hotspot-center-btn {
+  /* preview-meta.tl / preview-meta.tr は名前に反して両方とも bottom 配置なので、
+     中央ボタンは反対側の右上に置けばどのチップとも衝突しない。 */
   position: absolute;
-  bottom: 8px;
-  right: 78px;
+  top: 8px;
+  right: 8px;
   width: 22px;
   height: 22px;
   border-radius: 50%;
