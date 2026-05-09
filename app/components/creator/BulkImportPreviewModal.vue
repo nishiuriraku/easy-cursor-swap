@@ -185,12 +185,15 @@ function toRoleAsset(
   source: RoleAsset['source'],
   isNewRole: boolean,
 ): RoleAsset {
-  // PNG/SVG 由来のアセットは hotspot 情報を持たず、useBulkImport が (4,4) を
-  // ハードコードで埋めている。ロール新規かつホットスポットがデフォ値なら
-  // 中央既定ロールに対して中央 (primarySize/2) で初期化する。
-  const isDefault = asset.hotspotX === 4 && asset.hotspotY === 4
+  // 「元ファイルに hotspot 情報がない」を kind で判定する。
+  // PNG / SVG は仕様上 hotspot を持たない (Rust 側 bulk_resolve は (0,0) を返す)。
+  // CUR / ICO は header に hotspot があるが、未指定の場合 (0,0) で来る — そのときも
+  // 中央既定が望ましい。`(4, 4)` で判定すると Rust の sentinel (= 0) と噛み合わず
+  // 中央化が一切発火しないバグになる。
+  const noEmbeddedHotspot =
+    asset.kind === 'png' || asset.kind === 'svg' || (asset.hotspotX === 0 && asset.hotspotY === 0)
   const finalHotspot =
-    isNewRole && isDefault
+    isNewRole && noEmbeddedHotspot
       ? initialHotspotFor(roleId, asset.nativeSize)
       : { x: asset.hotspotX, y: asset.hotspotY }
   return {

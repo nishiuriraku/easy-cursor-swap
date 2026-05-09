@@ -1136,6 +1136,7 @@ async function onFileChange(e: Event) {
                 <button
                   class="hotspot-center-btn"
                   :title="t('creator.centerHotspot')"
+                  @pointerdown.stop
                   @click.stop="centerHotspot"
                 >
                   <UiIcon name="Crosshair" :size="11" />
