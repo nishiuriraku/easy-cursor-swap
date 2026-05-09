@@ -78,7 +78,7 @@
 | カテゴリ | コマンド名 |
 |---|---|
 | テーマ | `get_themes`, `apply_theme`, `delete_theme`, `duplicate_theme`, `repackage_theme`, `get_theme_previews`, `get_cursor_roles`, `get_current_cursors` |
-| .cursorpack | `inspect_cursorpack`, `import_cursorpack`, `export_cursorpack`, `export_cursorpack_streamed`, `cancel_build`, `build_cursor_file` |
+| .cursorpack | `inspect_cursorpack`, `import_cursorpack`, `export_cursorpack`, `export_cursorpack_streamed`, `cancel_build` |
 | 鍵管理 | `keystore_info`, `keystore_generate`, `keystore_delete`, `keystore_export`, `keystore_import` |
 | カーソルファイル | `import_cursor_file`, `inspect_ani_file` |
 | マーケットプレース | `marketplace_fetch_index`, `marketplace_install` |
@@ -135,7 +135,7 @@ app/
 | Page | 主な composable / Component | 主な IPC |
 |---|---|---|
 | `index.vue` (Library) | useThemes, ThemeCard / ThemeRow, ApplyModal, ImportConflictDialog, ThemePickerModal | `get_themes`, `apply_theme`, `import_cursorpack`, `inspect_cursorpack`, `delete_theme`, `duplicate_theme`, `repackage_theme`, `list_windows_schemes`, `get_windows_scheme_previews` |
-| `creator.vue` | useCreatorAssets, useRoleMatcher, useBulkImport, useKeystore, sanitizeSvg, NewThemeStartModal, BulkImportPreviewModal | `import_cursor_file`, `inspect_ani_file`, `parse_cursorpack_for_creator`, `bulk_resolve_assets`, `build_cursor_file`, `export_cursorpack_streamed`, `cancel_build`, `keystore_info` |
+| `creator.vue` | useCreatorAssets, useRoleMatcher, useBulkImport, useKeystore, useHotspotDefaults, sanitizeSvg, NewThemeStartModal, BulkImportPreviewModal | `import_cursor_file`, `inspect_ani_file`, `parse_cursorpack_for_creator`, `bulk_resolve_assets`, `export_cursorpack_streamed`, `cancel_build`, `keystore_info` |
 | `marketplace.vue` | useThemes, MarketplaceCard, FeaturedCard, SubmitThemeDialog | `marketplace_fetch_index`, `marketplace_install`, `keystore_info` |
 | `settings.vue` | useAppSettings, useKeystore, useUpdater, ConfigRecoveryPanel, PassphrasePrompt | `get_config`, `update_config`, `keystore_*`, `list_config_backups`, `restore_config_backup`, `export_profile`, `import_profile`, `list_crash_reports`, `clear_crash_reports`, `check_update_is_major_jump` |
 | `appearance.vue` | useAppSettings, ModeIndicator, PairingSlot, ThemePickerModal | `get_dark_mode_status`, `update_config` |

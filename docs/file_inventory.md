@@ -25,7 +25,7 @@
 
 | ファイル | 主な IPC（合計 44 個） |
 |---|---|
-| [commands/cursor_build.rs](../src-tauri/src/commands/cursor_build.rs) | `build_cursor_file` / `export_cursorpack` / `export_cursorpack_streamed` / `cancel_build`（進捗イベント `build-progress`） |
+| [commands/cursor_build.rs](../src-tauri/src/commands/cursor_build.rs) | `export_cursorpack` / `export_cursorpack_streamed` / `cancel_build`（進捗イベント `build-progress`）。低レベルの `cursor::build_cur_from_png` は `export_cursorpack_streamed` から呼ばれて存続（薄いラッパ IPC `build_cursor_file` のみ `17fde57` で廃止） |
 | [commands/cursor_io.rs](../src-tauri/src/commands/cursor_io.rs) | `import_cursor_file`（.cur/.ico → PNG）/ `inspect_ani_file`（RIFF 解析・プレビュー） |
 | [commands/theme.rs](../src-tauri/src/commands/theme.rs) | `get_cursor_roles` / `get_current_cursors` / `get_themes` / `get_theme_previews` / `apply_theme` / `clear_cursor_cache` / `inspect_cursorpack` / `import_cursorpack` / `delete_theme` / `duplicate_theme` / `repackage_theme` |
 | [commands/system.rs](../src-tauri/src/commands/system.rs) | `reset_to_default` / `reset_to_initial` / `get_dark_mode_status` / `get_environment_report` / `get_config` / `update_config` / `get_autostart_status` / `get_app_info` / `list_config_backups` / `restore_config_backup` / `open_url` / `get_accessibility_conflicts` / `check_update_is_major_jump` / `list_crash_reports` / `clear_crash_reports` |
@@ -96,7 +96,7 @@
 |---|---|
 | [shell/](../app/components/shell/) | `AppTitlebar` / `AppSidebar` / `AppStatusbar` / `EnvironmentBanner` |
 | [library/](../app/components/library/) | `ThemeCard` / `ApplyModal` / `CursorMatrix` / `ImportConflictDialog` / `ThemePickerModal` / `LibraryFilterBar` / `ThemeDetailDrawer` ほか 12 個 |
-| [creator/](../app/components/creator/) | `CreatorToolbar` / `CreatorRoleList` / `RoleListItem` / `SizeStrip` / `BulkImport*` 3 種 / `CreatorMetadataPane` / `CreatorPropertiesPane` ほか 11 個 |
+| [creator/](../app/components/creator/) | `CreatorToolbar` / `CreatorRoleList` / `RoleListItem` / `SizeStrip` / `BulkImport*` 3 種 / `CreatorMetadataPane`（Hotspot 節を内包）ほか 10 個。右ペイン (`CreatorPropertiesPane`) は `3886534` で廃止 |
 | [marketplace/](../app/components/marketplace/) | `FeaturedCard` / `MarketplaceCard` / `SubmitThemeDialog` |
 | [settings/](../app/components/settings/) | `GeneralSection` / `StartupSection` / `LibrarySection` / `SecuritySection` / `KeysSection` / `LoggingSection` / `UpdatesSection` / `AboutSection` / `PassphrasePrompt` / `ConfigRecoveryPanel` / `PairingSlot` / `ModeIndicator` ほか 13 個 |
 | [panic/](../app/components/panic/) | `PanicFlow`（ステージ選択 + ライブログ + 17 ロールグリッド） |

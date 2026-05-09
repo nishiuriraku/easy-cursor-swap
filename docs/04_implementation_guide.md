@@ -30,7 +30,7 @@
 フロントエンド・バックエンド間の通信用。Tauriコマンドとして `commands.rs` に登録済み。
 
 1. **取得・適用:** `get_cursor_roles`, `get_current_cursors`, `get_themes`, `apply_theme` (適用時に `active_theme_id` 保存)
-2. **パッケージ:** `inspect_cursorpack`, `import_cursorpack`, `build_cursor_file`, `export_cursorpack`
+2. **パッケージ:** `inspect_cursorpack`, `import_cursorpack`, `export_cursorpack`, `export_cursorpack_streamed`, `cancel_build`
 3. **バックアップ:** `export_profile`, `import_profile`
 4. **鍵管理:** `keystore_info`, `keystore_generate`, `keystore_delete`
 5. **インデックス:** `marketplace_fetch_index`, `marketplace_install`
