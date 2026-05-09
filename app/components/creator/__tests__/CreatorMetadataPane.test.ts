@@ -36,6 +36,11 @@ const baseProps = {
   exportMessage: null as string | null,
   exportProgress: null,
   exportBusy: false,
+  hotspotX: 4,
+  hotspotY: 4,
+  perSizeHotspot: false,
+  activeRoleJp: '通常の選択',
+  showAdvancedResolutions: false,
 }
 
 describe('CreatorMetadataPane', () => {
@@ -172,5 +177,38 @@ describe('CreatorMetadataPane', () => {
     expect(cancelBtn.exists()).toBe(true)
     await cancelBtn.trigger('click')
     expect(wrapper.emitted('cancel-export')).toHaveLength(1)
+  })
+
+  it('renders the Hotspot section with the active role name and emits updates', async () => {
+    const wrapper = mount(CreatorMetadataPane, { props: baseProps, global: { stubs } })
+
+    // Section title + role tag are visible (locale is environment-dependent)
+    expect(wrapper.text()).toMatch(/(ホットスポット \(現在ロール\)|Hotspot \(current role\))/)
+    expect(wrapper.text()).toContain('通常の選択')
+
+    // 2 number inputs (X / Y) are mounted with the bound values
+    const numberInputs = wrapper.findAll<HTMLInputElement>('input[type="number"]')
+    expect(numberInputs.length).toBe(2)
+    expect(numberInputs[0]!.element.value).toBe('4')
+    expect(numberInputs[1]!.element.value).toBe('4')
+
+    // Updating X emits update:hotspotX (defineModel pattern)
+    await numberInputs[0]!.setValue(12)
+    expect(wrapper.emitted('update:hotspotX')?.[0]).toEqual([12])
+
+    // Per-size toggle is hidden when showAdvancedResolutions is false
+    const toggleButtons = wrapper.findAll('.toggle-stub')
+    // existing single-toggle baseline has 1 toggle (shadow); new perSize toggle is hidden
+    expect(toggleButtons.length).toBe(1)
+  })
+
+  it('shows per-size toggle when showAdvancedResolutions is true', () => {
+    const wrapper = mount(CreatorMetadataPane, {
+      props: { ...baseProps, showAdvancedResolutions: true },
+      global: { stubs },
+    })
+
+    // Now both shadow toggle AND per-size toggle should be present (= 2 toggles)
+    expect(wrapper.findAll('.toggle-stub').length).toBe(2)
   })
 })

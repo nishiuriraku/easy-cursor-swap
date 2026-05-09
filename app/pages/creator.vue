@@ -1035,7 +1035,7 @@ async function onFileChange(e: Event) {
         @cancel-export="cancelExport"
       />
 
-      <!-- 3 カラムグリッド (assign タブのみ) -->
+      <!-- 2 カラムグリッド (assign タブのみ) -->
       <div v-if="activeTab === 'assign'" class="creator-grid">
         <CreatorRoleList
           :filled-count="filledCount"
