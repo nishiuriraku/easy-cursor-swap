@@ -304,7 +304,10 @@ onUnmounted(resetState)
             :placeholder="t('bulkImport.selectRolePlaceholder')"
             :options="[
               { value: null, label: t('bulkImport.selectRolePlaceholder') },
-              ...CURSOR_ROLE_IDS.map((r) => ({ value: r, label: r })),
+              ...CURSOR_ROLE_IDS.map((r) => {
+                const def = CURSOR_ROLES.find((d) => d.id === r)
+                return { value: r, label: def ? `${def.jp}（${r}）` : r }
+              }),
             ]"
           />
         </div>
