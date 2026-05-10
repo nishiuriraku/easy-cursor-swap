@@ -26,6 +26,20 @@ describe('normalize', () => {
   it('keeps the role name itself', () => {
     expect(normalize('Arrow.png')).toBe('arrow')
   })
+
+  it('folds full-width digits to half-width', () => {
+    // `Ａｒｒｏｗ＿６４．png` → `arrow` (全角は ASCII 経路と同じ結果になる)
+    expect(normalize('Ａｒｒｏｗ＿６４．png')).toBe('arrow')
+    // 全角数字でも 2 桁以上ならサイズサフィックス扱いになる
+    expect(normalize('arrow_６４.png')).toBe('arrow')
+    // 単一桁 (1 桁) はロール識別子保護のため残る
+    expect(normalize('斜め１.ani')).toBe('斜め1')
+  })
+
+  it('folds full-width ASCII letters to half-width', () => {
+    // `ＰＯＩＮＴＥＲ.png` → `pointer`
+    expect(normalize('ＰＯＩＮＴＥＲ.png')).toBe('pointer')
+  })
 })
 
 describe('scoreRole', () => {

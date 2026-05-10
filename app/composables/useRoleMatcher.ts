@@ -15,6 +15,8 @@
 /**
  * ファイル名を比較しやすい形に正規化する。
  *
+ *  - 全角 ASCII (`Ａ-Ｚ` `ａ-ｚ` `０-９` および `＿` `．` 等の記号) を半角に正規化
+ *    → 後段の ASCII 前提処理に流す
  *  - 拡張子 (英数字のみ、ASCII の `.` 終端) を除去 → `.ani` `.cur` `.png` 等
  *  - バージョンタグ `v1` / `v1.2` 等を除去
  *  - 解像度サフィックス (`64`, `64px`, `32x32`) を除去
@@ -25,6 +27,11 @@
 export function normalize(name: string): string {
   return (
     name
+      // 全角 ASCII (U+FF01–U+FF5E) を半角 (U+0021–U+007E) に変換。
+      // ブロック全体が ASCII から +0xFEE0 のオフセットになっているので一括で fold できる。
+      // 後段の `.toLowerCase()` / 拡張子除去 / サイズ剥がしは ASCII 想定のため、
+      // 最初に変換しておくと全角入力 (`Ａｒｒｏｗ＿６４．png` 等) も同じ経路で処理できる
+      .replace(/[！-～]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
       .toLowerCase()
       .replace(/\.[a-z0-9]+$/, '')
       .replace(/v\d+(\.\d+)*/g, '')
@@ -60,10 +67,23 @@ export const ROLE_ALIASES: Record<string, string[]> = {
     'loading',
     'バックグラウンドで作業中',
     'バックグラウンド',
+    'バック',
+    '作業',
     '作業中',
     '読み込み中',
   ],
-  Wait: ['wait', 'busy', 'spinner', 'hourglass', '待ち状態', '待機', '砂時計', 'ビジー'],
+  Wait: [
+    'wait',
+    'busy',
+    'spinner',
+    'hourglass',
+    '待ち状態',
+    '待ち',
+    '待',
+    '待機',
+    '砂時計',
+    'ビジー',
+  ],
   Crosshair: ['crosshair', 'cross', 'precision', '領域の選択', '領域', '十字', '精密'],
   // `カーソル` は日本語カーソルファイル名に頻出する汎用語のためエイリアスから除外
   // (例: `手書きカーソル.ani` を IBeam に誤マッチさせない)
