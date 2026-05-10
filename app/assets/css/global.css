@@ -921,37 +921,6 @@ button {
   font-size: 12px;
 }
 
-/* --- ステータスバー --- */
-.statbar {
-  height: 28px;
-  border-top: 1px solid var(--line);
-  display: flex;
-  align-items: center;
-  padding: 0 16px;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--fg-mute);
-  letter-spacing: 0.04em;
-  background: rgba(10, 11, 15, 0.6);
-  gap: 16px;
-  flex-shrink: 0;
-}
-.statbar .stat {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.statbar .stat .dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 6px var(--accent);
-}
-.statbar .sep {
-  color: var(--fg-faint);
-}
-
 /* --- ドロップオーバーレイ --- */
 .drop {
   position: absolute;

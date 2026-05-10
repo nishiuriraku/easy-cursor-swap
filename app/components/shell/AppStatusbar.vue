@@ -14,11 +14,16 @@ defineProps<{
 </script>
 
 <template>
-  <div class="statbar">
+  <div
+    class="flex h-7 shrink-0 items-center gap-4 border-t border-line bg-[rgba(10,11,15,0.6)] px-4 font-mono text-[10.5px] tracking-[0.04em] text-fg-mute"
+  >
     <template v-for="(it, i) in items" :key="i">
-      <span v-if="i > 0" class="sep">·</span>
-      <span class="stat">
-        <span v-if="it.dot" class="dot" />
+      <span v-if="i > 0" class="text-fg-faint">·</span>
+      <span class="flex items-center gap-1.5">
+        <span
+          v-if="it.dot"
+          class="size-1.5 rounded-full bg-accent shadow-[0_0_6px_var(--color-accent)]"
+        />
         {{ it.text }}
       </span>
     </template>
