@@ -326,6 +326,9 @@ export default {
     submitPreviewHint: 'entry JSON を確認し「GitHub で PR を開く」をクリックしてください。',
     submitFillInNote: 'FILL_IN_* の項目はアップロード後に GitHub の Web エディタで埋めてください。',
     submitOpenGithub: 'GitHub で PR を開く',
+    fetchError: 'インデックスの取得に失敗しました',
+    fetchRetry: '再試行',
+    lastSyncJustNow: '取得済み',
   },
   conflict: {
     headerNewer: '新しいバージョンへの更新',

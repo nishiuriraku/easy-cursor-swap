@@ -70,6 +70,10 @@ pub struct MarketplaceEntry {
     pub homepage: Option<String>,
     #[serde(rename = "download_count", default)]
     pub download_count: u64,
+    /// Featured 表示用ラベル (例: "new", "popular")。公式 index.json が
+    /// 将来このフィールドを含める可能性があるため `serde(default)` で受け取る。
+    #[serde(default)]
+    pub highlight: Option<String>,
 }
 
 /// 公開鍵レジストリ (`authors/{github}.json`) のスキーマ。

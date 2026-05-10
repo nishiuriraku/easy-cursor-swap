@@ -12,7 +12,6 @@
  */
 import { computed, onMounted, ref } from 'vue'
 import type { MarketplaceEntry, MarketplaceTag } from '~/types/marketplace'
-import { CURSOR_ROLES } from '~/components/icons/CursorIcons'
 import { invokeTauri } from '~/composables/useTauri'
 import { useI18n } from '~/composables/useI18n'
 
@@ -25,50 +24,70 @@ const isLoading = ref(true)
 const filter = ref<MarketplaceTag>('all')
 const searchQuery = ref('')
 const installingId = ref<string | null>(null)
-const lastSync = ref('2分前')
+const lastSync = computed(() => t('marketplace.lastSyncJustNow'))
 
-// --- デモデータ ---
-function makeDemo(): MarketplaceEntry[] {
-  const allRoles = CURSOR_ROLES.map((r) => r.id)
-  const featured: Array<Pick<MarketplaceEntry, 'name' | 'author' | 'downloadCount' | 'highlight'>> =
-    [
-      { name: 'Aurora Glass', author: 'studio.kane', downloadCount: 4821, highlight: 'new' },
-      { name: 'Pixel Pop 8bit', author: 'RetroPixel', downloadCount: 12404, highlight: 'popular' },
-      { name: 'Liquid Mercury', author: 'fluidlab', downloadCount: 2103, highlight: null },
-    ]
-  const gridNames = [
-    'Aurora Glass',
-    'Pixel Pop 8bit',
-    'Liquid Mercury',
-    'Sumi 墨',
-    'Origami',
-    'Holograph',
-    'Northstar',
-    'Brutalist',
-    'Vapor Trail',
-    'Soft Tide',
-    'Mech Industrial',
-    'Honeycomb',
-  ]
-  return gridNames.map((name, i) => {
-    const f = featured.find((x) => x.name === name)
-    return {
-      id: `demo-${i}`,
-      name,
-      author: f?.author ?? `curator${(i % 5) + 1}`,
-      authorGithub: f?.author?.toLowerCase() ?? `curator${(i % 5) + 1}`,
-      sha256: '0'.repeat(64),
-      signature: 'demo-signature',
-      authorPubkeyId: '7f3a9c' + (i % 10),
-      downloadUrl: `https://github.com/nishiuriraku/easy-cursor-swap-index/themes/releases/download/${name}.cursorpack`,
-      version: `1.${i % 5}.${i % 3}`,
-      downloadCount: f?.downloadCount ?? 420 + i * 137,
-      includedRoles: allRoles.slice(0, 6 + (i % 11)),
-      tags: ['minimal', 'dark'],
-      highlight: f?.highlight ?? null,
-      verified: true,
+// --- IPC 経由で受け取る Rust 側スキーマ (snake_case) ---
+interface RustMarketplaceEntry {
+  id: string
+  name: string
+  author: string
+  author_github: string
+  author_pubkey_id: string
+  sha256: string
+  signature: string
+  download_url: string
+  version: string
+  included_roles: string[]
+  tags: string[]
+  homepage?: string
+  download_count: number
+  highlight?: 'new' | 'popular' | null
+}
+
+interface RustMarketplaceIndex {
+  schema_version: number
+  commit?: string
+  entries: RustMarketplaceEntry[]
+}
+
+function adaptEntry(e: RustMarketplaceEntry): MarketplaceEntry {
+  return {
+    id: e.id,
+    name: e.name,
+    author: e.author,
+    authorGithub: e.author_github,
+    homepage: e.homepage,
+    sha256: e.sha256,
+    signature: e.signature,
+    authorPubkeyId: e.author_pubkey_id,
+    downloadUrl: e.download_url,
+    version: e.version,
+    downloadCount: e.download_count,
+    includedRoles: e.included_roles,
+    tags: e.tags,
+    highlight: (e.highlight ?? null) as MarketplaceEntry['highlight'],
+    verified: true, // 公式インデックス掲載 = CI で署名検証済み
+  }
+}
+
+const fetchError = ref<string | null>(null)
+
+async function loadIndex() {
+  isLoading.value = true
+  fetchError.value = null
+  try {
+    const idx = await invokeTauri<RustMarketplaceIndex>('marketplace_fetch_index')
+    if (!idx) {
+      throw new Error('empty response')
     }
-  })
+    entries.value = idx.entries.map(adaptEntry)
+  } catch (e) {
+    entries.value = []
+    fetchError.value = e instanceof Error ? e.message : String(e)
+    console.warn('[marketplace] fetch failed:', e)
+  } finally {
+    isLoading.value = false
+  }
 }
 
 // --- 計算プロパティ ---
@@ -141,12 +160,7 @@ const filters: Array<{ id: MarketplaceTag; label: string }> = [
   { id: 'dark', label: 'Dark' },
 ]
 
-onMounted(async () => {
-  // 将来: invoke('marketplace_fetch_index')
-  await new Promise((r) => setTimeout(r, 500))
-  entries.value = makeDemo()
-  isLoading.value = false
-})
+onMounted(loadIndex)
 </script>
 
 <template>
@@ -201,8 +215,17 @@ onMounted(async () => {
         </div>
       </div>
 
+      <!-- 取得失敗 -->
+      <div v-if="fetchError" class="error-state">
+        <UiIcon name="Alert" :size="32" />
+        <p class="error-msg">{{ t('marketplace.fetchError') }}</p>
+        <button class="btn primary" @click="loadIndex">
+          {{ t('marketplace.fetchRetry') }}
+        </button>
+      </div>
+
       <!-- ローディング -->
-      <div v-if="isLoading" class="grid">
+      <div v-else-if="isLoading" class="grid">
         <div v-for="i in 6" :key="i" class="card skeleton-card" />
       </div>
 
@@ -239,7 +262,7 @@ onMounted(async () => {
     <!-- ステータスバー -->
     <AppStatusbar
       :items="[
-        { dot: true, text: `Index synced ${lastSync}` },
+        { dot: true, text: `Index synced · ${lastSync}` },
         { text: `${entries.length} themes · ${totalAuthors} authors` },
         { text: 'schema v3.2' },
       ]"
@@ -285,7 +308,8 @@ onMounted(async () => {
   }
 }
 
-.empty-state {
+.empty-state,
+.error-state {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -294,6 +318,14 @@ onMounted(async () => {
   text-align: center;
   color: var(--fg-mute);
   gap: 12px;
+}
+.error-state {
+  color: var(--rose, #ff6b8a);
+}
+.error-state .error-msg {
+  margin: 0;
+  font-size: 14px;
+  color: var(--fg);
 }
 .empty-state h3 {
   margin: 0;

@@ -327,6 +327,9 @@ export default {
     submitPreviewHint: 'Review the entry JSON and click "Open GitHub PR" to start a PR.',
     submitFillInNote: 'Fill in the FILL_IN_* fields in the GitHub web editor after uploading your cursorpack.',
     submitOpenGithub: 'Open GitHub PR',
+    fetchError: 'Failed to fetch index',
+    fetchRetry: 'Retry',
+    lastSyncJustNow: 'Just synced',
   },
   conflict: {
     headerNewer: 'Update to a newer version',
