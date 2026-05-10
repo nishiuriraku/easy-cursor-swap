@@ -35,3 +35,12 @@ export async function invokeTauri<T = unknown>(
     throw err
   }
 }
+
+/**
+ * 起動時または 2 重起動シグナル経由で `.cursorpack` パスが Rust 側に積まれていれば
+ * 取り出す。なければ null。`useCursorpackOpener` から使う。
+ */
+export async function takePendingCursorpack(): Promise<string | null> {
+  const result = await invokeTauri<string | null>('take_pending_cursorpack')
+  return result ?? null
+}

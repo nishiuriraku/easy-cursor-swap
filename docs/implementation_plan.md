@@ -653,6 +653,13 @@
 > ほぼ枯渇。残るのは **外部依存** (実申請・実機 a11y 計測) と、
 > 配布規模を上げるための **クラッシュレポート Worker 強化** など。
 
+### 変更履歴
+
+- 2026-05-10: `.cursorpack` の Windows ファイル関連付けを v1.0 に追加
+  (spec: `docs/superpowers/specs/2026-05-10-cursorpack-file-association-design.md`)。
+  `tauri-plugin-single-instance` 導入に伴い、カスタム `single_instance.rs` を撤去。
+  `.ani` 新規生成は引き続き v1.0 スコープ外 (Future Work)。
+
 ### 🔧 コード変更で完結するもの
 
 1. **♿ WCAG AA コントラスト比 4.5:1 の実測検証** (Phase 5-11)

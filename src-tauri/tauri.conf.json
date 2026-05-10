@@ -38,6 +38,15 @@
     "category": "Utility",
     "shortDescription": "Win11 cursor manager",
     "longDescription": "Next-generation Windows mouse cursor manager with Ed25519 signed theme distribution.",
+    "fileAssociations": [
+      {
+        "ext": ["cursorpack"],
+        "name": "EasyCursorSwap Theme Pack",
+        "description": "EasyCursorSwap カーソルテーマパッケージ",
+        "role": "Editor",
+        "mimeType": "application/x-cursorpack"
+      }
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

@@ -16,6 +16,7 @@ import { notify } from '~/composables/useNotify'
 import { useI18n } from '~/composables/useI18n'
 import { useThemePreviews } from '~/composables/useThemePreviews'
 import { useAppSettings } from '~/composables/useAppSettings'
+import { useCursorpackOpener } from '~/composables/useCursorpackOpener'
 
 const { t } = useI18n()
 // UiIcon / ThemeCard / ApplyModal / AppStatusbar は Nuxt の自動インポートで解決される。
@@ -805,6 +806,11 @@ async function setupTauriDrop() {
   }
 }
 
+// Explorer から渡された .cursorpack を受け取り、既存の importByPath フローに流す。
+const cursorpackOpener = useCursorpackOpener((path) => {
+  void importByPath(path)
+})
+
 onMounted(async () => {
   await loadThemes()
   await setupTauriDrop()
@@ -819,9 +825,12 @@ onMounted(async () => {
   // appSettings は本ページ起動時に常時必要 (active_theme_id 等)。初回ロードのみ取りに行く。
   // 既に Settings 画面などで取得済みならキャッシュが返る。
   await appSettings.load().catch(() => null)
+  // .cursorpack のファイル関連付け経由インポートを開始
+  void cursorpackOpener.start()
 })
 
 onUnmounted(() => {
+  void cursorpackOpener.stop()
   if (unlistenDrop) {
     unlistenDrop()
     unlistenDrop = null

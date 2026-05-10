@@ -9,6 +9,9 @@ use app_lib::appusermodel;
 use app_lib::autostart;
 use app_lib::bulk_import;
 use app_lib::commands;
+use app_lib::commands::cursor_io::{
+    handle_pending_cursorpack, stash_pending_cursorpack, PendingCursorpack,
+};
 use app_lib::config::ConfigManager;
 use app_lib::crash;
 use app_lib::cursor_watcher;
@@ -16,7 +19,6 @@ use app_lib::health::{RollbackTarget, StartupCheck};
 use app_lib::hotkey;
 use app_lib::logging;
 use app_lib::registry::RegistryManager;
-use app_lib::single_instance::{self, SingleInstanceLock};
 use app_lib::tray;
 
 /// 連続起動失敗 3 回検出時のロールバック案内ダイアログ。
@@ -154,22 +156,8 @@ fn main() {
     // AppUserModelID を明示登録 (トースト発信元の見える化)
     appusermodel::register_aumid();
 
-    // 多重起動防止: Named Mutex を取得。既存インスタンスがあれば中断。
-    // _instance_lock は drop 時にミューテックスを解放するので main の最後まで保持。
-    let _instance_lock = match SingleInstanceLock::acquire() {
-        Ok(lock) => lock,
-        Err(e) => {
-            tracing::warn!("多重起動を検出: {}", e);
-            // 既存インスタンスへ「ウィンドウを表示せよ」シグナルを送って静かに終了
-            if let Err(notify_err) = single_instance::notify_existing_instance() {
-                tracing::warn!("既存インスタンスへの通知失敗: {}", notify_err);
-                eprintln!("EasyCursorSwap は既に起動しています");
-            } else {
-                tracing::info!("既存インスタンスへフォーカス要求を送信しました");
-            }
-            return;
-        }
-    };
+    // 多重起動防止 + argv ハンドオーバは tauri-plugin-single-instance に集約。
+    // 詳細は builder の .plugin(tauri_plugin_single_instance::init(...)) を参照。
 
     // 設定マネージャー初期化
     let config_manager = match ConfigManager::init() {
@@ -246,6 +234,21 @@ fn main() {
         builder = builder.plugin(tauri_plugin_mcp_bridge::init());
     }
     builder
+        .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
+            // 2 重起動時: 既存インスタンス側で実行される callback。
+            let cwd_path = std::path::PathBuf::from(&cwd);
+            handle_pending_cursorpack(app, &argv, &cwd_path);
+            // ウィンドウ前面化 (破棄されてトレイ常駐中なら再生成)
+            use tauri::Manager;
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.show();
+                let _ = w.unminimize();
+                let _ = w.set_focus();
+            } else {
+                tray::show_or_recreate_main_window(app);
+            }
+            tracing::info!("第二インスタンス要求でメインウィンドウを前面化");
+        }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
@@ -253,6 +256,7 @@ fn main() {
         .plugin(tauri_plugin_process::init())
         .manage(config_manager)
         .manage(bulk_import::CancelRegistry::default())
+        .manage(PendingCursorpack::default())
         // 閉じるボタン → WebView を破棄してメモリ解放 (Phase 4-1)
         // アプリ自体はトレイに常駐し続ける。再表示時に tray::show_or_recreate_main_window が
         // ウィンドウを再生成する。
@@ -269,19 +273,19 @@ fn main() {
         .setup(move |app| {
             let handle = app.handle().clone();
 
+            // 初回起動時の argv に .cursorpack があれば PendingCursorpack に積む。
+            // フロントは take_pending_cursorpack IPC でマウント後にプルする。
+            let argv: Vec<String> = std::env::args().collect();
+            let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+            stash_pending_cursorpack(&handle, &argv, &cwd);
+
             // システムトレイの初期化
             if let Err(e) = tray::setup_tray(&handle) {
                 tracing::error!("システムトレイの初期化に失敗: {}", e);
             }
 
-            // 第二インスタンスからの「ウィンドウを表示せよ」シグナル待機
-            let show_handle = handle.clone();
-            if let Err(e) = single_instance::start_show_window_listener(move || {
-                tray::show_or_recreate_main_window(&show_handle);
-                tracing::info!("第二インスタンス要求でメインウィンドウを前面化");
-            }) {
-                tracing::warn!("show-window listener の起動に失敗: {}", e);
-            }
+            // (旧 single_instance::start_show_window_listener は
+            //  tauri-plugin-single-instance の callback に統合した)
 
             // パニックホットキー (`Ctrl+Alt+Shift+R` 等 config 値) の登録
             // 押下時はフロントへ `panic-hotkey` イベントを発火し、PanicFlow を起動させる

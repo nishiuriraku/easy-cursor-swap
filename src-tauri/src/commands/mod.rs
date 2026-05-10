@@ -56,6 +56,7 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         // .cur / .ico / .ani 取り込み
         cursor_io::import_cursor_file,
         cursor_io::inspect_ani_file,
+        cursor_io::take_pending_cursorpack,
         // 鍵管理
         keystore::keystore_info,
         keystore::keystore_generate,
