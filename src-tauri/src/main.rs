@@ -1,6 +1,6 @@
 //! EasyCursorSwap - メインエントリポイント
 //!
-//! Tauri アプリケーションの初期化、トレイ常駐、ダークモード監視を統括する。
+//! Tauri アプリケーションの初期化とトレイ常駐を統括する。
 
 // リリースビルドではコンソールウィンドウを非表示にする
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
@@ -12,7 +12,6 @@ use app_lib::commands;
 use app_lib::config::ConfigManager;
 use app_lib::crash;
 use app_lib::cursor_watcher;
-use app_lib::darkmode;
 use app_lib::health::{RollbackTarget, StartupCheck};
 use app_lib::hotkey;
 use app_lib::logging;
@@ -282,65 +281,6 @@ fn main() {
                 tracing::info!("第二インスタンス要求でメインウィンドウを前面化");
             }) {
                 tracing::warn!("show-window listener の起動に失敗: {}", e);
-            }
-
-            // ダークモード監視の開始 — テーマ自動切替まで含めて配線
-            let app_handle = handle.clone();
-            if let Err(e) = darkmode::start_dark_mode_watcher(move |is_dark| {
-                tracing::info!(
-                    "ダークモード変更を検知: {}",
-                    if is_dark { "ダーク" } else { "ライト" }
-                );
-                // app_lib::tauri を経由して State<ConfigManager> を引き出す
-                use tauri::Manager;
-                let cfg_state: tauri::State<ConfigManager> = app_handle.state();
-                let config = match cfg_state.get() {
-                    Ok(c) => c,
-                    Err(err) => {
-                        tracing::warn!("auto-switch: config 取得失敗: {}", err);
-                        return;
-                    }
-                };
-                if !config.dark_mode.enabled {
-                    tracing::debug!("auto-switch: dark_mode.enabled = false なのでスキップ");
-                    return;
-                }
-                let target = if is_dark {
-                    config.dark_mode.dark_theme_id
-                } else {
-                    config.dark_mode.light_theme_id
-                };
-                let target = match target {
-                    Some(id) => id,
-                    None => {
-                        tracing::info!(
-                            "auto-switch: {} 側にテーマ未設定のためスキップ",
-                            if is_dark { "Dark" } else { "Light" }
-                        );
-                        return;
-                    }
-                };
-                if config.general.active_theme_id == Some(target) {
-                    tracing::debug!("auto-switch: 既に対象テーマがアクティブ");
-                    return;
-                }
-                match app_lib::theme::ThemeManager::apply_theme(target) {
-                    Ok(()) => {
-                        // active_theme_id 永続化
-                        if let Err(err) = cfg_state.update(|c| {
-                            c.general.active_theme_id = Some(target);
-                        }) {
-                            tracing::warn!("auto-switch: active_theme_id 保存失敗: {}", err);
-                        } else {
-                            tracing::info!("auto-switch: テーマ {} を適用しました", target);
-                        }
-                    }
-                    Err(err) => {
-                        tracing::error!("auto-switch: テーマ適用失敗 ({}): {}", target, err);
-                    }
-                }
-            }) {
-                tracing::warn!("ダークモード監視の開始に失敗: {}", e);
             }
 
             // パニックホットキー (`Ctrl+Alt+Shift+R` 等 config 値) の登録

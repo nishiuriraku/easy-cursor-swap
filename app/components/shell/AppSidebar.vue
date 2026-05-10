@@ -43,7 +43,6 @@ const workspace = computed<NavEntry[]>(() => [
 
 const system = computed<NavEntry[]>(() => [
   { id: 'settings', icon: 'Settings', label: t('nav.settings') },
-  { id: 'appearance', icon: 'Moon', label: t('nav.appearance') },
 ])
 
 function navigate(id: string) {

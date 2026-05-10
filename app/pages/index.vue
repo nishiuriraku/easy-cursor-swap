@@ -282,10 +282,6 @@ const totalStorageMb = computed(() => {
 // --- ステータスバー用の動的情報 ---
 // `useAppSettings` はグローバルシングルトン。Settings 画面で更新されると自動追従する。
 const appSettings = useAppSettings()
-const darkModeStatusLabel = computed(() => {
-  const enabled = appSettings.config.value?.dark_mode.enabled
-  return `${t('library.statusDarkMode')}: ${enabled ? t('library.statusOn') : t('library.statusOff')}`
-})
 const signatureVerifyLabel = computed(
   () => `${t('library.statusSignature')}: ${t('library.statusOn')}`,
 )
@@ -820,7 +816,7 @@ onMounted(async () => {
   if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', onVisibilityChange)
   }
-  // ステータスバーで `dark_mode.enabled` を表示するため、初回ロードのみ取りに行く。
+  // appSettings は本ページ起動時に常時必要 (active_theme_id 等)。初回ロードのみ取りに行く。
   // 既に Settings 画面などで取得済みならキャッシュが返る。
   await appSettings.load().catch(() => null)
 })
@@ -996,7 +992,6 @@ onUnmounted(() => {
     <AppStatusbar
       :items="[
         { dot: true, text: activeStatusLabel },
-        { text: darkModeStatusLabel },
         { text: signatureVerifyLabel },
         { text: storageStatusLabel },
       ]"
