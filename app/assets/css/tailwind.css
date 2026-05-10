@@ -1,0 +1,58 @@
+/* =============================================
+ * Tailwind v4 entry + design tokens (@theme)
+ * =============================================
+ *
+ * このファイルは Tailwind の utility class を生成するための入口。
+ * `@theme {}` 内の CSS custom property は Tailwind の utility にマップされる。
+ * - --color-X-Y → bg-X-Y, text-X-Y, border-X-Y
+ * - --radius-X  → rounded-X
+ * - --font-X    → font-X
+ *
+ * 既存の global.css の `:root` 変数 (--bg-0 等) は Phase 2 以降で順次廃止し、
+ * 本ファイル側 (--color-bg-0 等) を Source of Truth にする。
+ * 過渡期は両方を同値で維持する。
+ */
+
+@import 'tailwindcss';
+
+@theme {
+  /* --- 背景レイヤー --- */
+  --color-bg-0: #0a0b0f;
+  --color-bg-1: #101218;
+  --color-bg-2: #161922;
+  --color-bg-3: #1c2030;
+  --color-bg-glass: rgba(22, 25, 34, 0.72);
+  --color-bg-glass-hi: rgba(28, 32, 44, 0.85);
+
+  /* --- ボーダー --- */
+  --color-line: rgba(255, 255, 255, 0.06);
+  --color-line-hi: rgba(255, 255, 255, 0.12);
+  --color-line-strong: rgba(255, 255, 255, 0.18);
+
+  /* --- テキスト --- */
+  --color-fg: #eef0f6;
+  --color-fg-dim: #a0a6b8;
+  --color-fg-mute: #5a6076;
+  --color-fg-faint: #3a3f50;
+
+  /* --- アクセント --- */
+  --color-accent: #7cf2d4;
+  --color-accent-hi: #a5f7e2;
+  --color-accent-dim: rgba(124, 242, 212, 0.15);
+  --color-accent-line: rgba(124, 242, 212, 0.35);
+  --color-violet: #8b7dff;
+  --color-amber: #f5c26b;
+  --color-rose: #ff6b8a;
+
+  /* --- 角丸 --- */
+  --radius-sm: 4px;
+  --radius-DEFAULT: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 18px;
+
+  /* --- フォント --- */
+  --font-display:
+    'Inter Tight', 'Inter', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: 'Inter', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, Menlo, monospace;
+}

@@ -89,7 +89,8 @@ Vue (UI) ──invoke()──▶ Tauri command (commands.rs) ──▶ Rust modu
 - `composables/` — `useThemes`, `useAppSettings`, `useI18n`, `useTauri` (IPC wrapper), `useKeystore`, `useUiTheme`, `useRoleMatcher`, `useThemePreviews`, `useBulkImport`, `useUpdater`, `useNotify`, `sanitizeSvg`. Vitest specs in `app/composables/__tests__/`.
 - `locales/{ja,en}.ts` — keys typed `as const`; **must stay in parity** (CI gate via `scripts/check-i18n.mjs`).
 - `types/` — IPC payload types (`config.ts`, `theme.ts`, `marketplace.ts`).
-- `assets/css/global.css` — design tokens, Win11 chrome, Glassmorphism. Vanilla CSS only — **no Tailwind**.
+- `assets/css/tailwind.css` — Tailwind v4 entry + `@theme` ブロック (design tokens を utility に露出)。
+- `assets/css/global.css` — Win11 chrome, Glassmorphism, 既存の `:root` design tokens (Phase 2-8 で順次 `tailwind.css` 側に移行)。
 
 ### Backend layout (`src-tauri/src/`)
 
@@ -121,7 +122,7 @@ Vue (UI) ──invoke()──▶ Tauri command (commands.rs) ──▶ Rust modu
 
 - Rust comments and doc strings: **Japanese**.
 - Vue: SFC + `<script setup>` + Composition API + TypeScript.
-- CSS: Vanilla CSS via `app/assets/css/global.css` design tokens. No Tailwind, no CSS-in-JS.
+- CSS: **Tailwind v4 utility classes** as the default styling mechanism. Design tokens live in `app/assets/css/tailwind.css` (`@theme` block) and are exposed as utilities like `bg-bg-0`, `text-fg`, `rounded-lg`. Vanilla CSS is allowed in `<style scoped>` for non-utility cases (complex pseudo-elements, keyframes, special selectors). `app/assets/css/global.css` is being progressively migrated (Phase 2-8); new components should prefer Tailwind utilities and not add to global.css.
 - IPC payload types live in `app/types/` and must mirror `serde`-derived Rust structs in `commands.rs` / module files.
 - Filenames in `components/` are referenced without directory prefix — keep names globally unique.
 

@@ -1,5 +1,7 @@
 // EasyCursorSwap - Nuxt 設定
 // Tauri v2 連携用の SPA モード設定
+import tailwindcss from '@tailwindcss/vite'
+
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
 
@@ -23,7 +25,12 @@ export default defineNuxtConfig({
     port: 3000,
   },
 
+  // CSS load 順: Tailwind base + theme tokens を先に、global.css は後ろで上書きする
+  // (Phase 8 で global.css を縮小するまで、preflight 競合は global.css 側で吸収)
+  css: ['~/assets/css/tailwind.css', '~/assets/css/global.css'],
+
   vite: {
+    plugins: [tailwindcss()],
     // Tauri CLI と Vite の画面クリアが衝突しないようにする
     clearScreen: false,
     // Tauri の環境変数を Vite に渡す
