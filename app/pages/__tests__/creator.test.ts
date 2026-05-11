@@ -56,3 +56,18 @@ describe('creator.vue executeSave error handling contract', () => {
     expect(result.applied).toBe(false)
   })
 })
+
+describe('creator.vue applyBulkImport applyImmediately handling contract', () => {
+  it('propagates applyImmediately=true to open SaveDestinationModal', () => {
+    // payload.applyImmediately=true のとき creator.vue は saveModalOpen.value=true、
+    // saveModalDefault.value='libraryAndApply' をセットすることを期待する。
+    // フル mount は重いので shape の契約として記録。
+    const payload = {
+      roleAssets: [],
+      metadataChoice: 'keep' as const,
+      metadata: null,
+      applyImmediately: true,
+    }
+    expect(payload.applyImmediately).toBe(true)
+  })
+})

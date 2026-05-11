@@ -832,6 +832,13 @@ function applyBulkImport(payload: ApplyPayload) {
 
   bulkModalOpen.value = false
   importMessage.value = `${payload.roleAssets.length} 件のロールを適用しました`
+
+  // ✓ 「すぐシステムに反映」がチェックされていれば SaveDestinationModal を
+  // Library+Apply 既定で開く。ユーザーは [保存] を押すだけで適用まで進める。
+  if (payload.applyImmediately) {
+    saveModalDefault.value = 'libraryAndApply'
+    saveModalOpen.value = true
+  }
 }
 
 function cancelBulkImport() {
