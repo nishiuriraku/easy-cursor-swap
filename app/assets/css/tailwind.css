@@ -269,3 +269,41 @@
 .card-author {
   @apply mt-0.5 text-[11.5px] text-fg-dim;
 }
+
+/* --- .input / .toggle / .tag (Phase 10-D) --- */
+.input {
+  @apply h-7 w-full rounded-md border border-line bg-white/[0.03] px-2.5 font-body text-[12px] text-fg outline-none;
+}
+.input.mono {
+  @apply font-mono text-[11px];
+}
+.input:focus {
+  @apply border-accent-line;
+  background: rgba(124, 242, 212, 0.04);
+}
+:where(html.light) .input {
+  background: rgba(15, 20, 35, 0.025);
+}
+
+.toggle {
+  @apply relative inline-flex h-[18px] w-8 shrink-0 cursor-pointer items-center rounded-full border border-line bg-white/[0.06];
+  transition: all 0.15s;
+}
+.toggle .knob {
+  @apply absolute left-0.5 top-0.5 size-3 rounded-full bg-fg-dim;
+  transition: all 0.15s;
+}
+.toggle.on {
+  @apply border-accent-line;
+  background: rgba(124, 242, 212, 0.2);
+}
+.toggle.on .knob {
+  @apply left-4 bg-accent;
+}
+
+.tag {
+  @apply inline-flex items-center gap-1.5 rounded-[4px] border border-line bg-white/[0.02] px-2 py-[3px] font-mono text-[10px] tracking-[0.04em] text-fg-dim;
+}
+.tag.ok {
+  @apply border-accent-line bg-accent-dim text-accent;
+}

@@ -633,81 +633,6 @@ button {
 }
 
 /* =============================================
- * フォーム要素
- * ============================================= */
-.input {
-  height: 28px;
-  padding: 0 10px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  color: var(--fg);
-  font-size: 12px;
-  font-family: var(--font-body);
-  outline: none;
-  width: 100%;
-}
-.input.mono {
-  font-family: var(--font-mono);
-  font-size: 11px;
-}
-.input:focus {
-  border-color: var(--accent-line);
-  background: rgba(124, 242, 212, 0.04);
-}
-
-.toggle {
-  display: inline-flex;
-  align-items: center;
-  width: 32px;
-  height: 18px;
-  border-radius: 99px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--line);
-  position: relative;
-  cursor: pointer;
-  transition: all 0.15s;
-  flex-shrink: 0;
-}
-.toggle .knob {
-  position: absolute;
-  width: 12px;
-  height: 12px;
-  background: var(--fg-dim);
-  border-radius: 50%;
-  top: 2px;
-  left: 2px;
-  transition: all 0.15s;
-}
-.toggle.on {
-  background: rgba(124, 242, 212, 0.2);
-  border-color: var(--accent-line);
-}
-.toggle.on .knob {
-  left: 16px;
-  background: var(--accent);
-}
-
-.tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 8px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.04em;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  color: var(--fg-dim);
-  background: rgba(255, 255, 255, 0.02);
-}
-.tag.ok {
-  color: var(--accent);
-  border-color: var(--accent-line);
-  background: var(--accent-dim);
-}
-
-/* =============================================
  * アニメーション
  * ============================================= */
 @keyframes pulse {
@@ -1162,10 +1087,7 @@ html.light .win::before {
 html.light .toolbar {
   background: rgba(255, 255, 255, 0.55);
 }
-/* html.light .btn 上書きは tailwind.css @layer components の :where(html.light) で対応 */
-html.light .input {
-  background: rgba(15, 20, 35, 0.025);
-}
+/* html.light .btn / .input 上書きは tailwind.css の :where(html.light) で対応 */
 html.light .search {
   background: rgba(15, 20, 35, 0.025);
 }
