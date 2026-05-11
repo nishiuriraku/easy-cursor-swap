@@ -118,13 +118,13 @@ async function onTitlebarMouseDown(e: MouseEvent) {
     <div class="tb-title">
       <span class="tb-mark"><UiIcon name="Logo" :size="12" /></span>
       <span>{{ title }}</span>
-      <span style="color: var(--fg-faint)">—</span>
+      <span class="tb-dash">—</span>
       <span class="tb-meta">{{ version }} · Win 11</span>
     </div>
     <div class="tb-controls">
       <button
         type="button"
-        class="tb-btn theme"
+        class="tb-btn"
         :aria-label="`UI テーマ: ${themeLabel} (クリックで切替)`"
         :title="`Theme: ${themeLabel}`"
         @click="cycle"
@@ -149,7 +149,7 @@ async function onTitlebarMouseDown(e: MouseEvent) {
       </button>
       <button
         type="button"
-        class="tb-btn close"
+        class="tb-btn tb-btn-close"
         :aria-label="t('common.close')"
         @click="call('close')"
       >
@@ -158,3 +158,50 @@ async function onTitlebarMouseDown(e: MouseEvent) {
     </div>
   </div>
 </template>
+
+<style scoped>
+@reference '~/assets/css/tailwind.css';
+
+.titlebar {
+  @apply relative z-[5] grid h-9 grid-cols-[1fr_auto] items-center border-b border-line bg-bg-titlebar pl-3.5 backdrop-blur-[20px];
+}
+.tb-title {
+  @apply flex items-center gap-2.5 text-[12px] tracking-[0.02em] text-fg-dim;
+}
+.tb-mark {
+  @apply grid size-3.5 place-items-center text-accent;
+}
+.tb-dash {
+  @apply text-fg-faint;
+}
+.tb-meta {
+  @apply font-mono text-[10.5px] text-fg-mute;
+}
+.tb-controls {
+  @apply relative z-[6] flex;
+}
+
+/* Win11 風タイトルバーボタン。
+ * hover の overlay 色がダーク/ライトで反転するため `:where(html.light)` で
+ * scoped style 内に上書きルールを併置する。`tb-btn-close:hover` だけは赤背景固定。 */
+.tb-btn {
+  @apply grid h-9 w-[46px] place-items-center border-0 bg-transparent text-fg-dim;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.tb-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--fg);
+}
+:where(html.light) .tb-btn:hover {
+  background: rgba(15, 20, 35, 0.06);
+}
+.tb-btn-close:hover {
+  background: #c42b1c;
+  color: #fff;
+}
+:where(html.light) .tb-btn-close:hover {
+  background: #c42b1c;
+  color: #fff;
+}
+</style>
