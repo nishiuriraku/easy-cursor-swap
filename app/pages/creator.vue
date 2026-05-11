@@ -23,6 +23,7 @@ import {
   type ResolvedAsset,
   type ParsedCursorpack,
 } from '~/composables/useBulkImport'
+import AniThumb from '~/components/creator/AniThumb.vue'
 import BulkImportButton from '~/components/creator/BulkImportButton.vue'
 import BulkImportPreviewModal, {
   type ApplyPayload,
@@ -211,6 +212,20 @@ const hotspotReferenceSize = computed(
  */
 const IMAGE_DISPLAY_PCT = 90
 
+/** アクティブロールに .ani フレームデータが存在する場合にそれを返す。 */
+const activeAniFrames = computed(() => {
+  const id = activeRoleId.value
+  if (!id) return null
+  return assigned.value[id]?.aniFrames ?? null
+})
+
+/** アクティブロールの .ani 元ファイルパス (存在する場合のみ)。 */
+const activeAniSourcePath = computed(() => {
+  const id = activeRoleId.value
+  if (!id) return null
+  return assigned.value[id]?.aniSourcePath ?? null
+})
+
 /** ロールが切り替わったら、そのロールの保存済みホットスポットを反映する。 */
 watch(activeRoleId, (id) => {
   const a = assigned.value[id]
@@ -352,6 +367,20 @@ function centerHotspot() {
   if (a) {
     setAsset(activeRoleId.value, { ...a, hotspot: { x: center, y: center } })
   }
+}
+
+/**
+ * AniThumb editable モードから emit された hotspot-pick / hotspot-drag を受けて
+ * hotspotX/Y ref と setAsset に直結するハンドラ。
+ */
+function onAniHotspotPick(p: { x: number; y: number }) {
+  hotspotX.value = p.x
+  hotspotY.value = p.y
+  const id = activeRoleId.value
+  if (!id) return
+  const a = assigned.value[id]
+  if (!a) return
+  setAsset(id, { ...a, hotspot: { x: p.x, y: p.y } })
 }
 
 function selectSize(s: number) {
@@ -1123,8 +1152,20 @@ async function onFileChange(e: Event) {
               >
                 <div class="crosshair-h" />
                 <div class="crosshair-v" />
+                <AniThumb
+                  v-if="activeAniFrames"
+                  :frame-pngs="activeAniFrames.framePngs"
+                  :sequence="activeAniFrames.sequence"
+                  :durations="activeAniFrames.perStepDurationsMs"
+                  :width="hotspotReferenceSize"
+                  :height="hotspotReferenceSize"
+                  :hotspot="{ x: hotspotX, y: hotspotY }"
+                  editable
+                  @hotspot-pick="onAniHotspotPick"
+                  @hotspot-drag="onAniHotspotPick"
+                />
                 <img
-                  v-if="activePreviewUrl"
+                  v-else-if="activePreviewUrl"
                   :src="activePreviewUrl"
                   :alt="activeRole.jp"
                   draggable="false"

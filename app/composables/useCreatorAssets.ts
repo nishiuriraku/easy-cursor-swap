@@ -15,6 +15,14 @@ export interface RoleAsset {
   /** 解像度別オーバーライド。`.cursorpack` 取り込みのみ存在しうる。 */
   sized?: Map<number, Uint8Array>
   source: AssetSource
+  /** `.ani` 取り込み時の元ファイル絶対パス。Rust 側エクスポート時に使う。 */
+  aniSourcePath?: string
+  /** `.ani` のアニメーション情報。`aniSourcePath` がある場合のみ存在。 */
+  aniFrames?: {
+    framePngs: Uint8Array[]
+    sequence: number[]
+    perStepDurationsMs: number[]
+  }
 }
 
 /**

@@ -192,19 +192,30 @@ function toRoleAsset(
   // CUR / ICO は header に hotspot があるが、未指定の場合 (0,0) で来る — そのときも
   // 中央既定が望ましい。`(4, 4)` で判定すると Rust の sentinel (= 0) と噛み合わず
   // 中央化が一切発火しないバグになる。
+  // .ani は自前の埋め込みホットスポットを使う (中央既定を適用しない)。
+  const isAni = asset.kind === 'ani' && asset.ani !== null
   const noEmbeddedHotspot =
     asset.kind === 'png' || asset.kind === 'svg' || (asset.hotspotX === 0 && asset.hotspotY === 0)
   const finalHotspot =
-    isNewRole && noEmbeddedHotspot
+    isNewRole && noEmbeddedHotspot && !isAni
       ? initialHotspotFor(roleId, asset.nativeSize)
       : { x: asset.hotspotX, y: asset.hotspotY }
-  return {
+  const base: RoleAsset = {
     primary: new Uint8Array(asset.pngBytes),
     primarySize: asset.nativeSize,
     hotspot: finalHotspot,
     sized: undefined,
     source,
   }
+  if (isAni && asset.ani) {
+    base.aniSourcePath = asset.sourcePath
+    base.aniFrames = {
+      framePngs: asset.ani.framePngs.map((b) => new Uint8Array(b)),
+      sequence: asset.ani.sequence,
+      perStepDurationsMs: asset.ani.perStepDurationsMs,
+    }
+  }
+  return base
 }
 
 function apply() {
