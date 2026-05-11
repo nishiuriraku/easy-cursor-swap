@@ -105,17 +105,22 @@ watch(
     if (props.cursorpack) {
       // .cursorpack 経路: ロール ID は既に確定済み。全ロールを matches に詰める。
       for (const [role, parsed] of Object.entries(props.cursorpack.roles)) {
+        const isAni = parsed.ani !== null
         const fakeAsset: ResolvedAsset = {
-          sourceFile: `${role}.cur`,
-          sourcePath: '',
-          kind: 'cur',
+          sourceFile: isAni ? `${role}.ani` : `${role}.cur`,
+          // `.ani` の場合は展開先絶対パスを sourcePath に入れる
+          // (export 時に Rust が rewrite_ani_with_hotspot のソースとして使う)
+          sourcePath: parsed.aniSourcePath ?? '',
+          kind: isAni ? 'ani' : 'cur',
           pngBytes: parsed.primaryPngBytes,
           svgText: null,
           nativeSize: parsed.primarySize,
           hotspotX: parsed.hotspotX,
           hotspotY: parsed.hotspotY,
-          availableSizes: Object.keys(parsed.sizedPngBytes).map(Number),
-          ani: null,
+          availableSizes: isAni
+            ? [parsed.primarySize]
+            : Object.keys(parsed.sizedPngBytes).map(Number),
+          ani: parsed.ani,
         }
         const conflict = props.existingRoles.has(role) ? 'overwrite-existing' : 'none'
         matches.value.push({
@@ -125,7 +130,7 @@ watch(
           conflict,
           decision: conflict === 'overwrite-existing' && protectExisting.value ? 'skip' : 'apply',
           previewUrl: makePreview(fakeAsset),
-          aniFramesU8: null,
+          aniFramesU8: toAniFramesU8(fakeAsset),
         })
       }
       return
@@ -249,16 +254,23 @@ function apply() {
       for (const [k, v] of Object.entries(parsed.sizedPngBytes)) {
         sized.set(Number(k), new Uint8Array(v))
       }
-      roleAssets.push({
-        roleId: m.role,
-        asset: {
-          primary: new Uint8Array(parsed.primaryPngBytes),
-          primarySize: parsed.primarySize,
-          hotspot: { x: parsed.hotspotX, y: parsed.hotspotY },
-          sized,
-          source: 'cursorpack',
-        },
-      })
+      const asset: RoleAsset = {
+        primary: new Uint8Array(parsed.primaryPngBytes),
+        primarySize: parsed.primarySize,
+        hotspot: { x: parsed.hotspotX, y: parsed.hotspotY },
+        sized: sized.size > 0 ? sized : undefined,
+        source: 'cursorpack',
+      }
+      // `.ani` ロールはアニメーション情報を保持して export 時に動的カーソルとして再構築する
+      if (parsed.ani && parsed.aniSourcePath) {
+        asset.aniSourcePath = parsed.aniSourcePath
+        asset.aniFrames = {
+          framePngs: parsed.ani.framePngs.map((b) => new Uint8Array(b)),
+          sequence: parsed.ani.sequence,
+          perStepDurationsMs: parsed.ani.perStepDurationsMs,
+        }
+      }
+      roleAssets.push({ roleId: m.role, asset })
     }
   } else {
     const sourceTag: RoleAsset['source'] =

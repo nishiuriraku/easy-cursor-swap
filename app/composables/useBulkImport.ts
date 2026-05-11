@@ -37,6 +37,11 @@ export interface ParsedRole {
   hotspotX: number
   hotspotY: number
   sizedPngBytes: Record<string, number[]>
+  /** `.ani` ロールのフレームデータ。`.cur`/`.ico` ロールでは null。 */
+  ani: AniAssetData | null
+  /** `.ani` ロールの展開先絶対パス。`.cur`/`.ico` ロールでは null。
+   *  export 時に Rust 側が `rewrite_ani_with_hotspot` のソースとして使う。 */
+  aniSourcePath: string | null
 }
 
 export interface ParsedCursorpack {

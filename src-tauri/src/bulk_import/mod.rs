@@ -147,6 +147,14 @@ pub struct ParsedRole {
     pub hotspot_x: u32,
     pub hotspot_y: u32,
     pub sized_png_bytes: HashMap<u32, Vec<u8>>,
+    /// `.ani` ロールのフレームデータ。`.cur` / `.ico` の場合は `None`。
+    /// フロントエンドはこれがあれば「動くサムネ」を出し、`aniFrames` として
+    /// RoleAsset に格納する (= ResolvedAsset の `ani` と同じ役割)。
+    pub ani: Option<AniAssetData>,
+    /// `.ani` ロールの元バイトを展開した絶対パス。export 時に `rewrite_ani_with_hotspot`
+    /// のソースとして使う。`.cur` / `.ico` ロールでは `None`。
+    /// `.cursorpack` の隣 `<cursorpack>.extracted/<role-filename>` に書き出される。
+    pub ani_source_path: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
