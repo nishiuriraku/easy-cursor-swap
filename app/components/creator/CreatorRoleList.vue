@@ -64,10 +64,27 @@ const cursorRoles: readonly CursorRoleDef[] = CURSOR_ROLES
  * 問題が確認できたため、scoped style では layout/spacing の独自上書きのみを
  * 純粋な CSS リテラルで記述し、border/background/color などは global にゆだねる。 */
 
+.cpane {
+  padding: 14px;
+  overflow: auto;
+  min-width: 0;
+}
 .cpane.left {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  border-right: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.01);
+}
+
+@media (max-width: 880px) {
+  .cpane.left {
+    grid-column: 1;
+    grid-row: 1;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+    max-height: 200px;
+  }
 }
 
 .pane-head {

@@ -1425,6 +1425,29 @@ async function onFileChange(e: Event) {
   @apply mb-2 font-mono text-[10px] uppercase tracking-[0.16em] text-fg-mute;
 }
 
+.editor {
+  @apply flex min-w-0 flex-col;
+  background: radial-gradient(800px 600px at 50% 0%, rgba(124, 242, 212, 0.04), transparent 60%);
+}
+.editor-head {
+  @apply flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line px-[18px] py-3.5;
+}
+.editor-head h2 {
+  @apply m-0 font-display text-[18px] font-semibold tracking-[-0.01em];
+}
+.editor-head .desc {
+  @apply mt-0.5 text-[12px] text-fg-dim;
+}
+.canvas-area {
+  @apply grid min-h-0 flex-1 overflow-auto p-6;
+  grid-template-columns: 1fr;
+}
+.canvas-stage {
+  @apply flex flex-col items-center gap-[18px];
+  align-self: center;
+  justify-self: center;
+}
+
 .creator-grid {
   @apply grid min-h-0 flex-1 border-t border-line;
   grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);

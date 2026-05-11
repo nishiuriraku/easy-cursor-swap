@@ -201,6 +201,55 @@ function onBackdropClick(e: MouseEvent) {
 <style scoped>
 @reference '~/assets/css/tailwind.css';
 
+.kvlist {
+  @apply flex flex-col;
+}
+.kv {
+  @apply grid items-center gap-3.5 border-b border-line py-2.5;
+  grid-template-columns: 120px 1fr;
+}
+.kv:last-child {
+  @apply border-b-0;
+}
+.kv label {
+  @apply font-mono text-[10px] uppercase tracking-[0.12em] text-fg-mute;
+}
+.kv .val {
+  @apply text-[13px] text-fg;
+}
+.kv .val .sub {
+  @apply ml-1.5 text-[11.5px] text-fg-dim;
+}
+
+.bar-pair {
+  @apply flex h-1.5 gap-px overflow-hidden rounded-[3px];
+  background: rgba(255, 255, 255, 0.05);
+}
+.bar-pair > i {
+  @apply block h-full;
+}
+.bar-pair > i.a {
+  background: var(--accent);
+}
+.bar-pair > i.b {
+  background: var(--violet);
+}
+
+.mini-row {
+  @apply flex flex-wrap gap-1 rounded-lg border border-line p-2;
+  background: rgba(0, 0, 0, 0.2);
+}
+.mini {
+  @apply grid size-[26px] place-items-center rounded-[5px] border border-line;
+  background: rgba(255, 255, 255, 0.04);
+}
+.mini svg {
+  @apply size-[14px] text-fg;
+}
+.mini.empty {
+  @apply bg-transparent text-fg-faint;
+  border-style: dashed;
+}
 .mini-img {
   @apply size-4 object-contain;
   image-rendering: pixelated;

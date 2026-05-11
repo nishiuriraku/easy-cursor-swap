@@ -55,3 +55,14 @@ const fmtDownloads = computed(() => props.entry.downloadCount.toLocaleString('ja
     </div>
   </div>
 </template>
+
+<style scoped>
+@reference '~/assets/css/tailwind.css';
+
+.card-actions {
+  @apply mt-1 flex gap-1.5;
+}
+.card-actions .btn {
+  @apply h-[30px] flex-1 text-[12px];
+}
+</style>

@@ -154,4 +154,13 @@ onUnmounted(() => {
 .main {
   @apply relative flex min-w-0 flex-col overflow-hidden;
 }
+.skip-to-content {
+  @apply absolute left-2 z-[9999] rounded text-[13px] font-semibold text-black no-underline;
+  top: -100%;
+  padding: 6px 14px;
+  background: var(--accent);
+}
+.skip-to-content:focus {
+  top: 8px;
+}
 </style>

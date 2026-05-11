@@ -648,6 +648,78 @@
   @apply flex flex-col gap-3 px-3.5 py-3;
 }
 
+/* --- Page layout (Phase 12-F) ---
+ * 各ページ (Library / Creator / Marketplace / Settings / Appearance) 共通の
+ * 大枠ラッパとヘッダー、グリッド。 */
+.content {
+  @apply relative flex-1 overflow-auto pb-8 pt-6;
+  padding-left: 28px;
+  padding-right: 28px;
+}
+.page-head {
+  @apply mb-[22px] flex items-end justify-between gap-4;
+}
+.page-head h1 {
+  @apply m-0 font-display text-[26px] font-semibold tracking-[-0.02em];
+}
+.page-head p {
+  @apply mx-0 mb-0 mt-1 text-[13px] text-fg-dim;
+}
+.page-head p code {
+  @apply font-mono text-[12px] text-accent;
+}
+.page-head .right {
+  @apply flex items-center gap-2;
+}
+.grid {
+  @apply grid gap-4;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+/* --- Modal shell (Phase 12-F) ---
+ * 8 モーダル (Apply / NewThemeStart / BulkImport / ImportConflict / ThemePicker /
+ * ThemeDetail / SubmitTheme / PassphrasePrompt) で共有。 */
+.modal-page {
+  @apply fixed inset-0 z-[100] grid place-items-center p-6;
+  background:
+    rgba(0, 0, 0, 0.5),
+    radial-gradient(800px 500px at 30% 20%, rgba(139, 125, 255, 0.08), transparent 60%),
+    radial-gradient(900px 500px at 80% 80%, rgba(124, 242, 212, 0.06), transparent 60%);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: fade-in 0.2s ease-out;
+}
+.modal {
+  @apply w-[540px] max-w-full overflow-hidden rounded-2xl border border-line-hi bg-bg-glass-hi backdrop-blur-[28px];
+  box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.7);
+}
+.modal-head {
+  @apply flex items-center gap-3.5 border-b border-line px-6 pb-3.5 pt-5;
+}
+.modal-icon {
+  @apply grid size-10 shrink-0 place-items-center rounded-[10px] border border-accent-line text-accent;
+  background: rgba(124, 242, 212, 0.1);
+}
+.modal-head h2 {
+  @apply m-0 font-display text-[17px] font-semibold tracking-[-0.01em];
+}
+.modal-head p {
+  @apply mx-0 mb-0 mt-0.5 text-[12px] text-fg-dim;
+}
+.modal-body {
+  @apply px-6 py-[18px];
+}
+.modal-foot {
+  @apply flex items-center justify-between gap-3 border-t border-line px-6 py-4;
+  background: rgba(0, 0, 0, 0.2);
+}
+.modal-foot .left-note {
+  @apply flex items-center gap-2 font-mono text-[10.5px] text-fg-mute;
+}
+.modal-foot .actions {
+  @apply flex gap-2;
+}
+
 /* Narrow viewport (Q3): preview を 1 セル化して Arrow のみ表示 */
 @media (max-width: 1080px) {
   .lib-row {
