@@ -109,6 +109,12 @@ const resample = ref<ResampleMode>('lanczos')
 const hotspotX = ref(4)
 const hotspotY = ref(4)
 const perSizeHotspot = ref(true)
+/**
+ * `?editPath` で既存テーマを Creator に取り込んでいる場合、その元テーマの UUID。
+ * SaveDestinationModal の「上書き保存 / 複製」選択肢の表示と、
+ * Rust 側 export 時の `existing_theme_id` 引き継ぎに使う。
+ */
+const sourceThemeId = ref<string | null>(null)
 const shadowEnabled = ref(false)
 
 /**
@@ -379,6 +385,9 @@ onMounted(async () => {
       bulkSourceLabel.value = '📦 編集中'
       bulkModalOpen.value = true
       stage.value = 'editing'
+      // `?editPath` 経由のみ元テーマ ID を保持。SaveDestinationModal が
+      // 「上書き / 複製」セクションを出すトリガにも使う。
+      sourceThemeId.value = parsed.metadata.id ?? null
     } catch (err) {
       importMessage.value = `編集データの読込に失敗: ${err instanceof Error ? err.message : String(err)}`
       stage.value = 'editing'
@@ -821,6 +830,7 @@ function resetCreator() {
   filledRoles.clear()
   filledSizesByRole.value = {}
   activeRoleId.value = 'Arrow'
+  sourceThemeId.value = null
   activeSize.value = 64
   hotspotX.value = 4
   hotspotY.value = 4
