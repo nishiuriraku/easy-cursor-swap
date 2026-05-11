@@ -60,7 +60,9 @@ const conflictTitle = computed(() => {
       />
       <img v-else-if="previewUrl" :src="previewUrl" :alt="roleId" />
       <span v-else class="dim">{{ t('bulkImport.notProvided') }}</span>
-      <span v-if="aniData?.isLegacyRawDib" class="legacy-chip">{{ t('bulkImport.legacyAniChip') }}</span>
+      <span v-if="aniData?.isLegacyRawDib" class="legacy-chip">{{
+        t('bulkImport.legacyAniChip')
+      }}</span>
     </div>
     <div class="meta-cell">
       <span v-if="sourceFile" class="src">{{ sourceFile }}</span>

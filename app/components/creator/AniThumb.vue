@@ -87,10 +87,7 @@ function onMouseUp() {
     <template v-if="editable && hotspotPercent">
       <div class="crosshair-v" :style="{ left: hotspotPercent.left }" />
       <div class="crosshair-h" :style="{ top: hotspotPercent.top }" />
-      <div
-        class="dot"
-        :style="{ left: hotspotPercent.left, top: hotspotPercent.top }"
-      />
+      <div class="dot" :style="{ left: hotspotPercent.left, top: hotspotPercent.top }" />
     </template>
   </div>
 </template>

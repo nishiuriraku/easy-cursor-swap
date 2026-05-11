@@ -56,10 +56,13 @@ export function useAniPlayer(input: UseAniPlayerInput): UseAniPlayerReturn {
     const stepIdx = currentStep.value
     const durations = input.perStepDurationsMs
     const ms = durations.length > 0 ? durations[stepIdx % durations.length] : 100
-    timer = setTimeout(() => {
-      currentStep.value = (currentStep.value + 1) % input.sequence.length
-      scheduleNext()
-    }, Math.max(1, ms))
+    timer = setTimeout(
+      () => {
+        currentStep.value = (currentStep.value + 1) % input.sequence.length
+        scheduleNext()
+      },
+      Math.max(1, ms),
+    )
   }
 
   function play() {
