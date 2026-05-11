@@ -1,8 +1,8 @@
 //! `.ani` のバイト単位パススルー書き換え。
 //!
 //! - AF_ICON 形式: 元バイト列をコピーし、各 icon chunk 内の CUR ICONDIRENTRY の
-//!   ホットスポット 2 バイト (offset 4..5 within each 16-byte entry) のみ上書きする。
-//!   画像データ部 (PNG / BMP DIB) には触れない。
+//!   ホットスポット 4 バイト (offset 4..8 within each 16-byte entry: X u16 LE + Y u16 LE)
+//!   のみ上書きする。画像データ部 (PNG / BMP DIB) には触れない。
 //! - raw DIB 形式: 各 DIB を CUR (ICONDIR + ICONDIRENTRY + DIB) でラップし、
 //!   anih.flags に AF_ICON を立てて再パックする。DIB バイトはコピーのみ。
 //!   (Task 4 で実装予定)
