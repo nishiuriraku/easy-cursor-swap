@@ -72,69 +72,41 @@ defineEmits<{
 </template>
 
 <style scoped>
+/* NOTE: 元の scoped style は --border / --bg-elev1 / --bg-elev2 / --text /
+ * --text-mute / --bg-base / --mint などの未定義トークンを多数含み、それらは
+ * cascade で global.css の .toolbar / .bcrumb / .btn / .tag ルールに引き継がれ
+ * ていた。Tailwind の border utility を @apply で持ち込むと border-color が
+ * currentColor に化けて global の subtle border を上書きするため、scoped 側は
+ * global と衝突しないレイアウト/スペーシングの差分のみを CSS リテラルで保持する。 */
+
 .toolbar {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
   gap: 12px;
   padding: 10px 16px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-elev1);
 }
 
 .bcrumb {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   font-size: 12px;
-  color: var(--text-mute);
 }
 
 .crumb.active {
-  color: var(--text);
   font-weight: 600;
-}
-
-.sep {
-  color: var(--text-mute);
 }
 
 .draft-tag {
   margin-left: 8px;
   font-size: 11px;
   font-weight: 400;
-  color: var(--text-mute);
   font-family: var(--font-mono);
 }
 
-.tb-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
   padding: 0 14px;
   border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg-elev2);
-  color: var(--text);
   font-size: 13px;
-  cursor: pointer;
 }
 
 .btn.ghost {
   background: transparent;
-}
-
-.btn.primary {
-  background: var(--accent);
-  color: var(--bg-base);
-  border-color: var(--accent);
 }
 
 .btn:disabled {
@@ -143,19 +115,13 @@ defineEmits<{
 }
 
 .tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
   padding: 2px 8px;
   border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--bg-elev2);
   font-size: 11px;
-  color: var(--text-mute);
+  gap: 4px;
 }
 
 .tag.ok {
-  color: var(--mint);
   border-color: rgba(106, 213, 184, 0.3);
 }
 
@@ -163,7 +129,7 @@ defineEmits<{
   display: inline-block;
   width: 13px;
   height: 13px;
-  border: 2px solid var(--text-mute);
+  border: 2px solid var(--fg-mute);
   border-top-color: transparent;
   border-radius: 50%;
   animation: spin 800ms linear infinite;
