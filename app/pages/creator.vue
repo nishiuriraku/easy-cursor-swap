@@ -113,6 +113,12 @@ const perSizeHotspot = ref(true)
  * `?editPath` で既存テーマを Creator に取り込んでいる場合、その元テーマの UUID。
  * SaveDestinationModal の「上書き保存 / 複製」選択肢の表示と、
  * Rust 側 export 時の `existing_theme_id` 引き継ぎに使う。
+ *
+ * 設定タイミング: `?editPath` 経由の `onMounted` のみ。
+ * クリアタイミング:
+ *  - `resetCreator()` (= start ステージに戻る)
+ *  - `onDuplicateExistingFromStart()` (= 別テーマを複製として新規作成)
+ *  - `dispatchBulkPaths()` 内で `.cursorpack` を取り込んだ瞬間 (= ソースが入れ替わる)
  */
 const sourceThemeId = ref<string | null>(null)
 const shadowEnabled = ref(false)
@@ -746,6 +752,10 @@ async function dispatchBulkPaths(paths: string[]) {
       bulkResolved.value = null
       bulkSourceLabel.value = `📦 ${packs[0]!.split(/[\\/]/).pop()}`
       bulkModalOpen.value = true
+      // `.cursorpack` を取り込んだ瞬間、編集対象のソースが入れ替わる。
+      // `?editPath` で引き継いだ UUID は無効になるのでクリア (SaveDestinationModal の
+      // 誤 overwrite 提案を防ぐ)。
+      sourceThemeId.value = null
     } catch (err) {
       importMessage.value = `cursorpack 取り込み失敗: ${err instanceof Error ? err.message : String(err)}`
     }
@@ -901,6 +911,10 @@ function onNewThemeCancel() {
  * メタデータ反映の挙動はそちらと統一される。
  */
 async function onDuplicateExistingFromStart() {
+  // 既存テーマの「複製」を起点にした新規作成セッション。`?editPath` で引き継いだ
+  // ソース UUID は無効になるので、ピッカーを開く時点でクリアしておく
+  // (SaveDestinationModal が誤って元テーマへの overwrite を提案するのを防ぐ)。
+  sourceThemeId.value = null
   await refreshPickerThemes()
   themePickerSelected.value = null
   themePickerOpen.value = true
