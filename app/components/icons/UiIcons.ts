@@ -35,6 +35,10 @@ export const UI_ICONS: Record<string, UiIconDef> = {
   List: { viewBox: '0 0 16 16', body: '<path d="M3 4h10M3 8h10M3 12h10"/>' },
   Import: { viewBox: '0 0 16 16', body: '<path d="M8 2v8M5 7l3 3 3-3M2.5 13h11"/>' },
   Export: { viewBox: '0 0 16 16', body: '<path d="M8 11V3M5 6l3-3 3 3M2.5 13h11"/>' },
+  Save: {
+    viewBox: '0 0 16 16',
+    body: '<path d="M3 2.5h7.5L13.5 5.5V13a.5.5 0 0 1-.5.5H3a.5.5 0 0 1-.5-.5V3a.5.5 0 0 1 .5-.5z"/><path d="M5 2.5v3.5h5V2.5M5 13.5v-4h6v4"/>',
+  },
   Library: {
     viewBox: '0 0 16 16',
     body: '<path d="M2.5 3h2v10h-2zM5.5 3h2v10h-2zM9 3.5l2-.5 2.5 9.5-2 .5z"/>',

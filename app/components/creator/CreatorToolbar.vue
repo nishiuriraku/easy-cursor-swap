@@ -1,9 +1,10 @@
 <script setup lang="ts">
 /**
- * Creator のツールバー (パンくず + クリアボタン + 署名状態タグ + Export ボタン)。
+ * Creator のツールバー (パンくず + クリアボタン + 署名状態タグ + Save ボタン)。
  *
  * メタデータ表示 (テーマ名 / バージョン) と export 状態を props で受け取り、
- * アクション 2 種 (clear / export) を emit で親に通知する。
+ * アクション 2 種 (reset / save) を emit で親に通知する。
+ * Save ボタンを押すと親が SaveDestinationModal を開き、保存先 / 署名を選ばせる。
  */
 import { useI18n } from '~/composables/useI18n'
 
@@ -19,7 +20,7 @@ defineProps<{
 
 defineEmits<{
   (e: 'reset'): void
-  (e: 'export', payload: { sign: boolean }): void
+  (e: 'save'): void
 }>()
 </script>
 
@@ -50,22 +51,14 @@ defineEmits<{
         <UiIcon name="Alert" :size="11" />{{ t('creator.unsignedTag') }}
       </span>
       <button
-        class="btn ghost"
-        :disabled="exportBusy || !arrowAssigned"
-        title=".cursorpack"
-        @click="$emit('export', { sign: false })"
-      >
-        <span v-if="exportBusy" class="spinner" style="width: 13px; height: 13px" />
-        <UiIcon v-else name="Export" :size="14" />
-        {{ exportBusy ? t('creator.exportBusy') : t('creator.exportPack') }}
-      </button>
-      <button
-        v-if="hasKeystoreSigning"
         class="btn primary"
         :disabled="exportBusy || !arrowAssigned"
-        @click="$emit('export', { sign: true })"
+        :title="t('creator.save')"
+        @click="$emit('save')"
       >
-        <UiIcon name="Shield" :size="14" />{{ t('creator.exportSign') }}
+        <span v-if="exportBusy" class="spinner" style="width: 13px; height: 13px" />
+        <UiIcon v-else name="Save" :size="14" />
+        {{ exportBusy ? t('creator.exportBusy') : t('creator.save') }}…
       </button>
     </div>
   </div>

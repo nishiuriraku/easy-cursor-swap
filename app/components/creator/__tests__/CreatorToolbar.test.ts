@@ -66,40 +66,28 @@ describe('CreatorToolbar', () => {
     expect(wrapper.emitted('reset')).toHaveLength(1)
   })
 
-  it('emits export with sign=false on the ghost export button', async () => {
+  it('emits save on the Save button', async () => {
     const wrapper = mount(CreatorToolbar, { props: baseProps, global: { stubs } })
-    // ghost export ボタン (.cursorpack export 無署名)
-    const exportBtn = wrapper.findAll('button').find((b) => b.attributes('title') === '.cursorpack')
-    expect(exportBtn).toBeTruthy()
-    await exportBtn!.trigger('click')
-    expect(wrapper.emitted('export')).toEqual([[{ sign: false }]])
+    const saveBtn = wrapper.find('button.primary')
+    await saveBtn.trigger('click')
+    expect(wrapper.emitted('save')).toHaveLength(1)
   })
 
-  it('emits export with sign=true on primary "Sign & Export" button', async () => {
-    const wrapper = mount(CreatorToolbar, {
-      props: { ...baseProps, hasKeystoreSigning: true },
-      global: { stubs },
-    })
-    const primary = wrapper.find('button.primary')
-    await primary.trigger('click')
-    expect(wrapper.emitted('export')).toEqual([[{ sign: true }]])
-  })
-
-  it('disables export button when arrowAssigned=false', () => {
+  it('disables save when arrowAssigned=false', () => {
     const wrapper = mount(CreatorToolbar, {
       props: { ...baseProps, arrowAssigned: false },
       global: { stubs },
     })
-    const exportBtn = wrapper.findAll('button').find((b) => b.attributes('title') === '.cursorpack')
-    expect(exportBtn?.attributes('disabled')).toBeDefined()
+    const saveBtn = wrapper.find('button.primary')
+    expect(saveBtn.attributes('disabled')).toBeDefined()
   })
 
-  it('disables export when exportBusy=true', () => {
+  it('disables save when exportBusy=true', () => {
     const wrapper = mount(CreatorToolbar, {
       props: { ...baseProps, exportBusy: true },
       global: { stubs },
     })
-    const exportBtn = wrapper.findAll('button').find((b) => b.attributes('title') === '.cursorpack')
-    expect(exportBtn?.attributes('disabled')).toBeDefined()
+    const saveBtn = wrapper.find('button.primary')
+    expect(saveBtn.attributes('disabled')).toBeDefined()
   })
 })
