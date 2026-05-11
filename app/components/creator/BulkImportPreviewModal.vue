@@ -343,8 +343,7 @@ onUnmounted(resetState)
           <input v-model="applyImmediately" type="checkbox" data-test="apply-immediately" />
           {{ t('bulkImport.applyImmediately') }}
         </label>
-        <span style="flex: 1" />
-        <button class="btn ghost" @click="emit('cancel')">{{ t('common.cancel') }}</button>
+        <button class="btn ghost ml-auto" @click="emit('cancel')">{{ t('common.cancel') }}</button>
         <button class="btn primary" @click="apply">
           ✓
           {{
