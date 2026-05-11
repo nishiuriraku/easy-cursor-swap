@@ -179,79 +179,48 @@ function onBackdrop(e: MouseEvent) {
 </template>
 
 <style scoped>
+@reference '~/assets/css/tailwind.css';
+
 .conflict-modal {
-  width: 580px;
+  @apply w-[580px];
 }
 
 .diff-grid {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  gap: 14px;
-  align-items: stretch;
+  @apply grid grid-cols-[1fr_auto_1fr] items-stretch gap-3.5;
 }
 .col {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 14px;
+  @apply rounded-[10px] border border-line bg-white/[0.02] p-3.5;
 }
 .col-head {
-  font-family: var(--font-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--fg-mute);
-  margin-bottom: 6px;
+  @apply mb-1.5 font-mono text-[9.5px] uppercase tracking-[0.16em] text-fg-mute;
 }
 .diff-name {
-  font-family: var(--font-display);
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  margin-bottom: 6px;
+  @apply mb-1.5 font-display text-[14px] font-semibold tracking-[-0.01em];
 }
 .diff-meta {
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--fg-mute);
-  display: flex;
-  align-items: center;
-  gap: 0;
+  @apply flex items-center gap-0 font-mono text-[10.5px] text-fg-mute;
 }
 .diff-meta .m {
-  padding: 0 8px;
+  @apply px-2;
 }
 .diff-meta .m:first-child {
-  padding-left: 0;
+  @apply pl-0;
 }
 .diff-meta .m + .m {
-  border-left: 1px solid var(--line);
+  @apply border-l border-line;
 }
 
 .arrow {
-  display: grid;
-  place-items: center;
-  padding: 0 4px;
+  @apply grid place-items-center px-1;
 }
 
 .id-row {
-  margin-top: 14px;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.2);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--fg-dim);
+  @apply mt-3.5 flex items-center gap-2.5 rounded-[8px] border border-line bg-black/20 px-3 py-2.5 font-mono text-[11px] text-fg-dim;
 }
 .id-label {
-  color: var(--fg-mute);
+  @apply text-fg-mute;
 }
 .id-value {
-  color: var(--fg);
-  word-break: break-all;
+  @apply break-all text-fg;
 }
 </style>
