@@ -560,6 +560,27 @@
   @apply px-2.5 text-[11.5px];
 }
 
+/* --- .tabs / .tab (Phase 12-A) ---
+ * Creator / Settings 共通のタブバー。
+ * 1px ボーダー上に乗るため margin-bottom: -1px で重ねている。 */
+.tabs {
+  @apply flex h-[38px] shrink-0 gap-1 border-b border-line px-6;
+  background: rgba(10, 11, 15, 0.4);
+}
+.tab {
+  @apply relative -mb-px flex cursor-pointer items-center gap-2 border-0 border-b-2 border-transparent bg-transparent px-3.5 text-[12.5px] text-fg-dim;
+}
+.tab:hover {
+  @apply text-fg;
+}
+.tab.active {
+  @apply border-accent font-semibold text-fg;
+}
+.tab .num {
+  @apply rounded-[3px] border border-line px-[5px] py-px font-mono text-[9.5px] text-fg-mute;
+  background: rgba(255, 255, 255, 0.04);
+}
+
 /* Narrow viewport (Q3): preview を 1 セル化して Arrow のみ表示 */
 @media (max-width: 1080px) {
   .lib-row {

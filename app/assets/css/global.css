@@ -643,47 +643,7 @@ button {
   }
 }
 
-/* === タブバー (Creator / Settings 共有) === */
-.tabs {
-  display: flex;
-  border-bottom: 1px solid var(--line);
-  padding: 0 24px;
-  gap: 4px;
-  height: 38px;
-  background: rgba(10, 11, 15, 0.4);
-  flex-shrink: 0;
-}
-.tab {
-  padding: 0 14px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12.5px;
-  color: var(--fg-dim);
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  position: relative;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-}
-.tab:hover {
-  color: var(--fg);
-}
-.tab.active {
-  color: var(--fg);
-  border-bottom-color: var(--accent);
-  font-weight: 600;
-}
-.tab .num {
-  font-family: var(--font-mono);
-  font-size: 9.5px;
-  color: var(--fg-mute);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--line);
-  padding: 1px 5px;
-  border-radius: 3px;
-}
+/* .tabs / .tab は tailwind.css に移行 (Phase 12-A) */
 
 /* === Creator mode === */
 /*
