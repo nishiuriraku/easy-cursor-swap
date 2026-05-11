@@ -880,22 +880,17 @@ impl ThemeManager {
         Self::import_cursorpack_bytes(&bytes)
     }
 
-    /// `.cursorpack` を新規エクスポートする。
+    /// 内部 helper: in-memory `Vec<u8>` に `.cursorpack` zip バイト列を書き出す。
     ///
-    /// 引数:
-    ///  - `metadata`: `theme.json` の内容
-    ///  - `cursors`: 役割名 → 役割用 `.cur` バイト列 のマップ
-    ///  - `output_path`: 書き出し先の絶対パス
-    ///
-    /// theme.json の `cursors[role].file` は自動的に `cursors/<role>.cur` にリライトされる。
-    /// 戻り値: 書き込んだバイト数。
-    pub fn export_cursorpack(
+    /// `export_cursorpack` (ファイル出力) と `export_cursorpack_streamed` の
+    /// `destination::Library` 経路の双方から呼ばれる。theme.json の `file` フィールドは
+    /// 内部で `cursors/<role>.cur` に統一される。
+    pub fn write_cursorpack_to_buffer(
         metadata: &mut ThemeMetadata,
         cursors: &HashMap<String, Vec<u8>>,
-        output_path: &std::path::Path,
-    ) -> AppResult<u64> {
+    ) -> AppResult<Vec<u8>> {
         use crate::errors::AppError;
-        use std::io::Write;
+        use std::io::{Cursor, Write};
 
         // theme.json の `file` 参照を `cursors/<role>.cur` に統一
         for (_role, def) in metadata.cursors.iter_mut() {
@@ -912,28 +907,46 @@ impl ThemeManager {
             }
         }
 
-        // メタデータをシリアライズ
         let metadata_json = serde_json::to_vec_pretty(metadata)?;
 
-        // Zip 書き出し
+        let mut buf: Vec<u8> = Vec::new();
+        {
+            let cursor = Cursor::new(&mut buf);
+            let mut zip = zip::ZipWriter::new(cursor);
+            let opts: zip::write::SimpleFileOptions = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Deflated);
+
+            zip.start_file("theme.json", opts)?;
+            zip.write_all(&metadata_json)?;
+
+            for (role, bin) in cursors {
+                zip.start_file(format!("cursors/{}.cur", role), opts)?;
+                zip.write_all(bin)?;
+            }
+            zip.finish()?;
+        }
+
+        Ok(buf)
+    }
+
+    /// `.cursorpack` をファイルに出力する。Public な薄いラッパで、内部は
+    /// `write_cursorpack_to_buffer` + `fs::write`。
+    ///
+    /// theme.json の `cursors[role].file` は自動的に `cursors/<role>.cur` にリライトされる。
+    /// 戻り値: 書き込んだバイト数。
+    pub fn export_cursorpack(
+        metadata: &mut ThemeMetadata,
+        cursors: &HashMap<String, Vec<u8>>,
+        output_path: &std::path::Path,
+    ) -> AppResult<u64> {
+        let bytes = Self::write_cursorpack_to_buffer(metadata, cursors)?;
+
         if let Some(parent) = output_path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        let file = std::fs::File::create(output_path)?;
-        let mut zip = zip::ZipWriter::new(file);
-        let opts: zip::write::SimpleFileOptions = zip::write::SimpleFileOptions::default()
-            .compression_method(zip::CompressionMethod::Deflated);
+        std::fs::write(output_path, &bytes)?;
 
-        zip.start_file("theme.json", opts)?;
-        zip.write_all(&metadata_json)?;
-
-        for (role, bin) in cursors {
-            zip.start_file(format!("cursors/{}.cur", role), opts)?;
-            zip.write_all(bin)?;
-        }
-        zip.finish()?;
-
-        let size = std::fs::metadata(output_path)?.len();
+        let size = bytes.len() as u64;
         tracing::info!(
             "exported cursorpack: theme={} ({}) → {} ({} bytes)",
             metadata.name.get("ja"),
@@ -1197,5 +1210,36 @@ mod tests {
         // ~/.custom_cursors/<random-uuid>/theme.json はまず存在しないので false
         let id = uuid::Uuid::new_v4();
         assert!(!ThemeManager::theme_exists(id));
+    }
+
+    use std::collections::HashMap;
+
+    #[test]
+    fn write_cursorpack_to_buffer_produces_valid_zip() {
+        let mut metadata = crate::theme::types::ThemeMetadata {
+            schema_version: 1,
+            id: uuid::Uuid::new_v4(),
+            name: crate::theme::types::LocalizedString::Simple("Buf Test".to_string()),
+            version: "1.0.0".to_string(),
+            created_at: chrono::Utc::now().to_rfc3339(),
+            requires_os_shadow: false,
+            cursors: HashMap::new(),
+            author: None,
+            license: None,
+            homepage: None,
+            description: None,
+            min_app_version: None,
+            signature: None,
+            tags: Vec::new(),
+        };
+        let cursors: HashMap<String, Vec<u8>> = HashMap::new();
+
+        let bytes = ThemeManager::write_cursorpack_to_buffer(&mut metadata, &cursors).unwrap();
+
+        // 先頭は zip マジック "PK\x03\x04"
+        assert_eq!(&bytes[..4], b"PK\x03\x04");
+        // theme.json を含む = inspect_cursorpack_bytes でメタデータが取り出せる
+        let inspected = ThemeManager::inspect_cursorpack_bytes(&bytes).unwrap();
+        assert_eq!(inspected.id, metadata.id);
     }
 }
