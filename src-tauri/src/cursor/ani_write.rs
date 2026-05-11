@@ -174,8 +174,13 @@ fn rewrite_raw_dib_to_af_icon(
     Ok(out)
 }
 
-/// 1 枚の DIB バイト列を CUR (Type 2、エントリ 1 個) でラップする。
-/// 画像データは DIB バイト列をそのままコピー (再エンコードしない)。
+/// 1 枚の raw DIB バイト列を CUR (Type 2、エントリ 1 個) でラップする。
+///
+/// 入力 DIB の `biHeight` は表示高さ N そのもの (legacy .ani 規約)。CUR / `parse_ico_cur`
+/// は `biHeight = 2N` (XOR + AND マスクの合計行数) を期待するので、ラップ時に
+/// BITMAPINFOHEADER の `biHeight` フィールドだけ `2N` に書き換える。32bpp では
+/// AND マスクは不要 (`ico_cur.rs:222-225` 参照) なので、ピクセルバイトは元 DIB を
+/// そのままコピー。ヘッダ 40 バイトのうち `biHeight` 4 バイトだけが変化する。
 fn wrap_dib_as_cur(dib: &[u8], hotspot: (u16, u16)) -> AppResult<Vec<u8>> {
     if dib.len() < 40 {
         return Err(AppError::ImageProcessing(
@@ -187,26 +192,30 @@ fn wrap_dib_as_cur(dib: &[u8], hotspot: (u16, u16)) -> AppResult<Vec<u8>> {
     let _bit_count = u16::from_le_bytes([dib[14], dib[15]]);
 
     // CUR ICONDIRENTRY の幅・高さは u8 (0 = 256 を意味する)。
-    // CUR 内 DIB の biHeight は XOR マスク + AND マスクの合計行数 (表示高さの 2 倍) なので
-    // ICONDIRENTRY に格納する表示高さは biHeight / 2 とする。
     let w_u: u8 = if width <= 0 || width >= 256 {
         0
     } else {
         width as u8
     };
-    let h_abs = if height_raw < 0 {
-        -height_raw
-    } else {
-        height_raw
-    };
-    let h_disp = h_abs / 2; // biHeight は 2× なので表示高さに戻す
-    let h_u: u8 = if h_disp <= 0 || h_disp >= 256 {
+    // 表示高さ N = abs(biHeight) (legacy raw DIB は doubled でない)
+    let display_height = height_raw.unsigned_abs();
+    let h_u: u8 = if display_height == 0 || display_height >= 256 {
         0
     } else {
-        h_disp as u8
+        display_height as u8
     };
 
-    let mut cur: Vec<u8> = Vec::with_capacity(6 + 16 + dib.len());
+    // 新しい DIB を組み立て: ヘッダの biHeight だけ 2N に書き換え、それ以外はコピー。
+    // top-down (height_raw < 0) は符号を維持して 2N or -2N に。
+    let mut patched_dib = dib.to_vec();
+    let new_bi_height: i32 = if height_raw < 0 {
+        -((display_height as i32) * 2)
+    } else {
+        (display_height as i32) * 2
+    };
+    patched_dib[8..12].copy_from_slice(&new_bi_height.to_le_bytes());
+
+    let mut cur: Vec<u8> = Vec::with_capacity(6 + 16 + patched_dib.len());
     // ICONDIR
     cur.extend_from_slice(&0u16.to_le_bytes()); // reserved
     cur.extend_from_slice(&2u16.to_le_bytes()); // type = 2 (CUR)
@@ -218,9 +227,9 @@ fn wrap_dib_as_cur(dib: &[u8], hotspot: (u16, u16)) -> AppResult<Vec<u8>> {
     cur.push(0); // bReserved
     cur.extend_from_slice(&hotspot.0.to_le_bytes()); // hotspot X
     cur.extend_from_slice(&hotspot.1.to_le_bytes()); // hotspot Y
-    cur.extend_from_slice(&(dib.len() as u32).to_le_bytes()); // dwBytesInRes
+    cur.extend_from_slice(&(patched_dib.len() as u32).to_le_bytes()); // dwBytesInRes
     cur.extend_from_slice(&((6 + 16) as u32).to_le_bytes()); // dwImageOffset
-    cur.extend_from_slice(dib);
+    cur.extend_from_slice(&patched_dib);
 
     Ok(cur)
 }
@@ -407,11 +416,17 @@ mod tests {
         assert_eq!(reparsed.frames[0].hotspot_x, 5);
         assert_eq!(reparsed.frames[0].hotspot_y, 5);
 
+        // 寸法が元 DIB と一致 (= 半分に潰れていない)
+        assert_eq!(reparsed.frames[0].width, 8);
+        assert_eq!(reparsed.frames[0].height, 8);
+
+        // フォーマットが AF_ICON 化されている
         assert!(matches!(
             reparsed.frame_infos[0].format,
             super::super::ani::AniFrameFormat::AfIcon
         ));
 
+        // CUR ラッパ構造を検証
         let cur = &out[reparsed.frame_infos[0].raw_data_range.clone()];
         let count = u16::from_le_bytes([cur[4], cur[5]]) as usize;
         assert_eq!(count, 1);
@@ -419,7 +434,25 @@ mod tests {
         let dw_offset =
             u32::from_le_bytes([cur[6 + 12], cur[6 + 13], cur[6 + 14], cur[6 + 15]]) as usize;
         assert_eq!(dw_offset, image_off);
-        assert_eq!(&cur[image_off..], &dib[..]);
+
+        // DIB の biHeight は 2× 化されているが、それ以外 (ヘッダ残部 + ピクセル全部) は元 DIB と一致
+        let embedded_dib = &cur[image_off..];
+        assert_eq!(embedded_dib.len(), dib.len());
+        // [0..8] = biSize + biWidth: 元と一致
+        assert_eq!(&embedded_dib[0..8], &dib[0..8]);
+        // [8..12] = biHeight: 元の 2 倍
+        let new_h = i32::from_le_bytes([
+            embedded_dib[8],
+            embedded_dib[9],
+            embedded_dib[10],
+            embedded_dib[11],
+        ]);
+        let orig_h = i32::from_le_bytes([dib[8], dib[9], dib[10], dib[11]]);
+        assert_eq!(new_h, orig_h * 2);
+        // [12..40] = ヘッダ残部: 元と一致
+        assert_eq!(&embedded_dib[12..40], &dib[12..40]);
+        // [40..] = ピクセル領域: 元と完全一致 (← これが「フレーム不変」の核心)
+        assert_eq!(&embedded_dib[40..], &dib[40..]);
     }
 
     #[test]
@@ -430,6 +463,25 @@ mod tests {
         let cur = &out[reparsed.frame_infos[0].raw_data_range.clone()];
         let count = u16::from_le_bytes([cur[4], cur[5]]) as usize;
         let image_off = 6 + count * 16;
-        assert_eq!(&cur[image_off..], &dib[..]);
+        let embedded_dib = &cur[image_off..];
+        // ピクセル領域 (40 バイト目以降) は元 DIB と完全一致
+        assert_eq!(&embedded_dib[40..], &dib[40..]);
+    }
+
+    /// raw DIB → AF_ICON 正規化後、画素値が元 DIB と一致することを確認する。
+    #[test]
+    fn rewrite_legacy_preserves_pixel_colors() {
+        // 各ピクセルにユニークな値 (i % 256) を入れた DIB から ani を組み立て、
+        // rewrite → reparse 後、画像の特定ピクセル値が元と一致するか検証
+        let (ani, _) = build_raw_dib_one_frame_ani();
+        let out = rewrite_ani_with_hotspot(&ani, (0, 0)).expect("rewrite");
+        let reparsed = parse_ani(&out).expect("reparse");
+        let img = &reparsed.frames[0].image;
+        // build_raw_dib_one_frame_ani は 64 ピクセル (8x8 32bpp) に v=(i%256) で
+        // B,G,R それぞれを書いている (i は 0..64)。bottom-up DIB → 画像座標は反転後。
+        // ピクセル (3, 4) は file 順で y_src = 8 - 1 - 4 = 3 → row 3, x=3 → i = 3*8 + 3 = 27
+        // 各 B/G/R に 27 が書かれているはず。
+        let px = img.get_pixel(3, 4);
+        assert_eq!(px.0, [27, 27, 27, 0xFF]);
     }
 }
