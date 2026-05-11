@@ -17,6 +17,10 @@
 use super::ico_cur::{parse_ico_cur, ParsedIcoCurEntry};
 use crate::errors::{AppError, AppResult};
 
+/// `.ani` anih.flags のビット 0。立っていれば各 icon chunk のデータが完全な CUR ファイル。
+/// 0 のときは raw DIB 形式 (旧形式)。
+const AF_ICON: u32 = 0x01;
+
 /// `.ani` の各フレームが「完全な CUR ファイル (新形式)」か「raw DIB (旧形式)」かを表す。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AniFrameFormat {
@@ -27,10 +31,11 @@ pub enum AniFrameFormat {
 }
 
 /// 解析済み 1 フレームのメタ情報 (画像本体は `ParsedIcoCurEntry`)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AniFrameInfo {
     /// 元バイト列における icon chunk **データ部** のバイト範囲 (8 バイトヘッダ後)
     pub raw_data_range: std::ops::Range<usize>,
+    /// フレームデータの形式 (AF_ICON / raw DIB)。
     pub format: AniFrameFormat,
 }
 
@@ -52,9 +57,9 @@ pub struct ParsedAni {
     /// 抽出された各フレーム (CUR をデコードした RgbaImage)。
     /// 同サイズが複数解像度埋め込まれている場合は最大解像度を採用。
     pub frames: Vec<ParsedIcoCurEntry>,
-    /// ★ 各フレームに対応するメタ情報。`frames` と同じ順序・同じ長さ。
+    /// 各フレームに対応するメタ情報。`frames` と同じ順序・同じ長さ。
     pub frame_infos: Vec<AniFrameInfo>,
-    /// ★ anih.flags に AF_ICON (0x01) が立っていなかった場合 true
+    /// anih.flags に AF_ICON (0x01) が立っていなかった場合 true (旧形式 raw DIB)。
     pub is_legacy_raw_dib: bool,
 }
 
@@ -176,7 +181,7 @@ pub fn parse_ani(bytes: &[u8]) -> AppResult<ParsedAni> {
         sequence,
         frames,
         frame_infos,
-        is_legacy_raw_dib: (header.flags_for_caller & 0x01) == 0,
+        is_legacy_raw_dib: (header.flags & AF_ICON) == 0,
     })
 }
 
@@ -185,8 +190,8 @@ struct AniHeader {
     frames: u32,
     steps: u32,
     jif_rate: u32,
-    /// anih の生フラグ値。呼び出し元が AF_ICON / raw DIB を判定するために使用する。
-    flags_for_caller: u32,
+    /// anih の生フラグ値。AF_ICON / raw DIB の判定に使用する。
+    flags: u32,
 }
 
 fn parse_anih(data: &[u8]) -> AppResult<AniHeader> {
@@ -204,7 +209,7 @@ fn parse_anih(data: &[u8]) -> AppResult<AniHeader> {
         frames,
         steps,
         jif_rate,
-        flags_for_caller: flags,
+        flags,
     })
 }
 
@@ -333,6 +338,20 @@ mod tests {
         assert_eq!(parsed.frame_infos.len(), 2);
         assert_eq!(parsed.frame_infos[0].format, AniFrameFormat::AfIcon);
         assert!(!parsed.is_legacy_raw_dib);
+        // raw_data_range が元バイト列の対応する icon chunk データ部を正確に指していることを検証
+        let icon1_start = 76;
+        let icon1_end = icon1_start + cur1.len();
+        assert_eq!(parsed.frame_infos[0].raw_data_range, icon1_start..icon1_end);
+        // 1 フレーム目の範囲を切り出すと cur1 のバイト列と完全一致する
+        assert_eq!(
+            &ani[parsed.frame_infos[0].raw_data_range.clone()],
+            cur1.as_slice()
+        );
+        // 2 フレーム目の範囲も cur2 と一致
+        assert_eq!(
+            &ani[parsed.frame_infos[1].raw_data_range.clone()],
+            cur2.as_slice()
+        );
     }
 
     #[test]
