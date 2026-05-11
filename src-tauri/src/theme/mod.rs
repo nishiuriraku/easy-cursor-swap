@@ -906,8 +906,15 @@ impl ThemeManager {
     /// 内部 helper: in-memory `Vec<u8>` に `.cursorpack` zip バイト列を書き出す。
     ///
     /// `export_cursorpack` (ファイル出力) と `export_cursorpack_streamed` の
-    /// `destination::Library` 経路の双方から呼ばれる。theme.json の `file` フィールドは
-    /// 内部で `cursors/<role>.cur` に統一される。
+    /// `destination::File` / `destination::Library` 経路から呼ばれる。
+    ///
+    /// **拡張子方針**: `metadata.cursors[role].file` をそのまま zip エントリ名と
+    /// theme.json の `file` フィールドに使う。呼び出し側が `.cur` / `.ani` 等を
+    /// あらかじめ設定しておくこと。ここで強制的に `.cur` 化することはしない
+    /// (旧実装の落とし穴: `.ani` を吸い取る経路が出来ても出力で必ず .cur 化されて
+    /// しまい、Library 保存後にロード時の拡張子矛盾でカーソルが壊れていた)。
+    ///
+    /// `file` が空 / 異常な場合だけ安全な既定 `cursors/<role>.cur` にフォールバックする。
     pub fn write_cursorpack_to_buffer(
         metadata: &mut ThemeMetadata,
         cursors: &HashMap<String, Vec<u8>>,
@@ -915,9 +922,18 @@ impl ThemeManager {
         use crate::errors::AppError;
         use std::io::{Cursor, Write};
 
-        // theme.json の `file` 参照を `cursors/<role>.cur` に統一
-        for (_role, def) in metadata.cursors.iter_mut() {
-            def.file = format!("cursors/{}.cur", _role);
+        // 各ロールの zip エントリ名を確定する。`def.file` を尊重しつつ、空・不正のときだけ
+        // `cursors/<role>.cur` に正規化する。
+        for (role, def) in metadata.cursors.iter_mut() {
+            let raw = def.file.trim();
+            let needs_fallback = raw.is_empty()
+                || raw.contains("..")
+                || raw.starts_with('/')
+                || raw.starts_with('\\')
+                || raw.contains(':');
+            if needs_fallback {
+                def.file = format!("cursors/{}.cur", role);
+            }
         }
 
         // 全カーソル分のバイトが揃っているか検証
@@ -942,8 +958,15 @@ impl ThemeManager {
             zip.start_file("theme.json", opts)?;
             zip.write_all(&metadata_json)?;
 
+            // zip エントリ名は theme.json の `file` フィールドと完全一致させる
+            // (= import_cursorpack_bytes が `archive.by_name(&def.file)` で引けるように)
             for (role, bin) in cursors {
-                zip.start_file(format!("cursors/{}.cur", role), opts)?;
+                let entry_name = metadata
+                    .cursors
+                    .get(role)
+                    .map(|d| d.file.clone())
+                    .unwrap_or_else(|| format!("cursors/{}.cur", role));
+                zip.start_file(entry_name, opts)?;
                 zip.write_all(bin)?;
             }
             zip.finish()?;
@@ -1264,5 +1287,87 @@ mod tests {
         // theme.json を含む = inspect_cursorpack_bytes でメタデータが取り出せる
         let inspected = ThemeManager::inspect_cursorpack_bytes(&bytes).unwrap();
         assert_eq!(inspected.id, metadata.id);
+    }
+
+    /// 回帰テスト: `.ani` 拡張子のロールが zip 出力で `.cur` に書き換えられないこと。
+    /// 旧実装ではすべてのロールが `cursors/<role>.cur` に強制リネームされ、
+    /// `.ani` バイトを `.cur` ファイル名で埋め込んで Library に保存していた。
+    #[test]
+    fn write_cursorpack_to_buffer_preserves_ani_extension() {
+        use crate::theme::types::{CursorDefinition, LocalizedString};
+        use std::io::Read;
+
+        let mut cursors_meta = HashMap::new();
+        cursors_meta.insert(
+            "Arrow".to_string(),
+            CursorDefinition {
+                file: "cursors/Arrow.ani".to_string(),
+                hotspot_x: 0,
+                hotspot_y: 0,
+                resize_method: "lanczos".to_string(),
+                size_overrides: None,
+            },
+        );
+        cursors_meta.insert(
+            "IBeam".to_string(),
+            CursorDefinition {
+                file: "cursors/IBeam.cur".to_string(),
+                hotspot_x: 0,
+                hotspot_y: 0,
+                resize_method: "lanczos".to_string(),
+                size_overrides: None,
+            },
+        );
+        let mut metadata = crate::theme::types::ThemeMetadata {
+            schema_version: 1,
+            id: uuid::Uuid::new_v4(),
+            name: LocalizedString::Simple("Ani Mix".to_string()),
+            version: "1.0.0".to_string(),
+            created_at: chrono::Utc::now().to_rfc3339(),
+            requires_os_shadow: false,
+            cursors: cursors_meta,
+            author: None,
+            license: None,
+            homepage: None,
+            description: None,
+            min_app_version: None,
+            signature: None,
+            tags: Vec::new(),
+        };
+        // ani は "RIFF" マジックで始まるダミー、cur は "CUR1" ダミー
+        let mut cursors: HashMap<String, Vec<u8>> = HashMap::new();
+        cursors.insert("Arrow".to_string(), b"RIFF__ANI_PAYLOAD__".to_vec());
+        cursors.insert("IBeam".to_string(), b"CUR1__IBEAM_PAYLOAD__".to_vec());
+
+        let zip_bytes = ThemeManager::write_cursorpack_to_buffer(&mut metadata, &cursors).unwrap();
+
+        // theme.json の `file` が保持されていること
+        assert_eq!(metadata.cursors["Arrow"].file, "cursors/Arrow.ani");
+        assert_eq!(metadata.cursors["IBeam"].file, "cursors/IBeam.cur");
+
+        // zip エントリ名と中身が `def.file` に対応していること
+        let reader = std::io::Cursor::new(&zip_bytes);
+        let mut archive = zip::ZipArchive::new(reader).unwrap();
+        {
+            let mut e = archive
+                .by_name("cursors/Arrow.ani")
+                .expect("Arrow.ani entry");
+            let mut buf = Vec::new();
+            e.read_to_end(&mut buf).unwrap();
+            assert_eq!(buf, b"RIFF__ANI_PAYLOAD__");
+        }
+        {
+            let mut e = archive
+                .by_name("cursors/IBeam.cur")
+                .expect("IBeam.cur entry");
+            let mut buf = Vec::new();
+            e.read_to_end(&mut buf).unwrap();
+            assert_eq!(buf, b"CUR1__IBEAM_PAYLOAD__");
+        }
+        // 旧バグでは Arrow.cur に書かれていた → 存在しないことを確認
+        assert!(
+            archive.by_name("cursors/Arrow.cur").is_err(),
+            "Arrow.ani が誤って Arrow.cur に書かれていない"
+        );
     }
 }
