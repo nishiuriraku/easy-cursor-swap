@@ -39,6 +39,39 @@ defineProps<{
 <style scoped>
 @reference '~/assets/css/tailwind.css';
 
+.cursors {
+  @apply grid grid-cols-6 gap-1;
+}
+.cell {
+  @apply relative grid aspect-square place-items-center rounded-[5px] border border-line text-fg;
+  background: rgba(255, 255, 255, 0.03);
+}
+.cell.empty {
+  @apply text-fg-faint;
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(255, 255, 255, 0.025),
+    rgba(255, 255, 255, 0.025) 3px,
+    transparent 3px,
+    transparent 6px
+  );
+  border-color: rgba(255, 255, 255, 0.04);
+}
+.cell svg {
+  @apply size-[14px];
+}
+:where(html.light) .cell {
+  background: rgba(15, 20, 35, 0.025);
+}
+:where(html.light) .cell.empty {
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(15, 20, 35, 0.04),
+    rgba(15, 20, 35, 0.04) 3px,
+    transparent 3px,
+    transparent 6px
+  );
+}
 .cell-img {
   @apply size-[18px] object-contain;
   /* image-rendering は複数フォールバック値のスタックなので CSS リテラルで残す。 */

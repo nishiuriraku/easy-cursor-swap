@@ -75,9 +75,19 @@ defineEmits<{
   </div>
 </template>
 
-<!-- NOTE: 元の scoped style は var(--border)/--bg-elev1 など未定義トークンに
-  依存しており、それらの declaration は invalid → cascade で global.css の
-  .toolbar/.chip/.btn 等のルールが実際の見た目を提供していた。
-  scoped を維持すると Tailwind の border utility 等が global を上書きして
-  border-color が currentColor に化ける問題が発生したため、scoped style は
-  削除し global ルールに一任する。 -->
+<style scoped>
+@reference '~/assets/css/tailwind.css';
+
+.filters {
+  @apply mb-[22px] flex items-center gap-3 border-b border-line pb-4;
+}
+.spacer-x {
+  @apply flex-1;
+}
+.sort {
+  @apply flex items-center gap-2 text-[12px] text-fg-dim;
+}
+.sort .lbl {
+  @apply font-mono text-[10px] uppercase tracking-[0.12em] text-fg-mute;
+}
+</style>

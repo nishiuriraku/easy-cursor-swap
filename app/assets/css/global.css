@@ -202,33 +202,8 @@ button {
   align-items: center;
 }
 
-/* --- フィルター --- */
-.filters {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 22px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--line);
-}
-/* .chip family は tailwind.css の @layer components に移行 (Phase 10-B) */
-.spacer-x {
-  flex: 1;
-}
-.sort {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--fg-dim);
-}
-.sort .lbl {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--fg-mute);
-}
+/* .filters / .spacer-x / .sort 系は LibraryFilterBar.vue に scoped 化 (Phase 12-D)
+ * .chip family は tailwind.css に移行 (Phase 10-B) */
 
 /* --- グリッド --- */
 .grid {
@@ -242,37 +217,7 @@ button {
  * ============================================= */
 /* .card family は tailwind.css に移行 (Phase 10-C) */
 
-/* --- 17 ロールマトリクス --- */
-.cursors {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 4px;
-}
-.cell {
-  aspect-ratio: 1;
-  border-radius: 5px;
-  display: grid;
-  place-items: center;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--line);
-  color: var(--fg);
-  position: relative;
-}
-.cell.empty {
-  background: repeating-linear-gradient(
-    -45deg,
-    rgba(255, 255, 255, 0.025),
-    rgba(255, 255, 255, 0.025) 3px,
-    transparent 3px,
-    transparent 6px
-  );
-  border-color: rgba(255, 255, 255, 0.04);
-  color: var(--fg-faint);
-}
-.cell svg {
-  width: 14px;
-  height: 14px;
-}
+/* .cursors / .cell / .cell.empty / .cell svg は CursorMatrix.vue に scoped 化 (Phase 12-D) */
 
 /* .card-active-tag / .card-source-tag / .card-body / .card-row / .card-name /
  * .card-author / .star / .meta-row / .coverage は tailwind.css に移行
@@ -289,40 +234,7 @@ button {
   font-size: 12px;
 }
 
-/* --- ドロップオーバーレイ --- */
-.drop {
-  position: absolute;
-  inset: 0;
-  z-index: 10;
-  background: rgba(10, 11, 15, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  display: grid;
-  place-items: center;
-}
-.drop-inner {
-  width: 480px;
-  padding: 40px;
-  border: 1.5px dashed var(--accent-line);
-  border-radius: 16px;
-  background: rgba(124, 242, 212, 0.04);
-  text-align: center;
-}
-.drop-inner h3 {
-  margin: 12px 0 6px;
-  font-family: var(--font-display);
-  font-size: 18px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-.drop-inner p {
-  color: var(--fg-dim);
-  font-size: 13px;
-  margin: 0;
-}
-.drop-inner .ghost-icon {
-  color: var(--accent);
-}
+/* .drop / .drop-inner 系は LibraryDropOverlay.vue に scoped 化 (Phase 12-D) */
 
 /* =============================================
  * モーダル
@@ -599,12 +511,8 @@ button {
   }
 }
 
-.role-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-/* .role / .ridx / .rkey / .rstatus は RoleListItem.vue に scoped 化 (Phase 11-A) */
+/* .role-list は CreatorRoleList.vue scoped に内製化済 (Phase 12-D)
+ * .role / .ridx / .rkey / .rstatus は RoleListItem.vue に scoped 化 (Phase 11-A) */
 
 .editor {
   display: flex;
@@ -701,20 +609,9 @@ html.light .win::before {
     radial-gradient(800px 500px at 12% -10%, rgba(15, 168, 133, 0.1), transparent 60%),
     radial-gradient(900px 600px at 110% 110%, rgba(106, 92, 255, 0.08), transparent 60%);
 }
-/* html.light .toolbar / .btn / .input / .search の上書きは tailwind.css の
- * :where(html.light) で対応 (Phase 12-B) */
-html.light .cell {
-  background: rgba(15, 20, 35, 0.025);
-}
-html.light .cell.empty {
-  background: repeating-linear-gradient(
-    -45deg,
-    rgba(15, 20, 35, 0.04),
-    rgba(15, 20, 35, 0.04) 3px,
-    transparent 3px,
-    transparent 6px
-  );
-}
+/* html.light の .toolbar / .btn / .input / .search / .cell の上書きは
+ * tailwind.css の :where(html.light) または各 scoped 内で対応
+ * (Phase 12-B / Phase 12-D) */
 html.light body,
 html.light html,
 html.light #__nuxt {

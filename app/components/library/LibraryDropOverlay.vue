@@ -27,11 +27,29 @@ defineProps<{
 </template>
 
 <style scoped>
-/* 元の scoped style は var(--bg-elev1)/var(--text*) 等の未定義トークンに依存し、
- * 実際の見た目は global.css の .drop / .drop-inner / .drop-inner h3 / .ghost-icon
- * ルールが提供していた (scoped はほぼ dead-code 状態)。
- * scoped を維持すると Tailwind utility が global を上書きして visual regression が
- * 起きるため、Vue Transition の fade-* だけ残して他は削除。 */
+@reference '~/assets/css/tailwind.css';
+
+.drop {
+  @apply absolute inset-0 z-10 grid place-items-center;
+  background: rgba(10, 11, 15, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.drop-inner {
+  @apply w-[480px] rounded-2xl p-10 text-center;
+  border: 1.5px dashed var(--accent-line);
+  background: rgba(124, 242, 212, 0.04);
+}
+.drop-inner h3 {
+  @apply m-0 font-display text-[18px] font-semibold tracking-[-0.01em];
+  margin: 12px 0 6px;
+}
+.drop-inner p {
+  @apply m-0 text-[13px] text-fg-dim;
+}
+.drop-inner .ghost-icon {
+  @apply text-accent;
+}
 
 .fade-enter-active,
 .fade-leave-active {
