@@ -484,4 +484,24 @@ mod tests {
         let px = img.get_pixel(3, 4);
         assert_eq!(px.0, [27, 27, 27, 0xFF]);
     }
+
+    #[test]
+    fn rewrite_roundtrip_idempotent_af_icon() {
+        let (ani, _, _) = build_af_icon_two_frame_ani();
+        let out1 = rewrite_ani_with_hotspot(&ani, (4, 4)).unwrap();
+        let out2 = rewrite_ani_with_hotspot(&out1, (4, 4)).unwrap();
+        assert_eq!(
+            out1, out2,
+            "同じホットスポットで 2 回 rewrite した結果がバイト一致"
+        );
+    }
+
+    #[test]
+    fn rewrite_roundtrip_idempotent_legacy_normalized() {
+        let (ani, _) = build_raw_dib_one_frame_ani();
+        let out1 = rewrite_ani_with_hotspot(&ani, (2, 2)).unwrap();
+        // 1 回目で AF_ICON 化された結果を 2 回目に渡す → 完全に同じ
+        let out2 = rewrite_ani_with_hotspot(&out1, (2, 2)).unwrap();
+        assert_eq!(out1, out2);
+    }
 }
