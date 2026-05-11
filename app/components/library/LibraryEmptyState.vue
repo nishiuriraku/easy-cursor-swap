@@ -61,159 +61,103 @@ defineEmits<{
 </template>
 
 <style scoped>
+@reference '~/assets/css/tailwind.css';
+
+/* NOTE: 元コードは var(--bg-elev1/elev2/base) / var(--border) / var(--text*) など
+ * 未定義トークンを多用しており、それらは CSS の invalid value → 既定値で表示されていた。
+ * 視覚的な現状を維持するため、移行時もそれらの参照は変更せず保持する。 */
+
 .es-stage {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 60vh;
-  padding: 40px 20px;
+  @apply relative flex min-h-[60vh] items-center justify-center px-5 py-10;
 }
 
 .es-bg {
-  position: absolute;
-  inset: 0;
+  @apply pointer-events-none absolute inset-0;
   background:
     radial-gradient(circle at 30% 50%, rgba(106, 213, 184, 0.06), transparent 70%),
     radial-gradient(circle at 70% 50%, rgba(124, 159, 255, 0.04), transparent 70%);
-  pointer-events: none;
 }
 
 .es-empty {
-  position: relative;
-  max-width: 580px;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
+  @apply relative flex max-w-[580px] flex-col items-center gap-4 text-center;
 }
 
 .es-empty-icon {
-  position: relative;
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
+  @apply relative mb-2 flex size-20 items-center justify-center rounded-full;
   background: var(--bg-elev2);
   border: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 8px;
 }
 
 .es-empty-zero {
-  position: absolute;
-  bottom: -8px;
-  right: -8px;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--accent);
+  @apply absolute bottom-[-8px] right-[-8px] flex size-7 items-center justify-center rounded-full bg-accent text-[14px] font-bold;
   color: var(--bg-base);
-  font-weight: 700;
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .es-eyebrow {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
+  @apply text-[11px] font-semibold tracking-[0.08em];
 }
 
 .es-empty h1 {
-  font-size: 22px;
-  font-weight: 700;
-  margin: 0;
+  @apply m-0 text-[22px] font-bold;
 }
 
 .es-empty p {
-  font-size: 13px;
+  @apply m-0 text-[13px] leading-[1.5];
   color: var(--text-mute);
-  line-height: 1.5;
-  margin: 0;
 }
 
 .es-empty p code {
-  font-family: var(--font-mono);
+  @apply rounded-[4px] px-1.5 py-0.5 font-mono text-[12px];
   background: var(--bg-elev2);
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 12px;
 }
 
 .es-cta-row {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: center;
-  margin-top: 8px;
+  @apply mt-2 flex flex-wrap justify-center gap-2;
 }
 
 .es-drop {
-  width: 100%;
-  border: 1px dashed var(--border);
-  border-radius: 12px;
-  padding: 16px;
+  @apply mt-3 w-full rounded-[12px] border border-dashed p-4;
+  border-color: var(--border);
   background: var(--bg-elev1);
-  margin-top: 12px;
 }
 
 .es-drop-inner {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  justify-content: center;
+  @apply flex items-center justify-center gap-3;
 }
 
 .es-drop-t {
-  font-size: 13px;
-  font-weight: 600;
+  @apply text-[13px] font-semibold;
 }
 
 .es-drop-s {
-  font-size: 11px;
+  @apply text-[11px];
   color: var(--text-mute);
 }
 
 .es-foot-tip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
+  @apply mt-1 inline-flex items-center gap-1 text-[11px];
   color: var(--text-mute);
-  margin-top: 4px;
 }
 
+/* このコンポーネントだけは独自の .btn ローカル定義を持っている (グローバル .btn と独立) */
 .btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 14px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
+  @apply inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-[8px] border px-3.5 text-[13px] no-underline;
+  border-color: var(--border);
   background: var(--bg-elev2);
   color: var(--text);
-  font-size: 13px;
-  cursor: pointer;
-  text-decoration: none;
 }
 
 .btn.primary {
-  background: var(--accent);
+  @apply bg-accent;
   color: var(--bg-base);
   border-color: var(--accent);
 }
 
 .btn.ghost {
-  background: transparent;
+  @apply bg-transparent;
 }
 
 .es-cta-primary {
-  font-weight: 600;
+  @apply font-semibold;
 }
 </style>
