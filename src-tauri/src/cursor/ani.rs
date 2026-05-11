@@ -17,6 +17,23 @@
 use super::ico_cur::{parse_ico_cur, ParsedIcoCurEntry};
 use crate::errors::{AppError, AppResult};
 
+/// `.ani` の各フレームが「完全な CUR ファイル (新形式)」か「raw DIB (旧形式)」かを表す。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AniFrameFormat {
+    /// 新形式: icon chunk のデータ部分が完全な CUR ファイル
+    AfIcon,
+    /// 旧形式: icon chunk のデータ部分が裸の BITMAPINFOHEADER + DIB
+    RawDib { bit_count: u16 },
+}
+
+/// 解析済み 1 フレームのメタ情報 (画像本体は `ParsedIcoCurEntry`)
+#[derive(Debug, Clone)]
+pub struct AniFrameInfo {
+    /// 元バイト列における icon chunk **データ部** のバイト範囲 (8 バイトヘッダ後)
+    pub raw_data_range: std::ops::Range<usize>,
+    pub format: AniFrameFormat,
+}
+
 /// 解析済み .ani ファイル全体
 #[derive(Debug, Clone)]
 pub struct ParsedAni {
@@ -35,6 +52,10 @@ pub struct ParsedAni {
     /// 抽出された各フレーム (CUR をデコードした RgbaImage)。
     /// 同サイズが複数解像度埋め込まれている場合は最大解像度を採用。
     pub frames: Vec<ParsedIcoCurEntry>,
+    /// ★ 各フレームに対応するメタ情報。`frames` と同じ順序・同じ長さ。
+    pub frame_infos: Vec<AniFrameInfo>,
+    /// ★ anih.flags に AF_ICON (0x01) が立っていなかった場合 true
+    pub is_legacy_raw_dib: bool,
 }
 
 impl ParsedAni {
@@ -74,6 +95,7 @@ pub fn parse_ani(bytes: &[u8]) -> AppResult<ParsedAni> {
     let mut rates: Option<Vec<u32>> = None;
     let mut seq: Option<Vec<u32>> = None;
     let mut frames: Vec<ParsedIcoCurEntry> = Vec::new();
+    let mut frame_infos: Vec<AniFrameInfo> = Vec::new();
 
     let mut pos = 12;
     while pos + 8 <= end {
@@ -110,7 +132,8 @@ pub fn parse_ani(bytes: &[u8]) -> AppResult<ParsedAni> {
             }
             b"LIST" => {
                 if data.len() >= 4 && &data[0..4] == b"fram" {
-                    parse_frame_list(&data[4..], &mut frames)?;
+                    // data_start + 4: LIST チャンクのデータ先頭 + 'fram' の 4 バイト
+                    parse_frame_list(&data[4..], data_start + 4, &mut frames, &mut frame_infos)?;
                 }
                 // 他の LIST (INFO など) は無視
             }
@@ -152,6 +175,8 @@ pub fn parse_ani(bytes: &[u8]) -> AppResult<ParsedAni> {
         per_step_rate_jiffies,
         sequence,
         frames,
+        frame_infos,
+        is_legacy_raw_dib: (header.flags_for_caller & 0x01) == 0,
     })
 }
 
@@ -160,6 +185,8 @@ struct AniHeader {
     frames: u32,
     steps: u32,
     jif_rate: u32,
+    /// anih の生フラグ値。呼び出し元が AF_ICON / raw DIB を判定するために使用する。
+    flags_for_caller: u32,
 }
 
 fn parse_anih(data: &[u8]) -> AppResult<AniHeader> {
@@ -173,14 +200,11 @@ fn parse_anih(data: &[u8]) -> AppResult<AniHeader> {
     // cx (12), cy (16), cBitCount (20), cPlanes (24) — 個別フレーム参照のため未使用
     let jif_rate = u32::from_le_bytes([data[28], data[29], data[30], data[31]]);
     let flags = u32::from_le_bytes([data[32], data[33], data[34], data[35]]);
-    // AF_ICON (bit 0) が立っていなければ raw DIB エントリの可能性あり (旧形式)
-    if flags & 0x01 == 0 {
-        tracing::warn!("ANI フラグに AF_ICON が立っていません — raw DIB フレームは未対応");
-    }
     Ok(AniHeader {
         frames,
         steps,
         jif_rate,
+        flags_for_caller: flags,
     })
 }
 
@@ -190,7 +214,15 @@ fn parse_u32_array(data: &[u8]) -> Vec<u32> {
         .collect()
 }
 
-fn parse_frame_list(data: &[u8], frames: &mut Vec<ParsedIcoCurEntry>) -> AppResult<()> {
+/// `data`: LIST チャンクの 'fram' 識別子直後のバイト列 (icon chunks のみ)。
+/// `list_offset_in_file`: ファイル全体における `data` の先頭バイト位置。
+/// フレームごとの `raw_data_range` はこのオフセットを基準に計算する。
+fn parse_frame_list(
+    data: &[u8],
+    list_offset_in_file: usize,
+    frames: &mut Vec<ParsedIcoCurEntry>,
+    infos: &mut Vec<AniFrameInfo>,
+) -> AppResult<()> {
     let mut pos = 0;
     while pos + 8 <= data.len() {
         let id = &data[pos..pos + 4];
@@ -212,6 +244,13 @@ fn parse_frame_list(data: &[u8], frames: &mut Vec<ParsedIcoCurEntry>) -> AppResu
                 .into_iter()
                 .max_by_key(|e| e.width * e.height)
             {
+                // ファイル全体における icon chunk データ部のバイト範囲を記録する
+                let abs_start = list_offset_in_file + start;
+                let abs_end = list_offset_in_file + end;
+                infos.push(AniFrameInfo {
+                    raw_data_range: abs_start..abs_end,
+                    format: AniFrameFormat::AfIcon,
+                });
                 frames.push(largest);
             }
         }
@@ -290,6 +329,10 @@ mod tests {
             parsed.frames[1].image.get_pixel(0, 0),
             &image::Rgba([0, 255, 0, 255])
         );
+        // frame_infos の検証
+        assert_eq!(parsed.frame_infos.len(), 2);
+        assert_eq!(parsed.frame_infos[0].format, AniFrameFormat::AfIcon);
+        assert!(!parsed.is_legacy_raw_dib);
     }
 
     #[test]
@@ -353,5 +396,8 @@ mod tests {
         assert_eq!(parsed.per_step_rate_jiffies, vec![10, 20, 30]);
         // (10 + 20 + 30) jiffies = 60 jiffies = 1 sec = 1000 ms
         assert_eq!(parsed.total_duration_ms(), 1000);
+        // frame_infos の検証
+        assert_eq!(parsed.frame_infos.len(), 1);
+        assert!(!parsed.is_legacy_raw_dib);
     }
 }
