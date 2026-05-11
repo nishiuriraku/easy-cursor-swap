@@ -46,12 +46,24 @@ interface PendingMatch {
   conflict: 'none' | 'overwrite-existing' | 'collision-with-other-pending'
   decision: 'apply' | 'skip'
   previewUrl: string
+  /**
+   * `.ani` 用の Uint8Array 化済みフレーム列。Vue 3 のテンプレートは Uint8Array を
+   * グローバル名として認識しないため、`new Uint8Array(...)` をテンプレート式で書くと
+   * 「Property "Uint8Array" was accessed during render but is not defined on instance」
+   * の warn を出す。スクリプト側で 1 度だけ変換しておいて子コンポーネントへ渡す。
+   */
+  aniFramesU8: readonly Uint8Array[] | null
 }
 
 interface UnmatchedFile {
   asset: ResolvedAsset
   manuallyAssignedRole: string | null
   previewUrl: string
+  aniFramesU8: readonly Uint8Array[] | null
+}
+
+function toAniFramesU8(asset: ResolvedAsset): readonly Uint8Array[] | null {
+  return asset.ani ? asset.ani.framePngs.map((b) => new Uint8Array(b)) : null
 }
 
 const protectExisting = ref(true)
@@ -113,6 +125,7 @@ watch(
           conflict,
           decision: conflict === 'overwrite-existing' && protectExisting.value ? 'skip' : 'apply',
           previewUrl: makePreview(fakeAsset),
+          aniFramesU8: null,
         })
       }
       return
@@ -127,7 +140,12 @@ watch(
       if (m) {
         candidates.push({ sourceFile: a.sourceFile, nativeSize: a.nativeSize, match: m, asset: a })
       } else {
-        unmatched.value.push({ asset: a, manuallyAssignedRole: null, previewUrl: makePreview(a) })
+        unmatched.value.push({
+          asset: a,
+          manuallyAssignedRole: null,
+          previewUrl: makePreview(a),
+          aniFramesU8: toAniFramesU8(a),
+        })
       }
     }
     const { winners, demoted } = resolveCollisions(candidates)
@@ -136,6 +154,7 @@ watch(
         asset: c.asset,
         manuallyAssignedRole: null,
         previewUrl: makePreview(c.asset),
+        aniFramesU8: toAniFramesU8(c.asset),
       })
     }
     for (const w of winners as Array<(typeof candidates)[0]>) {
@@ -147,6 +166,7 @@ watch(
         conflict,
         decision: conflict === 'overwrite-existing' && protectExisting.value ? 'skip' : 'apply',
         previewUrl: makePreview(w.asset),
+        aniFramesU8: toAniFramesU8(w.asset),
       })
     }
   },
@@ -303,6 +323,7 @@ onUnmounted(resetState)
           :conflict="row.match?.conflict ?? 'none'"
           :decision="row.match?.decision ?? 'skip'"
           :ani-data="row.match?.asset.ani ?? null"
+          :ani-frames-u8="row.match?.aniFramesU8 ?? null"
           @toggle="(v) => row.match && (row.match.decision = v)"
         />
 
@@ -311,8 +332,8 @@ onUnmounted(resetState)
         </h4>
         <div v-for="u in unmatched" :key="u.asset.sourcePath" class="bi-unmatched">
           <AniThumb
-            v-if="u.asset.ani"
-            :frame-pngs="u.asset.ani.framePngs.map((b) => new Uint8Array(b))"
+            v-if="u.asset.ani && u.aniFramesU8"
+            :frame-pngs="u.aniFramesU8"
             :sequence="u.asset.ani.sequence"
             :durations="u.asset.ani.perStepDurationsMs"
             :width="32"

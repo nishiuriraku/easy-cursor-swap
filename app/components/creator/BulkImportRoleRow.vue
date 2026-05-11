@@ -27,8 +27,16 @@ interface Props {
     perStepDurationsMs: number[]
     isLegacyRawDib: boolean
   } | null
+  /**
+   * 親側で 1 度だけ Uint8Array 化した frames 配列。テンプレートに
+   * `new Uint8Array(...)` を書くと Vue 3 のグローバル白リスト
+   * (Math/Date/Array 等しか入っていない) に Uint8Array は含まれないため、
+   * `[Vue warn]: Property "Uint8Array" was accessed during render but is
+   * not defined on instance.` が出る。変換は script setup 内で済ませて渡す。
+   */
+  aniFramesU8?: readonly Uint8Array[] | null
 }
-const props = withDefaults(defineProps<Props>(), { aniData: null })
+const props = withDefaults(defineProps<Props>(), { aniData: null, aniFramesU8: null })
 const emit = defineEmits<{ (e: 'toggle', value: 'apply' | 'skip'): void }>()
 
 const confidenceLabel = computed(() => {
@@ -51,8 +59,8 @@ const conflictTitle = computed(() => {
     </div>
     <div class="thumb-cell">
       <AniThumb
-        v-if="aniData"
-        :frame-pngs="aniData.framePngs.map((b) => new Uint8Array(b))"
+        v-if="aniData && aniFramesU8"
+        :frame-pngs="aniFramesU8"
         :sequence="aniData.sequence"
         :durations="aniData.perStepDurationsMs"
         :width="32"
