@@ -274,74 +274,51 @@ onMounted(loadIndex)
 </template>
 
 <style scoped>
+@reference '~/assets/css/tailwind.css';
+
 .marketplace-host {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  position: relative;
+  @apply relative flex h-full flex-col;
 }
 
 .repo-link {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--fg-mute);
-  font-weight: 400;
-  margin-left: 12px;
+  @apply ml-3 font-mono text-[12px] font-normal text-fg-mute;
 }
 
 .featured-strip {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
-  margin-bottom: 24px;
+  @apply mb-6 grid grid-cols-3 gap-3.5;
 }
 
 @media (max-width: 1100px) {
   .featured-strip {
-    grid-template-columns: repeat(2, 1fr);
+    @apply grid-cols-2;
   }
 }
 
 @media (max-width: 700px) {
   .featured-strip {
-    grid-template-columns: 1fr;
+    @apply grid-cols-1;
   }
 }
 
 .empty-state,
 .error-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 80px 24px;
-  text-align: center;
-  color: var(--fg-mute);
-  gap: 12px;
+  @apply flex flex-col items-center justify-center gap-3 px-6 py-20 text-center text-fg-mute;
 }
 .error-state {
   color: var(--rose, #ff6b8a);
 }
 .error-state .error-msg {
-  margin: 0;
-  font-size: 14px;
-  color: var(--fg);
+  @apply m-0 text-[14px] text-fg;
 }
 .empty-state h3 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 18px;
-  color: var(--fg);
-  font-weight: 600;
+  @apply m-0 font-display text-[18px] font-semibold text-fg;
 }
 .empty-state p {
-  margin: 0;
-  font-size: 13px;
-  color: var(--fg-dim);
+  @apply m-0 text-[13px] text-fg-dim;
 }
 
 .skeleton-card {
-  height: 280px;
+  @apply h-[280px];
   background: linear-gradient(
     90deg,
     rgba(255, 255, 255, 0.02) 0%,
