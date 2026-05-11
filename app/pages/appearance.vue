@@ -253,85 +253,50 @@ watch(
 </template>
 
 <style scoped>
+@reference '~/assets/css/tailwind.css';
+
 .appearance-host {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
+  @apply flex h-full flex-col;
 }
 .content {
-  max-width: 1100px;
-  margin: 0 auto;
-  width: 100%;
-  flex: 1;
-  overflow-y: auto;
-  padding: 24px 28px 32px;
+  @apply mx-auto w-full max-w-[1100px] flex-1 overflow-y-auto px-7 pb-8 pt-6;
 }
 
 .page-head h1 {
-  font-size: 22px;
+  @apply text-[22px];
 }
 
 .head-hint {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--fg-mute);
-  text-transform: none;
-  letter-spacing: 0;
-  font-weight: 400;
+  @apply font-mono text-[10px] font-normal normal-case tracking-normal text-fg-mute;
 }
 
 .os-state {
-  margin-bottom: 20px;
+  @apply mb-5;
 }
 .indicator-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  @apply grid grid-cols-2;
 }
 
 .section-title {
-  margin: 0 0 12px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--fg-mute);
-  font-weight: 500;
+  @apply mb-3 mt-0 font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-fg-mute;
 }
 
 .pairing-grid {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  gap: 16px;
-  align-items: stretch;
-  margin-bottom: 24px;
+  @apply mb-6 grid grid-cols-[1fr_auto_1fr] items-stretch gap-4;
 }
 @media (max-width: 800px) {
   .pairing-grid {
-    grid-template-columns: 1fr;
+    @apply grid-cols-1;
   }
 }
 
 .auto-switch {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  color: var(--fg-mute);
-  font-family: var(--font-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  @apply flex flex-col items-center justify-center gap-1.5 font-mono text-[9.5px] uppercase tracking-[0.12em] text-fg-mute;
 }
 
 .watch-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
+  @apply mr-1.5 inline-block size-1.5 rounded-full bg-accent;
   box-shadow: 0 0 6px var(--accent);
-  margin-right: 6px;
-  display: inline-block;
 }
 
 .prop-body {
