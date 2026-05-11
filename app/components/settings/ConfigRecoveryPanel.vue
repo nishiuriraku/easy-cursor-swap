@@ -108,98 +108,66 @@ onMounted(load)
 </template>
 
 <style scoped>
+@reference '~/assets/css/tailwind.css';
+
 .recovery-panel {
-  margin-top: 4px;
+  @apply mt-1;
 }
 
 .prop-section {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 0 0 4px;
-  margin-bottom: 16px;
+  @apply mb-4 rounded-[8px] border border-line pb-1;
 }
 
 .prop-head {
-  padding: 10px 16px 9px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--fg-mute);
-  border-bottom: 1px solid var(--line);
+  @apply border-b border-line px-4 pb-[9px] pt-2.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-fg-mute;
 }
 
 .prop-body {
-  padding: 12px 16px;
+  @apply px-4 py-3;
 }
 
 .recovery-desc {
-  margin: 0 0 12px;
-  font-size: 13px;
-  color: var(--fg-dim);
+  @apply mb-3 mt-0 text-[13px] text-fg-dim;
 }
 
 .backup-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--line);
+  @apply flex items-center gap-3 border-b border-line py-2.5;
 }
 .backup-row:last-of-type {
-  border-bottom: none;
+  @apply border-b-0;
 }
 
 .backup-meta {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
+  @apply flex min-w-0 flex-1 flex-col gap-[3px];
 }
 
 .backup-name {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--fg);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @apply overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[12px] text-fg;
 }
 
 .backup-kind {
-  font-size: 11px;
-  font-family: var(--font-mono);
-  padding: 1px 6px;
-  border-radius: 3px;
-  width: fit-content;
+  @apply w-fit rounded-[3px] px-1.5 py-px font-mono text-[11px];
 }
 .backup-kind.versioned {
+  @apply border border-accent-line text-accent;
   background: rgba(124, 242, 212, 0.12);
-  color: var(--accent);
-  border: 1px solid var(--accent-line);
 }
 .backup-kind.corrupt {
+  @apply border;
   background: rgba(255, 107, 138, 0.1);
   color: #ffb8c5;
-  border: 1px solid rgba(255, 107, 138, 0.3);
+  border-color: rgba(255, 107, 138, 0.3);
 }
 
 .backup-date,
 .backup-size {
-  font-size: 11px;
-  color: var(--fg-mute);
+  @apply text-[11px] text-fg-mute;
 }
 
 .recovery-msg {
-  margin-top: 10px;
+  @apply mt-2.5 rounded-md border border-accent-line p-3 font-mono text-[11.5px] text-fg-dim;
   padding: 10px 12px;
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  color: var(--fg-dim);
   background: rgba(124, 242, 212, 0.06);
-  border: 1px solid var(--accent-line);
-  border-radius: 6px;
 }
 .recovery-msg.error {
   background: rgba(255, 107, 138, 0.06);
