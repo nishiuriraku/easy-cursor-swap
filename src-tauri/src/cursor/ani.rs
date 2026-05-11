@@ -310,23 +310,17 @@ fn parse_raw_dib_frame(data: &[u8]) -> AppResult<(ParsedIcoCurEntry, u16)> {
             width
         )));
     }
-    // bottom-up DIB: height_raw > 0 の場合は行順が下から上。
-    // AND マスク付き形式では height_raw == width * 2 になることがある (カーソル標準)。
-    let height_abs = if height_raw < 0 {
-        (-height_raw) as u32
+    let w = width as u32;
+    let (height_abs, is_bottom_up) = if height_raw < 0 {
+        // top-down DIB: 行順は上から下 (画像座標と一致)
+        ((-height_raw) as u32, false)
     } else {
+        // bottom-up DIB (標準形式): 行順は下から上、AND マスク付きでは h == w*2
+        // カーソルは常に正方形 (w==h) が前提。非正方形の場合この検出は誤検知の可能性がある。
         let h = height_raw as u32;
-        let w = width as u32;
-        // AND マスク付きの場合 h == w*2 → 実画像高さは w
-        if h == w * 2 {
-            w
-        } else {
-            h
-        }
+        let img_h = if h == w * 2 { w } else { h };
+        (img_h, true)
     };
-
-    let width_u = width as u32;
-    let height = height_abs;
 
     if bit_count != 32 {
         return Err(AppError::ImageProcessing(format!(
@@ -335,21 +329,20 @@ fn parse_raw_dib_frame(data: &[u8]) -> AppResult<(ParsedIcoCurEntry, u16)> {
         )));
     }
 
-    let row_bytes = (width_u * 4) as usize;
+    let row_bytes = (w * 4) as usize;
     let pixel_start = bi_size as usize;
-    let needed = pixel_start + row_bytes * height as usize;
+    let needed = pixel_start + row_bytes * height_abs as usize;
     if data.len() < needed {
         return Err(AppError::ImageProcessing(
             "raw DIB のピクセル領域が切り詰め".to_string(),
         ));
     }
 
-    let mut img = image::RgbaImage::new(width_u, height);
-    for y in 0..height {
-        // bottom-up: ファイル先頭の行が画像の最下行
-        let src_y = height - 1 - y;
+    let mut img = image::RgbaImage::new(w, height_abs);
+    for y in 0..height_abs {
+        let src_y = if is_bottom_up { height_abs - 1 - y } else { y };
         let row_start = pixel_start + (src_y as usize) * row_bytes;
-        for x in 0..width_u {
+        for x in 0..w {
             let i = row_start + (x as usize) * 4;
             let b = data[i];
             let g = data[i + 1];
@@ -361,8 +354,8 @@ fn parse_raw_dib_frame(data: &[u8]) -> AppResult<(ParsedIcoCurEntry, u16)> {
 
     Ok((
         ParsedIcoCurEntry {
-            width: width_u,
-            height,
+            width: w,
+            height: height_abs,
             hotspot_x: 0,
             hotspot_y: 0,
             image: img,
@@ -478,7 +471,7 @@ mod tests {
     }
 
     /// 旧形式 (raw DIB, flags=0) の .ani を組み立てて parse_ani が成功することを確認する。
-    /// DIB は 8x8 の RGBA 4bpp 風 (ここでは 32bpp 単色で簡易化) で、anih.cx/cy を持つ。
+    /// DIB は 8×8 の 32bpp 単色 (緑) で、anih.cx/cy = 8 を持つ。
     #[test]
     fn parse_legacy_raw_dib_frames() {
         // 32bpp BMP DIB: BITMAPINFOHEADER (40 bytes) + 8*8*4 = 256 bytes pixel data
@@ -604,6 +597,8 @@ mod tests {
         assert_eq!(img.get_pixel(0, h - 1).0, [0x00, 0x00, 0xFF, 0xFF]);
         // y=0 (最上行) は元の DIB y=h-1 (赤) のはず
         assert_eq!(img.get_pixel(0, 0).0, [0xFF, 0x00, 0x00, 0xFF]);
+        // 中間行 (y=1) も赤であることを確認 (高さ計算の off-by-one を捕捉)
+        assert_eq!(img.get_pixel(0, 1).0, [0xFF, 0x00, 0x00, 0xFF]);
     }
 
     #[test]
