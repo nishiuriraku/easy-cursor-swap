@@ -518,6 +518,8 @@ interface ExportResult {
   size_bytes: number
   signed: boolean
   key_id: string | null
+  applied: boolean
+  apply_error: string | null
 }
 
 /** ストリームエクスポート時の進捗状態 */
@@ -593,7 +595,9 @@ async function exportCursorpack(opts: { sign: boolean }) {
         version: metaVersion.value,
         requiresOsShadow: shadowEnabled.value,
         roles,
-        outputPath: target,
+        // Phase 3: 既存 Export ボタンは file 出力で固定。Phase 4 で SaveDestinationModal に置換
+        destination: { kind: 'file', path: target },
+        existingThemeId: null,
         sign: opts.sign,
       },
     })
