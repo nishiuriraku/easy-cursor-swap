@@ -349,78 +349,8 @@ button {
 }
 
 /* .card-active-tag / .card-source-tag / .card-body / .card-row / .card-name /
- * .card-author は tailwind.css に移行 (Phase 10-C) */
-.star {
-  width: 26px;
-  height: 26px;
-  display: grid;
-  place-items: center;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  color: var(--fg-faint);
-  cursor: pointer;
-  transition: all 0.12s;
-  flex-shrink: 0;
-}
-.star:hover {
-  color: var(--amber);
-  background: rgba(245, 194, 107, 0.06);
-}
-.star.on {
-  color: var(--amber);
-  background: rgba(245, 194, 107, 0.1);
-  border-color: rgba(245, 194, 107, 0.25);
-}
-
-.meta-row {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--fg-mute);
-  letter-spacing: 0.04em;
-}
-.meta-row .m {
-  padding: 0 8px;
-}
-.meta-row .m:first-child {
-  padding-left: 0;
-}
-.meta-row .m + .m {
-  border-left: 1px solid var(--line);
-}
-.meta-row b {
-  color: var(--fg-dim);
-  font-weight: 500;
-}
-
-.coverage {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.coverage .bar {
-  flex: 1;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 2px;
-  overflow: hidden;
-}
-.coverage .bar > i {
-  display: block;
-  height: 100%;
-  background: linear-gradient(90deg, var(--accent), #5dd9bd);
-  border-radius: 2px;
-}
-.coverage .num {
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--fg-dim);
-  min-width: 42px;
-  text-align: right;
-}
+ * .card-author / .star / .meta-row / .coverage は tailwind.css に移行
+ * (Phase 10-C, 10-E) */
 
 .card-actions {
   display: flex;
@@ -672,14 +602,7 @@ button {
   }
 }
 
-.spinner {
-  width: 20px;
-  height: 20px;
-  border: 2px solid var(--line);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
-}
+/* .spinner は tailwind.css に移行 (Phase 10-E) */
 
 /* =============================================
  * アクセシビリティ

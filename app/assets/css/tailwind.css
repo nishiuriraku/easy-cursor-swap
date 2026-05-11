@@ -307,3 +307,54 @@
 .tag.ok {
   @apply border-accent-line bg-accent-dim text-accent;
 }
+
+/* --- 個別 utility: .star / .meta-row / .coverage / .spinner (Phase 10-E) --- */
+.star {
+  @apply grid size-[26px] shrink-0 cursor-pointer place-items-center rounded-md border border-transparent bg-transparent text-fg-faint;
+  transition: all 0.12s;
+}
+.star:hover {
+  color: var(--amber);
+  background: rgba(245, 194, 107, 0.06);
+}
+.star.on {
+  color: var(--amber);
+  background: rgba(245, 194, 107, 0.1);
+  border-color: rgba(245, 194, 107, 0.25);
+}
+
+.meta-row {
+  @apply flex items-center gap-0 font-mono text-[10.5px] tracking-[0.04em] text-fg-mute;
+}
+.meta-row .m {
+  @apply px-2;
+}
+.meta-row .m:first-child {
+  @apply pl-0;
+}
+.meta-row .m + .m {
+  @apply border-l border-line;
+}
+.meta-row b {
+  @apply font-medium text-fg-dim;
+}
+
+.coverage {
+  @apply flex items-center gap-2;
+}
+.coverage .bar {
+  @apply h-1 flex-1 overflow-hidden rounded-[2px] bg-white/[0.05];
+}
+.coverage .bar > i {
+  @apply block h-full rounded-[2px];
+  background: linear-gradient(90deg, var(--accent), #5dd9bd);
+}
+.coverage .num {
+  @apply min-w-[42px] text-right font-mono text-[10.5px] text-fg-dim;
+}
+
+.spinner {
+  @apply size-5 rounded-full border-2 border-line;
+  border-top-color: var(--accent);
+  animation: spin 0.6s linear infinite;
+}
