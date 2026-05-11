@@ -46,6 +46,7 @@ pub enum AssetKind {
     Svg,
     Cur,
     Ico,
+    Ani,
 }
 
 #[derive(Debug, Serialize)]
@@ -60,6 +61,16 @@ pub struct ResolvedAsset {
     pub hotspot_x: u32,
     pub hotspot_y: u32,
     pub available_sizes: Vec<u32>,
+    pub ani: Option<AniAssetData>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct AniAssetData {
+    pub frame_pngs: Vec<Vec<u8>>,
+    pub sequence: Vec<u32>,
+    pub per_step_durations_ms: Vec<u32>,
+    pub is_legacy_raw_dib: bool,
 }
 
 #[derive(Debug, Serialize)]

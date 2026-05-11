@@ -11,7 +11,7 @@ use crate::errors::AppError;
 use std::path::Path;
 use tauri::{AppHandle, Emitter, Manager, State};
 
-const SUPPORTED_EXTS: &[&str] = &["png", "svg", "cur", "ico"];
+const SUPPORTED_EXTS: &[&str] = &["png", "svg", "cur", "ico", "ani"];
 
 fn ext_supported(path: &Path) -> bool {
     path.extension()
@@ -83,6 +83,7 @@ pub fn resolve_one(path: &str) -> Result<ResolvedAsset, AppError> {
         "png" => resolve_png(path, basename, &bytes),
         "svg" => resolve_svg(path, basename, &bytes),
         "cur" | "ico" => resolve_cur_or_ico(path, basename, &bytes, ext == "cur"),
+        "ani" => resolve_ani(path, basename, &bytes),
         _ => Err(AppError::ImageProcessing(format!("未対応拡張子: {}", ext))),
     }
 }
@@ -104,6 +105,7 @@ fn resolve_png(path: &str, basename: String, bytes: &[u8]) -> Result<ResolvedAss
         hotspot_x: 0,
         hotspot_y: 0,
         available_sizes: vec![size],
+        ani: None,
     })
 }
 
@@ -121,6 +123,60 @@ fn resolve_svg(path: &str, basename: String, bytes: &[u8]) -> Result<ResolvedAss
         hotspot_x: 0,
         hotspot_y: 0,
         available_sizes: vec![256],
+        ani: None,
+    })
+}
+
+fn resolve_ani(path: &str, basename: String, bytes: &[u8]) -> Result<ResolvedAsset, AppError> {
+    use crate::cursor::parse_ani;
+
+    let parsed = parse_ani(bytes)?;
+
+    let mut frame_pngs: Vec<Vec<u8>> = Vec::with_capacity(parsed.frames.len());
+    for entry in &parsed.frames {
+        let mut png = Vec::new();
+        let encoder = image::codecs::png::PngEncoder::new(&mut png);
+        image::ImageEncoder::write_image(
+            encoder,
+            entry.image.as_raw(),
+            entry.image.width(),
+            entry.image.height(),
+            image::ExtendedColorType::Rgba8,
+        )
+        .map_err(|e| AppError::ImageProcessing(format!("PNG エンコード失敗: {}", e)))?;
+        frame_pngs.push(png);
+    }
+
+    let per_step_durations_ms: Vec<u32> = parsed
+        .per_step_rate_jiffies
+        .iter()
+        .map(|j| ((*j as u64 * 1000) / 60) as u32)
+        .collect();
+
+    let (width, hotspot_x, hotspot_y) = parsed
+        .frames
+        .first()
+        .map(|f| (f.width, f.hotspot_x, f.hotspot_y))
+        .unwrap_or((0, 0, 0));
+
+    let primary_png = frame_pngs.first().cloned().unwrap_or_default();
+
+    Ok(ResolvedAsset {
+        source_file: basename,
+        source_path: path.to_string(),
+        kind: AssetKind::Ani,
+        png_bytes: primary_png,
+        svg_text: None,
+        native_size: width,
+        hotspot_x,
+        hotspot_y,
+        available_sizes: vec![width],
+        ani: Some(super::AniAssetData {
+            frame_pngs,
+            sequence: parsed.sequence,
+            per_step_durations_ms,
+            is_legacy_raw_dib: parsed.is_legacy_raw_dib,
+        }),
     })
 }
 
@@ -148,6 +204,7 @@ fn resolve_cur_or_ico(
         hotspot_x: largest.hotspot_x,
         hotspot_y: largest.hotspot_y,
         available_sizes,
+        ani: None,
     })
 }
 
@@ -374,5 +431,56 @@ mod tests {
         .unwrap();
         assert_eq!(result.assets.len(), 1);
         assert_eq!(result.failures.len(), 1);
+    }
+
+    #[test]
+    fn resolve_ani_returns_animation_data() {
+        use crate::cursor::generate_cur_binary;
+        use image::RgbaImage;
+        use std::io::Write;
+
+        let img = RgbaImage::from_pixel(16, 16, image::Rgba([200, 100, 50, 255]));
+        let cur = generate_cur_binary(&[(img, 2, 3)]).unwrap();
+
+        let mut ani: Vec<u8> = Vec::new();
+        ani.extend_from_slice(b"RIFF");
+        let bp = ani.len();
+        ani.extend_from_slice(&0u32.to_le_bytes());
+        ani.extend_from_slice(b"ACON");
+        ani.extend_from_slice(b"anih");
+        ani.extend_from_slice(&36u32.to_le_bytes());
+        let mut h = vec![0u8; 36];
+        h[0..4].copy_from_slice(&36u32.to_le_bytes());
+        h[4..8].copy_from_slice(&1u32.to_le_bytes());
+        h[8..12].copy_from_slice(&1u32.to_le_bytes());
+        h[28..32].copy_from_slice(&6u32.to_le_bytes());
+        h[32..36].copy_from_slice(&0x01u32.to_le_bytes());
+        ani.extend_from_slice(&h);
+        ani.extend_from_slice(b"LIST");
+        let ls = 4 + 8 + cur.len();
+        ani.extend_from_slice(&(ls as u32).to_le_bytes());
+        ani.extend_from_slice(b"fram");
+        ani.extend_from_slice(b"icon");
+        ani.extend_from_slice(&(cur.len() as u32).to_le_bytes());
+        ani.extend_from_slice(&cur);
+        let body = (ani.len() - 8) as u32;
+        ani[bp..bp + 4].copy_from_slice(&body.to_le_bytes());
+
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("anim.ani");
+        std::fs::File::create(&path)
+            .unwrap()
+            .write_all(&ani)
+            .unwrap();
+
+        let resolved = resolve_one(path.to_str().unwrap()).expect("resolve");
+        assert_eq!(resolved.kind, AssetKind::Ani);
+        assert_eq!(resolved.native_size, 16);
+        assert_eq!(resolved.hotspot_x, 2);
+        assert_eq!(resolved.hotspot_y, 3);
+        let ani_data = resolved.ani.expect("ani field");
+        assert_eq!(ani_data.frame_pngs.len(), 1);
+        assert!(!ani_data.is_legacy_raw_dib);
+        assert_eq!(ani_data.per_step_durations_ms, vec![100]);
     }
 }

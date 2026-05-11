@@ -19,6 +19,7 @@
 //!
 //! `bulk_import` 系 IPC は [`crate::bulk_import`] に直接定義されている (キャンセル可能なバックグラウンド処理を伴うため)。
 
+pub mod ani_export;
 pub mod cursor_build;
 pub mod cursor_io;
 pub mod keystore;
@@ -57,6 +58,8 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         cursor_io::import_cursor_file,
         cursor_io::inspect_ani_file,
         cursor_io::take_pending_cursorpack,
+        // .ani 書き出し
+        ani_export::export_ani_with_hotspot,
         // 鍵管理
         keystore::keystore_info,
         keystore::keystore_generate,
