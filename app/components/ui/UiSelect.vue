@@ -52,6 +52,43 @@ const open = ref(false)
 const highlightedIndex = ref(-1)
 const triggerRef = ref<HTMLButtonElement | null>(null)
 const listboxRef = ref<HTMLUListElement | null>(null)
+/**
+ * listbox の表示方向。`'down'` で trigger の下、`'up'` で上に開く。
+ * `show()` で viewport を計測して決定し、その後 listbox がアンマウントされるまで保持する。
+ * (開いた後に再計算しないのは、option 数が変わらない前提で安定挙動を優先するため。)
+ */
+const placement = ref<'down' | 'up'>('down')
+
+/** listbox の推定高さ (px)。viewport 計算で auto-flip 判定に使う。
+ * 実測すると初回 show 時にチラつくため、option 行高 (32px) × 件数 + padding/border から推定。
+ * scoped CSS の max-height: 280px で頭打ち。 */
+const ITEM_HEIGHT_PX = 32
+const LISTBOX_VPAD_PX = 10 /* 上下 padding (4px) + border (1px*2) ≒ 余裕分 */
+const LISTBOX_MAX_HEIGHT_PX = 280
+const LISTBOX_GAP_PX = 4 /* trigger と listbox の隙間 */
+const LISTBOX_VIEWPORT_MARGIN_PX = 8 /* viewport 端からの最小マージン */
+
+function computeListboxHeight(): number {
+  return Math.min(LISTBOX_MAX_HEIGHT_PX, props.options.length * ITEM_HEIGHT_PX + LISTBOX_VPAD_PX)
+}
+
+function decidePlacement() {
+  const trigger = triggerRef.value
+  if (!trigger || typeof window === 'undefined') return
+  const rect = trigger.getBoundingClientRect()
+  const listboxH = computeListboxHeight()
+  const spaceBelow = window.innerHeight - rect.bottom - LISTBOX_VIEWPORT_MARGIN_PX
+  const spaceAbove = rect.top - LISTBOX_VIEWPORT_MARGIN_PX
+  // 下に収まれば 'down'、収まらず上に余裕があるなら 'up'。
+  // どちらにも収まらない場合は広い方を採用 (画面が極端に小さいときの fallback)。
+  if (spaceBelow >= listboxH + LISTBOX_GAP_PX) {
+    placement.value = 'down'
+  } else if (spaceAbove >= listboxH + LISTBOX_GAP_PX) {
+    placement.value = 'up'
+  } else {
+    placement.value = spaceBelow >= spaceAbove ? 'down' : 'up'
+  }
+}
 
 // 安定 ID。生成タイミングで毎回ユニーク値にする (pages/* 跨ぎでも衝突しない)。
 const uid = props.id ?? `ui-select-${Math.random().toString(36).slice(2, 9)}`
@@ -79,6 +116,8 @@ function toggle() {
 }
 
 function show() {
+  // 先に方向を決定 (DOM 挿入前)。ボタンの現在位置を基準に算出するので open=true より前に呼ぶ。
+  decidePlacement()
   open.value = true
   // 開いた瞬間は選択中をハイライト。未選択なら先頭の有効項目。
   const sel = selectedIndex.value
@@ -115,11 +154,26 @@ function moveHighlight(delta: 1 | -1) {
   }
 }
 
+/**
+ * listbox 内のハイライト項目を listbox 内部だけスクロールして可視にする。
+ *
+ * 旧実装は `item.scrollIntoView({ block: 'nearest' })` を使っていたが、これは
+ * listbox が viewport 外にある場合に scroll 伝播してページ全体までスクロール
+ * させてしまう (= 閉じた後にトリガーの位置が動いて見える原因)。
+ * scroll を listbox 自身に閉じ込めるため、`listbox.scrollTop` を直接調整する。
+ */
 function scrollHighlightIntoView() {
   const list = listboxRef.value
   if (!list) return
   const item = list.children[highlightedIndex.value] as HTMLElement | undefined
-  item?.scrollIntoView({ block: 'nearest' })
+  if (!item) return
+  const listRect = list.getBoundingClientRect()
+  const itemRect = item.getBoundingClientRect()
+  if (itemRect.top < listRect.top) {
+    list.scrollTop -= listRect.top - itemRect.top
+  } else if (itemRect.bottom > listRect.bottom) {
+    list.scrollTop += itemRect.bottom - listRect.bottom
+  }
 }
 
 function pick(index: number) {
@@ -226,12 +280,12 @@ onBeforeUnmount(() => {
       <UiIcon name="ChevD" :size="11" class="ui-select-caret" :class="{ open }" />
     </button>
 
-    <Transition name="ui-select-fade">
+    <Transition :name="placement === 'up' ? 'ui-select-fade-up' : 'ui-select-fade'">
       <ul
         v-if="open"
         :id="listboxId"
         ref="listboxRef"
-        class="ui-select-listbox"
+        :class="['ui-select-listbox', placement === 'up' ? 'up' : 'down']"
         role="listbox"
         :aria-labelledby="uid"
         tabindex="-1"
@@ -317,10 +371,10 @@ onBeforeUnmount(() => {
   color: var(--accent);
 }
 
-/* listbox はトリガー直下、`--bg-glass-hi` のトークンを採用 (元 select の白背景を解消) */
+/* listbox は trigger に対して上 or 下に展開。`up` クラス時は bottom 基準で上向き。
+ * `--bg-glass-hi` のトークンを採用 (元 select の白背景を解消) */
 .ui-select-listbox {
   position: absolute;
-  top: calc(100% + 4px);
   left: 0;
   right: 0;
   margin: 0;
@@ -336,6 +390,14 @@ onBeforeUnmount(() => {
   overflow-y: auto;
   z-index: 80;
   /* glassmorphism の代わりにフラットで読みやすさ優先 */
+}
+.ui-select-listbox.down {
+  top: calc(100% + 4px);
+  bottom: auto;
+}
+.ui-select-listbox.up {
+  top: auto;
+  bottom: calc(100% + 4px);
 }
 html.light .ui-select-listbox {
   background: var(--bg-1);
@@ -384,9 +446,11 @@ html.light .ui-select-item.highlighted {
   white-space: nowrap;
 }
 
-/* 出現/消失アニメーション */
+/* 出現/消失アニメーション (down: 上から降りてくる、up: 下から上がってくる) */
 .ui-select-fade-enter-active,
-.ui-select-fade-leave-active {
+.ui-select-fade-leave-active,
+.ui-select-fade-up-enter-active,
+.ui-select-fade-up-leave-active {
   transition:
     opacity 0.12s ease,
     transform 0.12s ease;
@@ -395,5 +459,10 @@ html.light .ui-select-item.highlighted {
 .ui-select-fade-leave-to {
   opacity: 0;
   transform: translateY(-4px);
+}
+.ui-select-fade-up-enter-from,
+.ui-select-fade-up-leave-to {
+  opacity: 0;
+  transform: translateY(4px);
 }
 </style>
