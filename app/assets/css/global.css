@@ -132,15 +132,10 @@ button {
   z-index: 0;
 }
 
-/* --- タイトルバー --- */
-/*
- * Tauri v2 では `data-tauri-drag-region` 属性 (mousedown JS フック) でドラッグを
- * 実装する。CSS `app-region: drag` は Chromium/Electron 用で、Tauri v2 の
- * WebView2 + decorations:false ではクリックイベントを奪ってしまう副作用があるため
- * 使用しない。属性ベースなら mousedown 時の event.target がボタンのとき
- * Tauri は drag を発火しないので、子要素のクリックハンドラが正常に届く。
- */
 /* --- ボディ (サイドバー + メイン) --- */
+/* NOTE: .titlebar の CSS は AppTitlebar.vue の scoped style に移行済。
+ * Tauri v2 の data-tauri-drag-region は使わず、JS mousedown フックでドラッグを
+ * 実装している。詳細は AppTitlebar.vue:onTitlebarMouseDown を参照。 */
 .body {
   flex: 1;
   display: grid;
@@ -994,9 +989,6 @@ button {
   }
 }
 
-.fade-in {
-  animation: fade-in 0.25s ease-out;
-}
 .spinner {
   width: 20px;
   height: 20px;
@@ -1043,19 +1035,6 @@ button {
     animation-duration: 0.001ms !important;
     transition-duration: 0.001ms !important;
   }
-}
-
-/* スクリーンリーダー専用テキスト */
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
 }
 
 /* === タブバー (Creator / Settings 共有) === */
@@ -1370,18 +1349,6 @@ button {
   flex-direction: column;
   gap: 12px;
 }
-.prop-row {
-  display: grid;
-  grid-template-columns: 84px 1fr;
-  align-items: center;
-  gap: 10px;
-  font-size: 12px;
-}
-.prop-row > label {
-  color: var(--fg-dim);
-  font-size: 11.5px;
-}
-
 /* tb-actions (toolbar 右側のボタン群) */
 .tb-actions {
   display: flex;
