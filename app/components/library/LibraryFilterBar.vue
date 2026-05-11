@@ -75,82 +75,9 @@ defineEmits<{
   </div>
 </template>
 
-<style scoped>
-.filters {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--border);
-}
-
-.chips {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 28px;
-  padding: 0 10px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--bg-elev1);
-  color: var(--text-mute);
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.chip.active {
-  background: var(--bg-elev2);
-  color: var(--text);
-  border-color: var(--accent);
-}
-
-.chip .num {
-  margin-left: 4px;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: var(--bg-elev2);
-  color: var(--text-mute);
-  font-size: 10px;
-  line-height: 14px;
-  min-width: 18px;
-  text-align: center;
-}
-
-.spacer-x {
-  flex: 1;
-}
-
-.sort {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.sort .lbl {
-  font-size: 11px;
-  color: var(--text-mute);
-}
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 10px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg-elev2);
-  color: var(--text);
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.btn.ghost {
-  background: transparent;
-}
-</style>
+<!-- NOTE: 元の scoped style は var(--border)/--bg-elev1 など未定義トークンに
+  依存しており、それらの declaration は invalid → cascade で global.css の
+  .toolbar/.chip/.btn 等のルールが実際の見た目を提供していた。
+  scoped を維持すると Tailwind の border utility 等が global を上書きして
+  border-color が currentColor に化ける問題が発生したため、scoped style は
+  削除し global ルールに一任する。 -->
