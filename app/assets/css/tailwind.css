@@ -72,85 +72,116 @@
 /* ======================================================
  * Shared component classes (Phase 10〜)
  * ======================================================
- * 複数コンポーネント横断で使われる shared utility class を
- * @layer components に集約する。utility layer より低い優先度なので、
- * 利用側で `class="btn px-6"` のように utility をプラスすると padding が
- * 上書きされる Tailwind 公式の component pattern。
+ * 複数コンポーネント横断で使われる shared utility class を集約する。
+ *
+ * NOTE: 当初 `@layer components { ... }` で囲む設計だったが、Tailwind v4 の
+ * preflight が `button { color: inherit }` を unlayered で出力するため、
+ * @layer 内のルールは specificity で勝っても cascade で負ける (unlayered が
+ * 全 layer に勝つ CSS 仕様)。結果として shared class の `color` が反映
+ * されない問題が発生した。
+ *
+ * 対策として shared class は top-level (unlayered) で定義する。これにより
+ * 同じく unlayered な global.css のルールと cascade で同列の優先度になる。
  *
  * 移行は Phase 10-A 〜 10-E で段階的に進める。
  */
-@layer components {
-  /* --- .btn family (Phase 10-A) --- */
-  .btn {
-    @apply inline-flex h-8 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-[7px] border border-line-hi bg-white/[0.04] px-3 font-body text-[12.5px] font-medium text-fg;
-    transition: all 0.12s;
-  }
-  .btn:hover:not(:disabled) {
-    @apply border-line-strong bg-white/[0.07];
-  }
-  .btn:disabled {
-    @apply cursor-not-allowed opacity-60;
-  }
-  .btn.ghost {
-    @apply border-transparent bg-transparent text-fg-dim;
-  }
-  .btn.ghost:hover:not(:disabled) {
-    @apply bg-white/[0.04] text-fg;
-  }
-  .btn.primary {
-    @apply border-accent bg-accent font-semibold text-[#0a0b0f];
-    box-shadow:
-      0 4px 14px -4px rgba(124, 242, 212, 0.55),
-      inset 0 1px 0 rgba(255, 255, 255, 0.3);
-  }
-  .btn.primary:hover:not(:disabled) {
-    @apply bg-accent-hi;
-    border-color: var(--accent-hi);
-  }
-  .btn.danger {
-    @apply text-rose;
-    border-color: rgba(255, 107, 138, 0.3);
-    background: rgba(255, 107, 138, 0.06);
-  }
-  .btn.danger:hover:not(:disabled) {
-    color: #ffb8c5;
-    background: rgba(255, 107, 138, 0.12);
-    border-color: rgba(255, 107, 138, 0.5);
-  }
-  .btn.icon {
-    @apply w-8 justify-center px-0;
-  }
-  .btn-group {
-    @apply flex;
-  }
-  .btn-group .btn {
-    border-radius: 0;
-    border-right-width: 0;
-  }
-  .btn-group .btn:first-child {
-    border-radius: 7px 0 0 7px;
-  }
-  .btn-group .btn:last-child {
-    border-radius: 0 7px 7px 0;
-    border-right-width: 1px;
-  }
-  .btn-group .btn.active {
-    @apply z-[1] border-accent-line text-accent;
-    background: rgba(124, 242, 212, 0.1);
-  }
-  :where(html.light) .btn {
-    background: rgba(15, 20, 35, 0.03);
-  }
-  :where(html.light) .btn:hover:not(:disabled) {
-    background: rgba(15, 20, 35, 0.06);
-  }
-  :where(html.light) .btn.primary {
-    color: #0a0b0f;
-    box-shadow:
-      0 4px 12px -4px rgba(15, 168, 133, 0.45),
-      inset 0 1px 0 rgba(255, 255, 255, 0.45);
-  }
-  :where(html.light) .btn.primary svg {
-    color: #0a0b0f;
-  }
+
+/* --- .btn family (Phase 10-A) --- */
+.btn {
+  @apply inline-flex h-8 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-[7px] border border-line-hi bg-white/[0.04] px-3 font-body text-[12.5px] font-medium text-fg;
+  transition: all 0.12s;
+}
+.btn:hover:not(:disabled) {
+  @apply border-line-strong bg-white/[0.07];
+}
+.btn:disabled {
+  @apply cursor-not-allowed opacity-60;
+}
+.btn.ghost {
+  @apply border-transparent bg-transparent text-fg-dim;
+}
+.btn.ghost:hover:not(:disabled) {
+  @apply bg-white/[0.04] text-fg;
+}
+.btn.primary {
+  @apply border-accent bg-accent font-semibold text-[#0a0b0f];
+  box-shadow:
+    0 4px 14px -4px rgba(124, 242, 212, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+.btn.primary:hover:not(:disabled) {
+  @apply bg-accent-hi;
+  border-color: var(--accent-hi);
+}
+.btn.danger {
+  @apply text-rose;
+  border-color: rgba(255, 107, 138, 0.3);
+  background: rgba(255, 107, 138, 0.06);
+}
+.btn.danger:hover:not(:disabled) {
+  color: #ffb8c5;
+  background: rgba(255, 107, 138, 0.12);
+  border-color: rgba(255, 107, 138, 0.5);
+}
+.btn.icon {
+  @apply w-8 justify-center px-0;
+}
+.btn-group {
+  @apply flex;
+}
+.btn-group .btn {
+  border-radius: 0;
+  border-right-width: 0;
+}
+.btn-group .btn:first-child {
+  border-radius: 7px 0 0 7px;
+}
+.btn-group .btn:last-child {
+  border-radius: 0 7px 7px 0;
+  border-right-width: 1px;
+}
+.btn-group .btn.active {
+  @apply z-[1] border-accent-line text-accent;
+  background: rgba(124, 242, 212, 0.1);
+}
+:where(html.light) .btn {
+  background: rgba(15, 20, 35, 0.03);
+}
+:where(html.light) .btn:hover:not(:disabled) {
+  background: rgba(15, 20, 35, 0.06);
+}
+:where(html.light) .btn.primary {
+  color: #0a0b0f;
+  box-shadow:
+    0 4px 12px -4px rgba(15, 168, 133, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+:where(html.light) .btn.primary svg {
+  color: #0a0b0f;
+}
+
+/* --- .chip family (Phase 10-B) --- */
+.chips {
+  @apply flex flex-wrap gap-1.5;
+}
+.chip {
+  @apply inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-full border border-line bg-transparent px-[11px] text-[12px] font-medium text-fg-dim;
+  transition: all 0.12s;
+}
+.chip:hover {
+  @apply border-line-hi text-fg;
+}
+.chip.active {
+  @apply font-semibold;
+  background: var(--fg);
+  border-color: var(--fg);
+  color: #0a0b0f;
+}
+.chip .num {
+  @apply font-mono text-[10.5px] opacity-60;
+}
+:where(html.light) .chip.active {
+  color: #ffffff;
+  background: var(--fg);
+  border-color: var(--fg);
 }

@@ -285,41 +285,7 @@ button {
   padding-bottom: 16px;
   border-bottom: 1px solid var(--line);
 }
-.chips {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-.chip {
-  height: 28px;
-  padding: 0 11px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--fg-dim);
-  background: transparent;
-  border: 1px solid var(--line);
-  border-radius: 99px;
-  cursor: pointer;
-  transition: all 0.12s;
-}
-.chip:hover {
-  color: var(--fg);
-  border-color: var(--line-hi);
-}
-.chip.active {
-  color: #0a0b0f;
-  background: var(--fg);
-  border-color: var(--fg);
-  font-weight: 600;
-}
-.chip .num {
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  opacity: 0.6;
-}
+/* .chip family は tailwind.css の @layer components に移行 (Phase 10-B) */
 .spacer-x {
   flex: 1;
 }
@@ -1324,11 +1290,6 @@ html.light .toolbar {
   background: rgba(255, 255, 255, 0.55);
 }
 /* html.light .btn 上書きは tailwind.css @layer components の :where(html.light) で対応 */
-html.light .chip.active {
-  color: #ffffff;
-  background: var(--fg);
-  border-color: var(--fg);
-}
 html.light .input {
   background: rgba(15, 20, 35, 0.025);
 }
