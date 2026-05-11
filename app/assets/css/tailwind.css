@@ -8,41 +8,49 @@
  * - --radius-X  → rounded-X
  * - --font-X    → font-X
  *
- * 既存の global.css の `:root` 変数 (--bg-0 等) は Phase 2 以降で順次廃止し、
- * 本ファイル側 (--color-bg-0 等) を Source of Truth にする。
- * 過渡期は両方を同値で維持する。
+ * **重要:** `--color-*` トークンは固定値ではなく legacy トークン (`--bg-0` 等)
+ * を `var()` 参照する形にしている。legacy トークンは `global.css` の
+ * `:root` (ダーク既定) と `html.light` (ライト上書き) で切り替わるため、
+ * Tailwind utility (`bg-bg-0`, `text-fg`, …) も自動的にライトモード追従する。
  */
 
 @import 'tailwindcss';
 
 @theme {
-  /* --- 背景レイヤー --- */
-  --color-bg-0: #0a0b0f;
-  --color-bg-1: #101218;
-  --color-bg-2: #161922;
-  --color-bg-3: #1c2030;
-  --color-bg-glass: rgba(22, 25, 34, 0.72);
-  --color-bg-glass-hi: rgba(28, 32, 44, 0.85);
+  /* --- 背景レイヤー (legacy `--bg-*` を参照) --- */
+  --color-bg-0: var(--bg-0);
+  --color-bg-1: var(--bg-1);
+  --color-bg-2: var(--bg-2);
+  --color-bg-3: var(--bg-3);
+  --color-bg-glass: var(--bg-glass);
+  --color-bg-glass-hi: var(--bg-glass-hi);
+
+  /* --- サーフェス専用背景 (Shell の半透明バー / グラデ。html.light で値が入れ替わる) --- */
+  --color-bg-titlebar: var(--bg-titlebar);
+  --color-bg-statbar: var(--bg-statbar);
+  --color-bg-toolbar: var(--bg-toolbar);
+  --color-bg-sidebar-from: var(--bg-sidebar-from);
+  --color-bg-sidebar-to: var(--bg-sidebar-to);
 
   /* --- ボーダー --- */
-  --color-line: rgba(255, 255, 255, 0.06);
-  --color-line-hi: rgba(255, 255, 255, 0.12);
-  --color-line-strong: rgba(255, 255, 255, 0.18);
+  --color-line: var(--line);
+  --color-line-hi: var(--line-hi);
+  --color-line-strong: var(--line-strong);
 
   /* --- テキスト --- */
-  --color-fg: #eef0f6;
-  --color-fg-dim: #a0a6b8;
-  --color-fg-mute: #5a6076;
-  --color-fg-faint: #3a3f50;
+  --color-fg: var(--fg);
+  --color-fg-dim: var(--fg-dim);
+  --color-fg-mute: var(--fg-mute);
+  --color-fg-faint: var(--fg-faint);
 
   /* --- アクセント --- */
-  --color-accent: #7cf2d4;
-  --color-accent-hi: #a5f7e2;
-  --color-accent-dim: rgba(124, 242, 212, 0.15);
-  --color-accent-line: rgba(124, 242, 212, 0.35);
-  --color-violet: #8b7dff;
-  --color-amber: #f5c26b;
-  --color-rose: #ff6b8a;
+  --color-accent: var(--accent);
+  --color-accent-hi: var(--accent-hi);
+  --color-accent-dim: var(--accent-dim);
+  --color-accent-line: var(--accent-line);
+  --color-violet: var(--violet);
+  --color-amber: var(--amber);
+  --color-rose: var(--rose);
 
   /* --- 角丸 --- */
   --radius-sm: 4px;
@@ -56,3 +64,7 @@
   --font-body: 'Inter', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, Menlo, monospace;
 }
+
+/* `html.light` を起点とした variant。Vue scoped style 内で `light:bg-foo` のような
+ * クラスを使いたいときに使えるが、本プロジェクトでは原則 token 切替で済ませる。 */
+@custom-variant light (&:where(html.light, html.light *));

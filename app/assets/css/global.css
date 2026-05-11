@@ -13,6 +13,13 @@
   --bg-glass: rgba(22, 25, 34, 0.72);
   --bg-glass-hi: rgba(28, 32, 44, 0.85);
 
+  /* シェルの半透明サーフェス。html.light で値が入れ替わることでライトモード追従する。 */
+  --bg-titlebar: rgba(10, 11, 15, 0.6);
+  --bg-statbar: rgba(10, 11, 15, 0.6);
+  --bg-toolbar: rgba(10, 11, 15, 0.4);
+  --bg-sidebar-from: rgba(16, 18, 24, 0.6);
+  --bg-sidebar-to: rgba(10, 11, 15, 0.4);
+
   /* --- ボーダー --- */
   --line: rgba(255, 255, 255, 0.06);
   --line-hi: rgba(255, 255, 255, 0.12);
@@ -1642,6 +1649,13 @@ html.light {
   --bg-glass: rgba(255, 255, 255, 0.78);
   --bg-glass-hi: rgba(255, 255, 255, 0.92);
 
+  /* シェルの半透明サーフェス (ライト上書き)。 */
+  --bg-titlebar: rgba(255, 255, 255, 0.7);
+  --bg-statbar: rgba(255, 255, 255, 0.7);
+  --bg-toolbar: rgba(255, 255, 255, 0.55);
+  --bg-sidebar-from: rgba(255, 255, 255, 0.6);
+  --bg-sidebar-to: rgba(247, 249, 253, 0.4);
+
   --line: rgba(15, 20, 35, 0.07);
   --line-hi: rgba(15, 20, 35, 0.13);
   --line-strong: rgba(15, 20, 35, 0.22);
@@ -1689,9 +1703,6 @@ html.light .sidebar {
 }
 html.light .toolbar {
   background: rgba(255, 255, 255, 0.55);
-}
-html.light .statbar {
-  background: rgba(255, 255, 255, 0.7);
 }
 html.light .btn {
   background: rgba(15, 20, 35, 0.03);
