@@ -55,11 +55,18 @@ const cursorRoles: readonly CursorRoleDef[] = CURSOR_ROLES
 </template>
 
 <style scoped>
+/* NOTE: 元コードは var(--border) や var(--bg-elev1/2)、var(--text-mute) などの
+ * 未定義トークンに依存しており、それらの declaration は invalid → global.css の
+ * .cpane.left / .tag / .role-list 等のルールがカスケードで効いていた。
+ *
+ * Tailwind の `border` utility を @apply で持ち込むと border-color が
+ * currentColor に化けて global の subtle border-color (--line) を上書きしてしまう
+ * 問題が確認できたため、scoped style では layout/spacing の独自上書きのみを
+ * 純粋な CSS リテラルで記述し、border/background/color などは global にゆだねる。 */
+
 .cpane.left {
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--border);
-  background: var(--bg-elev1);
   overflow: hidden;
 }
 
@@ -68,7 +75,6 @@ const cursorRoles: readonly CursorRoleDef[] = CURSOR_ROLES
   align-items: center;
   justify-content: space-between;
   padding: 12px 14px;
-  border-bottom: 1px solid var(--border);
 }
 
 .pane-head h6 {
@@ -77,19 +83,13 @@ const cursorRoles: readonly CursorRoleDef[] = CURSOR_ROLES
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--text-mute);
 }
 
 .tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
   padding: 2px 8px;
   border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--bg-elev2);
   font-size: 11px;
-  color: var(--text-mute);
+  gap: 4px;
 }
 
 .role-list {
