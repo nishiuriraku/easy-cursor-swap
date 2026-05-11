@@ -96,11 +96,17 @@ pub fn parse_ani(bytes: &[u8]) -> AppResult<ParsedAni> {
         .ok_or_else(|| AppError::ImageProcessing("RIFF サイズオーバーフロー".to_string()))?;
     let end = body_end.min(bytes.len());
 
+    // ---- 第 1 パス: チャンクを収集 ----
+    // anih が LIST より後に来ることは稀だが仕様上は許容されるため、
+    // 2 パス構成にして af_icon フラグを確定させてから LIST を処理する。
+    struct PendingList {
+        offset: usize,
+        data: Vec<u8>,
+    }
     let mut anih: Option<AniHeader> = None;
     let mut rates: Option<Vec<u32>> = None;
     let mut seq: Option<Vec<u32>> = None;
-    let mut frames: Vec<ParsedIcoCurEntry> = Vec::new();
-    let mut frame_infos: Vec<AniFrameInfo> = Vec::new();
+    let mut pending_lists: Vec<PendingList> = Vec::new();
 
     let mut pos = 12;
     while pos + 8 <= end {
@@ -126,19 +132,15 @@ pub fn parse_ani(bytes: &[u8]) -> AppResult<ParsedAni> {
         let data = &bytes[data_start..data_end];
 
         match id {
-            b"anih" => {
-                anih = Some(parse_anih(data)?);
-            }
-            b"rate" => {
-                rates = Some(parse_u32_array(data));
-            }
-            b"seq " => {
-                seq = Some(parse_u32_array(data));
-            }
+            b"anih" => anih = Some(parse_anih(data)?),
+            b"rate" => rates = Some(parse_u32_array(data)),
+            b"seq " => seq = Some(parse_u32_array(data)),
             b"LIST" => {
                 if data.len() >= 4 && &data[0..4] == b"fram" {
-                    // data_start + 4: LIST チャンクのデータ先頭 + 'fram' の 4 バイト
-                    parse_frame_list(&data[4..], data_start + 4, &mut frames, &mut frame_infos)?;
+                    pending_lists.push(PendingList {
+                        offset: data_start + 4,
+                        data: data[4..].to_vec(),
+                    });
                 }
                 // 他の LIST (INFO など) は無視
             }
@@ -151,6 +153,14 @@ pub fn parse_ani(bytes: &[u8]) -> AppResult<ParsedAni> {
 
     let header = anih
         .ok_or_else(|| AppError::ImageProcessing("'anih' チャンクが見つかりません".to_string()))?;
+
+    // ---- 第 2 パス: af_icon フラグを使って LIST/fram を処理 ----
+    let af_icon = (header.flags & AF_ICON) != 0;
+    let mut frames: Vec<ParsedIcoCurEntry> = Vec::new();
+    let mut frame_infos: Vec<AniFrameInfo> = Vec::new();
+    for pl in &pending_lists {
+        parse_frame_list(&pl.data, pl.offset, af_icon, &mut frames, &mut frame_infos)?;
+    }
     let num_frames = if header.frames == 0 {
         frames.len() as u32
     } else {
@@ -221,10 +231,12 @@ fn parse_u32_array(data: &[u8]) -> Vec<u32> {
 
 /// `data`: LIST チャンクの 'fram' 識別子直後のバイト列 (icon chunks のみ)。
 /// `list_offset_in_file`: ファイル全体における `data` の先頭バイト位置。
+/// `af_icon`: anih.flags に AF_ICON が立っていれば true (新形式 CUR)、false なら raw DIB (旧形式)。
 /// フレームごとの `raw_data_range` はこのオフセットを基準に計算する。
 fn parse_frame_list(
     data: &[u8],
     list_offset_in_file: usize,
+    af_icon: bool,
     frames: &mut Vec<ParsedIcoCurEntry>,
     infos: &mut Vec<AniFrameInfo>,
 ) -> AppResult<()> {
@@ -241,27 +253,122 @@ fn parse_frame_list(
                 AppError::ImageProcessing("LIST/fram 内のチャンクが切り詰め".to_string())
             })?;
         if id == b"icon" {
-            // icon チャンクは丸ごと CUR/ICO ファイル
-            let parsed = parse_ico_cur(&data[start..end])?;
-            // 各フレームは複数解像度を持つ可能性があるが、最大解像度のみ採用
-            if let Some(largest) = parsed
-                .entries
-                .into_iter()
-                .max_by_key(|e| e.width * e.height)
-            {
-                // ファイル全体における icon chunk データ部のバイト範囲を記録する
-                let abs_start = list_offset_in_file + start;
-                let abs_end = list_offset_in_file + end;
+            if af_icon {
+                // 新形式: icon チャンクは丸ごと CUR/ICO ファイル
+                let parsed = parse_ico_cur(&data[start..end])?;
+                // 各フレームは複数解像度を持つ可能性があるが、最大解像度のみ採用
+                if let Some(largest) = parsed
+                    .entries
+                    .into_iter()
+                    .max_by_key(|e| e.width * e.height)
+                {
+                    // ファイル全体における icon chunk データ部のバイト範囲を記録する
+                    frames.push(largest);
+                    infos.push(AniFrameInfo {
+                        raw_data_range: (list_offset_in_file + start)..(list_offset_in_file + end),
+                        format: AniFrameFormat::AfIcon,
+                    });
+                }
+            } else {
+                // 旧形式: icon chunk のデータは裸の BITMAPINFOHEADER + DIB ピクセル
+                let (entry, bit_count) = parse_raw_dib_frame(&data[start..end])?;
+                frames.push(entry);
                 infos.push(AniFrameInfo {
-                    raw_data_range: abs_start..abs_end,
-                    format: AniFrameFormat::AfIcon,
+                    raw_data_range: (list_offset_in_file + start)..(list_offset_in_file + end),
+                    format: AniFrameFormat::RawDib { bit_count },
                 });
-                frames.push(largest);
             }
         }
         pos = end + (size & 1);
     }
     Ok(())
+}
+
+/// 旧形式 .ani の icon chunk (= 裸の BITMAPINFOHEADER + ピクセル) をデコードする。
+/// 戻り値の `ParsedIcoCurEntry` は hotspot=(0,0) で埋める (raw DIB は持たない)。
+/// 現在は 32bpp のみ対応。他の bit_count は明示的にエラーを返す。
+fn parse_raw_dib_frame(data: &[u8]) -> AppResult<(ParsedIcoCurEntry, u16)> {
+    if data.len() < 40 {
+        return Err(AppError::ImageProcessing(
+            "raw DIB が BITMAPINFOHEADER 40 バイトを満たさない".to_string(),
+        ));
+    }
+    let bi_size = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+    if bi_size < 40 {
+        return Err(AppError::ImageProcessing(format!(
+            "biSize が小さすぎる: {}",
+            bi_size
+        )));
+    }
+    let width = i32::from_le_bytes([data[4], data[5], data[6], data[7]]);
+    let height_raw = i32::from_le_bytes([data[8], data[9], data[10], data[11]]);
+    let bit_count = u16::from_le_bytes([data[14], data[15]]);
+
+    if width <= 0 || width > 1024 {
+        return Err(AppError::ImageProcessing(format!(
+            "raw DIB の幅が異常: {}",
+            width
+        )));
+    }
+    // bottom-up DIB: height_raw > 0 の場合は行順が下から上。
+    // AND マスク付き形式では height_raw == width * 2 になることがある (カーソル標準)。
+    let height_abs = if height_raw < 0 {
+        (-height_raw) as u32
+    } else {
+        let h = height_raw as u32;
+        let w = width as u32;
+        // AND マスク付きの場合 h == w*2 → 実画像高さは w
+        if h == w * 2 {
+            w
+        } else {
+            h
+        }
+    };
+
+    let width_u = width as u32;
+    let height = height_abs;
+
+    if bit_count != 32 {
+        return Err(AppError::ImageProcessing(format!(
+            "raw DIB の bit_count={} は未対応 (32bpp のみ対応)",
+            bit_count
+        )));
+    }
+
+    let row_bytes = (width_u * 4) as usize;
+    let pixel_start = bi_size as usize;
+    let needed = pixel_start + row_bytes * height as usize;
+    if data.len() < needed {
+        return Err(AppError::ImageProcessing(
+            "raw DIB のピクセル領域が切り詰め".to_string(),
+        ));
+    }
+
+    let mut img = image::RgbaImage::new(width_u, height);
+    for y in 0..height {
+        // bottom-up: ファイル先頭の行が画像の最下行
+        let src_y = height - 1 - y;
+        let row_start = pixel_start + (src_y as usize) * row_bytes;
+        for x in 0..width_u {
+            let i = row_start + (x as usize) * 4;
+            let b = data[i];
+            let g = data[i + 1];
+            let r = data[i + 2];
+            let a = data[i + 3];
+            img.put_pixel(x, y, image::Rgba([r, g, b, a]));
+        }
+    }
+
+    Ok((
+        ParsedIcoCurEntry {
+            width: width_u,
+            height,
+            hotspot_x: 0,
+            hotspot_y: 0,
+            image: img,
+        },
+        bit_count,
+    ))
 }
 
 #[cfg(test)]
@@ -368,6 +475,135 @@ mod tests {
         bytes.extend_from_slice(b"WAVE"); // ACON ではない
         let err = parse_ani(&bytes).unwrap_err();
         assert!(matches!(err, AppError::ImageProcessing(_)));
+    }
+
+    /// 旧形式 (raw DIB, flags=0) の .ani を組み立てて parse_ani が成功することを確認する。
+    /// DIB は 8x8 の RGBA 4bpp 風 (ここでは 32bpp 単色で簡易化) で、anih.cx/cy を持つ。
+    #[test]
+    fn parse_legacy_raw_dib_frames() {
+        // 32bpp BMP DIB: BITMAPINFOHEADER (40 bytes) + 8*8*4 = 256 bytes pixel data
+        let mut dib = Vec::new();
+        // BITMAPINFOHEADER
+        dib.extend_from_slice(&40u32.to_le_bytes()); // biSize
+        dib.extend_from_slice(&8i32.to_le_bytes()); // biWidth = 8
+        dib.extend_from_slice(&8i32.to_le_bytes()); // biHeight = 8 (bottom-up)
+        dib.extend_from_slice(&1u16.to_le_bytes()); // biPlanes
+        dib.extend_from_slice(&32u16.to_le_bytes()); // biBitCount = 32
+        dib.extend_from_slice(&0u32.to_le_bytes()); // biCompression = BI_RGB
+        dib.extend_from_slice(&256u32.to_le_bytes()); // biSizeImage
+        dib.extend_from_slice(&0i32.to_le_bytes()); // biXPelsPerMeter
+        dib.extend_from_slice(&0i32.to_le_bytes());
+        dib.extend_from_slice(&0u32.to_le_bytes());
+        dib.extend_from_slice(&0u32.to_le_bytes());
+        // 8x8 = 64 BGRA pixels (B, G, R, A)
+        for _ in 0..64 {
+            dib.extend_from_slice(&[0x00, 0xFF, 0x00, 0xFF]); // green opaque
+        }
+
+        let mut ani = Vec::new();
+        ani.extend_from_slice(b"RIFF");
+        let body_pos = ani.len();
+        ani.extend_from_slice(&0u32.to_le_bytes());
+        ani.extend_from_slice(b"ACON");
+        ani.extend_from_slice(b"anih");
+        ani.extend_from_slice(&36u32.to_le_bytes());
+        let mut header = vec![0u8; 36];
+        header[0..4].copy_from_slice(&36u32.to_le_bytes());
+        header[4..8].copy_from_slice(&1u32.to_le_bytes()); // cFrames = 1
+        header[8..12].copy_from_slice(&1u32.to_le_bytes()); // cSteps = 1
+        header[12..16].copy_from_slice(&8u32.to_le_bytes()); // cx = 8
+        header[16..20].copy_from_slice(&8u32.to_le_bytes()); // cy = 8
+        header[20..24].copy_from_slice(&32u32.to_le_bytes()); // cBitCount = 32
+        header[28..32].copy_from_slice(&3u32.to_le_bytes()); // jifRate
+        header[32..36].copy_from_slice(&0u32.to_le_bytes()); // flags = 0 (NO AF_ICON)
+        ani.extend_from_slice(&header);
+
+        ani.extend_from_slice(b"LIST");
+        let list_size = 4 + 8 + dib.len();
+        ani.extend_from_slice(&(list_size as u32).to_le_bytes());
+        ani.extend_from_slice(b"fram");
+        ani.extend_from_slice(b"icon");
+        ani.extend_from_slice(&(dib.len() as u32).to_le_bytes());
+        ani.extend_from_slice(&dib);
+
+        let body = (ani.len() - 8) as u32;
+        ani[body_pos..body_pos + 4].copy_from_slice(&body.to_le_bytes());
+
+        let parsed = parse_ani(&ani).expect("parse legacy ani");
+        assert!(parsed.is_legacy_raw_dib);
+        assert_eq!(parsed.frames.len(), 1);
+        let f = &parsed.frames[0];
+        assert_eq!(f.width, 8);
+        assert_eq!(f.height, 8);
+        // 中央付近のピクセルが green
+        let px = f.image.get_pixel(4, 4);
+        assert_eq!(px.0, [0x00, 0xFF, 0x00, 0xFF]);
+        assert_eq!(parsed.frame_infos.len(), 1);
+        match parsed.frame_infos[0].format {
+            AniFrameFormat::RawDib { bit_count } => assert_eq!(bit_count, 32),
+            _ => panic!("expected RawDib"),
+        }
+    }
+
+    /// bottom-up DIB が縦方向に正しく反転されることを確認する。
+    /// 最上段 (y=0) を赤、最下段 (y=h-1) を青にした場合、デコード後も同じになるはず。
+    /// raw DIB はピクセルが「ファイル先頭 = 最下行」のため、ファイルの bytes 順とは逆になる。
+    #[test]
+    fn parse_raw_dib_bottom_up_orientation() {
+        let w = 4u32;
+        let h = 4u32;
+        let mut dib = Vec::new();
+        dib.extend_from_slice(&40u32.to_le_bytes());
+        dib.extend_from_slice(&(w as i32).to_le_bytes());
+        dib.extend_from_slice(&(h as i32).to_le_bytes());
+        dib.extend_from_slice(&1u16.to_le_bytes());
+        dib.extend_from_slice(&32u16.to_le_bytes());
+        dib.extend_from_slice(&0u32.to_le_bytes());
+        dib.extend_from_slice(&(w * h * 4).to_le_bytes());
+        dib.extend_from_slice(&[0; 16]);
+        // 最下行 (ファイル順では最初) を青 (BGRA: B=FF, G=00, R=00, A=FF)、
+        // それ以外を赤 (BGRA: B=00, G=00, R=FF, A=FF)
+        for y in 0..h {
+            let row_color = if y == 0 {
+                [0xFF, 0x00, 0x00, 0xFF] // B,G,R,A => Blue
+            } else {
+                [0x00, 0x00, 0xFF, 0xFF] // B,G,R,A => Red
+            };
+            for _ in 0..w {
+                dib.extend_from_slice(&row_color);
+            }
+        }
+
+        let mut ani = Vec::new();
+        ani.extend_from_slice(b"RIFF");
+        let bp = ani.len();
+        ani.extend_from_slice(&0u32.to_le_bytes());
+        ani.extend_from_slice(b"ACON");
+        ani.extend_from_slice(b"anih");
+        ani.extend_from_slice(&36u32.to_le_bytes());
+        let mut header = vec![0u8; 36];
+        header[0..4].copy_from_slice(&36u32.to_le_bytes());
+        header[4..8].copy_from_slice(&1u32.to_le_bytes());
+        header[8..12].copy_from_slice(&1u32.to_le_bytes());
+        header[28..32].copy_from_slice(&1u32.to_le_bytes());
+        // flags = 0 (NO AF_ICON) → raw DIB
+        ani.extend_from_slice(&header);
+        ani.extend_from_slice(b"LIST");
+        let ls = 4 + 8 + dib.len();
+        ani.extend_from_slice(&(ls as u32).to_le_bytes());
+        ani.extend_from_slice(b"fram");
+        ani.extend_from_slice(b"icon");
+        ani.extend_from_slice(&(dib.len() as u32).to_le_bytes());
+        ani.extend_from_slice(&dib);
+        let body = (ani.len() - 8) as u32;
+        ani[bp..bp + 4].copy_from_slice(&body.to_le_bytes());
+
+        let parsed = parse_ani(&ani).expect("parse");
+        let img = &parsed.frames[0].image;
+        // y=h-1 (最下行 in image coordinates) は元の DIB y=0 (青) のはず
+        assert_eq!(img.get_pixel(0, h - 1).0, [0x00, 0x00, 0xFF, 0xFF]);
+        // y=0 (最上行) は元の DIB y=h-1 (赤) のはず
+        assert_eq!(img.get_pixel(0, 0).0, [0xFF, 0x00, 0x00, 0xFF]);
     }
 
     #[test]
