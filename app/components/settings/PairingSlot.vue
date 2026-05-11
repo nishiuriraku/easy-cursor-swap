@@ -70,51 +70,38 @@ const coveragePct = computed(() => Math.round((props.theme.includedRoles.length 
 </template>
 
 <style scoped>
+@reference '~/assets/css/tailwind.css';
+
 .pairing-slot {
-  padding: 0;
+  @apply p-0;
 }
 .pairing-slot.current {
   border-color: color-mix(in srgb, var(--pair-accent) 33%, transparent);
 }
 
 .pairing-head {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--line);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  @apply flex items-center justify-between border-b border-line px-4 py-3;
 }
 .pairing-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  @apply flex items-center gap-2;
 }
 .pair-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  @apply size-2 rounded-full;
   background: var(--pair-accent);
   box-shadow: 0 0 8px var(--pair-accent);
 }
 .pair-label {
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 13px;
+  @apply font-display text-[13px] font-semibold;
 }
 .pair-sub {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--fg-mute);
-  margin-top: 2px;
+  @apply mt-0.5 font-mono text-[10px] text-fg-mute;
 }
 
 .small-tag {
-  padding: 1px 6px;
-  font-size: 9px;
+  @apply px-1.5 py-px text-[9px];
 }
 
 .change-btn {
-  height: 26px;
-  font-size: 11px;
+  @apply h-[26px] text-[11px];
 }
 </style>
