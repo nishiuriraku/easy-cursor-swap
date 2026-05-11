@@ -30,11 +30,10 @@ defineEmits<{
 </template>
 
 <style scoped>
+@reference '~/assets/css/tailwind.css';
+
 /* `.role` 本体のレイアウトは global.css で定義。ここでは role-label のみ。 */
 .role-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
+  @apply flex min-w-0 items-center gap-2;
 }
 </style>
