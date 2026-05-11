@@ -37,10 +37,11 @@ defineProps<{
 </template>
 
 <style scoped>
+@reference '~/assets/css/tailwind.css';
+
 .cell-img {
-  width: 18px;
-  height: 18px;
-  object-fit: contain;
+  @apply size-[18px] object-contain;
+  /* image-rendering は複数フォールバック値のスタックなので CSS リテラルで残す。 */
   image-rendering: -webkit-optimize-contrast;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
