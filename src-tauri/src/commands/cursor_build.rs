@@ -41,9 +41,11 @@ pub struct ExportCursorpackRequest {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum ExportDestination {
+    #[serde(rename_all = "camelCase")]
     File {
         path: String,
     },
+    #[serde(rename_all = "camelCase")]
     Library {
         #[serde(default)]
         apply_after: bool,
@@ -160,6 +162,8 @@ pub fn export_cursorpack(req: ExportCursorpackRequest) -> Result<ExportResult, A
         size_bytes: size,
         signed: req.sign,
         key_id: signed_key_id,
+        applied: false,
+        apply_error: None,
     })
 }
 
@@ -257,6 +261,12 @@ pub fn cancel_build(build_id: String) {
     tracing::info!("ビルド中止要求: {}", build_id);
 }
 
+/// `existing_theme_id` があれば引き継ぎ、なければ新規 UUID を発行する。
+/// Task 1.3 で導入。`export_cursorpack_streamed` のメタデータ ID 決定に使用。
+pub(crate) fn resolve_metadata_id(existing: Option<uuid::Uuid>) -> uuid::Uuid {
+    existing.unwrap_or_else(uuid::Uuid::new_v4)
+}
+
 fn emit_progress(app: &tauri::AppHandle, payload: BuildProgress) {
     use tauri::Emitter;
     if let Err(e) = app.emit("build-progress", payload) {
@@ -352,7 +362,7 @@ pub fn export_cursorpack_streamed(
     }
     let mut metadata = ThemeMetadata {
         schema_version: 1,
-        id: uuid::Uuid::new_v4(),
+        id: resolve_metadata_id(req.existing_theme_id),
         name: LocalizedString::Localized(name_map),
         version: req.version.clone(),
         created_at: chrono::Utc::now().to_rfc3339(),
@@ -420,8 +430,31 @@ pub fn export_cursorpack_streamed(
         },
     );
 
-    let out_path = std::path::PathBuf::from(&req.output_path);
-    let size = ThemeManager::export_cursorpack(&mut metadata, &cursor_bytes, &out_path)?;
+    // destination で分岐: 現状は File のみ実装、Library は Task 2.1 で追加
+    let zip_bytes = ThemeManager::write_cursorpack_to_buffer(&mut metadata, &cursor_bytes)?;
+    let (applied, apply_error, size_bytes) = match &req.destination {
+        ExportDestination::File { path } => {
+            let out_path = std::path::PathBuf::from(path);
+            if let Some(parent) = out_path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            std::fs::write(&out_path, &zip_bytes)?;
+            tracing::info!(
+                "exported cursorpack: theme={} ({}) → {} ({} bytes)",
+                metadata.name.get("ja"),
+                metadata.id,
+                crate::logging::redact_path(&out_path),
+                zip_bytes.len()
+            );
+            (false, None, zip_bytes.len() as u64)
+        }
+        ExportDestination::Library { apply_after: _ } => {
+            // 次タスクで実装
+            return Err(AppError::Other(
+                "destination::Library は未実装 (Task 2.1 で対応予定)".to_string(),
+            ));
+        }
+    };
 
     emit_progress(
         &app,
@@ -437,9 +470,11 @@ pub fn export_cursorpack_streamed(
 
     Ok(ExportResult {
         theme_id: metadata.id.to_string(),
-        size_bytes: size,
+        size_bytes,
         signed: req.sign,
         key_id: signed_key_id,
+        applied,
+        apply_error,
     })
 }
 
@@ -511,5 +546,20 @@ mod tests {
         let req: super::StreamedExportRequest = serde_json::from_value(json).unwrap();
         assert!(req.existing_theme_id.is_none());
         assert!(matches!(req.destination, super::ExportDestination::File { .. }));
+    }
+
+    #[test]
+    fn metadata_id_inherits_existing_theme_id_when_provided() {
+        // Helper を直接テストする (フル export_cursorpack_streamed は AppHandle 必要のため)
+        let existing = uuid::Uuid::new_v4();
+        let resolved = super::resolve_metadata_id(Some(existing));
+        assert_eq!(resolved, existing);
+    }
+
+    #[test]
+    fn metadata_id_generates_new_when_existing_is_none() {
+        let a = super::resolve_metadata_id(None);
+        let b = super::resolve_metadata_id(None);
+        assert_ne!(a, b, "別の Uuid::new_v4() が生成されるはず");
     }
 }
