@@ -199,37 +199,26 @@ function onBackdropClick(e: MouseEvent) {
 </template>
 
 <style scoped>
+@reference '~/assets/css/tailwind.css';
+
 .mini-img {
-  width: 16px;
-  height: 16px;
-  object-fit: contain;
+  @apply size-4 object-contain;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
 }
 
 .a11y-banner {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  margin: 0 20px 12px;
-  padding: 10px 12px;
-  border-radius: 6px;
+  @apply mx-5 mb-3 mt-0 flex items-start gap-2.5 rounded-md border px-3 py-2.5 text-[12px] leading-[1.5];
   background: rgba(245, 158, 11, 0.1);
-  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-color: rgba(245, 158, 11, 0.35);
   color: var(--warning, #f59e0b);
-  font-size: 12px;
-  line-height: 1.5;
 }
 
 .a11y-banner strong {
-  display: block;
-  font-size: 12px;
-  margin-bottom: 4px;
+  @apply mb-1 block text-[12px];
 }
 
 .a11y-banner ul {
-  margin: 0;
-  padding-left: 16px;
-  color: var(--fg);
+  @apply m-0 pl-4 text-fg;
 }
 </style>
