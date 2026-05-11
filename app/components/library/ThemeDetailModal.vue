@@ -126,28 +126,16 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+@reference '~/assets/css/tailwind.css';
+
 .td-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  background: rgba(8, 9, 14, 0.6);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  display: grid;
-  place-items: center;
-  padding: 32px;
+  @apply fixed inset-0 z-[100] grid place-items-center bg-[rgba(8,9,14,0.6)] p-8 backdrop-blur-[8px];
 }
 .td-modal-shell {
-  width: min(960px, 100%);
-  max-height: calc(100vh - 64px);
-  height: auto;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  @apply flex h-auto max-h-[calc(100vh-64px)] w-[min(960px,100%)] flex-col overflow-hidden;
 }
 .td-modal-body {
-  flex: 1;
-  overflow-y: auto;
+  @apply flex-1 overflow-y-auto;
 }
 /* モーダル内の drawer は通常のカード文脈ではないので、外側の境界線を消して二重枠を避ける */
 .td-modal-body :deep(.td-drawer) {
