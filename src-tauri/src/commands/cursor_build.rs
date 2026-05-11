@@ -42,9 +42,7 @@ pub struct ExportCursorpackRequest {
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum ExportDestination {
     #[serde(rename_all = "camelCase")]
-    File {
-        path: String,
-    },
+    File { path: String },
     #[serde(rename_all = "camelCase")]
     Library {
         #[serde(default)]
@@ -450,8 +448,7 @@ pub fn export_cursorpack_streamed(
         }
         ExportDestination::Library { apply_after } => {
             // 1. in-memory zip を import_cursorpack_bytes に流して Library に展開
-            let imported_id =
-                crate::theme::ThemeManager::import_cursorpack_bytes(&zip_bytes)?;
+            let imported_id = crate::theme::ThemeManager::import_cursorpack_bytes(&zip_bytes)?;
             tracing::info!(
                 "imported cursorpack to library: theme={} ({} bytes)",
                 imported_id,
@@ -572,7 +569,10 @@ mod tests {
         });
         let req: super::StreamedExportRequest = serde_json::from_value(json).unwrap();
         assert!(req.existing_theme_id.is_none());
-        assert!(matches!(req.destination, super::ExportDestination::File { .. }));
+        assert!(matches!(
+            req.destination,
+            super::ExportDestination::File { .. }
+        ));
     }
 
     #[test]
@@ -616,11 +616,8 @@ mod tests {
         };
         let target_id = metadata.id;
         let cursors: HashMap<String, Vec<u8>> = HashMap::new();
-        let bytes = crate::theme::ThemeManager::write_cursorpack_to_buffer(
-            &mut metadata,
-            &cursors,
-        )
-        .unwrap();
+        let bytes = crate::theme::ThemeManager::write_cursorpack_to_buffer(&mut metadata, &cursors)
+            .unwrap();
         let inspected = crate::theme::ThemeManager::inspect_cursorpack_bytes(&bytes).unwrap();
         assert_eq!(inspected.id, target_id, "ID が引き継がれているはず");
         assert_eq!(inspected.version, "1.2.3");
