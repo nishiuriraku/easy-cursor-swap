@@ -37,6 +37,19 @@ pub struct ExportCursorpackRequest {
     pub sign: bool,
 }
 
+/// 出力先。`File` はディスクへの保存、`Library` はライブラリ展開 (+ オプションで apply)。
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum ExportDestination {
+    File {
+        path: String,
+    },
+    Library {
+        #[serde(default)]
+        apply_after: bool,
+    },
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct Hotspot {
     pub x: u32,
@@ -49,6 +62,10 @@ pub struct ExportResult {
     pub size_bytes: u64,
     pub signed: bool,
     pub key_id: Option<String>,
+    /// `apply_after=true` で `apply_theme` まで成功した場合のみ true。
+    pub applied: bool,
+    /// `Library { apply_after: true }` で Library 登録は成功したが apply が失敗した場合のメッセージ。
+    pub apply_error: Option<String>,
 }
 
 #[tauri::command]
@@ -214,7 +231,10 @@ pub struct StreamedExportRequest {
     pub version: String,
     pub requires_os_shadow: bool,
     pub roles: Vec<RoleBuildEntry>,
-    pub output_path: String,
+    /// File / Library{apply_after} で出力先を切替える。
+    pub destination: ExportDestination,
+    /// `Some(uuid)` のとき新 UUID 発行ではなく既存テーマ ID を引き継ぐ (= 上書き保存)。
+    pub existing_theme_id: Option<uuid::Uuid>,
     pub sign: bool,
 }
 
@@ -446,5 +466,50 @@ mod tests {
         assert!(is_cancelled(id_a));
         assert!(!is_cancelled(id_b));
         clear_cancel(id_a);
+    }
+
+    #[test]
+    fn export_destination_file_round_trip() {
+        let json = serde_json::json!({
+            "kind": "file",
+            "path": "/tmp/out.cursorpack"
+        });
+        let dest: super::ExportDestination = serde_json::from_value(json).unwrap();
+        match dest {
+            super::ExportDestination::File { path } => assert_eq!(path, "/tmp/out.cursorpack"),
+            _ => panic!("expected File variant"),
+        }
+    }
+
+    #[test]
+    fn export_destination_library_round_trip() {
+        let json = serde_json::json!({
+            "kind": "library",
+            "applyAfter": true
+        });
+        let dest: super::ExportDestination = serde_json::from_value(json).unwrap();
+        match dest {
+            super::ExportDestination::Library { apply_after } => assert!(apply_after),
+            _ => panic!("expected Library variant"),
+        }
+    }
+
+    #[test]
+    fn streamed_request_deserializes_with_existing_theme_id_null() {
+        let json = serde_json::json!({
+            "buildId": "test-id",
+            "nameJa": "T",
+            "nameEn": null,
+            "author": null,
+            "version": "1.0.0",
+            "requiresOsShadow": false,
+            "roles": [],
+            "destination": { "kind": "file", "path": "/tmp/x" },
+            "existingThemeId": null,
+            "sign": false
+        });
+        let req: super::StreamedExportRequest = serde_json::from_value(json).unwrap();
+        assert!(req.existing_theme_id.is_none());
+        assert!(matches!(req.destination, super::ExportDestination::File { .. }));
     }
 }
