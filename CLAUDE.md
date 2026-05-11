@@ -89,8 +89,8 @@ Vue (UI) ──invoke()──▶ Tauri command (commands.rs) ──▶ Rust modu
 - `composables/` — `useThemes`, `useAppSettings`, `useI18n`, `useTauri` (IPC wrapper), `useKeystore`, `useUiTheme`, `useRoleMatcher`, `useThemePreviews`, `useBulkImport`, `useUpdater`, `useNotify`, `sanitizeSvg`. Vitest specs in `app/composables/__tests__/`.
 - `locales/{ja,en}.ts` — keys typed `as const`; **must stay in parity** (CI gate via `scripts/check-i18n.mjs`).
 - `types/` — IPC payload types (`config.ts`, `theme.ts`, `marketplace.ts`).
-- `assets/css/tailwind.css` — Tailwind v4 entry + `@theme` ブロック (design tokens を utility に露出)。
-- `assets/css/global.css` — Win11 chrome, Glassmorphism, 既存の `:root` design tokens (Phase 2-8 で順次 `tailwind.css` 側に移行)。
+- `assets/css/tailwind.css` — Tailwind v4 entry + `@theme` ブロック (design tokens を utility に露出) + 横断 shared utility (`.btn` / `.card` / `.chip` / `.input` / `.tag` / `.toolbar` / `.tabs` / `.prop-section` / `.lib-table` / `.lib-row` / `.lt-*` / `.modal*` / `.content` / `.page-head` / `.grid` ほか)。
+- `assets/css/global.css` — `:root` + `html.light` design tokens、CSS リセット、スクロールバーカスタマイズ、`:focus-visible`、`prefers-reduced-motion`、共有 `@keyframes` (pulse / fade-in / slide-in-right / spin) のみ。コンポーネント固有のスタイルは追加しない。
 
 ### Backend layout (`src-tauri/src/`)
 
@@ -122,7 +122,11 @@ Vue (UI) ──invoke()──▶ Tauri command (commands.rs) ──▶ Rust modu
 
 - Rust comments and doc strings: **Japanese**.
 - Vue: SFC + `<script setup>` + Composition API + TypeScript.
-- CSS: **Tailwind v4 utility classes** as the default styling mechanism. Design tokens live in `app/assets/css/tailwind.css` (`@theme` block) and are exposed as utilities like `bg-bg-0`, `text-fg`, `rounded-lg`. Vanilla CSS is allowed in `<style scoped>` for non-utility cases (complex pseudo-elements, keyframes, special selectors). `app/assets/css/global.css` is being progressively migrated (Phase 2-8); new components should prefer Tailwind utilities and not add to global.css.
+- CSS: **Tailwind v4 utility classes** as the default styling mechanism.
+  - Design tokens live in `app/assets/css/tailwind.css` (`@theme` block) aliasing legacy `--*` tokens.
+  - **横断 shared utility** (`.btn`, `.card`, `.chip`, `.input`, `.tag`, `.toolbar`, `.tabs`, `.prop-section`, `.lib-row`, `.lt-*`, `.modal*`, `.content`, `.page-head`, `.grid` ほか) は `app/assets/css/tailwind.css` の top-level (unlayered) に定義。`@layer components` には**入れない** — Tailwind preflight (`button { color: inherit }` 等) が unlayered で出力されるため、`@layer` 内のルールは cascade で負ける。
+  - **コンポーネント固有のスタイル**は各 `.vue` ファイルの `<style scoped>` に置き、`@reference '~/assets/css/tailwind.css';` を冒頭で宣言してから `@apply` を使う。
+  - `app/assets/css/global.css` は `:root` トークン、CSS リセット、スクロールバーカスタマイズ、`:focus-visible`、`prefers-reduced-motion`、共有 `@keyframes`、`html.light` トークン上書きの**みに限定**。コンポーネント固有スタイルをここへ追加しない (Phase 10-12 で 3327 行 → 223 行に収束済み)。
 - IPC payload types live in `app/types/` and must mirror `serde`-derived Rust structs in `commands.rs` / module files.
 - Filenames in `components/` are referenced without directory prefix — keep names globally unique.
 
