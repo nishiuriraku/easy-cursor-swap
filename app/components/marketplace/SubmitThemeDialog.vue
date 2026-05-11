@@ -234,152 +234,100 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+@reference '~/assets/css/tailwind.css';
+
+/* NOTE: --surface / --surface-raised / --surface-hover / --border / --warning は
+ * 未定義トークン (元コードの leftover)。それらを参照する declaration は invalid
+ * で discarded されていた。global に同名ルールが無いコンポーネント固有なので、
+ * 視覚的な現状維持のためそれらの行はそのまま literal CSS で残置する。 */
+
 .modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.55);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
+  @apply fixed inset-0 z-[1000] flex items-center justify-center bg-black/55;
 }
 
 .modal {
+  @apply flex max-h-[80vh] w-[560px] max-w-[90vw] flex-col rounded-[8px] border shadow-[0_16px_48px_rgba(0,0,0,0.4)];
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  width: 560px;
-  max-width: 90vw;
-  max-height: 80vh;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+  border-color: var(--border);
 }
 
 .modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px 12px;
-  border-bottom: 1px solid var(--border);
+  @apply flex items-center justify-between border-b px-5 pb-3 pt-4;
+  border-bottom-color: var(--border);
 }
 
 .modal-header h2 {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
+  @apply m-0 text-[15px] font-semibold;
 }
 
 .close-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--fg-mute);
-  padding: 4px;
-  display: flex;
-  align-items: center;
+  @apply flex cursor-pointer items-center border-none bg-transparent p-1 text-fg-mute;
 }
 
 .close-btn:hover {
-  color: var(--fg);
+  @apply text-fg;
 }
 
 .modal-body {
-  padding: 16px 20px;
-  overflow-y: auto;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  @apply flex flex-1 flex-col gap-3 overflow-y-auto px-5 py-4;
 }
 
 .modal-footer {
-  padding: 12px 20px;
-  border-top: 1px solid var(--border);
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
+  @apply flex justify-end gap-2 border-t px-5 py-3;
+  border-top-color: var(--border);
 }
 
 .field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  @apply flex flex-col gap-1;
 }
 
 .field label {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--fg-mute);
+  @apply text-[12px] font-medium text-fg-mute;
 }
 
 .field select,
 .field input[type='text'],
 .field input[type='url'] {
+  @apply rounded border px-2 py-1.5 text-[13px];
   background: var(--surface-raised);
-  border: 1px solid var(--border);
-  border-radius: 4px;
+  border-color: var(--border);
   color: var(--fg);
-  padding: 6px 8px;
-  font-size: 13px;
 }
 
 .field-note {
-  font-size: 11px;
-  color: var(--fg-mute);
+  @apply text-[11px] text-fg-mute;
 }
 
 .hint {
-  font-size: 13px;
-  color: var(--fg-mute);
-  margin: 0;
+  @apply m-0 text-[13px] text-fg-mute;
 }
 
 .hint.small {
-  font-size: 11px;
+  @apply text-[11px];
 }
 
 .json-preview {
+  @apply max-h-[280px] overflow-auto rounded border;
   background: var(--surface-raised);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  overflow: auto;
-  max-height: 280px;
+  border-color: var(--border);
 }
 
 .json-preview pre {
-  margin: 0;
-  padding: 12px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--fg);
-  white-space: pre;
+  @apply m-0 whitespace-pre p-3 font-mono text-[12px] leading-[1.5] text-fg;
 }
 
 .warn-box {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--warning, #f59e0b);
+  @apply flex items-center gap-1.5 rounded border px-2.5 py-2 text-[12px];
   background: rgba(245, 158, 11, 0.1);
-  border: 1px solid rgba(245, 158, 11, 0.3);
-  border-radius: 4px;
-  padding: 8px 10px;
+  border-color: rgba(245, 158, 11, 0.3);
+  color: var(--warning, #f59e0b);
 }
 
 .btn {
-  padding: 6px 14px;
-  border-radius: 4px;
-  font-size: 13px;
-  cursor: pointer;
-  border: 1px solid var(--border);
+  @apply flex cursor-pointer items-center gap-1.5 rounded border px-3.5 py-1.5 text-[13px];
+  border-color: var(--border);
   background: var(--surface-raised);
   color: var(--fg);
-  display: flex;
-  align-items: center;
-  gap: 6px;
 }
 
 .btn:hover {
@@ -387,23 +335,21 @@ onMounted(async () => {
 }
 
 .btn.primary {
+  @apply text-white;
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
 }
 
 .btn.primary:hover:not(:disabled) {
-  opacity: 0.88;
+  @apply opacity-90;
 }
 
 .btn.primary:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+  @apply cursor-not-allowed opacity-40;
 }
 
 .btn.ghost {
-  background: transparent;
-  border-color: transparent;
+  @apply border-transparent bg-transparent;
 }
 
 .btn.ghost:hover {
