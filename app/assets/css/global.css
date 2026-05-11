@@ -234,88 +234,7 @@ button {
 /* =============================================
  * ボタン
  * ============================================= */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 12px;
-  font-size: 12.5px;
-  font-weight: 500;
-  font-family: var(--font-body);
-  border-radius: 7px;
-  border: 1px solid var(--line-hi);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--fg);
-  cursor: pointer;
-  transition: all 0.12s;
-  white-space: nowrap;
-}
-.btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: var(--line-strong);
-}
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-.btn.ghost {
-  background: transparent;
-  border-color: transparent;
-  color: var(--fg-dim);
-}
-.btn.ghost:hover:not(:disabled) {
-  color: var(--fg);
-  background: rgba(255, 255, 255, 0.04);
-}
-.btn.primary {
-  background: var(--accent);
-  color: #0a0b0f;
-  border-color: var(--accent);
-  font-weight: 600;
-  box-shadow:
-    0 4px 14px -4px rgba(124, 242, 212, 0.55),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3);
-}
-.btn.primary:hover:not(:disabled) {
-  background: var(--accent-hi);
-  border-color: var(--accent-hi);
-}
-.btn.danger {
-  color: var(--rose);
-  border-color: rgba(255, 107, 138, 0.3);
-  background: rgba(255, 107, 138, 0.06);
-}
-.btn.danger:hover:not(:disabled) {
-  background: rgba(255, 107, 138, 0.12);
-  border-color: rgba(255, 107, 138, 0.5);
-  color: #ffb8c5;
-}
-.btn.icon {
-  padding: 0;
-  width: 32px;
-  justify-content: center;
-}
-.btn-group {
-  display: flex;
-}
-.btn-group .btn {
-  border-radius: 0;
-  border-right-width: 0;
-}
-.btn-group .btn:first-child {
-  border-radius: 7px 0 0 7px;
-}
-.btn-group .btn:last-child {
-  border-radius: 0 7px 7px 0;
-  border-right-width: 1px;
-}
-.btn-group .btn.active {
-  background: rgba(124, 242, 212, 0.1);
-  color: var(--accent);
-  border-color: var(--accent-line);
-  z-index: 1;
-}
+/* .btn family は tailwind.css の @layer components に移行 (Phase 10-A) */
 
 /* =============================================
  * コンテンツエリア
@@ -1404,27 +1323,7 @@ html.light .win::before {
 html.light .toolbar {
   background: rgba(255, 255, 255, 0.55);
 }
-html.light .btn {
-  background: rgba(15, 20, 35, 0.03);
-}
-html.light .btn:hover {
-  background: rgba(15, 20, 35, 0.06);
-}
-/*
- * ライトモードの primary ボタンは accent (#0fa885) 上に白文字だと
- * コントラスト比が約 3.4:1 で WCAG AA を満たさず読みづらい。
- * 同色ペアレントの暗背景 (--bg-0 = #14171f 相当) のテキストを使うことで
- * 6.0:1 程度を確保する。
- */
-html.light .btn.primary {
-  color: #0a0b0f;
-  box-shadow:
-    0 4px 12px -4px rgba(15, 168, 133, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.45);
-}
-html.light .btn.primary svg {
-  color: #0a0b0f;
-}
+/* html.light .btn 上書きは tailwind.css @layer components の :where(html.light) で対応 */
 html.light .chip.active {
   color: #ffffff;
   background: var(--fg);
