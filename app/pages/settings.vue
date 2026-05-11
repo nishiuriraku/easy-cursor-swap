@@ -510,65 +510,41 @@ function selectSection(id: SectionId) {
 </template>
 
 <style scoped>
+@reference '~/assets/css/tailwind.css';
+
 .settings-host {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
+  @apply flex h-full flex-col;
 }
 
 .settings-grid {
-  flex: 1;
-  display: grid;
-  grid-template-columns: 220px 1fr;
-  min-height: 0;
+  @apply grid min-h-0 flex-1 grid-cols-[220px_1fr];
 }
 
 .settings-sidenav {
-  border-right: 1px solid var(--line);
-  padding: 16px 10px;
-  background: rgba(255, 255, 255, 0.01);
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  @apply flex flex-col gap-0.5 overflow-y-auto border-r border-line bg-white/[0.01] px-2.5 py-4;
 }
 .nav-title {
-  margin: 0 8px 10px;
-  font-family: var(--font-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--fg-mute);
-  font-weight: 500;
+  @apply mb-2.5 ml-2 mr-2 mt-0 font-mono text-[9.5px] font-medium uppercase tracking-[0.16em] text-fg-mute;
 }
 
 .settings-content {
-  overflow-y: auto;
-  padding: 24px 28px 32px;
+  @apply overflow-y-auto px-7 pb-8 pt-6;
 }
 .section-head {
-  margin-bottom: 22px;
+  @apply mb-[22px];
 }
 .section-head h1 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  @apply m-0 font-display text-[22px] font-semibold tracking-[-0.02em];
 }
 .section-head p {
-  margin: 4px 0 0;
-  color: var(--fg-dim);
-  font-size: 13px;
+  @apply mt-1 text-[13px] text-fg-dim;
+  margin-left: 0;
+  margin-right: 0;
+  margin-bottom: 0;
 }
 
 .head-hint {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--fg-mute);
-  text-transform: none;
-  letter-spacing: 0;
-  font-weight: 400;
+  @apply font-mono text-[10px] font-normal normal-case tracking-normal text-fg-mute;
 }
 
 .prop-body {
@@ -576,14 +552,8 @@ function selectSection(id: SectionId) {
 }
 
 .profile-msg {
-  margin-top: 12px;
+  @apply mt-3 break-all rounded-md border border-accent-line p-3 font-mono text-[11.5px] text-fg-dim;
   padding: 10px 12px;
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  color: var(--fg-dim);
   background: rgba(124, 242, 212, 0.06);
-  border: 1px solid var(--accent-line);
-  border-radius: 6px;
-  word-break: break-all;
 }
 </style>
