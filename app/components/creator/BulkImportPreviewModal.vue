@@ -36,6 +36,8 @@ export interface ApplyPayload {
   roleAssets: Array<{ roleId: string; asset: RoleAsset }>
   metadataChoice: 'keep' | 'overwrite' | 'name-only'
   metadata: ParsedCursorpack['metadata'] | null
+  /** ✓ なら親側で SaveDestinationModal を libraryAndApply で自動オープン */
+  applyImmediately: boolean
 }
 
 interface PendingMatch {
@@ -54,6 +56,7 @@ interface UnmatchedFile {
 }
 
 const protectExisting = ref(true)
+const applyImmediately = ref(false)
 const matches = ref<PendingMatch[]>([])
 const unmatched = ref<UnmatchedFile[]>([])
 const skippedCount = ref(0)
@@ -255,6 +258,7 @@ function apply() {
     roleAssets,
     metadataChoice: metadataChoice.value,
     metadata: props.cursorpack?.metadata ?? null,
+    applyImmediately: applyImmediately.value,
   })
 }
 
@@ -335,6 +339,11 @@ onUnmounted(resetState)
       </div>
 
       <footer class="bi-foot">
+        <label class="bi-apply-immediately">
+          <input v-model="applyImmediately" type="checkbox" data-test="apply-immediately" />
+          {{ t('bulkImport.applyImmediately') }}
+        </label>
+        <span style="flex: 1" />
         <button class="btn ghost" @click="emit('cancel')">{{ t('common.cancel') }}</button>
         <button class="btn primary" @click="apply">
           ✓
@@ -376,6 +385,9 @@ onUnmounted(resetState)
 }
 .bi-protect {
   @apply mb-3 inline-flex gap-1.5 text-[12px];
+}
+.bi-apply-immediately {
+  @apply inline-flex items-center gap-1.5 text-[12px];
 }
 .bi-unmatched {
   @apply flex items-center gap-2 py-1 text-[12px];
