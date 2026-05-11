@@ -55,41 +55,30 @@ function highlightLabel(h: MarketplaceEntry['highlight']): string {
 </template>
 
 <style scoped>
+@reference '~/assets/css/tailwind.css';
+
 .featured-card {
-  padding: 18px;
-  flex-direction: row;
-  align-items: center;
-  gap: 14px;
+  @apply flex-row items-center gap-3.5 p-4;
 }
 
 .featured-thumb {
-  width: 56px;
-  height: 56px;
-  border-radius: 10px;
+  @apply grid size-14 shrink-0 place-items-center rounded-[10px] border border-line-hi;
   background: linear-gradient(135deg, rgba(124, 242, 212, 0.2), rgba(139, 125, 255, 0.2));
-  border: 1px solid var(--line-hi);
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
 }
 
 .featured-body {
-  flex: 1;
-  min-width: 0;
+  @apply min-w-0 flex-1;
 }
 
 .featured-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  @apply flex items-center gap-2;
 }
 
 .featured-tag {
-  padding: 1px 5px;
-  font-size: 9px;
+  @apply px-[5px] py-px text-[9px];
 }
 
 .featured-meta {
-  margin-top: 6px;
+  @apply mt-1.5;
 }
 </style>
