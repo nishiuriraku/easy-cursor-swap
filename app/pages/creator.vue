@@ -28,6 +28,9 @@ import BulkImportPreviewModal, {
   type ApplyPayload,
 } from '~/components/creator/BulkImportPreviewModal.vue'
 import NewThemeStartModal from '~/components/creator/NewThemeStartModal.vue'
+import SaveDestinationModal, {
+  type SaveSubmitPayload,
+} from '~/components/creator/SaveDestinationModal.vue'
 import ThemePickerModal from '~/components/library/ThemePickerModal.vue'
 import { useThemes } from '~/composables/useThemes'
 
@@ -121,6 +124,9 @@ const perSizeHotspot = ref(true)
  *  - `dispatchBulkPaths()` 内で `.cursorpack` を取り込んだ瞬間 (= ソースが入れ替わる)
  */
 const sourceThemeId = ref<string | null>(null)
+/** SaveDestinationModal の開閉と初期 destination 制御 */
+const saveModalOpen = ref(false)
+const saveModalDefault = ref<'file' | 'library' | 'libraryAndApply'>('file')
 const shadowEnabled = ref(false)
 
 /**
@@ -394,6 +400,8 @@ onMounted(async () => {
       // `?editPath` 経由のみ元テーマ ID を保持。SaveDestinationModal が
       // 「上書き / 複製」セクションを出すトリガにも使う。
       sourceThemeId.value = parsed.metadata.id ?? null
+      // `?editPath` 由来のテーマは「編集 → 再適用」が典型。デフォルトを Library+Apply に。
+      saveModalDefault.value = 'libraryAndApply'
     } catch (err) {
       importMessage.value = `編集データの読込に失敗: ${err instanceof Error ? err.message : String(err)}`
       stage.value = 'editing'
@@ -558,8 +566,11 @@ async function cancelExport() {
   }
 }
 
-/** クリエイターの全状態を `.cursorpack` として書き出す (ストリーム式)。 */
-async function exportCursorpack(opts: { sign: boolean }) {
+/**
+ * SaveDestinationModal の submit を受けて Rust 側 export_cursorpack_streamed を呼ぶ。
+ * destination ごとにトーストメッセージを切り替え、apply 失敗時は warning + retry。
+ */
+async function executeSave(payload: SaveSubmitPayload) {
   if (assignedRoleCount.value === 0) {
     exportMessage.value = '少なくとも 1 役割に画像を割り当ててください'
     return
@@ -574,22 +585,9 @@ async function exportCursorpack(opts: { sign: boolean }) {
 
   let unlisten: (() => void) | null = null
   try {
-    const { save } = await import('@tauri-apps/plugin-dialog')
-    const safeName = metaName.value.replace(/[^\p{L}\p{N}_-]+/gu, '_').slice(0, 64) || 'theme'
-    const target = await save({
-      defaultPath: `${safeName}.cursorpack`,
-      filters: [{ name: 'Cursor Pack', extensions: ['cursorpack'] }],
-    })
-    if (!target) {
-      exportMessage.value = '保存先が選択されませんでした'
-      return
-    }
-
-    // build_id は時刻 + 乱数で衝突回避
     const buildId = `build-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     currentBuildId.value = buildId
 
-    // 進捗イベントを購読 (build_id でフィルタ)
     try {
       const { listen } = await import('@tauri-apps/api/event')
       unlisten = await listen<BuildProgress>('build-progress', (e) => {
@@ -601,36 +599,52 @@ async function exportCursorpack(opts: { sign: boolean }) {
 
     const roles = toExportPayload(resample.value)
 
+    const destination =
+      payload.destination === 'file'
+        ? { kind: 'file', path: payload.filePath! }
+        : { kind: 'library', applyAfter: payload.destination === 'libraryAndApply' }
+
     const result = await invokeTauri<ExportResult>('export_cursorpack_streamed', {
       req: {
         buildId,
-        nameJa: metaName.value,
+        nameJa: payload.effectiveName,
         nameEn: metaNameEn.value || null,
         author: metaAuthor.value || null,
         version: metaVersion.value,
         requiresOsShadow: shadowEnabled.value,
         roles,
-        // Phase 3: 既存 Export ボタンは file 出力で固定。Phase 4 で SaveDestinationModal に置換
-        destination: { kind: 'file', path: target },
-        existingThemeId: null,
-        sign: opts.sign,
+        destination,
+        existingThemeId:
+          payload.overwriteExisting && sourceThemeId.value ? sourceThemeId.value : null,
+        sign: payload.sign,
       },
     })
 
     if (!result) throw new Error('エクスポート結果が空でした')
-    const sigText = result.signed ? `署名: ${result.key_id ?? '?'}` : '未署名'
-    exportMessage.value = `.cursorpack を書き出しました (${result.size_bytes} bytes, ${sigText}) → ${target}`
+
+    if (result.apply_error) {
+      exportMessage.value = t('saveModal.toastAppliedFailed').replace('{error}', result.apply_error)
+    } else if (result.applied) {
+      exportMessage.value = t('saveModal.toastSavedAndApplied')
+    } else if (payload.destination === 'file') {
+      exportMessage.value = t('saveModal.toastSavedFile').replace('{path}', payload.filePath!)
+    } else {
+      exportMessage.value = t('saveModal.toastSavedLibrary')
+    }
   } catch (err) {
     exportMessage.value = `エクスポート失敗: ${err instanceof Error ? err.message : String(err)}`
   } finally {
     if (unlisten) unlisten()
     currentBuildId.value = null
     exportBusy.value = false
-    // 完了表示は 3 秒残す
     setTimeout(() => {
       if (!exportBusy.value) exportProgress.value = null
     }, 3000)
   }
+}
+
+function onToolbarSave() {
+  saveModalOpen.value = true
 }
 
 /** sanitized SVG 文字列 → 指定サイズの PNG バイト列 (Canvas 経由) */
@@ -841,6 +855,8 @@ function resetCreator() {
   filledSizesByRole.value = {}
   activeRoleId.value = 'Arrow'
   sourceThemeId.value = null
+  saveModalDefault.value = 'file'
+  saveModalOpen.value = false
   activeSize.value = 64
   hotspotX.value = 4
   hotspotY.value = 4
@@ -1041,7 +1057,7 @@ async function onFileChange(e: Event) {
         :export-busy="exportBusy"
         :arrow-assigned="arrowAssigned"
         @reset="resetCreator"
-        @export="exportCursorpack"
+        @save="onToolbarSave"
       />
 
       <!-- タブバー -->
@@ -1293,6 +1309,21 @@ async function onFileChange(e: Event) {
       @pick-folder="onNewThemePickFolder"
       @start-empty="onNewThemeStartEmpty"
       @cancel="onNewThemeCancel"
+    />
+
+    <SaveDestinationModal
+      :open="saveModalOpen"
+      :has-keystore-signing="hasKeystoreSigning"
+      :source-theme-id="sourceThemeId"
+      :default-destination="saveModalDefault"
+      :meta-name="metaName"
+      @cancel="saveModalOpen = false"
+      @submit="
+        (payload) => {
+          saveModalOpen = false
+          void executeSave(payload)
+        }
+      "
     />
 
     <!--

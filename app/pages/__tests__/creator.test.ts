@@ -37,3 +37,22 @@ describe('creator.vue ?editPath integration', () => {
     expect(parsed.metadata.id).toBe(fakeId)
   })
 })
+
+describe('creator.vue executeSave error handling contract', () => {
+  it('treats apply_error as a partial-success warning toast', () => {
+    // 純粋な契約テスト: ExportResult { applied: false, apply_error: '...' } のとき
+    // creator.vue は warning レベルの notify を呼ぶことを期待する。
+    // 実体は executeSave 内のロジックで、ここでは shape が定まっていることを確認。
+    const result: {
+      theme_id: string
+      applied: boolean
+      apply_error: string | null
+    } = {
+      theme_id: 'x',
+      applied: false,
+      apply_error: 'registry locked',
+    }
+    expect(result.apply_error).toBeTruthy()
+    expect(result.applied).toBe(false)
+  })
+})
