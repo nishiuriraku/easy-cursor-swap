@@ -1,16 +1,24 @@
 import { ref } from 'vue'
 import { invokeTauri } from '~/composables/useTauri'
 
+export interface AniAssetData {
+  framePngs: number[][]
+  sequence: number[]
+  perStepDurationsMs: number[]
+  isLegacyRawDib: boolean
+}
+
 export interface ResolvedAsset {
   sourceFile: string
   sourcePath: string
-  kind: 'png' | 'svg' | 'cur' | 'ico'
+  kind: 'png' | 'svg' | 'cur' | 'ico' | 'ani'
   pngBytes: number[]
   svgText: string | null
   nativeSize: number
   hotspotX: number
   hotspotY: number
   availableSizes: number[]
+  ani: AniAssetData | null
 }
 
 export interface ResolveFailure {

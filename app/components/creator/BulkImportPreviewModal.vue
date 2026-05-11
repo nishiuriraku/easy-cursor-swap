@@ -12,6 +12,7 @@ import type { RoleAsset } from '~/composables/useCreatorAssets'
 import { initialHotspotFor } from '~/composables/useHotspotDefaults'
 import { useI18n } from '~/composables/useI18n'
 import BulkImportRoleRow from './BulkImportRoleRow.vue'
+import AniThumb from './AniThumb.vue'
 
 const { t } = useI18n()
 
@@ -102,6 +103,7 @@ watch(
           hotspotX: parsed.hotspotX,
           hotspotY: parsed.hotspotY,
           availableSizes: Object.keys(parsed.sizedPngBytes).map(Number),
+          ani: null,
         }
         const conflict = props.existingRoles.has(role) ? 'overwrite-existing' : 'none'
         matches.value.push({
@@ -289,6 +291,7 @@ onUnmounted(resetState)
           :confidence="row.match?.confidence ?? null"
           :conflict="row.match?.conflict ?? 'none'"
           :decision="row.match?.decision ?? 'skip'"
+          :ani-data="row.match?.asset.ani ?? null"
           @toggle="(v) => row.match && (row.match.decision = v)"
         />
 
@@ -296,7 +299,15 @@ onUnmounted(resetState)
           {{ t('bulkImport.unmatchedHeader', { count: unmatched.length }) }}
         </h4>
         <div v-for="u in unmatched" :key="u.asset.sourcePath" class="bi-unmatched">
-          <img :src="u.previewUrl" :alt="u.asset.sourceFile" />
+          <AniThumb
+            v-if="u.asset.ani"
+            :frame-pngs="u.asset.ani.framePngs.map((b) => new Uint8Array(b))"
+            :sequence="u.asset.ani.sequence"
+            :durations="u.asset.ani.perStepDurationsMs"
+            :width="32"
+            :height="32"
+          />
+          <img v-else :src="u.previewUrl" :alt="u.asset.sourceFile" />
           <span>{{ u.asset.sourceFile }} ({{ u.asset.nativeSize }}px)</span>
           <UiSelect
             v-model="u.manuallyAssignedRole"

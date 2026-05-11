@@ -365,6 +365,7 @@ export default {
     notProvided: '— Not provided —',
     conflictOverwrite: 'Will overwrite the existing image',
     conflictCollision: 'Conflicts with another pending file',
+    legacyAniChip: 'Legacy',
   },
   // Creator start screen + property panel labels
   creatorStart: {

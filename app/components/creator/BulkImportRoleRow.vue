@@ -5,6 +5,7 @@
  */
 import { computed } from 'vue'
 import { useI18n } from '~/composables/useI18n'
+import AniThumb from './AniThumb.vue'
 
 const { t } = useI18n()
 
@@ -20,8 +21,14 @@ interface Props {
   confidence: number | null
   conflict: 'none' | 'overwrite-existing' | 'collision-with-other-pending'
   decision: 'apply' | 'skip'
+  aniData?: {
+    framePngs: number[][]
+    sequence: number[]
+    perStepDurationsMs: number[]
+    isLegacyRawDib: boolean
+  } | null
 }
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), { aniData: null })
 const emit = defineEmits<{ (e: 'toggle', value: 'apply' | 'skip'): void }>()
 
 const confidenceLabel = computed(() => {
@@ -43,8 +50,17 @@ const conflictTitle = computed(() => {
       <span class="role-label">{{ roleLabel }}</span>
     </div>
     <div class="thumb-cell">
-      <img v-if="previewUrl" :src="previewUrl" :alt="roleId" />
+      <AniThumb
+        v-if="aniData"
+        :frame-pngs="aniData.framePngs.map((b) => new Uint8Array(b))"
+        :sequence="aniData.sequence"
+        :durations="aniData.perStepDurationsMs"
+        :width="32"
+        :height="32"
+      />
+      <img v-else-if="previewUrl" :src="previewUrl" :alt="roleId" />
       <span v-else class="dim">{{ t('bulkImport.notProvided') }}</span>
+      <span v-if="aniData?.isLegacyRawDib" class="legacy-chip">{{ t('bulkImport.legacyAniChip') }}</span>
     </div>
     <div class="meta-cell">
       <span v-if="sourceFile" class="src">{{ sourceFile }}</span>
@@ -105,5 +121,8 @@ const conflictTitle = computed(() => {
 }
 .warn {
   @apply ml-1 text-amber;
+}
+.legacy-chip {
+  @apply ml-1 rounded-sm bg-[rgba(240,180,40,0.2)] px-1 text-[10px] uppercase text-[#f0b428];
 }
 </style>
