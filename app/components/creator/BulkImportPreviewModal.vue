@@ -352,76 +352,41 @@ onUnmounted(resetState)
 </template>
 
 <style scoped>
+@reference '~/assets/css/tailwind.css';
+
 .bi-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(10, 11, 15, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
+  @apply fixed inset-0 z-[100] flex items-center justify-center bg-[rgba(10,11,15,0.7)];
 }
 .bi-modal {
+  @apply flex max-h-[90vh] w-[min(900px,96vw)] flex-col rounded-[12px] border border-line;
   background: var(--bg-1, #14161c);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  width: min(900px, 96vw);
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
 }
 .bi-head,
 .bi-foot {
-  padding: 12px 18px;
-  border-bottom: 1px solid var(--line);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  @apply flex items-center justify-between border-b border-line px-4 py-3;
 }
 .bi-foot {
-  border-bottom: 0;
-  border-top: 1px solid var(--line);
-  gap: 8px;
-  justify-content: flex-end;
+  @apply justify-end gap-2 border-b-0 border-t border-line;
 }
 .bi-body {
-  padding: 12px 18px;
-  overflow-y: auto;
-  flex: 1;
+  @apply flex-1 overflow-y-auto px-4 py-3;
 }
 .bi-source {
-  font-size: 12px;
-  color: var(--fg-mute);
-  margin-bottom: 8px;
+  @apply mb-2 text-[12px] text-fg-mute;
 }
 .bi-protect {
-  display: inline-flex;
-  gap: 6px;
-  margin-bottom: 12px;
-  font-size: 12px;
+  @apply mb-3 inline-flex gap-1.5 text-[12px];
 }
 .bi-unmatched {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 0;
-  font-size: 12px;
+  @apply flex items-center gap-2 py-1 text-[12px];
 }
 .bi-unmatched img {
-  width: 32px;
-  height: 32px;
-  object-fit: contain;
+  @apply size-8 object-contain;
 }
 .bi-meta-info {
-  font-size: 12px;
-  color: var(--fg-mute);
-  margin-bottom: 6px;
+  @apply mb-1.5 text-[12px] text-fg-mute;
 }
 h4 {
-  font-size: 11px;
-  color: var(--fg-mute);
-  margin: 12px 0 6px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  @apply my-3 mb-1.5 text-[11px] uppercase tracking-[0.1em] text-fg-mute;
 }
 </style>
