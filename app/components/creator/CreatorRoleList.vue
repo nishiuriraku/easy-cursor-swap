@@ -55,6 +55,8 @@ const cursorRoles: readonly CursorRoleDef[] = CURSOR_ROLES
 </template>
 
 <style scoped>
+@reference '~/assets/css/tailwind.css';
+
 /* NOTE: 元コードは var(--border) や var(--bg-elev1/2)、var(--text-mute) などの
  * 未定義トークンに依存しており、それらの declaration は invalid → global.css の
  * .cpane.left / .tag / .role-list 等のルールがカスケードで効いていた。
@@ -94,20 +96,15 @@ const cursorRoles: readonly CursorRoleDef[] = CURSOR_ROLES
   padding: 12px 14px;
 }
 
+/* design/styles.css の `.nav-section h6` パターン (mono uppercase) と一致させる。
+ * 旧 scoped は font-size:12px / weight:600 / tracking:0.04em のため visual drift していた。 */
 .pane-head h6 {
-  margin: 0;
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  @apply m-0 font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-fg-mute;
 }
 
-.tag {
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  gap: 4px;
-}
+/* `.tag` の shared utility をそのまま使う (design: padding 3px 8px / font-size 10px /
+ * border-radius 4px の四角寄りタグ)。旧 scoped は pill 形状 + 大きめ font に
+ * drift していた。ローカル上書きは削除して shared に統一。 */
 
 .role-list {
   flex: 1;

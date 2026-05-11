@@ -160,11 +160,16 @@ function navigate(id: string) {
 /* ─────────────────────────────────────────────────────────────
  * ナビゲーション
  *
- * NOTE: nav 要素には class を当てず、h6 もブラウザデフォルトで表示する。
- * 元の global.css には `.nav-section h6` 用の uppercase / font-mono ルールが
- * あったが、template が `.nav-section` クラスを付けていなかったため dead code。
- * baseline の見た目 (h6 デフォルト) と一致させるため意図的に未スタイル。
+ * design/styles.css の `.nav-section h6` を再現:
+ * mono uppercase + tracking-[0.16em] + text-[9.5px] + text-fg-mute
+ * (WORKSPACE / SYSTEM などのセクションラベル)
  * ────────────────────────────────────────────────────────────*/
+nav h6 {
+  @apply mx-2 mb-1.5 mt-0 font-mono text-[9.5px] font-medium uppercase tracking-[0.16em] text-fg-mute;
+}
+nav {
+  @apply flex flex-col gap-0.5;
+}
 .nav-item {
   @apply relative flex w-full cursor-pointer items-center gap-2.5 rounded-[7px] border border-transparent bg-transparent px-2.5 py-[7px] text-left text-[13px] font-medium text-fg-dim;
   transition:
