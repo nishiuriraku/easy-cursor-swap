@@ -1061,42 +1061,27 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+@reference '~/assets/css/tailwind.css';
+
 .library-host {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  position: relative;
+  @apply relative flex h-full flex-col;
 }
 
 .empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 80px 24px;
-  text-align: center;
-  color: var(--fg-mute);
-  gap: 12px;
+  @apply flex flex-col items-center justify-center gap-3 px-6 py-20 text-center text-fg-mute;
 }
 .empty-state h3 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 18px;
-  color: var(--fg);
-  font-weight: 600;
+  @apply m-0 font-display text-[18px] font-semibold text-fg;
 }
 .empty-state p {
-  margin: 0;
-  font-size: 13px;
-  color: var(--fg-dim);
+  @apply m-0 text-[13px] text-fg-dim;
 }
 .empty-state code {
-  font-family: var(--font-mono);
-  color: var(--accent);
+  @apply font-mono text-accent;
 }
 
 .skeleton-card {
-  height: 280px;
+  @apply h-[280px];
   background: linear-gradient(
     90deg,
     rgba(255, 255, 255, 0.02) 0%,
@@ -1125,24 +1110,10 @@ onUnmounted(() => {
 }
 
 .apply-error {
-  position: fixed;
-  bottom: 48px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 90;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  font-size: 12.5px;
+  @apply fixed bottom-12 left-1/2 z-[90] flex min-w-[320px] max-w-[80%] -translate-x-1/2 items-center gap-2.5 rounded-[8px] border px-3.5 py-2.5 text-[12.5px] backdrop-blur-[12px];
   background: rgba(255, 107, 138, 0.12);
-  border: 1px solid rgba(255, 107, 138, 0.4);
-  border-radius: 8px;
+  border-color: rgba(255, 107, 138, 0.4);
   color: #ffb8c5;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   box-shadow: var(--shadow-2);
-  min-width: 320px;
-  max-width: 80%;
 }
 </style>
