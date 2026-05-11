@@ -1,16 +1,24 @@
 import { ref } from 'vue'
 import { invokeTauri } from '~/composables/useTauri'
 
+export interface AniAssetData {
+  framePngs: number[][]
+  sequence: number[]
+  perStepDurationsMs: number[]
+  isLegacyRawDib: boolean
+}
+
 export interface ResolvedAsset {
   sourceFile: string
   sourcePath: string
-  kind: 'png' | 'svg' | 'cur' | 'ico'
+  kind: 'png' | 'svg' | 'cur' | 'ico' | 'ani'
   pngBytes: number[]
   svgText: string | null
   nativeSize: number
   hotspotX: number
   hotspotY: number
   availableSizes: number[]
+  ani: AniAssetData | null
 }
 
 export interface ResolveFailure {
@@ -29,6 +37,11 @@ export interface ParsedRole {
   hotspotX: number
   hotspotY: number
   sizedPngBytes: Record<string, number[]>
+  /** `.ani` ロールのフレームデータ。`.cur`/`.ico` ロールでは null。 */
+  ani: AniAssetData | null
+  /** `.ani` ロールの展開先絶対パス。`.cur`/`.ico` ロールでは null。
+   *  export 時に Rust 側が `rewrite_ani_with_hotspot` のソースとして使う。 */
+  aniSourcePath: string | null
 }
 
 export interface ParsedCursorpack {

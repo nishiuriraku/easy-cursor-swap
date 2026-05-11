@@ -4,10 +4,13 @@
 //! Creator の「既存パックを取り込んで編集」フローではディスク書き込みせず
 //! メモリ上で PNG バイトを取り出す必要がある。本モジュールはその専用パイプライン。
 
-use super::{BulkImportProgress, ParseCursorpackRequest, ParsedCursorpack, ParsedRole};
+use super::{
+    AniAssetData, BulkImportProgress, ParseCursorpackRequest, ParsedCursorpack, ParsedRole,
+};
 use crate::errors::AppError;
 use std::collections::HashMap;
 use std::io::Read;
+use std::path::Path;
 use tauri::{AppHandle, Emitter};
 use zip::ZipArchive;
 
@@ -56,7 +59,109 @@ fn encode_entry_to_png(entry: &crate::cursor::ParsedIcoCurEntry) -> Result<Vec<u
     Ok(buf)
 }
 
+/// `parse_ani_role` の戻り値。`.ani` ロールから抽出した primary プレビューと
+/// フレーム列、(あれば) 展開先絶対パスを束ねたもの。
+struct AniRoleParseResult {
+    primary_size: u32,
+    primary_png: Vec<u8>,
+    hotspot_x: u32,
+    hotspot_y: u32,
+    ani: AniAssetData,
+    ani_source_path: Option<String>,
+}
+
+/// `.ani` ロールを解析して `AniRoleParseResult` を返す。
+/// `ani_extract_dir` が指定されていればロールの元バイトを `<dir>/<role-filename>` に
+/// 書き出し、その絶対パスを返す (export 時の rewrite_ani_with_hotspot ソースに使う)。
+fn parse_ani_role(
+    role_id: &str,
+    file_in_zip: &str,
+    bytes: &[u8],
+    ani_extract_dir: Option<&Path>,
+) -> Result<AniRoleParseResult, AppError> {
+    let parsed = crate::cursor::parse_ani(bytes)?;
+    let frame0 = parsed.frames.first().ok_or_else(|| {
+        AppError::ImageProcessing(format!("ロール {} の .ani にフレームがありません", role_id))
+    })?;
+    let primary_png = {
+        let mut buf = Vec::new();
+        let encoder = image::codecs::png::PngEncoder::new(&mut buf);
+        image::ImageEncoder::write_image(
+            encoder,
+            frame0.image.as_raw(),
+            frame0.image.width(),
+            frame0.image.height(),
+            image::ExtendedColorType::Rgba8,
+        )
+        .map_err(|e| AppError::ImageProcessing(format!("PNG エンコード失敗: {}", e)))?;
+        buf
+    };
+
+    // 全フレームを PNG 化
+    let mut frame_pngs: Vec<Vec<u8>> = Vec::with_capacity(parsed.frames.len());
+    for f in &parsed.frames {
+        let mut buf = Vec::new();
+        let encoder = image::codecs::png::PngEncoder::new(&mut buf);
+        if image::ImageEncoder::write_image(
+            encoder,
+            f.image.as_raw(),
+            f.image.width(),
+            f.image.height(),
+            image::ExtendedColorType::Rgba8,
+        )
+        .is_err()
+        {
+            continue;
+        }
+        frame_pngs.push(buf);
+    }
+    let per_step_durations_ms: Vec<u32> = parsed
+        .per_step_rate_jiffies
+        .iter()
+        .map(|j| ((*j as u64 * 1000) / 60) as u32)
+        .collect();
+
+    // export 用にバイトを展開
+    let ani_source_path = if let Some(dir) = ani_extract_dir {
+        std::fs::create_dir_all(dir)?;
+        // file_in_zip にはサブディレクトリ含む可能性があるのでファイル名だけ取り出す
+        let fname = Path::new(file_in_zip)
+            .file_name()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_else(|| format!("{}.ani", role_id));
+        let out_path = dir.join(&fname);
+        std::fs::write(&out_path, bytes)?;
+        Some(out_path.to_string_lossy().to_string())
+    } else {
+        None
+    };
+
+    Ok(AniRoleParseResult {
+        primary_size: frame0.image.width(),
+        primary_png,
+        hotspot_x: frame0.hotspot_x,
+        hotspot_y: frame0.hotspot_y,
+        ani: AniAssetData {
+            frame_pngs,
+            sequence: parsed.sequence,
+            per_step_durations_ms,
+            is_legacy_raw_dib: parsed.is_legacy_raw_dib,
+        },
+        ani_source_path,
+    })
+}
+
 pub fn parse_cursorpack_inner(bytes: &[u8]) -> Result<ParsedCursorpack, AppError> {
+    parse_cursorpack_inner_with_extract(bytes, None)
+}
+
+/// `parse_cursorpack_inner` の `.ani` 展開先指定版。
+/// `ani_extract_dir` を渡すと、`.ani` ロールのバイトをそこに書き出して
+/// 各 ParsedRole の `ani_source_path` に絶対パスを格納する。
+pub fn parse_cursorpack_inner_with_extract(
+    bytes: &[u8],
+    ani_extract_dir: Option<&Path>,
+) -> Result<ParsedCursorpack, AppError> {
     let cursor = std::io::Cursor::new(bytes);
     let mut archive = ZipArchive::new(cursor).map_err(|e| AppError::InvalidCursorpack {
         reason: format!("ZIP オープン失敗: {}", e),
@@ -105,6 +210,31 @@ pub fn parse_cursorpack_inner(bytes: &[u8]) -> Result<ParsedCursorpack, AppError
             buf
         };
 
+        // 拡張子で `.ani` を判定。.cur / .ico は従来通り parse_ico_cur に流す。
+        let is_ani = Path::new(&def.file)
+            .extension()
+            .and_then(|s| s.to_str())
+            .map(|e| e.eq_ignore_ascii_case("ani"))
+            .unwrap_or(false);
+
+        if is_ani {
+            let r = parse_ani_role(role_id, &def.file, &primary_bytes, ani_extract_dir)?;
+            // .ani には sized オーバーライドの概念がないので空 HashMap
+            roles.insert(
+                role_id.clone(),
+                ParsedRole {
+                    primary_size: r.primary_size,
+                    primary_png_bytes: r.primary_png,
+                    hotspot_x: r.hotspot_x,
+                    hotspot_y: r.hotspot_y,
+                    sized_png_bytes: HashMap::new(),
+                    ani: Some(r.ani),
+                    ani_source_path: r.ani_source_path,
+                },
+            );
+            continue;
+        }
+
         let parsed = crate::cursor::parse_ico_cur(&primary_bytes)?;
         let (largest, primary_png) = crate::cursor::pick_largest_as_png(&parsed)?;
 
@@ -147,6 +277,8 @@ pub fn parse_cursorpack_inner(bytes: &[u8]) -> Result<ParsedCursorpack, AppError
                 hotspot_x: def.hotspot_x,
                 hotspot_y: def.hotspot_y,
                 sized_png_bytes: sized,
+                ani: None,
+                ani_source_path: None,
             },
         );
     }
@@ -175,7 +307,21 @@ pub async fn parse_cursorpack_for_creator(
         let bytes = std::fs::read(&req.path).map_err(|e| AppError::InvalidCursorpack {
             reason: format!("読み込み失敗: {}", e),
         })?;
-        let r = parse_cursorpack_inner(&bytes)?;
+        // `.ani` ロールのバイトは export 時に rewrite_ani_with_hotspot で再利用するため、
+        // `<cursorpack>.extracted/` に書き出してパスを ParsedRole.ani_source_path に格納する。
+        // ディレクトリは cursorpack と同じ寿命 (一時テーマ複製では tempDir() 配下) なので
+        // 通常のテーマ保存までは生きている。
+        let extract_dir = {
+            let p = Path::new(&req.path);
+            let suffix = format!(
+                "{}.extracted",
+                p.file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("cursorpack")
+            );
+            p.parent().map(|d| d.join(suffix))
+        };
+        let r = parse_cursorpack_inner_with_extract(&bytes, extract_dir.as_deref())?;
         let _ = app_clone.emit(
             "bulk-import-progress",
             BulkImportProgress {

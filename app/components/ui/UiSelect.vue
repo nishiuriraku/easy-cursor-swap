@@ -13,6 +13,8 @@
  * - 外側クリックと Esc で閉じる
  * - メニューはボタン直下に表示。スクロールが必要なケースだけ縦最大 280px
  * - `<UiIcon>` (Nuxt 自動 import) でシェブロン表示
+ * - listbox は `<Teleport to="body">` + `position: fixed` で描画。
+ *   `.prop-section` などの祖先が `overflow: hidden` でも listbox はクリップされない。
  */
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
@@ -54,10 +56,16 @@ const triggerRef = ref<HTMLButtonElement | null>(null)
 const listboxRef = ref<HTMLUListElement | null>(null)
 /**
  * listbox の表示方向。`'down'` で trigger の下、`'up'` で上に開く。
- * `show()` で viewport を計測して決定し、その後 listbox がアンマウントされるまで保持する。
- * (開いた後に再計算しないのは、option 数が変わらない前提で安定挙動を優先するため。)
+ * Teleport で body 直下に描画するため、viewport を計測して decide する。
  */
 const placement = ref<'down' | 'up'>('down')
+
+/**
+ * Teleport された listbox の `position: fixed` 用座標。
+ * `updateListboxPosition()` で trigger の getBoundingClientRect() から導出。
+ * scroll/resize 時にも追従更新する。
+ */
+const listboxStyle = ref<Record<string, string>>({})
 
 /** listbox の推定高さ (px)。viewport 計算で auto-flip 判定に使う。
  * 実測すると初回 show 時にチラつくため、option 行高 (32px) × 件数 + padding/border から推定。
@@ -72,22 +80,60 @@ function computeListboxHeight(): number {
   return Math.min(LISTBOX_MAX_HEIGHT_PX, props.options.length * ITEM_HEIGHT_PX + LISTBOX_VPAD_PX)
 }
 
-function decidePlacement() {
+/**
+ * trigger の現在位置を基準に、listbox を viewport のどちらに開くか決定し、
+ * `position: fixed` 用の座標 (top/left/width/maxHeight) を `listboxStyle` に書き込む。
+ *
+ * Teleport で body 直下に描画されるため、ancestor の `overflow: hidden` に
+ * クリップされない。位置は scroll/resize で随時 update。
+ */
+function updateListboxPosition() {
   const trigger = triggerRef.value
   if (!trigger || typeof window === 'undefined') return
   const rect = trigger.getBoundingClientRect()
   const listboxH = computeListboxHeight()
   const spaceBelow = window.innerHeight - rect.bottom - LISTBOX_VIEWPORT_MARGIN_PX
   const spaceAbove = rect.top - LISTBOX_VIEWPORT_MARGIN_PX
+
   // 下に収まれば 'down'、収まらず上に余裕があるなら 'up'。
-  // どちらにも収まらない場合は広い方を採用 (画面が極端に小さいときの fallback)。
+  // どちらにも収まらない場合は広い方を採用し、その方向の使える高さを max-height にする。
+  let dir: 'down' | 'up'
+  let maxHeight: number
   if (spaceBelow >= listboxH + LISTBOX_GAP_PX) {
-    placement.value = 'down'
+    dir = 'down'
+    maxHeight = Math.min(LISTBOX_MAX_HEIGHT_PX, spaceBelow - LISTBOX_GAP_PX)
   } else if (spaceAbove >= listboxH + LISTBOX_GAP_PX) {
-    placement.value = 'up'
+    dir = 'up'
+    maxHeight = Math.min(LISTBOX_MAX_HEIGHT_PX, spaceAbove - LISTBOX_GAP_PX)
+  } else if (spaceBelow >= spaceAbove) {
+    dir = 'down'
+    maxHeight = Math.max(LISTBOX_VPAD_PX + ITEM_HEIGHT_PX, spaceBelow - LISTBOX_GAP_PX)
   } else {
-    placement.value = spaceBelow >= spaceAbove ? 'down' : 'up'
+    dir = 'up'
+    maxHeight = Math.max(LISTBOX_VPAD_PX + ITEM_HEIGHT_PX, spaceAbove - LISTBOX_GAP_PX)
   }
+  placement.value = dir
+
+  const style: Record<string, string> = {
+    position: 'fixed',
+    left: `${Math.round(rect.left)}px`,
+    width: `${Math.round(rect.width)}px`,
+    maxHeight: `${Math.round(maxHeight)}px`,
+  }
+  if (dir === 'down') {
+    style.top = `${Math.round(rect.bottom + LISTBOX_GAP_PX)}px`
+  } else {
+    // 上開きは bottom を viewport 底からの距離で指定する。
+    style.bottom = `${Math.round(window.innerHeight - rect.top + LISTBOX_GAP_PX)}px`
+  }
+  listboxStyle.value = style
+}
+
+// 動的追従用ハンドラ。`{ passive: true, capture: true }` でスクロール可能な
+// 全 ancestor の scroll イベントも拾う (capture が無いと .settings-content など
+// 内側スクロール container は拾えない)。
+function onWindowChange() {
+  if (open.value) updateListboxPosition()
 }
 
 // 安定 ID。生成タイミングで毎回ユニーク値にする (pages/* 跨ぎでも衝突しない)。
@@ -116,13 +162,17 @@ function toggle() {
 }
 
 function show() {
-  // 先に方向を決定 (DOM 挿入前)。ボタンの現在位置を基準に算出するので open=true より前に呼ぶ。
-  decidePlacement()
+  // 先に位置と方向を決定 (DOM 挿入前)。ボタンの現在位置を基準に算出するので open=true より前に呼ぶ。
+  updateListboxPosition()
   open.value = true
   // 開いた瞬間は選択中をハイライト。未選択なら先頭の有効項目。
   const sel = selectedIndex.value
   highlightedIndex.value = sel >= 0 ? sel : firstEnabledIndex()
-  void nextTick(() => scrollHighlightIntoView())
+  void nextTick(() => {
+    // Teleport で実 DOM に追加されたあとに再計算 (option の実寸を反映)
+    updateListboxPosition()
+    scrollHighlightIntoView()
+  })
 }
 
 function close() {
@@ -245,14 +295,24 @@ watch(open, (v) => {
   if (typeof document === 'undefined') return
   if (v) {
     document.addEventListener('mousedown', onDocumentMouseDown)
+    // capture: true で全 ancestor の scroll を拾い、内側スクロール container
+    // (settings-content / drawer body 等) でも listbox 位置が trigger に追従する。
+    window.addEventListener('scroll', onWindowChange, { passive: true, capture: true })
+    window.addEventListener('resize', onWindowChange, { passive: true })
   } else {
     document.removeEventListener('mousedown', onDocumentMouseDown)
+    window.removeEventListener('scroll', onWindowChange, { capture: true } as EventListenerOptions)
+    window.removeEventListener('resize', onWindowChange)
   }
 })
 
 onBeforeUnmount(() => {
   if (typeof document !== 'undefined') {
     document.removeEventListener('mousedown', onDocumentMouseDown)
+  }
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('scroll', onWindowChange, { capture: true } as EventListenerOptions)
+    window.removeEventListener('resize', onWindowChange)
   }
 })
 </script>
@@ -280,44 +340,49 @@ onBeforeUnmount(() => {
       <UiIcon name="ChevD" :size="11" class="ui-select-caret" :class="{ open }" />
     </button>
 
-    <Transition :name="placement === 'up' ? 'ui-select-fade-up' : 'ui-select-fade'">
-      <ul
-        v-if="open"
-        :id="listboxId"
-        ref="listboxRef"
-        :class="['ui-select-listbox', placement === 'up' ? 'up' : 'down']"
-        role="listbox"
-        :aria-labelledby="uid"
-        tabindex="-1"
-      >
-        <li
-          v-for="(opt, i) in options"
-          :id="`${uid}-opt-${i}`"
-          :key="String(opt.value) + ':' + i"
-          role="option"
-          :class="[
-            'ui-select-item',
-            {
-              selected: Object.is(opt.value, modelValue),
-              highlighted: i === highlightedIndex,
-              disabled: opt.disabled,
-            },
-          ]"
-          :aria-selected="Object.is(opt.value, modelValue)"
-          :aria-disabled="opt.disabled || undefined"
-          @mouseenter="!opt.disabled && (highlightedIndex = i)"
-          @click="pick(i)"
+    <!-- listbox は祖先の overflow:hidden に影響されないよう body 直下へ Teleport。
+         位置は updateListboxPosition() が computed する fixed 座標で制御する。 -->
+    <Teleport to="body">
+      <Transition :name="placement === 'up' ? 'ui-select-fade-up' : 'ui-select-fade'">
+        <ul
+          v-if="open"
+          :id="listboxId"
+          ref="listboxRef"
+          :class="['ui-select-listbox', placement === 'up' ? 'up' : 'down']"
+          :style="listboxStyle"
+          role="listbox"
+          :aria-labelledby="uid"
+          tabindex="-1"
         >
-          <span class="ui-select-item-label">{{ opt.label }}</span>
-          <UiIcon
-            v-if="Object.is(opt.value, modelValue)"
-            name="Check"
-            :size="12"
-            class="ui-select-item-check"
-          />
-        </li>
-      </ul>
-    </Transition>
+          <li
+            v-for="(opt, i) in options"
+            :id="`${uid}-opt-${i}`"
+            :key="String(opt.value) + ':' + i"
+            role="option"
+            :class="[
+              'ui-select-item',
+              {
+                selected: Object.is(opt.value, modelValue),
+                highlighted: i === highlightedIndex,
+                disabled: opt.disabled,
+              },
+            ]"
+            :aria-selected="Object.is(opt.value, modelValue)"
+            :aria-disabled="opt.disabled || undefined"
+            @mouseenter="!opt.disabled && (highlightedIndex = i)"
+            @click="pick(i)"
+          >
+            <span class="ui-select-item-label">{{ opt.label }}</span>
+            <UiIcon
+              v-if="Object.is(opt.value, modelValue)"
+              name="Check"
+              :size="12"
+              class="ui-select-item-check"
+            />
+          </li>
+        </ul>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -371,12 +436,12 @@ onBeforeUnmount(() => {
   color: var(--accent);
 }
 
-/* listbox は trigger に対して上 or 下に展開。`up` クラス時は bottom 基準で上向き。
+/* listbox は <Teleport to="body"> + position: fixed (inline style) で配置するため、
+ * top/left/right/bottom/width/max-height はコンポーネント側の updateListboxPosition()
+ * が computed する。ここでは表示のみ担当。
+ * `up` / `down` クラスは Transition 切替と debugging 用の placement 識別子。
  * `--bg-glass-hi` のトークンを採用 (元 select の白背景を解消) */
 .ui-select-listbox {
-  position: absolute;
-  left: 0;
-  right: 0;
   margin: 0;
   padding: 4px;
   list-style: none;
@@ -386,18 +451,9 @@ onBeforeUnmount(() => {
   box-shadow:
     0 12px 32px -12px rgba(0, 0, 0, 0.55),
     0 0 0 1px rgba(0, 0, 0, 0.25);
-  max-height: 280px;
   overflow-y: auto;
   z-index: 80;
   /* glassmorphism の代わりにフラットで読みやすさ優先 */
-}
-.ui-select-listbox.down {
-  top: calc(100% + 4px);
-  bottom: auto;
-}
-.ui-select-listbox.up {
-  top: auto;
-  bottom: calc(100% + 4px);
 }
 html.light .ui-select-listbox {
   background: var(--bg-1);

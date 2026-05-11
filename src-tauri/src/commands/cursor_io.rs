@@ -179,6 +179,7 @@ pub struct AniInspection {
     pub height: u32,
     pub hotspot_x: u32,
     pub hotspot_y: u32,
+    pub is_legacy_raw_dib: bool,
 }
 
 /// `.ani` ファイルを読み込み、フレームごとの PNG とアニメーション情報を返す。
@@ -240,6 +241,7 @@ pub fn inspect_ani_file(path: String) -> Result<AniInspection, AppError> {
         height,
         hotspot_x,
         hotspot_y,
+        is_legacy_raw_dib: parsed.is_legacy_raw_dib,
     })
 }
 

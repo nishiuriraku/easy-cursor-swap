@@ -367,6 +367,7 @@ export default {
     conflictOverwrite: 'Will overwrite the existing image',
     conflictCollision: 'Conflicts with another pending file',
     applyImmediately: 'Apply immediately',
+    legacyAniChip: 'Legacy',
   },
   // Creator start screen + property panel labels
   creatorStart: {

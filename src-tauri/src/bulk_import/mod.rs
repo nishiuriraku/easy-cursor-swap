@@ -46,6 +46,7 @@ pub enum AssetKind {
     Svg,
     Cur,
     Ico,
+    Ani,
 }
 
 #[derive(Debug, Serialize)]
@@ -60,6 +61,16 @@ pub struct ResolvedAsset {
     pub hotspot_x: u32,
     pub hotspot_y: u32,
     pub available_sizes: Vec<u32>,
+    pub ani: Option<AniAssetData>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct AniAssetData {
+    pub frame_pngs: Vec<Vec<u8>>,
+    pub sequence: Vec<u32>,
+    pub per_step_durations_ms: Vec<u32>,
+    pub is_legacy_raw_dib: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -136,6 +147,14 @@ pub struct ParsedRole {
     pub hotspot_x: u32,
     pub hotspot_y: u32,
     pub sized_png_bytes: HashMap<u32, Vec<u8>>,
+    /// `.ani` ロールのフレームデータ。`.cur` / `.ico` の場合は `None`。
+    /// フロントエンドはこれがあれば「動くサムネ」を出し、`aniFrames` として
+    /// RoleAsset に格納する (= ResolvedAsset の `ani` と同じ役割)。
+    pub ani: Option<AniAssetData>,
+    /// `.ani` ロールの元バイトを展開した絶対パス。export 時に `rewrite_ani_with_hotspot`
+    /// のソースとして使う。`.cur` / `.ico` ロールでは `None`。
+    /// `.cursorpack` の隣 `<cursorpack>.extracted/<role-filename>` に書き出される。
+    pub ani_source_path: Option<String>,
 }
 
 #[derive(Debug, Serialize)]

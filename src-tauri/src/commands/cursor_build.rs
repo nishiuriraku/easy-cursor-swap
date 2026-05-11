@@ -219,6 +219,11 @@ pub struct RoleBuildEntry {
     /// None / 空なら従来どおり png_bytes をリサンプル。
     #[serde(default)]
     pub sized_png_bytes: Option<std::collections::HashMap<u32, Vec<u8>>>,
+    /// `.ani` 由来ロールのソースファイル絶対パス。
+    /// セットされている場合、PNG → CUR ビルダではなく rewrite_ani_with_hotspot を経由して
+    /// cursors/<role>.ani として書き出す。
+    #[serde(default)]
+    pub ani_source_path: Option<String>,
 }
 
 /// ストリーム式 .cursorpack ビルドリクエスト
@@ -315,6 +320,43 @@ pub fn export_cursorpack_streamed(
                 },
             );
             return Err(AppError::Other("ビルドがキャンセルされました".to_string()));
+        }
+
+        // .ani 由来ロール: rewrite_ani_with_hotspot 経由で .ani バイナリを生成
+        if let Some(src) = &entry.ani_source_path {
+            let bytes = std::fs::read(src).map_err(|e| {
+                AppError::ImageProcessing(format!(
+                    "ani 読込失敗 ({}): {}",
+                    crate::logging::redact_path(std::path::Path::new(src)),
+                    e
+                ))
+            })?;
+            let rewritten = crate::cursor::rewrite_ani_with_hotspot(
+                &bytes,
+                (entry.hotspot_x as u16, entry.hotspot_y as u16),
+            )?;
+            cursor_bytes.insert(entry.role.clone(), rewritten);
+            cursors_meta.insert(
+                entry.role.clone(),
+                CursorDefinition {
+                    file: format!("cursors/{}.ani", entry.role),
+                    hotspot_x: entry.hotspot_x,
+                    hotspot_y: entry.hotspot_y,
+                    resize_method: entry.resample.clone(),
+                    size_overrides: None,
+                },
+            );
+            emit_progress(
+                &app,
+                BuildProgress {
+                    build_id: req.build_id.clone(),
+                    stage: "role".to_string(),
+                    current: (idx + 1) as u32,
+                    total: total_steps,
+                    message: Some(entry.role.clone()),
+                },
+            );
+            continue;
         }
 
         let resample = match entry.resample.as_str() {

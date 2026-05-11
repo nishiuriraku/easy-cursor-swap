@@ -366,6 +366,7 @@ export default {
     conflictOverwrite: '既存の画像を上書きします',
     conflictCollision: '他ファイルと衝突しています',
     applyImmediately: 'すぐシステムに反映',
+    legacyAniChip: '旧形式',
   },
   // クリエイター開始画面 + プロパティパネルラベル
   creatorStart: {

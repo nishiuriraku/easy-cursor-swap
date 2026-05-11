@@ -12,6 +12,7 @@ import type { RoleAsset } from '~/composables/useCreatorAssets'
 import { initialHotspotFor } from '~/composables/useHotspotDefaults'
 import { useI18n } from '~/composables/useI18n'
 import BulkImportRoleRow from './BulkImportRoleRow.vue'
+import AniThumb from './AniThumb.vue'
 
 const { t } = useI18n()
 
@@ -47,12 +48,24 @@ interface PendingMatch {
   conflict: 'none' | 'overwrite-existing' | 'collision-with-other-pending'
   decision: 'apply' | 'skip'
   previewUrl: string
+  /**
+   * `.ani` 用の Uint8Array 化済みフレーム列。Vue 3 のテンプレートは Uint8Array を
+   * グローバル名として認識しないため、`new Uint8Array(...)` をテンプレート式で書くと
+   * 「Property "Uint8Array" was accessed during render but is not defined on instance」
+   * の warn を出す。スクリプト側で 1 度だけ変換しておいて子コンポーネントへ渡す。
+   */
+  aniFramesU8: readonly Uint8Array[] | null
 }
 
 interface UnmatchedFile {
   asset: ResolvedAsset
   manuallyAssignedRole: string | null
   previewUrl: string
+  aniFramesU8: readonly Uint8Array[] | null
+}
+
+function toAniFramesU8(asset: ResolvedAsset): readonly Uint8Array[] | null {
+  return asset.ani ? asset.ani.framePngs.map((b) => new Uint8Array(b)) : null
 }
 
 const protectExisting = ref(true)
@@ -95,16 +108,22 @@ watch(
     if (props.cursorpack) {
       // .cursorpack 経路: ロール ID は既に確定済み。全ロールを matches に詰める。
       for (const [role, parsed] of Object.entries(props.cursorpack.roles)) {
+        const isAni = parsed.ani !== null
         const fakeAsset: ResolvedAsset = {
-          sourceFile: `${role}.cur`,
-          sourcePath: '',
-          kind: 'cur',
+          sourceFile: isAni ? `${role}.ani` : `${role}.cur`,
+          // `.ani` の場合は展開先絶対パスを sourcePath に入れる
+          // (export 時に Rust が rewrite_ani_with_hotspot のソースとして使う)
+          sourcePath: parsed.aniSourcePath ?? '',
+          kind: isAni ? 'ani' : 'cur',
           pngBytes: parsed.primaryPngBytes,
           svgText: null,
           nativeSize: parsed.primarySize,
           hotspotX: parsed.hotspotX,
           hotspotY: parsed.hotspotY,
-          availableSizes: Object.keys(parsed.sizedPngBytes).map(Number),
+          availableSizes: isAni
+            ? [parsed.primarySize]
+            : Object.keys(parsed.sizedPngBytes).map(Number),
+          ani: parsed.ani,
         }
         const conflict = props.existingRoles.has(role) ? 'overwrite-existing' : 'none'
         matches.value.push({
@@ -114,6 +133,7 @@ watch(
           conflict,
           decision: conflict === 'overwrite-existing' && protectExisting.value ? 'skip' : 'apply',
           previewUrl: makePreview(fakeAsset),
+          aniFramesU8: toAniFramesU8(fakeAsset),
         })
       }
       return
@@ -128,7 +148,12 @@ watch(
       if (m) {
         candidates.push({ sourceFile: a.sourceFile, nativeSize: a.nativeSize, match: m, asset: a })
       } else {
-        unmatched.value.push({ asset: a, manuallyAssignedRole: null, previewUrl: makePreview(a) })
+        unmatched.value.push({
+          asset: a,
+          manuallyAssignedRole: null,
+          previewUrl: makePreview(a),
+          aniFramesU8: toAniFramesU8(a),
+        })
       }
     }
     const { winners, demoted } = resolveCollisions(candidates)
@@ -137,6 +162,7 @@ watch(
         asset: c.asset,
         manuallyAssignedRole: null,
         previewUrl: makePreview(c.asset),
+        aniFramesU8: toAniFramesU8(c.asset),
       })
     }
     for (const w of winners as Array<(typeof candidates)[0]>) {
@@ -148,6 +174,7 @@ watch(
         conflict,
         decision: conflict === 'overwrite-existing' && protectExisting.value ? 'skip' : 'apply',
         previewUrl: makePreview(w.asset),
+        aniFramesU8: toAniFramesU8(w.asset),
       })
     }
   },
@@ -193,19 +220,30 @@ function toRoleAsset(
   // CUR / ICO は header に hotspot があるが、未指定の場合 (0,0) で来る — そのときも
   // 中央既定が望ましい。`(4, 4)` で判定すると Rust の sentinel (= 0) と噛み合わず
   // 中央化が一切発火しないバグになる。
+  // .ani は自前の埋め込みホットスポットを使う (中央既定を適用しない)。
+  const isAni = asset.kind === 'ani' && asset.ani !== null
   const noEmbeddedHotspot =
     asset.kind === 'png' || asset.kind === 'svg' || (asset.hotspotX === 0 && asset.hotspotY === 0)
   const finalHotspot =
-    isNewRole && noEmbeddedHotspot
+    isNewRole && noEmbeddedHotspot && !isAni
       ? initialHotspotFor(roleId, asset.nativeSize)
       : { x: asset.hotspotX, y: asset.hotspotY }
-  return {
+  const base: RoleAsset = {
     primary: new Uint8Array(asset.pngBytes),
     primarySize: asset.nativeSize,
     hotspot: finalHotspot,
     sized: undefined,
     source,
   }
+  if (isAni && asset.ani) {
+    base.aniSourcePath = asset.sourcePath
+    base.aniFrames = {
+      framePngs: asset.ani.framePngs.map((b) => new Uint8Array(b)),
+      sequence: asset.ani.sequence,
+      perStepDurationsMs: asset.ani.perStepDurationsMs,
+    }
+  }
+  return base
 }
 
 function apply() {
@@ -219,16 +257,23 @@ function apply() {
       for (const [k, v] of Object.entries(parsed.sizedPngBytes)) {
         sized.set(Number(k), new Uint8Array(v))
       }
-      roleAssets.push({
-        roleId: m.role,
-        asset: {
-          primary: new Uint8Array(parsed.primaryPngBytes),
-          primarySize: parsed.primarySize,
-          hotspot: { x: parsed.hotspotX, y: parsed.hotspotY },
-          sized,
-          source: 'cursorpack',
-        },
-      })
+      const asset: RoleAsset = {
+        primary: new Uint8Array(parsed.primaryPngBytes),
+        primarySize: parsed.primarySize,
+        hotspot: { x: parsed.hotspotX, y: parsed.hotspotY },
+        sized: sized.size > 0 ? sized : undefined,
+        source: 'cursorpack',
+      }
+      // `.ani` ロールはアニメーション情報を保持して export 時に動的カーソルとして再構築する
+      if (parsed.ani && parsed.aniSourcePath) {
+        asset.aniSourcePath = parsed.aniSourcePath
+        asset.aniFrames = {
+          framePngs: parsed.ani.framePngs.map((b) => new Uint8Array(b)),
+          sequence: parsed.ani.sequence,
+          perStepDurationsMs: parsed.ani.perStepDurationsMs,
+        }
+      }
+      roleAssets.push({ roleId: m.role, asset })
     }
   } else {
     const sourceTag: RoleAsset['source'] =
@@ -293,6 +338,8 @@ onUnmounted(resetState)
           :confidence="row.match?.confidence ?? null"
           :conflict="row.match?.conflict ?? 'none'"
           :decision="row.match?.decision ?? 'skip'"
+          :ani-data="row.match?.asset.ani ?? null"
+          :ani-frames-u8="row.match?.aniFramesU8 ?? null"
           @toggle="(v) => row.match && (row.match.decision = v)"
         />
 
@@ -300,7 +347,15 @@ onUnmounted(resetState)
           {{ t('bulkImport.unmatchedHeader', { count: unmatched.length }) }}
         </h4>
         <div v-for="u in unmatched" :key="u.asset.sourcePath" class="bi-unmatched">
-          <img :src="u.previewUrl" :alt="u.asset.sourceFile" />
+          <AniThumb
+            v-if="u.asset.ani && u.aniFramesU8"
+            :frame-pngs="u.aniFramesU8"
+            :sequence="u.asset.ani.sequence"
+            :durations="u.asset.ani.perStepDurationsMs"
+            :width="32"
+            :height="32"
+          />
+          <img v-else :src="u.previewUrl" :alt="u.asset.sourceFile" />
           <span>{{ u.asset.sourceFile }} ({{ u.asset.nativeSize }}px)</span>
           <UiSelect
             v-model="u.manuallyAssignedRole"

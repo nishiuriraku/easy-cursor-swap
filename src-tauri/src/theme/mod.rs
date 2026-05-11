@@ -203,7 +203,6 @@ impl ThemeManager {
         roles_filter: Option<&[String]>,
     ) -> AppResult<HashMap<String, Vec<u8>>> {
         use crate::config::ConfigManager;
-        use crate::cursor::{parse_ico_cur, pick_largest_as_png};
 
         let cursors_dir = ConfigManager::cursors_dir()?;
         let theme_dir = cursors_dir.join(id.to_string());
@@ -228,31 +227,17 @@ impl ThemeManager {
             if !abs.is_file() {
                 continue;
             }
-            let bytes = match std::fs::read(&abs) {
-                Ok(b) => b,
+            // 拡張子別の分岐 (.png / .ani / .cur / .ico) は render_cursor_file_as_png に集約。
+            // ここで個別に parse_ico_cur を呼んでしまうと .ani が "RIFF" 先頭バイトを
+            // ICO の reserved (18770 = 0x4952) として解釈されて落ちる。
+            match Self::render_cursor_file_as_png(&abs) {
+                Ok(png) => {
+                    out.insert(role.clone(), png);
+                }
                 Err(e) => {
-                    tracing::warn!("プレビュー読込失敗 ({}): {}", role, e);
-                    continue;
+                    tracing::warn!("{} の PNG 化に失敗: {}", role, e);
                 }
-            };
-            // 拡張子で判別: .png ならそのまま、それ以外は cur/ico として解釈
-            let ext = abs
-                .extension()
-                .and_then(|e| e.to_str())
-                .unwrap_or("")
-                .to_ascii_lowercase();
-            let png_bytes = if ext == "png" {
-                bytes
-            } else {
-                match parse_ico_cur(&bytes).and_then(|p| pick_largest_as_png(&p)) {
-                    Ok((_, png)) => png,
-                    Err(e) => {
-                        tracing::warn!("{} の PNG 化に失敗: {}", role, e);
-                        continue;
-                    }
-                }
-            };
-            out.insert(role.clone(), png_bytes);
+            }
         }
         Ok(out)
     }
@@ -267,7 +252,7 @@ impl ThemeManager {
         roles_filter: Option<&[String]>,
     ) -> AppResult<HashMap<String, RolePreview>> {
         use crate::config::ConfigManager;
-        use crate::cursor::{parse_ico_cur, pick_largest_as_png};
+        use crate::cursor::{parse_ani, parse_ico_cur, pick_largest_as_png};
 
         let cursors_dir = ConfigManager::cursors_dir()?;
         let theme_dir = cursors_dir.join(id.to_string());
@@ -323,6 +308,44 @@ impl ThemeManager {
                     },
                     Err(e) => {
                         tracing::warn!("{} の PNG デコード失敗: {}", role, e);
+                        continue;
+                    }
+                }
+            } else if ext == "ani" {
+                // .ani: 先頭フレームを PNG 化。ホットスポットは theme.json 値ではなく
+                // フレーム内蔵の値を採用 (フレーム寸法と同じ座標系で取り回せるため)。
+                match parse_ani(&bytes).and_then(|parsed| {
+                    let frame = parsed.frames.into_iter().next().ok_or_else(|| {
+                        crate::errors::AppError::ImageProcessing(
+                            ".ani にフレームがありません".to_string(),
+                        )
+                    })?;
+                    let mut png = Vec::new();
+                    let encoder = image::codecs::png::PngEncoder::new(&mut png);
+                    image::ImageEncoder::write_image(
+                        encoder,
+                        frame.image.as_raw(),
+                        frame.image.width(),
+                        frame.image.height(),
+                        image::ExtendedColorType::Rgba8,
+                    )
+                    .map_err(|e| {
+                        crate::errors::AppError::ImageProcessing(format!(
+                            "PNG エンコード失敗: {}",
+                            e
+                        ))
+                    })?;
+                    Ok(RolePreview {
+                        png,
+                        width: frame.image.width(),
+                        height: frame.image.height(),
+                        hotspot_x: frame.hotspot_x,
+                        hotspot_y: frame.hotspot_y,
+                    })
+                }) {
+                    Ok(p) => p,
+                    Err(e) => {
+                        tracing::warn!("{} の .ani PNG 化に失敗: {}", role, e);
                         continue;
                     }
                 }

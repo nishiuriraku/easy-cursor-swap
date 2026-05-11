@@ -504,4 +504,140 @@ mod tests {
         let out2 = rewrite_ani_with_hotspot(&out1, (2, 2)).unwrap();
         assert_eq!(out1, out2);
     }
+
+    /// 実 `.ani` ファイルでのバイトラウンドトリップ検証 (合成テストの実ファイル版)。
+    ///
+    /// `ECS_SAMPLE_CURSOR_DIR` 環境変数で示されたディレクトリを再帰探索し、見つかった
+    /// すべての `.ani` について以下を検証する:
+    ///   1. parse_ani が成功する (ファイルが壊れていない)
+    ///   2. rewrite_ani_with_hotspot を 2 回適用した結果 (out2) と 1 回適用した結果 (out1)
+    ///      の SHA-256 が一致する (= 冪等性)
+    ///   3. AF_ICON な `.ani` の場合、frame[0] のホットスポットを取り直して
+    ///      rewrite した結果は元のバイトと一致する (= no-op であるべき)
+    ///
+    /// CI では走らせない (#[ignore])。ローカル実行:
+    /// ```text
+    /// $env:ECS_SAMPLE_CURSOR_DIR = "C:\path\to\sample-cursor"
+    /// cargo test --manifest-path src-tauri/Cargo.toml --lib \
+    ///     cursor::ani_write::tests::real_ani_files_roundtrip -- --ignored --nocapture
+    /// ```
+    #[test]
+    #[ignore]
+    fn real_ani_files_roundtrip() {
+        use sha2::{Digest, Sha256};
+        use std::path::{Path, PathBuf};
+
+        fn collect_ani(dir: &Path, out: &mut Vec<PathBuf>) {
+            let Ok(rd) = std::fs::read_dir(dir) else {
+                return;
+            };
+            for entry in rd.flatten() {
+                let p = entry.path();
+                if p.is_dir() {
+                    collect_ani(&p, out);
+                } else if p.extension().is_some_and(|e| e.eq_ignore_ascii_case("ani")) {
+                    out.push(p);
+                }
+            }
+        }
+
+        let dir = match std::env::var("ECS_SAMPLE_CURSOR_DIR") {
+            Ok(v) => PathBuf::from(v),
+            Err(_) => {
+                eprintln!(
+                    "ECS_SAMPLE_CURSOR_DIR が未設定のため real_ani_files_roundtrip をスキップ"
+                );
+                return;
+            }
+        };
+        assert!(dir.is_dir(), "sample dir does not exist: {}", dir.display());
+
+        let mut files = Vec::new();
+        collect_ani(&dir, &mut files);
+        assert!(
+            !files.is_empty(),
+            "No .ani files found under {}",
+            dir.display()
+        );
+
+        let mut tested = 0usize;
+        let mut legacy_normalized = 0usize;
+        let mut af_icon_noops = 0usize;
+        let mut parse_skipped = 0usize;
+
+        for path in &files {
+            let bytes = match std::fs::read(path) {
+                Ok(b) => b,
+                Err(e) => panic!("read failed: {}: {}", path.display(), e),
+            };
+            let parsed = match parse_ani(&bytes) {
+                Ok(p) => p,
+                Err(e) => {
+                    // 一部の `.ani` は非標準 (壊れた RIFF など) で実用品ではないことがあるため
+                    // 検証スキップを許容する。CI でないので診断のみ出す。
+                    eprintln!("[skip] parse_ani failed: {}: {:?}", path.display(), e);
+                    parse_skipped += 1;
+                    continue;
+                }
+            };
+            assert!(
+                !parsed.frames.is_empty(),
+                "frames empty: {}",
+                path.display()
+            );
+
+            let hotspot = (
+                parsed.frames[0].hotspot_x as u16,
+                parsed.frames[0].hotspot_y as u16,
+            );
+
+            let out1 = rewrite_ani_with_hotspot(&bytes, hotspot)
+                .unwrap_or_else(|e| panic!("rewrite(1) failed: {}: {:?}", path.display(), e));
+            let out2 = rewrite_ani_with_hotspot(&out1, hotspot)
+                .unwrap_or_else(|e| panic!("rewrite(2) failed: {}: {:?}", path.display(), e));
+
+            let h1 = hex::encode(Sha256::digest(&out1));
+            let h2 = hex::encode(Sha256::digest(&out2));
+            assert_eq!(
+                h1,
+                h2,
+                "idempotency violated: {}\n  out1 sha256={}\n  out2 sha256={}",
+                path.display(),
+                h1,
+                h2
+            );
+
+            if parsed.is_legacy_raw_dib {
+                // 旧形式 raw DIB は AF_ICON 化されるためバイトは変わる。サイズは増える方向。
+                legacy_normalized += 1;
+                assert!(
+                    out1.len() >= bytes.len(),
+                    "legacy normalize should not shrink: {} ({} -> {})",
+                    path.display(),
+                    bytes.len(),
+                    out1.len()
+                );
+            } else {
+                // AF_ICON な .ani は frame[0] のホットスポットを使って rewrite したので
+                // 完全に no-op (= 元バイトと一致) でなければならない。ただし他フレームが
+                // 別のホットスポットを持っていた場合 (理論上は許されるが実運用では稀) は
+                // 一致しないので、その場合は警告のみ。
+                let h_orig = hex::encode(Sha256::digest(&bytes));
+                if h_orig == h1 {
+                    af_icon_noops += 1;
+                } else {
+                    eprintln!(
+                        "[note] AF_ICON file changed after rewrite with frame[0] hotspot \
+                         (likely per-frame hotspot variance): {}",
+                        path.display()
+                    );
+                }
+            }
+            tested += 1;
+        }
+
+        eprintln!("real_ani_files_roundtrip: examined={}, parse_skipped={}, idempotent={}, legacy_normalized={}, af_icon_noops={}",
+            files.len(), parse_skipped, tested, legacy_normalized, af_icon_noops);
+        assert!(tested > 0, "no `.ani` files could be tested");
+    }
 }

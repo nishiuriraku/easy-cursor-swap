@@ -23,6 +23,7 @@ import {
   type ResolvedAsset,
   type ParsedCursorpack,
 } from '~/composables/useBulkImport'
+import AniThumb from '~/components/creator/AniThumb.vue'
 import BulkImportButton from '~/components/creator/BulkImportButton.vue'
 import BulkImportPreviewModal, {
   type ApplyPayload,
@@ -229,6 +230,20 @@ const hotspotReferenceSize = computed(
  */
 const IMAGE_DISPLAY_PCT = 90
 
+/** アクティブロールに .ani フレームデータが存在する場合にそれを返す。 */
+const activeAniFrames = computed(() => {
+  const id = activeRoleId.value
+  if (!id) return null
+  return assigned.value[id]?.aniFrames ?? null
+})
+
+/** アクティブロールの .ani 元ファイルパス (存在する場合のみ)。 */
+const activeAniSourcePath = computed(() => {
+  const id = activeRoleId.value
+  if (!id) return null
+  return assigned.value[id]?.aniSourcePath ?? null
+})
+
 /** ロールが切り替わったら、そのロールの保存済みホットスポットを反映する。 */
 watch(activeRoleId, (id) => {
   const a = assigned.value[id]
@@ -370,6 +385,20 @@ function centerHotspot() {
   if (a) {
     setAsset(activeRoleId.value, { ...a, hotspot: { x: center, y: center } })
   }
+}
+
+/**
+ * AniThumb editable モードから emit された hotspot-pick / hotspot-drag を受けて
+ * hotspotX/Y ref と setAsset に直結するハンドラ。
+ */
+function onAniHotspotPick(p: { x: number; y: number }) {
+  hotspotX.value = p.x
+  hotspotY.value = p.y
+  const id = activeRoleId.value
+  if (!id) return
+  const a = assigned.value[id]
+  if (!a) return
+  setAsset(id, { ...a, hotspot: { x: p.x, y: p.y } })
 }
 
 function selectSize(s: number) {
@@ -702,7 +731,7 @@ async function rasterizeSvgToPng(svgString: string, size: number): Promise<Uint8
 // --- 一括インポート ハンドラ ---
 
 /**
- * 統合エントリ。png/svg/cur/ico/.cursorpack をまとめて選べるダイアログを開き、
+ * 統合エントリ。png/svg/cur/ico/ani/.cursorpack をまとめて選べるダイアログを開き、
  * 拡張子で内部分岐:
  *   - 単独 `.cursorpack`     → cursorpack 解析経路 (parseCursorpack)
  *   - 通常ファイル (複数可)   → bulk_resolve_assets 経路
@@ -717,7 +746,7 @@ async function pickBulkAuto() {
     filters: [
       {
         name: 'Cursor assets / pack',
-        extensions: ['png', 'svg', 'cur', 'ico', 'cursorpack'],
+        extensions: ['png', 'svg', 'cur', 'ico', 'ani', 'cursorpack'],
       },
     ],
   })
@@ -742,6 +771,8 @@ async function pickBulkFolder() {
  *    bulk preview を経由せず **現在編集中のロールに直接代入** する fast-path に流す。
  *    これは旧「画像 / カーソルを取込」ボタンの挙動を維持するためで、エディタ内で
  *    特定ロールを選んで素早く差し替えるワークフローを壊さない
+ *  - 単一 `.ani` は static fast-path には乗せず、bulk preview 経路に通す
+ *    (アニメ再生 + ホットスポット調整 UI が必要なため)
  *  - `.cursorpack` は他のファイルと一緒に取り込む意味的整合性が無い (パッケージ単位の取込なので)
  *    ため、混在時は通常ファイルのみ取り込み、cursorpack 部分は無視する
  *  - 複数 `.cursorpack` の同時取込もサポートしない (ロール衝突解決が複雑になるため)
@@ -1199,8 +1230,20 @@ async function onFileChange(e: Event) {
               >
                 <div class="crosshair-h" />
                 <div class="crosshair-v" />
+                <AniThumb
+                  v-if="activeAniFrames"
+                  :frame-pngs="activeAniFrames.framePngs"
+                  :sequence="activeAniFrames.sequence"
+                  :durations="activeAniFrames.perStepDurationsMs"
+                  :width="hotspotReferenceSize"
+                  :height="hotspotReferenceSize"
+                  :hotspot="{ x: hotspotX, y: hotspotY }"
+                  editable
+                  @hotspot-pick="onAniHotspotPick"
+                  @hotspot-drag="onAniHotspotPick"
+                />
                 <img
-                  v-if="activePreviewUrl"
+                  v-else-if="activePreviewUrl"
                   :src="activePreviewUrl"
                   :alt="activeRole.jp"
                   draggable="false"
