@@ -314,64 +314,7 @@ button {
 /* =============================================
  * テーマカード
  * ============================================= */
-.card {
-  position: relative;
-  background: var(--bg-glass);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  transition:
-    transform 0.18s ease,
-    border-color 0.18s,
-    box-shadow 0.18s;
-  display: flex;
-  flex-direction: column;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-.card:hover {
-  transform: translateY(-2px);
-  border-color: var(--line-hi);
-  box-shadow: var(--shadow-2);
-}
-.card.interactive {
-  cursor: pointer;
-}
-.card.interactive:hover {
-  border-color: var(--accent-line);
-  box-shadow:
-    0 0 0 1px var(--accent-line),
-    0 18px 36px -18px rgba(124, 242, 212, 0.28);
-}
-.card.interactive:focus-visible {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow:
-    0 0 0 2px var(--accent),
-    0 18px 36px -18px rgba(124, 242, 212, 0.35);
-}
-.card.active {
-  border-color: var(--accent-line);
-  box-shadow:
-    0 0 0 1px var(--accent-line),
-    0 12px 32px -16px rgba(124, 242, 212, 0.4);
-}
-.card.active::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(600px 200px at 50% 0%, rgba(124, 242, 212, 0.06), transparent 70%);
-  pointer-events: none;
-}
-.card-preview {
-  padding: 14px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent),
-    radial-gradient(120% 100% at 0% 0%, rgba(124, 242, 212, 0.04), transparent 50%);
-  border-bottom: 1px solid var(--line);
-  position: relative;
-  min-height: 132px;
-}
+/* .card family は tailwind.css に移行 (Phase 10-C) */
 
 /* --- 17 ロールマトリクス --- */
 .cursors {
@@ -405,78 +348,8 @@ button {
   height: 14px;
 }
 
-.card-active-tag {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 8px 3px 7px;
-  font-family: var(--font-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--accent);
-  background: rgba(124, 242, 212, 0.12);
-  border: 1px solid var(--accent-line);
-  border-radius: 99px;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
-.card-active-tag .pulse {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 8px var(--accent);
-  animation: pulse 1.6s infinite;
-}
-
-/* Windows システムスキームに付ける識別バッジ。アクティブタグと位置がぶつからないよう左上に置く。 */
-.card-source-tag {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  padding: 2px 7px;
-  font-family: var(--font-mono);
-  font-size: 9px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--violet);
-  background: rgba(139, 125, 255, 0.12);
-  border: 1px solid rgba(139, 125, 255, 0.32);
-  border-radius: 4px;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  pointer-events: none;
-}
-
-.card-body {
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.card-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-}
-.card-name {
-  font-family: var(--font-display);
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--fg);
-  line-height: 1.25;
-}
-.card-author {
-  font-size: 11.5px;
-  color: var(--fg-dim);
-  margin-top: 2px;
-}
+/* .card-active-tag / .card-source-tag / .card-body / .card-row / .card-name /
+ * .card-author は tailwind.css に移行 (Phase 10-C) */
 .star {
   width: 26px;
   height: 26px;
@@ -1296,11 +1169,6 @@ html.light .input {
 html.light .search {
   background: rgba(15, 20, 35, 0.025);
 }
-html.light .card-preview {
-  background:
-    linear-gradient(180deg, rgba(15, 20, 35, 0.015), transparent),
-    radial-gradient(120% 100% at 0% 0%, rgba(15, 168, 133, 0.05), transparent 50%);
-}
 html.light .cell {
   background: rgba(15, 20, 35, 0.025);
 }
@@ -1318,10 +1186,6 @@ html.light html,
 html.light #__nuxt {
   background: var(--bg-0);
 }
-html.light .card-active-tag .pulse {
-  box-shadow: 0 0 8px rgba(15, 168, 133, 0.5);
-}
-
 /* === Theme Detail Drawer === */
 
 /* When a card hosts a drawer, span 2 columns and shed the card aspect */

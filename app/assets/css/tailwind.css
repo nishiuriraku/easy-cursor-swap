@@ -185,3 +185,87 @@
   background: var(--fg);
   border-color: var(--fg);
 }
+
+/* --- .card family (Phase 10-C) --- */
+.card {
+  @apply relative flex flex-col overflow-hidden rounded-lg border border-line bg-bg-glass backdrop-blur-xl;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s,
+    box-shadow 0.18s;
+}
+.card:hover {
+  @apply border-line-hi;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-2);
+}
+.card.interactive {
+  @apply cursor-pointer;
+}
+.card.interactive:hover {
+  @apply border-accent-line;
+  box-shadow:
+    0 0 0 1px var(--accent-line),
+    0 18px 36px -18px rgba(124, 242, 212, 0.28);
+}
+.card.interactive:focus-visible {
+  @apply border-accent outline-none;
+  box-shadow:
+    0 0 0 2px var(--accent),
+    0 18px 36px -18px rgba(124, 242, 212, 0.35);
+}
+.card.active {
+  @apply border-accent-line;
+  box-shadow:
+    0 0 0 1px var(--accent-line),
+    0 12px 32px -16px rgba(124, 242, 212, 0.4);
+}
+.card.active::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(600px 200px at 50% 0%, rgba(124, 242, 212, 0.06), transparent 70%);
+  pointer-events: none;
+}
+.card-preview {
+  @apply relative min-h-[132px] border-b border-line p-3.5;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent),
+    radial-gradient(120% 100% at 0% 0%, rgba(124, 242, 212, 0.04), transparent 50%);
+}
+:where(html.light) .card-preview {
+  background:
+    linear-gradient(180deg, rgba(15, 20, 35, 0.015), transparent),
+    radial-gradient(120% 100% at 0% 0%, rgba(15, 168, 133, 0.05), transparent 50%);
+}
+.card-active-tag {
+  @apply absolute right-2.5 top-2.5 inline-flex items-center gap-1.5 rounded-full border border-accent-line font-mono text-[9.5px] uppercase tracking-[0.12em] text-accent backdrop-blur-md;
+  padding: 3px 8px 3px 7px;
+  background: rgba(124, 242, 212, 0.12);
+}
+.card-active-tag .pulse {
+  @apply size-[5px] rounded-full bg-accent;
+  box-shadow: 0 0 8px var(--accent);
+  animation: pulse 1.6s infinite;
+}
+:where(html.light) .card-active-tag .pulse {
+  box-shadow: 0 0 8px rgba(15, 168, 133, 0.5);
+}
+.card-source-tag {
+  @apply pointer-events-none absolute left-2.5 top-2.5 rounded font-mono text-[9px] uppercase tracking-[0.16em] text-violet backdrop-blur-md;
+  padding: 2px 7px;
+  background: rgba(139, 125, 255, 0.12);
+  border: 1px solid rgba(139, 125, 255, 0.32);
+}
+.card-body {
+  @apply flex flex-col gap-2.5 p-3.5;
+}
+.card-row {
+  @apply flex items-start justify-between gap-2.5;
+}
+.card-name {
+  @apply font-display text-[15px] font-semibold leading-[1.25] tracking-[-0.01em] text-fg;
+}
+.card-author {
+  @apply mt-0.5 text-[11.5px] text-fg-dim;
+}
