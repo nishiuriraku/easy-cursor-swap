@@ -108,79 +108,44 @@ function cancel() {
 </template>
 
 <style scoped>
+@reference '~/assets/css/tailwind.css';
+
 .nt-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(10, 11, 15, 0.7);
-  backdrop-filter: blur(2px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
+  @apply fixed inset-0 z-[100] flex items-center justify-center bg-[rgba(10,11,15,0.7)] backdrop-blur-[2px];
 }
 .nt-modal {
+  @apply flex max-h-[90vh] w-[min(560px,96vw)] flex-col rounded-[12px] border border-line shadow-[0_30px_60px_rgba(0,0,0,0.45)];
   background: var(--bg-1, #14161c);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  width: min(560px, 96vw);
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.45);
 }
 .nt-head,
 .nt-foot {
-  padding: 14px 20px;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  @apply flex items-start justify-between px-5 py-3.5;
 }
 .nt-head {
-  border-bottom: 1px solid var(--line);
+  @apply border-b border-line;
 }
 .nt-foot {
-  border-top: 1px solid var(--line);
-  align-items: center;
-  justify-content: flex-end;
+  @apply items-center justify-end border-t border-line;
 }
 .nt-head h3 {
-  margin: 4px 0 0;
-  font-size: 16px;
-  font-weight: 600;
+  @apply mb-0 ml-0 mr-0 mt-1 text-[16px] font-semibold;
 }
 .nt-eyebrow {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.16em;
-  color: var(--accent);
+  @apply font-mono text-[10px] tracking-[0.16em] text-accent;
 }
 .nt-body {
-  padding: 14px 20px 18px;
-  overflow-y: auto;
+  @apply overflow-y-auto px-5 pb-[18px] pt-3.5;
 }
 .nt-desc {
-  font-size: 12.5px;
-  color: var(--fg-dim);
-  margin: 0 0 14px;
-  line-height: 1.55;
+  @apply m-0 mb-3.5 text-[12.5px] leading-[1.55] text-fg-dim;
 }
 
 .nt-choices {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  @apply flex flex-col gap-2.5;
 }
 .nt-choice {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
+  @apply flex cursor-pointer items-center gap-3.5 rounded-[10px] border border-line px-4 py-3.5 text-left text-fg;
   background: rgba(124, 242, 212, 0.02);
-  text-align: left;
-  cursor: pointer;
-  color: var(--fg);
   transition:
     border-color 160ms ease,
     background 160ms ease,
@@ -198,37 +163,20 @@ function cancel() {
   background: rgba(124, 242, 212, 0.06);
 }
 .nt-choice-icon {
-  flex: 0 0 auto;
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--accent);
+  @apply flex size-9 shrink-0 items-center justify-center rounded-[8px] text-accent;
   background: rgba(124, 242, 212, 0.08);
 }
 .nt-choice-body {
-  flex: 1;
-  min-width: 0;
+  @apply min-w-0 flex-1;
 }
 .nt-choice-title {
-  font-size: 13.5px;
-  font-weight: 600;
-  margin-bottom: 2px;
+  @apply mb-0.5 text-[13.5px] font-semibold;
 }
 .nt-choice-sub {
-  font-size: 11.5px;
-  color: var(--fg-mute);
-  line-height: 1.5;
+  @apply text-[11.5px] leading-[1.5] text-fg-mute;
 }
 
 .nt-tip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 14px 0 0;
-  font-size: 11px;
-  color: var(--fg-mute);
+  @apply m-0 mt-3.5 flex items-center gap-1.5 text-[11px] text-fg-mute;
 }
 </style>
