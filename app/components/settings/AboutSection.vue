@@ -51,68 +51,40 @@ const { t } = useI18n()
 </template>
 
 <style scoped>
+@reference '~/assets/css/tailwind.css';
+
+/* NOTE: dead-var pattern (Phase 6-F 参照)。scoped は layout/spacing 差分のみ。 */
+
 .section-head {
-  margin-bottom: 16px;
+  @apply mb-4;
 }
-
 .section-head h1 {
-  font-size: 18px;
-  font-weight: 700;
-  margin: 0 0 4px 0;
+  @apply mb-1 mt-0 text-[18px] font-bold;
 }
-
 .section-head p {
-  font-size: 13px;
-  color: var(--text-mute);
-  margin: 0;
+  @apply m-0 text-[13px];
 }
-
 .prop-section {
-  border: 1px solid var(--border);
   border-radius: 12px;
-  background: var(--bg-elev1);
 }
-
 .prop-head {
+  @apply flex items-baseline justify-between;
   padding: 10px 16px;
   font-size: 12px;
   font-weight: 600;
-  text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--text-mute);
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
 }
-
 .head-hint {
-  font-size: 11px;
-  font-weight: 400;
-  text-transform: none;
-  letter-spacing: 0;
-  color: var(--text-mute);
+  @apply text-[11px] font-normal normal-case tracking-normal;
 }
-
 .prop-body {
   padding: 4px 16px;
 }
-
 .btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
   padding: 0 14px;
   border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg-elev2);
-  color: var(--text);
   font-size: 13px;
-  cursor: pointer;
-  text-decoration: none;
 }
-
 .btn.ghost {
   background: transparent;
 }
