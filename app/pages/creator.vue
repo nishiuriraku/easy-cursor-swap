@@ -535,6 +535,8 @@ async function pickCursorFromPath(picked: string) {
 // --- パッケージエクスポート ---
 const exportBusy = ref(false)
 const exportMessage = ref<string | null>(null)
+/** Library 保存成功 + apply 失敗時の theme_id。retry ボタンの活性化と invokeTauri('apply_theme', { themeId }) 呼出に使う。 */
+const failedApplyThemeId = ref<string | null>(null)
 
 interface ExportResult {
   theme_id: string
@@ -624,12 +626,16 @@ async function executeSave(payload: SaveSubmitPayload) {
 
     if (result.apply_error) {
       exportMessage.value = t('saveModal.toastAppliedFailed').replace('{error}', result.apply_error)
+      failedApplyThemeId.value = result.theme_id
     } else if (result.applied) {
       exportMessage.value = t('saveModal.toastSavedAndApplied')
+      failedApplyThemeId.value = null
     } else if (payload.destination === 'file') {
       exportMessage.value = t('saveModal.toastSavedFile').replace('{path}', payload.filePath!)
+      failedApplyThemeId.value = null
     } else {
       exportMessage.value = t('saveModal.toastSavedLibrary')
+      failedApplyThemeId.value = null
     }
   } catch (err) {
     exportMessage.value = `エクスポート失敗: ${err instanceof Error ? err.message : String(err)}`
@@ -640,6 +646,23 @@ async function executeSave(payload: SaveSubmitPayload) {
     setTimeout(() => {
       if (!exportBusy.value) exportProgress.value = null
     }, 3000)
+  }
+}
+
+/**
+ * apply 失敗後の再試行 CTA。バナーから呼ばれる。
+ * 失敗 ID をクリアして apply_theme を再度叩く。
+ */
+async function retryApply() {
+  if (!failedApplyThemeId.value) return
+  const themeId = failedApplyThemeId.value
+  failedApplyThemeId.value = null
+  try {
+    await invokeTauri<void>('apply_theme', { themeId })
+    exportMessage.value = t('saveModal.toastSavedAndApplied')
+  } catch (err) {
+    exportMessage.value = `再試行失敗: ${err instanceof Error ? err.message : String(err)}`
+    failedApplyThemeId.value = themeId // 再再試行のため復元
   }
 }
 
@@ -1098,8 +1121,10 @@ async function onFileChange(e: Event) {
         :export-busy="exportBusy"
         :active-role-jp="activeRole.jp"
         :show-advanced-resolutions="showAdvancedResolutions"
+        :failed-apply-theme-id="failedApplyThemeId"
         @dismiss-export-message="exportMessage = null"
         @cancel-export="cancelExport"
+        @retry-apply="retryApply"
       />
 
       <!-- 2 カラムグリッド (assign タブのみ) -->

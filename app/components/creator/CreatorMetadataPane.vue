@@ -38,11 +38,13 @@ defineProps<{
   exportBusy: boolean
   activeRoleJp: string
   showAdvancedResolutions: boolean
+  failedApplyThemeId: string | null
 }>()
 
 defineEmits<{
   (e: 'dismiss-export-message'): void
   (e: 'cancel-export'): void
+  (e: 'retry-apply'): void
 }>()
 </script>
 
@@ -151,8 +153,16 @@ defineEmits<{
         />
         <span>{{ exportMessage }}</span>
         <button
+          v-if="failedApplyThemeId"
           class="btn ghost"
-          style="margin-left: auto; height: 24px"
+          style="height: 24px; margin-left: auto"
+          @click="$emit('retry-apply')"
+        >
+          {{ t('saveModal.retryApply') }}
+        </button>
+        <button
+          class="btn ghost"
+          :style="failedApplyThemeId ? 'height: 24px' : 'margin-left: auto; height: 24px'"
           @click="$emit('dismiss-export-message')"
         >
           <UiIcon name="X" :size="11" />
