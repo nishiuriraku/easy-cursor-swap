@@ -160,60 +160,15 @@ function navigate(id: string) {
 /* ─────────────────────────────────────────────────────────────
  * ナビゲーション
  *
- * design/styles.css の `.nav-section h6` を再現:
- * mono uppercase + tracking-[0.16em] + text-[9.5px] + text-fg-mute
- * (WORKSPACE / SYSTEM などのセクションラベル)
+ * `.nav-item` / `.nav-count` は tailwind.css の shared utility に移動
+ * (AppSidebar + Settings sidenav の両方で使うため)。
+ * ここでは sidebar 固有の h6 セクションヘッダーのレイアウトのみ。
  * ────────────────────────────────────────────────────────────*/
 nav h6 {
   @apply mx-2 mb-1.5 mt-0 font-mono text-[9.5px] font-medium uppercase tracking-[0.16em] text-fg-mute;
 }
 nav {
   @apply flex flex-col gap-0.5;
-}
-.nav-item {
-  @apply relative flex w-full cursor-pointer items-center gap-2.5 rounded-[7px] border border-transparent bg-transparent px-2.5 py-[7px] text-left text-[13px] font-medium text-fg-dim;
-  transition:
-    background 0.12s,
-    color 0.12s;
-}
-.nav-item > svg {
-  @apply size-3.5 shrink-0 opacity-85;
-}
-.nav-item.active > svg {
-  @apply opacity-100 text-accent;
-}
-.nav-item:hover {
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--fg);
-}
-.nav-item.active {
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--fg);
-  border-color: var(--line-hi);
-  box-shadow: var(--shadow-1);
-}
-:where(html.light) .nav-item.active {
-  background: rgba(15, 20, 35, 0.035);
-}
-.nav-item.active::before {
-  content: '';
-  position: absolute;
-  left: -12px;
-  top: 8px;
-  bottom: 8px;
-  width: 2px;
-  background: var(--accent);
-  border-radius: 2px;
-  box-shadow: 0 0 12px var(--accent);
-}
-:where(html.light) .nav-item.active::before {
-  box-shadow: 0 0 8px rgba(15, 168, 133, 0.5);
-}
-.nav-count {
-  @apply ml-auto rounded-[4px] border border-line bg-white/[0.04] px-1.5 py-px font-mono text-[10.5px] text-fg-mute;
-}
-.nav-item.active .nav-count {
-  @apply border-accent-line bg-accent-dim text-accent;
 }
 
 /* ─────────────────────────────────────────────────────────────
