@@ -113,74 +113,48 @@ defineEmits<{
 </template>
 
 <style scoped>
+@reference '~/assets/css/tailwind.css';
+
+/* NOTE: dead-var pattern (Phase 6-F 参照)。scoped は layout/spacing 差分のみ。 */
+
 .section-head {
-  margin-bottom: 16px;
+  @apply mb-4;
 }
 .section-head h1 {
-  font-size: 18px;
-  font-weight: 700;
-  margin: 0 0 4px 0;
+  @apply mb-1 mt-0 text-[18px] font-bold;
 }
 .section-head p {
-  font-size: 13px;
-  color: var(--text-mute);
-  margin: 0;
+  @apply m-0 text-[13px];
 }
 .prop-section {
-  border: 1px solid var(--border);
   border-radius: 12px;
-  background: var(--bg-elev1);
 }
 .prop-head {
   padding: 10px 16px;
   font-size: 12px;
   font-weight: 600;
-  text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--text-mute);
-  border-bottom: 1px solid var(--border);
 }
 .prop-body {
   padding: 4px 16px 12px;
 }
 .btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
   padding: 0 14px;
   border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg-elev2);
-  color: var(--text);
   font-size: 13px;
-  cursor: pointer;
-}
-.btn.primary {
-  background: var(--accent);
-  color: var(--bg-base);
-  border-color: var(--accent);
 }
 .btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  @apply cursor-not-allowed opacity-50;
 }
 .profile-msg {
-  margin-top: 8px;
-  padding: 8px 12px;
-  font-size: 12px;
-  border-radius: 8px;
+  @apply mt-2 rounded-[8px] border px-3 py-2 text-[12px];
   background: rgba(106, 213, 184, 0.06);
-  border: 1px solid rgba(106, 213, 184, 0.4);
-  color: var(--mint);
+  border-color: rgba(106, 213, 184, 0.4);
 }
 .spinner {
-  display: inline-block;
-  width: 13px;
-  height: 13px;
-  border: 2px solid var(--text-mute);
+  @apply inline-block size-[13px] rounded-full;
+  border: 2px solid var(--fg-mute);
   border-top-color: transparent;
-  border-radius: 50%;
   animation: spin 800ms linear infinite;
 }
 @keyframes spin {
