@@ -38,32 +38,27 @@ const warnUnsignedImport = defineModel<boolean>('warnUnsignedImport', { required
 </template>
 
 <style scoped>
+@reference '~/assets/css/tailwind.css';
+
+/* NOTE: dead-var pattern (Phase 6-F 参照)。scoped は layout/spacing 差分のみ。 */
+
 .section-head {
-  margin-bottom: 16px;
+  @apply mb-4;
 }
 .section-head h1 {
-  font-size: 18px;
-  font-weight: 700;
-  margin: 0 0 4px 0;
+  @apply mb-1 mt-0 text-[18px] font-bold;
 }
 .section-head p {
-  font-size: 13px;
-  color: var(--text-mute);
-  margin: 0;
+  @apply m-0 text-[13px];
 }
 .prop-section {
-  border: 1px solid var(--border);
   border-radius: 12px;
-  background: var(--bg-elev1);
 }
 .prop-head {
   padding: 10px 16px;
   font-size: 12px;
   font-weight: 600;
-  text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--text-mute);
-  border-bottom: 1px solid var(--border);
 }
 .prop-body {
   padding: 4px 16px;
