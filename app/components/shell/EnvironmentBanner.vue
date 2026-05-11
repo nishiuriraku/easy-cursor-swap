@@ -63,42 +63,27 @@ function close() {
 </template>
 
 <style scoped>
+@reference '~/assets/css/tailwind.css';
+
 .env-banner {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
+  @apply z-[8] flex shrink-0 items-center gap-3 border-b px-4 py-2.5 text-[12.5px] text-amber;
   background: rgba(245, 194, 107, 0.1);
-  border-bottom: 1px solid rgba(245, 194, 107, 0.35);
-  color: var(--amber);
-  font-size: 12.5px;
-  flex-shrink: 0;
-  z-index: 8;
+  border-bottom-color: rgba(245, 194, 107, 0.35);
 }
 .env-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-  min-width: 0;
+  @apply flex min-w-0 flex-1 flex-col gap-0.5;
 }
 .env-text strong {
-  color: var(--fg);
-  font-weight: 600;
-  font-size: 12.5px;
+  @apply text-[12.5px] font-semibold text-fg;
 }
 .env-text span {
-  font-size: 11.5px;
-  color: var(--fg-dim);
-  line-height: 1.45;
+  @apply text-[11.5px] leading-[1.45] text-fg-dim;
 }
 .env-close {
-  height: 24px;
-  width: 24px;
-  padding: 0;
-  flex-shrink: 0;
+  @apply h-6 w-6 shrink-0 p-0;
 }
 
+/* Vue Transition の fade-* は class 名を Vue が直接適用するため utility 化不可。 */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.18s ease;
