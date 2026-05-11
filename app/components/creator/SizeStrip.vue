@@ -41,5 +41,36 @@ function tileIconSize(s: number): number {
 </template>
 
 <style scoped>
-/* `.size-tile` 本体は global.css 側で完全に定義済み。ここではスタイル追加なし。 */
+@reference '~/assets/css/tailwind.css';
+
+.size-strip {
+  @apply flex gap-2.5 rounded-[10px] border border-line p-1.5;
+  background: rgba(255, 255, 255, 0.02);
+}
+.size-tile {
+  @apply relative grid size-16 cursor-pointer place-items-center rounded-[7px] border border-line;
+  background:
+    repeating-conic-gradient(rgba(255, 255, 255, 0.03) 0% 25%, transparent 0% 50%) 0 / 8px 8px,
+    var(--bg-2);
+  transition: border 0.12s;
+}
+.size-tile:hover {
+  @apply border-line-hi;
+}
+.size-tile.active {
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 1px var(--accent),
+    inset 0 0 0 1px rgba(124, 242, 212, 0.2);
+}
+.size-tile.empty {
+  @apply text-fg-faint;
+}
+.size-tile .lbl {
+  @apply absolute -right-1.5 -top-1.5 rounded border border-line bg-bg-2 px-1 py-px font-mono text-[9.5px] text-fg-mute;
+}
+.size-tile.active .lbl {
+  @apply border-accent-line text-accent;
+  background: rgba(124, 242, 212, 0.08);
+}
 </style>

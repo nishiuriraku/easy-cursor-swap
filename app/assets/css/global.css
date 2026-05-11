@@ -729,53 +729,7 @@ button {
   flex-direction: column;
   gap: 2px;
 }
-.role {
-  display: grid;
-  grid-template-columns: 20px 1fr auto auto;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: 7px;
-  font-size: 12.5px;
-  cursor: pointer;
-  border: 1px solid transparent;
-  color: var(--fg-dim);
-  width: 100%;
-  background: transparent;
-  text-align: left;
-}
-.role:hover {
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--fg);
-}
-.role.active {
-  background: rgba(124, 242, 212, 0.06);
-  border-color: var(--accent-line);
-  color: var(--fg);
-}
-.role .ridx {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--fg-mute);
-}
-.role .rkey {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--fg-mute);
-}
-.role .rstatus {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--fg-faint);
-}
-.role .rstatus.filled {
-  background: var(--accent);
-  box-shadow: 0 0 6px var(--accent);
-}
-.role .rstatus.partial {
-  background: var(--amber);
-}
+/* .role / .ridx / .rkey / .rstatus は RoleListItem.vue に scoped 化 (Phase 11-A) */
 
 .editor {
   display: flex;
@@ -878,57 +832,7 @@ button {
   box-shadow: 0 0 12px var(--accent);
 }
 
-.size-strip {
-  display: flex;
-  gap: 10px;
-  padding: 6px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-}
-.size-tile {
-  width: 64px;
-  height: 64px;
-  border-radius: 7px;
-  background:
-    repeating-conic-gradient(rgba(255, 255, 255, 0.03) 0% 25%, transparent 0% 50%) 0 / 8px 8px,
-    var(--bg-2);
-  border: 1px solid var(--line);
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  position: relative;
-  transition: border 0.12s;
-}
-.size-tile:hover {
-  border-color: var(--line-hi);
-}
-.size-tile.active {
-  border-color: var(--accent);
-  box-shadow:
-    0 0 0 1px var(--accent),
-    inset 0 0 0 1px rgba(124, 242, 212, 0.2);
-}
-.size-tile.empty {
-  color: var(--fg-faint);
-}
-.size-tile .lbl {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  font-family: var(--font-mono);
-  font-size: 9.5px;
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 1px 4px;
-  color: var(--fg-mute);
-}
-.size-tile.active .lbl {
-  color: var(--accent);
-  border-color: var(--accent-line);
-  background: rgba(124, 242, 212, 0.08);
-}
+/* .size-strip / .size-tile は SizeStrip.vue に scoped 化 (Phase 11-A) */
 
 .prop-section {
   border: 1px solid var(--line);

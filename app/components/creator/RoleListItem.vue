@@ -32,8 +32,33 @@ defineEmits<{
 <style scoped>
 @reference '~/assets/css/tailwind.css';
 
-/* `.role` 本体のレイアウトは global.css で定義。ここでは role-label のみ。 */
+.role {
+  @apply grid w-full cursor-pointer items-center gap-2.5 rounded-[7px] border border-transparent bg-transparent px-2.5 py-2 text-left text-[12.5px] text-fg-dim;
+  grid-template-columns: 20px 1fr auto auto;
+}
+.role:hover {
+  @apply text-fg;
+  background: rgba(255, 255, 255, 0.03);
+}
+.role.active {
+  @apply border-accent-line text-fg;
+  background: rgba(124, 242, 212, 0.06);
+}
 .role-label {
   @apply flex min-w-0 items-center gap-2;
+}
+.ridx,
+.rkey {
+  @apply font-mono text-[10px] text-fg-mute;
+}
+.rstatus {
+  @apply size-1.5 rounded-full bg-fg-faint;
+}
+.rstatus.filled {
+  @apply bg-accent;
+  box-shadow: 0 0 6px var(--accent);
+}
+.rstatus.partial {
+  background: var(--amber);
 }
 </style>
