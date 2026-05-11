@@ -259,297 +259,192 @@ function logMark(s: LogEntry['status']): string {
 </template>
 
 <style scoped>
+@reference '~/assets/css/tailwind.css';
+
 .panic-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  display: grid;
-  place-items: center;
-  padding: 32px;
+  @apply fixed inset-0 z-[100] grid place-items-center p-8 backdrop-blur-[10px];
   background:
     radial-gradient(900px 600px at 50% 30%, rgba(255, 107, 138, 0.1), transparent 60%),
     radial-gradient(700px 400px at 80% 100%, rgba(139, 125, 255, 0.06), transparent 60%),
     rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
 }
 
 .panic-card {
-  width: 720px;
-  max-width: 100%;
-  background: var(--bg-glass-hi);
-  border: 1px solid rgba(255, 107, 138, 0.25);
-  border-radius: 16px;
-  overflow: hidden;
+  @apply w-[720px] max-w-full overflow-hidden rounded-2xl border bg-bg-glass-hi backdrop-blur-[24px];
+  border-color: rgba(255, 107, 138, 0.25);
   box-shadow:
     0 30px 80px -20px rgba(0, 0, 0, 0.7),
     0 0 0 1px rgba(255, 107, 138, 0.15);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
 }
 
 .panic-head {
-  padding: 22px 26px 18px;
-  border-bottom: 1px solid var(--line);
-  display: flex;
-  align-items: center;
-  gap: 16px;
+  @apply flex items-center gap-4 border-b border-line px-[26px] pb-[18px] pt-[22px];
   background: linear-gradient(180deg, rgba(255, 107, 138, 0.06), transparent);
 }
 .panic-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  display: grid;
-  place-items: center;
+  @apply grid size-12 shrink-0 place-items-center rounded-[12px] border text-rose;
   background: rgba(255, 107, 138, 0.12);
-  border: 1px solid rgba(255, 107, 138, 0.35);
-  color: var(--rose);
+  border-color: rgba(255, 107, 138, 0.35);
   box-shadow: 0 0 20px rgba(255, 107, 138, 0.3);
-  flex-shrink: 0;
 }
 .panic-title-block {
-  flex: 1;
-  min-width: 0;
+  @apply min-w-0 flex-1;
 }
 .panic-title-block h2 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 18px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  @apply m-0 font-display text-[18px] font-semibold tracking-[-0.01em];
 }
 .panic-title-block p {
-  margin: 4px 0 0;
-  font-size: 12.5px;
-  color: var(--fg-dim);
+  @apply mt-1 text-[12.5px] text-fg-dim;
+  margin-left: 0;
+  margin-right: 0;
+  margin-bottom: 0;
 }
 .hotkey {
-  font-family: var(--font-mono);
-  font-size: 9.5px;
-  color: var(--rose);
-  letter-spacing: 0.12em;
+  @apply font-mono text-[9.5px] tracking-[0.12em] text-rose;
 }
 
 /* ステージ選択 */
 .stage-select {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-  padding: 18px;
+  @apply grid grid-cols-2 gap-3.5 p-[18px];
 }
 @media (max-width: 600px) {
   .stage-select {
-    grid-template-columns: 1fr;
+    @apply grid-cols-1;
   }
 }
 .stage-card {
-  text-align: left;
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
+  @apply flex cursor-pointer flex-col gap-2.5 rounded-[10px] border border-line p-4 text-left text-fg;
   background: rgba(0, 0, 0, 0.2);
-  cursor: pointer;
   transition:
     border-color 0.15s,
     background 0.15s;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  color: var(--fg);
 }
 .stage-card:hover {
-  border-color: var(--line-hi);
+  @apply border-line-hi;
 }
 .stage-card.selected {
   border-color: rgba(255, 107, 138, 0.5);
   background: rgba(255, 107, 138, 0.05);
 }
 .stage-card h3 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 14px;
-  font-weight: 600;
+  @apply m-0 font-display text-[14px] font-semibold;
 }
 .stage-card p {
-  margin: 0;
-  font-size: 11.5px;
-  color: var(--fg-dim);
-  line-height: 1.5;
+  @apply m-0 text-[11.5px] leading-[1.5] text-fg-dim;
 }
 .stage-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  @apply flex items-center justify-between;
 }
 .step {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--fg-mute);
-  letter-spacing: 0.12em;
+  @apply font-mono text-[10px] tracking-[0.12em] text-fg-mute;
 }
 .badge {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  border: 1px solid var(--line);
-  color: var(--fg-dim);
+  @apply rounded border border-line px-2 py-0.5 font-mono text-[10px] text-fg-dim;
 }
 .badge.danger {
-  color: var(--rose);
+  @apply text-rose;
   border-color: rgba(255, 107, 138, 0.25);
   background: rgba(255, 107, 138, 0.06);
 }
 
 /* トレース */
 .trace-block {
-  padding: 20px 26px;
+  @apply px-[26px] py-5;
 }
 .trace-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 14px;
+  @apply mb-3.5 flex items-center gap-2.5;
 }
 .phase-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--rose);
+  @apply size-2.5 rounded-full bg-rose;
   box-shadow: 0 0 10px var(--rose);
   animation: pulse 1.4s infinite;
 }
 .phase-dot.done {
-  background: var(--accent);
+  @apply bg-accent;
   box-shadow: 0 0 10px var(--accent);
   animation: none;
 }
 .phase-dot.error {
-  background: var(--rose);
+  @apply bg-rose;
   animation: none;
 }
 .phase-label {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--rose);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  flex: 1;
+  @apply flex-1 font-mono text-[11px] uppercase tracking-[0.08em] text-rose;
 }
 .role-count {
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--fg-mute);
+  @apply font-mono text-[10.5px] text-fg-mute;
 }
 
 .progress-track {
-  height: 4px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 2px;
-  overflow: hidden;
-  margin-bottom: 18px;
+  @apply mb-[18px] h-1 overflow-hidden rounded-sm bg-white/5;
 }
 .progress-fill {
-  height: 100%;
+  @apply h-full;
   background: linear-gradient(90deg, var(--rose), #ff9bb0);
   box-shadow: 0 0 8px rgba(255, 107, 138, 0.6);
   transition: width 0.2s ease-out;
 }
 
 .log-pane {
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  line-height: 1.85;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 12px 14px;
-  max-height: 200px;
-  overflow-y: auto;
-  color: var(--fg-dim);
+  @apply max-h-[200px] overflow-y-auto rounded-[8px] border border-line bg-black/30 p-3 font-mono text-[11.5px] leading-[1.85] text-fg-dim;
 }
 .log-line {
-  display: flex;
-  gap: 10px;
+  @apply flex gap-2.5;
 }
 .log-line.pending {
-  opacity: 0.5;
+  @apply opacity-50;
 }
 .log-mark {
-  width: 12px;
-  flex-shrink: 0;
+  @apply w-3 shrink-0;
 }
 .log-line.ok .log-mark {
-  color: var(--accent);
+  @apply text-accent;
 }
 .log-line.running .log-mark {
-  color: var(--rose);
+  @apply text-rose;
 }
 .log-line.pending .log-mark {
-  color: var(--fg-faint);
+  @apply text-fg-faint;
 }
 .log-time {
-  color: var(--fg-mute);
-  width: 56px;
-  flex-shrink: 0;
+  @apply w-14 shrink-0 text-fg-mute;
 }
 .log-text {
-  flex: 1;
-  word-break: break-all;
+  @apply flex-1 break-all;
 }
 
 .role-grid {
-  display: grid;
-  grid-template-columns: repeat(17, 1fr);
-  gap: 4px;
-  margin-top: 18px;
+  @apply mt-[18px] grid grid-cols-[repeat(17,1fr)] gap-1;
 }
 @media (max-width: 600px) {
   .role-grid {
-    grid-template-columns: repeat(9, 1fr);
+    @apply grid-cols-[repeat(9,1fr)];
   }
 }
 .rg-cell {
+  @apply relative grid place-items-center rounded-[5px] border border-line bg-white/[0.02] text-fg-faint;
   aspect-ratio: 1;
-  border-radius: 5px;
-  display: grid;
-  place-items: center;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--line);
-  color: var(--fg-faint);
-  position: relative;
 }
 .rg-cell.done {
+  @apply border-accent-line text-accent;
   background: rgba(124, 242, 212, 0.1);
-  border-color: var(--accent-line);
-  color: var(--accent);
 }
 .rg-cell.running {
+  @apply text-rose;
   background: rgba(255, 107, 138, 0.12);
   border-color: rgba(255, 107, 138, 0.4);
-  color: var(--rose);
   animation: pulse 1s infinite;
 }
 
 /* フッター */
 .panic-foot {
-  padding: 14px 26px;
-  background: rgba(0, 0, 0, 0.25);
-  border-top: 1px solid var(--line);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  @apply flex items-center justify-between gap-3 border-t border-line bg-black/25 px-[26px] py-3.5;
 }
 .foot-note {
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--fg-mute);
+  @apply font-mono text-[10.5px] text-fg-mute;
 }
 .foot-actions {
-  display: flex;
-  gap: 8px;
+  @apply flex gap-2;
 }
 
 /* トランジション */
