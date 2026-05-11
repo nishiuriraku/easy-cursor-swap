@@ -1284,76 +1284,42 @@ async function onFileChange(e: Event) {
 </template>
 
 <style scoped>
+@reference '~/assets/css/tailwind.css';
+
 .creator-host {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  position: relative;
+  @apply relative flex h-full flex-col;
 }
 
 .draft-tag {
-  color: var(--fg-mute);
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  margin-left: 6px;
+  @apply ml-1.5 font-mono text-[10.5px] text-fg-mute;
 }
 
 .pane-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
+  @apply mb-2.5 flex items-center justify-between;
 }
 .pane-head h6 {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--fg-mute);
-  font-weight: 500;
+  @apply m-0 font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-fg-mute;
 }
 
 .role-key {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--fg-mute);
-  font-weight: 400;
-  margin-left: 8px;
+  @apply ml-2 font-mono text-[12px] font-normal text-fg-mute;
 }
 
 .preview-meta {
-  position: absolute;
-  bottom: 10px;
-  font-family: var(--font-mono);
-  font-size: 10px;
+  @apply absolute bottom-2.5 font-mono text-[10px];
 }
 .preview-meta.tl {
-  left: 12px;
-  color: var(--fg-mute);
+  @apply left-3 text-fg-mute;
 }
 .preview-meta.tr {
-  right: 12px;
-  color: var(--accent);
+  @apply right-3 text-accent;
 }
 
 .hotspot-center-btn {
   /* preview-meta.tl / preview-meta.tr は名前に反して両方とも bottom 配置なので、
      中央ボタンは反対側の右上に置けばどのチップとも衝突しない。 */
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 1px solid var(--accent-line);
+  @apply absolute right-2 top-2 inline-flex size-[22px] cursor-pointer items-center justify-center rounded-full border border-accent-line p-0 text-accent;
   background: rgba(0, 0, 0, 0.4);
-  color: var(--accent);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
   transition:
     background 120ms ease,
     transform 120ms ease;
@@ -1364,169 +1330,99 @@ async function onFileChange(e: Event) {
 }
 
 .next-step-row {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 16px;
-  padding-top: 16px;
+  /* NOTE: var(--border) は未定義 (元コード leftover) — 結果として border 無し。
+   * 視覚的現状維持のためそのまま literal で残置。 */
+  @apply mt-4 flex justify-end pt-4;
   border-top: 1px solid var(--border);
 }
 .next-step-row .btn.primary {
-  height: 36px;
-  padding: 0 18px;
-  font-size: 13px;
+  @apply h-9 px-[18px] text-[13px];
 }
 
 .resample-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--fg-mute);
-  letter-spacing: 0.04em;
+  @apply flex items-center gap-2 font-mono text-[10.5px] tracking-[0.04em] text-fg-mute;
 }
 
 .color-chips {
-  display: flex;
-  gap: 4px;
+  @apply flex gap-1;
 }
 .cc {
-  width: 18px;
-  height: 18px;
-  border-radius: 4px;
-  border: 1px solid var(--line);
+  @apply size-[18px] rounded border border-line;
 }
 
 .validation-body {
-  gap: 8px;
-  font-size: 11.5px;
-  font-family: var(--font-mono);
-  color: var(--fg-dim);
+  @apply gap-2 font-mono text-[11.5px] text-fg-dim;
 }
 .vrow {
-  display: flex;
-  justify-content: space-between;
+  @apply flex justify-between;
 }
 .vrow .ok {
-  color: var(--accent);
+  @apply text-accent;
 }
 .vrow .warn {
-  color: var(--amber);
+  @apply text-amber;
 }
 .vrow .dim {
-  color: var(--fg-dim);
+  @apply text-fg-dim;
 }
 
 .import-banner {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  margin: 0 18px 8px;
+  @apply mx-[18px] mb-2 mt-0 flex items-center gap-2 rounded-[8px] border border-accent-line px-3 py-2 text-[12px] text-fg-dim;
   background: rgba(124, 242, 212, 0.06);
-  border: 1px solid var(--accent-line);
-  border-radius: 8px;
-  font-size: 12px;
-  color: var(--fg-dim);
 }
 
 .export-progress {
-  margin: 0 18px 8px;
-  padding: 8px 12px;
+  @apply mx-[18px] mb-2 mt-0 rounded-[8px] border border-accent-line px-3 py-2 text-[12px] text-fg-dim;
   background: rgba(124, 242, 212, 0.04);
-  border: 1px solid var(--accent-line);
-  border-radius: 8px;
-  font-size: 12px;
-  color: var(--fg-dim);
 }
 .export-progress-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
+  @apply mb-1.5 flex items-center gap-2;
 }
 .export-progress-label {
   font-variant-numeric: tabular-nums;
 }
 .export-progress-bar {
-  height: 4px;
+  @apply h-1 overflow-hidden rounded-sm;
   background: rgba(255, 255, 255, 0.06);
-  border-radius: 2px;
-  overflow: hidden;
 }
 .export-progress-fill {
-  height: 100%;
-  background: var(--accent);
+  @apply h-full bg-accent;
   transition: width 120ms ease-out;
 }
 
 .metadata-pane {
-  flex: 1;
-  overflow-y: auto;
-  padding: 24px 28px 32px;
+  @apply flex-1 overflow-y-auto px-7 pb-8 pt-6;
   background: radial-gradient(800px 600px at 50% 0%, rgba(124, 242, 212, 0.04), transparent 60%);
 }
 .metadata-grid {
-  max-width: 760px;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
+  @apply mx-auto flex max-w-[760px] flex-col gap-[18px];
 }
 
 .advanced-toggle-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
+  @apply flex flex-wrap items-center justify-between gap-4;
 }
 .advanced-toggle {
-  background: transparent;
-  border: 1px dashed var(--line);
-  color: var(--fg-mute);
-  padding: 6px 10px;
-  border-radius: 8px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  font-size: 11.5px;
-  font-family: var(--font-mono);
-  letter-spacing: 0.04em;
+  @apply inline-flex cursor-pointer items-center gap-1.5 rounded-[8px] border border-dashed border-line bg-transparent px-2.5 py-1.5 font-mono text-[11.5px] tracking-[0.04em] text-fg-mute;
   transition:
     color 160ms ease,
     border-color 160ms ease;
 }
 .advanced-toggle:hover {
-  color: var(--fg);
-  border-color: var(--accent-line);
+  @apply border-accent-line text-fg;
 }
 .advanced-toggle[aria-expanded='true'] {
-  color: var(--accent);
-  border-color: var(--accent-line);
+  @apply border-accent-line text-accent;
 }
 .advanced-hint {
-  color: var(--fg-dim);
-  font-family: var(--font-body);
-  font-size: 10.5px;
-  margin-left: 4px;
+  @apply ml-1 font-body text-[10.5px] text-fg-dim;
 }
 
 .advanced-panel {
-  margin-top: 8px;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  @apply mt-2 rounded-[8px] border border-line px-3 py-2.5;
   background: rgba(124, 242, 212, 0.02);
 }
 .advanced-label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--fg-mute);
-  margin-bottom: 8px;
+  @apply mb-2 font-mono text-[10px] uppercase tracking-[0.16em] text-fg-mute;
 }
 
 .bigpreview:focus {
