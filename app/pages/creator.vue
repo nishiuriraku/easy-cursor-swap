@@ -675,7 +675,7 @@ async function rasterizeSvgToPng(svgString: string, size: number): Promise<Uint8
 // --- 一括インポート ハンドラ ---
 
 /**
- * 統合エントリ。png/svg/cur/ico/.cursorpack をまとめて選べるダイアログを開き、
+ * 統合エントリ。png/svg/cur/ico/ani/.cursorpack をまとめて選べるダイアログを開き、
  * 拡張子で内部分岐:
  *   - 単独 `.cursorpack`     → cursorpack 解析経路 (parseCursorpack)
  *   - 通常ファイル (複数可)   → bulk_resolve_assets 経路
@@ -690,7 +690,7 @@ async function pickBulkAuto() {
     filters: [
       {
         name: 'Cursor assets / pack',
-        extensions: ['png', 'svg', 'cur', 'ico', 'cursorpack'],
+        extensions: ['png', 'svg', 'cur', 'ico', 'ani', 'cursorpack'],
       },
     ],
   })
@@ -715,6 +715,8 @@ async function pickBulkFolder() {
  *    bulk preview を経由せず **現在編集中のロールに直接代入** する fast-path に流す。
  *    これは旧「画像 / カーソルを取込」ボタンの挙動を維持するためで、エディタ内で
  *    特定ロールを選んで素早く差し替えるワークフローを壊さない
+ *  - 単一 `.ani` は static fast-path には乗せず、bulk preview 経路に通す
+ *    (アニメ再生 + ホットスポット調整 UI が必要なため)
  *  - `.cursorpack` は他のファイルと一緒に取り込む意味的整合性が無い (パッケージ単位の取込なので)
  *    ため、混在時は通常ファイルのみ取り込み、cursorpack 部分は無視する
  *  - 複数 `.cursorpack` の同時取込もサポートしない (ロール衝突解決が複雑になるため)
