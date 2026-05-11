@@ -130,34 +130,25 @@ function confirm() {
 </template>
 
 <style scoped>
+@reference '~/assets/css/tailwind.css';
+
 .pp-modal {
-  width: 460px;
+  @apply w-[460px];
 }
 .pp-row {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 14px;
+  @apply mb-3.5 flex flex-col gap-1.5;
 }
 .pp-label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--fg-mute);
+  @apply font-mono text-[10px] uppercase tracking-[0.12em] text-fg-mute;
 }
 .pp-error {
-  margin: 0 0 10px;
-  font-size: 12px;
-  color: var(--rose);
+  @apply mb-2.5 text-[12px] text-rose;
+  margin-top: 0;
+  margin-left: 0;
+  margin-right: 0;
 }
 .pp-note {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 4px 0 0;
-  font-size: 11.5px;
-  color: var(--fg-dim);
+  @apply mt-1 flex items-center gap-1.5 text-[11.5px] text-fg-dim;
 }
 .fade-enter-active,
 .fade-leave-active {
