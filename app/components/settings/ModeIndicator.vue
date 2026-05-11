@@ -25,15 +25,13 @@ const props = defineProps<{
 </template>
 
 <style scoped>
+@reference '~/assets/css/tailwind.css';
+
 .mode-indicator {
-  padding: 18px 22px;
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  @apply relative flex items-center gap-3 px-[22px] py-[18px];
 }
 .mode-indicator.light {
-  border-right: 1px solid var(--line);
+  @apply border-r border-line;
 }
 .mode-indicator.light.active {
   background: linear-gradient(180deg, rgba(245, 194, 107, 0.08), transparent);
@@ -43,49 +41,38 @@ const props = defineProps<{
 }
 
 .mi-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 9px;
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
+  @apply grid size-9 shrink-0 place-items-center rounded-[9px];
 }
 .mi-icon.light {
+  @apply text-amber;
   background: rgba(245, 194, 107, 0.12);
   border: 1px solid rgba(245, 194, 107, 0.3);
-  color: var(--amber);
 }
 .mi-icon.dark {
+  @apply text-accent;
   background: rgba(124, 242, 212, 0.12);
   border: 1px solid var(--accent-line);
-  color: var(--accent);
 }
 
 .mi-text {
-  flex: 1;
+  @apply flex-1;
 }
 .mi-title {
-  font-family: var(--font-display);
-  font-size: 14px;
-  font-weight: 600;
+  @apply font-display text-[14px] font-semibold;
 }
 .mi-sub {
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--fg-mute);
+  @apply font-mono text-[10.5px] text-fg-mute;
 }
 
 .mi-tag .dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
+  @apply size-[5px] rounded-full;
   background: currentColor;
   box-shadow: 0 0 6px currentColor;
 }
 
 .mode-indicator.light .mi-tag {
+  @apply text-amber;
   background: rgba(245, 194, 107, 0.12);
-  color: var(--amber);
   border-color: rgba(245, 194, 107, 0.3);
 }
 </style>
