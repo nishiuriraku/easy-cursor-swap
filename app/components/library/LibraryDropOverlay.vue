@@ -27,45 +27,31 @@ defineProps<{
 </template>
 
 <style scoped>
+@reference '~/assets/css/tailwind.css';
+
 .drop {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(10, 11, 15, 0.85);
-  backdrop-filter: blur(8px);
-  z-index: 100;
-  pointer-events: none;
+  @apply pointer-events-none absolute inset-0 z-[100] flex items-center justify-center bg-[rgba(10,11,15,0.85)] backdrop-blur-[8px];
 }
 
 .drop-inner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  padding: 32px 48px;
-  border-radius: 16px;
-  border: 2px dashed var(--accent);
+  @apply flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-accent px-12 py-8;
+  /* NOTE: var(--bg-elev1) は元コードから未定義 (resolved to invalid → fallback)。
+   * 視覚的な現状を保つためそのまま残す。 */
   background: var(--bg-elev1);
 }
 
 .drop-inner h3 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 18px;
+  @apply m-0 font-display text-[18px];
   color: var(--text);
 }
 
 .drop-inner p {
-  margin: 0;
-  font-size: 13px;
+  @apply m-0 text-[13px];
   color: var(--text-mute);
 }
 
 .ghost-icon {
-  color: var(--accent);
-  opacity: 0.6;
+  @apply text-accent opacity-60;
 }
 
 .fade-enter-active,
