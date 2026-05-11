@@ -62,50 +62,29 @@ function pickFolder() {
 </template>
 
 <style scoped>
+@reference '~/assets/css/tailwind.css';
+
 .bi-btn-host {
-  position: relative;
-  display: inline-block;
+  @apply relative inline-block;
 }
 .bi-split {
-  display: inline-flex;
-  align-items: stretch;
-  gap: 0;
+  @apply inline-flex items-stretch gap-0;
 }
 .bi-primary {
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
+  @apply rounded-r-none;
 }
 .bi-chevron {
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-  border-left: 1px solid var(--line);
-  padding-left: 6px;
-  padding-right: 6px;
+  @apply rounded-l-none border-l border-line px-1.5;
 }
 .caret {
-  font-size: 9px;
+  @apply text-[9px];
 }
 .bi-menu {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  margin-top: 4px;
+  @apply absolute right-0 top-full z-50 mt-1 flex min-w-[200px] flex-col rounded-[8px] border border-line;
   background: var(--bg-1, #14161c);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  min-width: 200px;
-  z-index: 50;
-  display: flex;
-  flex-direction: column;
 }
 .bi-menu-item {
-  background: transparent;
-  border: 0;
-  padding: 8px 12px;
-  text-align: left;
-  font-size: 12px;
-  color: var(--fg);
-  cursor: pointer;
+  @apply cursor-pointer border-0 bg-transparent px-3 py-2 text-left text-[12px] text-fg;
 }
 .bi-menu-item:hover {
   background: rgba(124, 242, 212, 0.08);
