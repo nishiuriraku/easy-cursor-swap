@@ -223,4 +223,14 @@ const emit = defineEmits<{
   background: rgba(245, 194, 107, 0.1);
   border: 1px solid rgba(245, 194, 107, 0.3);
 }
+
+.td-pane-k {
+  @apply font-mono text-[9.5px] font-medium uppercase tracking-[0.16em] text-fg-mute;
+}
+.td-pane-link {
+  @apply cursor-pointer border-0 bg-transparent p-0 font-mono text-[11px] tracking-[0.04em] text-accent;
+}
+.td-pane-link:hover {
+  color: var(--accent-hi);
+}
 </style>

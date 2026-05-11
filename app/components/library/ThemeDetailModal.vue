@@ -142,6 +142,23 @@ onBeforeUnmount(() => {
   background: transparent;
 }
 
+.td-standalone {
+  @apply flex h-full flex-col overflow-hidden rounded-[14px] border border-line-hi bg-bg-1;
+  box-shadow: var(--shadow-2);
+}
+.td-standalone-h {
+  @apply flex items-start justify-between gap-3 border-b border-line px-[22px] pb-4 pt-[18px];
+}
+.td-standalone-eyebrow {
+  @apply mb-1 font-mono text-[9.5px] uppercase tracking-[0.16em] text-accent;
+}
+.td-standalone h2 {
+  @apply m-0 font-display text-[20px] font-semibold tracking-[-0.02em];
+}
+.td-standalone-sub {
+  @apply mt-1 font-mono text-[12px] tracking-[0.02em] text-fg-dim;
+}
+
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.18s ease;
