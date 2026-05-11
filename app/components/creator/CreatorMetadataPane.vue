@@ -212,6 +212,15 @@ defineEmits<{
 </template>
 
 <style scoped>
+/* NOTE: 元の scoped は --border / --bg-elev1 / --bg-elev2 / --text / --text-mute /
+ * --mint などの未定義トークンに依存しており、それらの declaration は invalid と
+ * なって cascade で global.css の .prop-section / .prop-head / .input / .tag /
+ * .btn ルールが見た目を提供していた。
+ * @apply の border utility が global を上書きする問題を避けるため、scoped 側は
+ * global と衝突しないレイアウト/スペーシングの差分のみを CSS リテラルで保持する。
+ * .metadata-pane / .metadata-grid / .import-banner / .export-progress* / .role-tag
+ * は global に同名ルールが無いコンポーネント固有のものなのでそのまま残す。 */
+
 .metadata-pane {
   display: grid;
   gap: 16px;
@@ -235,27 +244,19 @@ defineEmits<{
 }
 
 .prop-section {
-  border: 1px solid var(--border);
   border-radius: 12px;
-  background: var(--bg-elev1);
 }
 
 .prop-head {
   padding: 10px 16px;
   font-size: 12px;
   font-weight: 600;
-  text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--text-mute);
-  border-bottom: 1px solid var(--border);
 }
 
 .input {
   height: 32px;
   border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg-elev2);
-  color: var(--text);
   padding: 0 10px;
   font-size: 13px;
 }
@@ -265,19 +266,13 @@ defineEmits<{
 }
 
 .tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
   padding: 2px 8px;
   border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--bg-elev2);
   font-size: 11px;
-  color: var(--text-mute);
+  gap: 4px;
 }
 
 .tag.ok {
-  color: var(--mint);
   border-color: rgba(106, 213, 184, 0.3);
 }
 
@@ -327,17 +322,9 @@ defineEmits<{
 }
 
 .btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
   padding: 0 14px;
   border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg-elev2);
-  color: var(--text);
   font-size: 13px;
-  cursor: pointer;
 }
 
 .btn.ghost {
