@@ -140,87 +140,56 @@ function onBackdrop(e: MouseEvent) {
 </template>
 
 <style scoped>
+@reference '~/assets/css/tailwind.css';
+
 .picker-modal {
-  width: 480px;
+  @apply w-[480px];
 }
 .picker-body {
-  padding: 16px 20px 8px;
+  @apply px-5 pb-2 pt-4;
 }
 .picker-search {
-  margin-bottom: 12px;
-  max-width: none;
+  @apply mb-3 max-w-none;
 }
 .picker-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  padding: 32px 0;
-  color: var(--fg-mute);
+  @apply flex flex-col items-center gap-3 py-8 text-fg-mute;
 }
 .picker-empty p {
-  margin: 0;
-  font-size: 13px;
+  @apply m-0 text-[13px];
 }
 
 .picker-list {
+  @apply m-0 flex max-h-[360px] flex-col gap-1 overflow-y-auto p-0;
   list-style: none;
-  margin: 0;
-  padding: 0;
-  max-height: 360px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
 }
 
 .picker-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid transparent;
-  cursor: pointer;
+  @apply flex cursor-pointer items-center gap-3 rounded-[8px] border border-transparent px-3 py-2.5;
   transition:
     background 0.12s,
     border-color 0.12s;
 }
 .picker-item:hover {
-  background: rgba(255, 255, 255, 0.04);
+  @apply bg-white/[0.04];
   border-color: var(--line-hi);
 }
 .picker-item.selected {
-  background: var(--accent-dim);
+  @apply bg-accent-dim;
   border-color: var(--accent-line);
 }
 
 .pi-thumb {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  display: grid;
-  place-items: center;
+  @apply grid size-9 shrink-0 place-items-center rounded-[8px] border border-line text-fg;
   background: linear-gradient(135deg, rgba(124, 242, 212, 0.15), rgba(139, 125, 255, 0.15));
-  border: 1px solid var(--line);
-  color: var(--fg);
-  flex-shrink: 0;
 }
 
 .pi-meta {
-  flex: 1;
-  min-width: 0;
+  @apply min-w-0 flex-1;
 }
 .pi-name {
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 13px;
-  letter-spacing: -0.01em;
+  @apply font-display text-[13px] font-semibold tracking-[-0.01em];
 }
 .pi-sub {
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--fg-mute);
-  margin-top: 2px;
+  @apply mt-0.5 font-mono text-[10.5px] text-fg-mute;
 }
 </style>
