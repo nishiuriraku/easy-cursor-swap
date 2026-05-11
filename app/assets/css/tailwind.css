@@ -635,6 +635,19 @@
   @apply flex items-center gap-2;
 }
 
+/* --- .prop-section / .prop-head / .prop-body (Phase 12-C) ---
+ * Creator メタデータタブ + Settings の各セクションで使う基本パネル。 */
+.prop-section {
+  @apply mb-3.5 overflow-hidden rounded-[10px] border border-line;
+  background: rgba(255, 255, 255, 0.015);
+}
+.prop-head {
+  @apply flex items-center justify-between border-b border-line px-3.5 py-2.5 font-mono text-[10px] uppercase tracking-[0.12em] text-fg-mute;
+}
+.prop-body {
+  @apply flex flex-col gap-3 px-3.5 py-3;
+}
+
 /* Narrow viewport (Q3): preview を 1 セル化して Arrow のみ表示 */
 @media (max-width: 1080px) {
   .lib-row {

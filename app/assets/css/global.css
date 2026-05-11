@@ -655,31 +655,7 @@ button {
  * creator.vue scoped に移行 (Phase 11-D)
  * .size-strip / .size-tile は SizeStrip.vue に scoped 化 (Phase 11-A) */
 
-.prop-section {
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.015);
-  overflow: hidden;
-  margin-bottom: 14px;
-}
-.prop-head {
-  padding: 10px 14px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid var(--line);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--fg-mute);
-}
-.prop-body {
-  padding: 12px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
+/* .prop-section / .prop-head / .prop-body は tailwind.css に移行 (Phase 12-C) */
 /* =============================================
  * ライトテーマ — html.light に付与してアプリ全体を切替
  * design/styles.css の `.win.light` から移植
