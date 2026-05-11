@@ -8,16 +8,19 @@
 //! | [`cur_build`] | PNG → 6 解像度 `.cur` バイナリ生成 (sized override 対応) |
 //! | [`ico_cur`]   | `.ico` `.cur` の解析 (PNG エントリ + 32bpp BMP DIB エントリ) |
 //! | [`ani`]       | `.ani` (RIFF/ACON) アニメーションカーソルの解析 |
+//! | [`ani_write`] | `.ani` のバイト単位パススルー書き換え (AF_ICON ホットスポット上書き) |
 //!
 //! 公開 API はすべて本ファイルから `pub use` で再エクスポートしているため、
 //! 既存の `use crate::cursor::ResizeMethod;` 等の import は分割後も変更不要。
 
 pub mod ani;
+pub mod ani_write;
 pub mod cur_build;
 pub mod ico_cur;
 pub mod image;
 
 pub use self::ani::{parse_ani, ParsedAni};
+pub use self::ani_write::{rewrite_ani_to_path, rewrite_ani_with_hotspot, RewriteStats};
 pub use self::cur_build::{build_cur_from_png, generate_cur_binary};
 pub use self::ico_cur::{parse_ico_cur, pick_largest_as_png, ParsedIcoCur, ParsedIcoCurEntry};
 pub use self::image::{
