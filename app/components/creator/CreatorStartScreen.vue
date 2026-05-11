@@ -98,3 +98,129 @@ const emit = defineEmits<{
     </div>
   </div>
 </template>
+
+<style scoped>
+@reference '~/assets/css/tailwind.css';
+
+.es-stage {
+  @apply relative grid flex-1 overflow-auto px-8 py-10;
+  place-items: center;
+}
+.es-bg {
+  @apply pointer-events-none absolute inset-0 z-0;
+  background:
+    radial-gradient(700px 400px at 50% 0%, rgba(124, 242, 212, 0.08), transparent 60%),
+    radial-gradient(900px 500px at 50% 100%, rgba(139, 125, 255, 0.05), transparent 60%);
+}
+:where(html.light) .es-bg {
+  background:
+    radial-gradient(700px 400px at 50% 0%, rgba(15, 168, 133, 0.08), transparent 60%),
+    radial-gradient(900px 500px at 50% 100%, rgba(106, 92, 255, 0.05), transparent 60%);
+}
+.es-eyebrow {
+  @apply mb-2.5 font-mono text-[10px] uppercase tracking-[0.18em] text-accent;
+}
+.es-cta-row {
+  @apply mt-6 flex flex-wrap justify-center gap-2.5;
+}
+.es-cta-primary {
+  height: 40px !important;
+  padding: 0 20px !important;
+  font-size: 13.5px !important;
+  @apply font-semibold;
+}
+
+.es-creator-hero {
+  @apply relative z-10 flex w-[720px] max-w-full flex-col items-center text-center;
+}
+.es-mark {
+  @apply relative mb-[22px] grid size-24 place-items-center rounded-3xl border border-accent-line;
+  background:
+    radial-gradient(70% 70% at 30% 30%, rgba(124, 242, 212, 0.25), rgba(124, 242, 212, 0.05) 60%),
+    rgba(0, 0, 0, 0.3);
+  box-shadow:
+    0 24px 60px -20px rgba(124, 242, 212, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.es-mark::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 25px;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0%,
+    var(--accent) 25%,
+    transparent 50%,
+    var(--violet) 75%,
+    transparent 100%
+  );
+  opacity: 0.35;
+  z-index: -1;
+  filter: blur(14px);
+}
+.es-creator-hero h1 {
+  @apply m-0 font-display text-[32px] font-semibold tracking-[-0.025em];
+}
+.es-creator-hero p {
+  @apply mx-0 mb-0 mt-3 max-w-[520px] text-[14px] leading-[1.7] text-fg-dim;
+  text-wrap: pretty;
+}
+.es-creator-hero p code {
+  @apply rounded border border-accent-line bg-accent-dim px-[5px] py-px font-mono text-[12.5px] text-accent;
+}
+
+.es-shortcuts {
+  @apply mt-[22px] flex flex-wrap justify-center gap-[18px];
+}
+.es-kb {
+  @apply inline-flex items-center gap-1.5 text-[11.5px] text-fg-mute;
+}
+.es-kb .kbd {
+  @apply min-w-4 rounded-[3px] border border-line-hi px-[5px] py-px text-center font-mono text-[10px] text-fg-dim;
+  background: rgba(255, 255, 255, 0.05);
+}
+:where(html.light) .es-kb .kbd {
+  background: rgba(15, 20, 35, 0.04);
+}
+
+.es-recent {
+  @apply relative z-10 mt-9 w-[720px] max-w-full overflow-hidden rounded-xl border border-line bg-bg-glass backdrop-blur-2xl;
+}
+.es-recent-h {
+  @apply flex items-center justify-between border-b border-line px-4 py-3;
+}
+.es-recent-list {
+  @apply flex flex-col;
+}
+.es-recent-item {
+  @apply grid cursor-pointer items-center gap-3 border-0 border-b border-line bg-transparent px-4 py-3 text-left text-fg;
+  grid-template-columns: 36px 1fr 14px;
+  transition: background 0.12s;
+}
+.es-recent-item:last-child {
+  @apply border-b-0;
+}
+.es-recent-item:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+:where(html.light) .es-recent-item:hover {
+  background: rgba(15, 20, 35, 0.025);
+}
+.es-recent-thumb {
+  @apply grid size-9 place-items-center rounded-lg border border-line text-fg-dim;
+  background: rgba(255, 255, 255, 0.04);
+}
+.es-recent-name {
+  @apply flex items-center gap-2 text-[13px] font-medium;
+}
+.es-recent-sub {
+  @apply mt-0.5 text-[11px] text-fg-mute;
+}
+.es-draft {
+  @apply rounded-[3px] px-[5px] py-0 font-mono text-[9px] tracking-[0.12em];
+  color: var(--amber);
+  background: rgba(245, 194, 107, 0.1);
+  border: 1px solid rgba(245, 194, 107, 0.3);
+}
+</style>
