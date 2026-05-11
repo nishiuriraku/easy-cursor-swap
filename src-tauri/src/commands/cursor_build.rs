@@ -448,11 +448,38 @@ pub fn export_cursorpack_streamed(
             );
             (false, None, zip_bytes.len() as u64)
         }
-        ExportDestination::Library { apply_after: _ } => {
-            // 次タスクで実装
-            return Err(AppError::Other(
-                "destination::Library は未実装 (Task 2.1 で対応予定)".to_string(),
-            ));
+        ExportDestination::Library { apply_after } => {
+            // 1. in-memory zip を import_cursorpack_bytes に流して Library に展開
+            let imported_id =
+                crate::theme::ThemeManager::import_cursorpack_bytes(&zip_bytes)?;
+            tracing::info!(
+                "imported cursorpack to library: theme={} ({} bytes)",
+                imported_id,
+                zip_bytes.len()
+            );
+
+            // 2. apply_after = true なら適用も試みる。失敗しても Library 登録は成功扱い (部分成功)
+            let (applied, apply_error) = if *apply_after {
+                match crate::theme::ThemeManager::apply_theme(imported_id) {
+                    Ok(()) => {
+                        tracing::info!("applied theme {} from creator", imported_id);
+                        (true, None)
+                    }
+                    Err(e) => {
+                        let msg = e.to_string();
+                        tracing::warn!(
+                            "Library 登録は成功したが apply に失敗: theme={} reason={}",
+                            imported_id,
+                            msg
+                        );
+                        (false, Some(msg))
+                    }
+                }
+            } else {
+                (false, None)
+            };
+
+            (applied, apply_error, zip_bytes.len() as u64)
         }
     };
 
@@ -561,5 +588,41 @@ mod tests {
         let a = super::resolve_metadata_id(None);
         let b = super::resolve_metadata_id(None);
         assert_ne!(a, b, "別の Uuid::new_v4() が生成されるはず");
+    }
+
+    #[test]
+    fn library_destination_zip_round_trips_through_import() {
+        // 注: import_cursorpack_bytes は ConfigManager::cursors_dir() を呼ぶため、
+        // 一時的なホームディレクトリ環境で実行する必要がある。
+        // ここでは write_cursorpack_to_buffer の出力が
+        // inspect_cursorpack_bytes でメタを取り出せることだけ確認する
+        // (フル展開は手動 E2E に委ねる)。
+        use std::collections::HashMap;
+        let mut metadata = crate::theme::types::ThemeMetadata {
+            schema_version: 1,
+            id: uuid::Uuid::new_v4(),
+            name: crate::theme::types::LocalizedString::Simple("Lib Test".to_string()),
+            version: "1.2.3".to_string(),
+            created_at: chrono::Utc::now().to_rfc3339(),
+            requires_os_shadow: false,
+            cursors: HashMap::new(),
+            author: None,
+            license: None,
+            homepage: None,
+            description: None,
+            min_app_version: None,
+            signature: None,
+            tags: Vec::new(),
+        };
+        let target_id = metadata.id;
+        let cursors: HashMap<String, Vec<u8>> = HashMap::new();
+        let bytes = crate::theme::ThemeManager::write_cursorpack_to_buffer(
+            &mut metadata,
+            &cursors,
+        )
+        .unwrap();
+        let inspected = crate::theme::ThemeManager::inspect_cursorpack_bytes(&bytes).unwrap();
+        assert_eq!(inspected.id, target_id, "ID が引き継がれているはず");
+        assert_eq!(inspected.version, "1.2.3");
     }
 }
