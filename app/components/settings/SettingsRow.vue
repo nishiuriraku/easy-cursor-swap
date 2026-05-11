@@ -24,28 +24,21 @@ defineProps<{
 </template>
 
 <style scoped>
+@reference '~/assets/css/tailwind.css';
+
 .settings-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 16px;
-  align-items: center;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--line);
+  @apply grid grid-cols-[1fr_auto] items-center gap-4 border-b border-line py-3;
 }
 .settings-row:last-child {
-  border-bottom: none;
+  @apply border-b-0;
 }
 .row-label {
-  font-size: 13px;
-  font-weight: 500;
+  @apply text-[13px] font-medium;
 }
 .row-label.mono {
-  font-family: var(--font-mono);
+  @apply font-mono;
 }
 .row-desc {
-  font-size: 11.5px;
-  color: var(--fg-mute);
-  margin-top: 3px;
-  line-height: 1.5;
+  @apply mt-[3px] text-[11.5px] leading-[1.5] text-fg-mute;
 }
 </style>
