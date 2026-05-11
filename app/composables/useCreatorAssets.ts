@@ -82,6 +82,7 @@ export function useCreatorAssets() {
       sizedPngBytes: a.sized
         ? Object.fromEntries(Array.from(a.sized.entries()).map(([k, v]) => [k, Array.from(v)]))
         : null,
+      aniSourcePath: a.aniSourcePath ?? null,
     }))
   }
 
