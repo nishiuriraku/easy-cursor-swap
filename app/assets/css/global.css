@@ -109,50 +109,9 @@ button {
 
 /* =============================================
  * ウィンドウシェル (Win11 風)
+ * .win / .win::before / .body / .main は default.vue scoped に移行 (Phase 12-E)
+ * .titlebar は AppTitlebar.vue scoped に移行済
  * ============================================= */
-.win {
-  width: 100%;
-  height: 100%;
-  background: var(--bg-0);
-  overflow: hidden;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  isolation: isolate;
-}
-
-.win::before {
-  content: '';
-  position: absolute;
-  inset: -200px;
-  background:
-    radial-gradient(800px 500px at 12% -10%, rgba(124, 242, 212, 0.08), transparent 60%),
-    radial-gradient(900px 600px at 110% 110%, rgba(139, 125, 255, 0.07), transparent 60%);
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* --- ボディ (サイドバー + メイン) --- */
-/* NOTE: .titlebar の CSS は AppTitlebar.vue の scoped style に移行済。
- * Tauri v2 の data-tauri-drag-region は使わず、JS mousedown フックでドラッグを
- * 実装している。詳細は AppTitlebar.vue:onTitlebarMouseDown を参照。 */
-.body {
-  flex: 1;
-  display: grid;
-  grid-template-columns: 248px 1fr;
-  min-height: 0;
-  position: relative;
-  z-index: 1;
-}
-
-/* --- メイン --- */
-.main {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  position: relative;
-  overflow: hidden;
-}
 
 /* .toolbar / .bcrumb / .search / .kbd / .tb-actions は
  * tailwind.css に移行 (Phase 12-B) */
@@ -604,12 +563,8 @@ html.light {
   --shadow-1: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 1px 2px rgba(15, 20, 35, 0.06);
   --shadow-2: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 12px 28px -12px rgba(15, 20, 35, 0.18);
 }
-html.light .win::before {
-  background:
-    radial-gradient(800px 500px at 12% -10%, rgba(15, 168, 133, 0.1), transparent 60%),
-    radial-gradient(900px 600px at 110% 110%, rgba(106, 92, 255, 0.08), transparent 60%);
-}
-/* html.light の .toolbar / .btn / .input / .search / .cell の上書きは
+/* html.light .win::before は default.vue scoped 内 (Phase 12-E)
+ * html.light の .toolbar / .btn / .input / .search / .cell の上書きは
  * tailwind.css の :where(html.light) または各 scoped 内で対応
  * (Phase 12-B / Phase 12-D) */
 html.light body,

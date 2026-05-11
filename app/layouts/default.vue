@@ -124,3 +124,34 @@ onUnmounted(() => {
     <PanicFlow v-model:open="panicOpen" @done="onPanicDone" />
   </div>
 </template>
+
+<style scoped>
+@reference '~/assets/css/tailwind.css';
+
+.win {
+  @apply relative flex size-full flex-col overflow-hidden bg-bg-0;
+  isolation: isolate;
+}
+.win::before {
+  content: '';
+  position: absolute;
+  inset: -200px;
+  background:
+    radial-gradient(800px 500px at 12% -10%, rgba(124, 242, 212, 0.08), transparent 60%),
+    radial-gradient(900px 600px at 110% 110%, rgba(139, 125, 255, 0.07), transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+}
+:where(html.light) .win::before {
+  background:
+    radial-gradient(800px 500px at 12% -10%, rgba(15, 168, 133, 0.1), transparent 60%),
+    radial-gradient(900px 600px at 110% 110%, rgba(106, 92, 255, 0.08), transparent 60%);
+}
+.body {
+  @apply relative z-[1] grid min-h-0 flex-1;
+  grid-template-columns: 248px 1fr;
+}
+.main {
+  @apply relative flex min-w-0 flex-col overflow-hidden;
+}
+</style>
