@@ -94,15 +94,20 @@ async function onSubmit() {
         <section class="prop-section">
           <h4>{{ t('saveModal.destinationLabel') }}</h4>
           <label>
-            <input v-model="destination" type="radio" value="file" />
+            <input v-model="destination" type="radio" name="save-destination" value="file" />
             {{ t('saveModal.destinationFile') }}
           </label>
           <label>
-            <input v-model="destination" type="radio" value="library" />
+            <input v-model="destination" type="radio" name="save-destination" value="library" />
             {{ t('saveModal.destinationLibrary') }}
           </label>
           <label>
-            <input v-model="destination" type="radio" value="libraryAndApply" />
+            <input
+              v-model="destination"
+              type="radio"
+              name="save-destination"
+              value="libraryAndApply"
+            />
             {{ t('saveModal.destinationLibraryAndApply') }}
           </label>
         </section>
@@ -110,11 +115,21 @@ async function onSubmit() {
         <section v-if="showOverwriteSection" data-test="overwrite-section" class="prop-section">
           <h4>{{ t('saveModal.overwriteLabel') }}</h4>
           <label>
-            <input v-model="overwriteExisting" type="radio" :value="true" />
+            <input
+              v-model="overwriteExisting"
+              type="radio"
+              name="save-overwrite-existing"
+              :value="true"
+            />
             {{ t('saveModal.overwriteOverwrite') }}
           </label>
           <label>
-            <input v-model="overwriteExisting" type="radio" :value="false" />
+            <input
+              v-model="overwriteExisting"
+              type="radio"
+              name="save-overwrite-existing"
+              :value="false"
+            />
             {{ t('saveModal.overwriteDuplicate') }}
           </label>
         </section>
