@@ -66,62 +66,44 @@ const conflictTitle = computed(() => {
 </template>
 
 <style scoped>
+@reference '~/assets/css/tailwind.css';
+
 .bi-row {
-  display: grid;
-  grid-template-columns: 140px 56px 1fr 80px 32px;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--line);
-  font-size: 12px;
+  @apply grid grid-cols-[140px_56px_1fr_80px_32px] items-center gap-2 border-b border-line px-2 py-1.5 text-[12px];
 }
 .bi-row.skip {
-  opacity: 0.5;
+  @apply opacity-50;
 }
 .bi-row.conflict {
   background: rgba(255, 191, 0, 0.04);
 }
 
 .role-id {
-  font-family: var(--font-mono);
-  font-weight: 500;
+  @apply font-mono font-medium;
 }
 .req {
-  color: var(--accent);
-  margin: 0 4px;
+  @apply mx-1 my-0 text-accent;
 }
 .role-label {
-  color: var(--fg-mute);
-  margin-left: 6px;
+  @apply ml-1.5 text-fg-mute;
 }
 .thumb-cell img {
-  width: 48px;
-  height: 48px;
-  object-fit: contain;
+  @apply size-12 object-contain;
   image-rendering: pixelated;
 }
 .dim {
-  color: var(--fg-dim);
-  font-size: 11px;
+  @apply text-[11px] text-fg-dim;
 }
 .src {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--fg-dim);
+  @apply font-mono text-[11px] text-fg-dim;
 }
 .size {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--fg-mute);
-  margin-left: 6px;
+  @apply ml-1.5 font-mono text-[10px] text-fg-mute;
 }
 .confidence {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--accent);
+  @apply font-mono text-[10px] text-accent;
 }
 .warn {
-  color: var(--amber);
-  margin-left: 4px;
+  @apply ml-1 text-amber;
 }
 </style>
