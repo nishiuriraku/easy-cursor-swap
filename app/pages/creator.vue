@@ -1425,6 +1425,55 @@ async function onFileChange(e: Event) {
   @apply mb-2 font-mono text-[10px] uppercase tracking-[0.16em] text-fg-mute;
 }
 
+.creator-grid {
+  @apply grid min-h-0 flex-1 border-t border-line;
+  grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+}
+@media (max-width: 880px) {
+  .creator-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+}
+
+.bigpreview {
+  @apply relative grid size-[220px] min-h-0 cursor-crosshair place-items-center rounded-2xl border border-line-hi;
+  background:
+    repeating-conic-gradient(rgba(255, 255, 255, 0.025) 0% 25%, transparent 0% 50%) 0 / 18px 18px,
+    var(--bg-1);
+  box-shadow: var(--shadow-2);
+  touch-action: none;
+  user-select: none;
+}
+.bigpreview.dragging .hot {
+  border-color: var(--accent-hi);
+  background: rgba(124, 242, 212, 0.4);
+  box-shadow:
+    0 0 16px var(--accent),
+    0 0 0 6px rgba(124, 242, 212, 0.18);
+}
+.bigpreview .hot {
+  @apply absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full;
+  border: 1.5px solid var(--accent);
+  background: rgba(124, 242, 212, 0.2);
+  box-shadow: 0 0 12px var(--accent);
+  transition:
+    box-shadow 120ms ease,
+    background 120ms ease;
+}
+.bigpreview .crosshair-h,
+.bigpreview .crosshair-v {
+  @apply absolute;
+  background: var(--accent-line);
+}
+.bigpreview .crosshair-h {
+  @apply inset-x-0 h-px;
+  top: 50%;
+}
+.bigpreview .crosshair-v {
+  @apply inset-y-0 w-px;
+  left: 50%;
+}
 .bigpreview:focus {
   outline: 2px solid var(--accent-line);
   outline-offset: -2px;

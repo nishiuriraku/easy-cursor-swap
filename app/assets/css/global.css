@@ -691,14 +691,7 @@ button {
  * 2 カラム (左ロール一覧 + 中央エディタ) で、左ペインに minmax を使い柔軟に縮める。
  * 狭いウィンドウ (本文 < 660px) では左ペインを上段ヘッダー化する。
  */
-.creator-grid {
-  display: grid;
-  grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
-  gap: 0;
-  flex: 1;
-  min-height: 0;
-  border-top: 1px solid var(--line);
-}
+/* .creator-grid は creator.vue scoped に移行 (Phase 11-D) */
 .cpane {
   padding: 14px;
   overflow: auto;
@@ -711,10 +704,6 @@ button {
 
 /* 本文 660px 未満: 左ペインも上に回し、エディタを最大化 */
 @media (max-width: 880px) {
-  .creator-grid {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
-  }
   .cpane.left {
     grid-column: 1;
     grid-row: 1;
@@ -776,63 +765,9 @@ button {
   align-items: center;
   gap: 18px;
 }
-.bigpreview {
-  width: 220px;
-  height: 220px;
-  border-radius: 16px;
-  background:
-    repeating-conic-gradient(rgba(255, 255, 255, 0.025) 0% 25%, transparent 0% 50%) 0 / 18px 18px,
-    var(--bg-1);
-  border: 1px solid var(--line-hi);
-  display: grid;
-  place-items: center;
-  position: relative;
-  box-shadow: var(--shadow-2);
-  cursor: crosshair;
-  touch-action: none;
-  user-select: none;
-}
-.bigpreview.dragging .hot {
-  border-color: var(--accent-hi);
-  background: rgba(124, 242, 212, 0.4);
-  box-shadow:
-    0 0 16px var(--accent),
-    0 0 0 6px rgba(124, 242, 212, 0.18);
-}
-.bigpreview .hot {
-  transition:
-    box-shadow 120ms ease,
-    background 120ms ease;
-}
-.bigpreview .crosshair-h,
-.bigpreview .crosshair-v {
-  position: absolute;
-  background: var(--accent-line);
-}
-.bigpreview .crosshair-h {
-  left: 0;
-  right: 0;
-  top: 50%;
-  height: 1px;
-}
-.bigpreview .crosshair-v {
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  width: 1px;
-}
-.bigpreview .hot {
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  border: 1.5px solid var(--accent);
-  border-radius: 50%;
-  background: rgba(124, 242, 212, 0.2);
-  transform: translate(-50%, -50%);
-  box-shadow: 0 0 12px var(--accent);
-}
-
-/* .size-strip / .size-tile は SizeStrip.vue に scoped 化 (Phase 11-A) */
+/* .bigpreview / .bigpreview .hot / .bigpreview .crosshair-* は
+ * creator.vue scoped に移行 (Phase 11-D)
+ * .size-strip / .size-tile は SizeStrip.vue に scoped 化 (Phase 11-A) */
 
 .prop-section {
   border: 1px solid var(--line);
