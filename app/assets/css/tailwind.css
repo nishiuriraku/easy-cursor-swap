@@ -358,3 +358,229 @@
   border-top-color: var(--accent);
   animation: spin 0.6s linear infinite;
 }
+
+/* --- Library list view shared (Phase 11-E) ---
+ * .lib-table (index.vue) + .lib-row.lib-head (index.vue) +
+ * .lib-row (ThemeRow.vue) で同じグリッドレイアウトを共有するため shared utility に置く。
+ * 9 列構成: fav | preview | name | coverage | ver | date | size | signed */
+.lib-table {
+  @apply overflow-hidden rounded-lg border border-line bg-bg-glass backdrop-blur-2xl;
+}
+.lib-row {
+  @apply relative grid min-h-14 items-center gap-3.5 border-b border-line px-4;
+  grid-template-columns:
+    36px
+    140px
+    minmax(220px, 1.4fr)
+    160px
+    78px
+    104px
+    72px
+    104px;
+  transition: background 0.12s;
+}
+.lib-row:not(.lib-head) {
+  @apply cursor-pointer outline-none;
+}
+.lib-row:not(.lib-head):focus-visible {
+  box-shadow: inset 0 0 0 2px var(--accent-line);
+}
+.lib-row:last-child {
+  @apply border-b-0;
+}
+.lib-row:not(.lib-head):hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+:where(html.light) .lib-row:not(.lib-head):hover {
+  background: rgba(15, 20, 35, 0.025);
+}
+.lib-row.lib-head {
+  @apply min-h-9 select-none border-b border-line-hi font-mono text-[10px] uppercase tracking-[0.12em] text-fg-mute;
+  background: rgba(255, 255, 255, 0.025);
+}
+:where(html.light) .lib-row.lib-head {
+  background: rgba(15, 20, 35, 0.025);
+}
+.lib-row.lib-head .lt-col {
+  @apply font-medium;
+}
+.lib-row.active {
+  background: linear-gradient(90deg, rgba(124, 242, 212, 0.04), transparent 60%);
+}
+.lib-row.active::before {
+  content: '';
+  @apply absolute left-0 w-0.5 rounded-[2px] bg-accent;
+  top: 8px;
+  bottom: 8px;
+  box-shadow: 0 0 12px var(--accent);
+}
+:where(html.light) .lib-row.active {
+  background: linear-gradient(90deg, rgba(15, 168, 133, 0.05), transparent 60%);
+}
+
+.lt-col {
+  @apply flex min-w-0 items-center;
+}
+.lt-sortable {
+  @apply cursor-pointer gap-1 outline-none;
+  transition: color 0.12s;
+}
+.lt-sortable:hover,
+.lt-sortable:focus-visible {
+  @apply text-fg;
+}
+.lt-sortable:focus-visible {
+  @apply rounded;
+  box-shadow: inset 0 0 0 2px var(--accent-line);
+}
+.lt-sortable.active {
+  @apply text-fg;
+}
+.sort-dir {
+  @apply font-mono text-[11px] text-accent;
+}
+
+/* Cells in ThemeRow */
+.lt-fav {
+  @apply justify-center;
+}
+.lt-fav .star {
+  @apply size-6;
+}
+.lt-preview {
+  @apply py-2;
+}
+.lt-mini {
+  @apply grid gap-0.5;
+  grid-template-columns: repeat(8, 14px);
+}
+.lt-cell {
+  @apply grid size-[14px] place-items-center rounded-[3px] border border-line text-fg;
+  background: rgba(255, 255, 255, 0.04);
+}
+.lt-cell.empty {
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(255, 255, 255, 0.025),
+    rgba(255, 255, 255, 0.025) 2px,
+    transparent 2px,
+    transparent 4px
+  );
+  border-color: rgba(255, 255, 255, 0.04);
+}
+:where(html.light) .lt-cell {
+  background: rgba(15, 20, 35, 0.03);
+}
+:where(html.light) .lt-cell.empty {
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(15, 20, 35, 0.04),
+    rgba(15, 20, 35, 0.04) 2px,
+    transparent 2px,
+    transparent 4px
+  );
+}
+
+.lt-name-wrap {
+  @apply flex min-w-0 flex-col gap-[3px];
+}
+.lt-name-row {
+  @apply flex min-w-0 flex-wrap items-center gap-2;
+}
+.lt-name-text {
+  @apply overflow-hidden truncate whitespace-nowrap font-display text-[14px] font-semibold tracking-[-0.01em] text-fg;
+}
+.lt-author {
+  @apply text-[11px] text-fg-dim;
+}
+.lt-tag {
+  @apply inline-flex rounded-[3px] border border-line px-1.5 py-px font-mono text-[9.5px] tracking-[0.04em] text-fg-dim;
+  background: rgba(255, 255, 255, 0.03);
+}
+:where(html.light) .lt-tag {
+  background: rgba(15, 20, 35, 0.03);
+}
+
+.lt-active-pill {
+  @apply inline-flex items-center gap-[5px] rounded-full border border-accent-line font-mono text-[9px] uppercase tracking-[0.12em] text-accent;
+  padding: 2px 7px;
+  background: rgba(124, 242, 212, 0.1);
+}
+:where(html.light) .lt-active-pill {
+  background: rgba(15, 168, 133, 0.1);
+}
+.lt-active-pill .pulse {
+  @apply size-1 rounded-full bg-accent;
+  box-shadow: 0 0 6px var(--accent);
+  animation: pulse 1.6s infinite;
+}
+
+.lt-cov-wrap {
+  @apply flex w-full items-center gap-2;
+}
+.lt-cov-bar {
+  @apply h-1 flex-1 overflow-hidden rounded-[2px];
+  background: rgba(255, 255, 255, 0.06);
+}
+:where(html.light) .lt-cov-bar {
+  background: rgba(15, 20, 35, 0.06);
+}
+.lt-cov-bar > i {
+  @apply block h-full rounded-[2px];
+  background: linear-gradient(90deg, var(--accent), #5dd9bd);
+}
+.lt-cov-num {
+  @apply min-w-9 text-right font-mono text-[11px] text-fg;
+}
+.lt-cov-tot {
+  @apply text-fg-mute;
+}
+
+.lt-mono {
+  @apply font-mono text-[11px] tracking-[0.02em] text-fg-dim;
+}
+
+.lt-sig-ok,
+.lt-sig-warn {
+  @apply inline-flex items-center gap-[5px] rounded border px-2 py-[3px] font-mono text-[9.5px] tracking-[0.06em];
+}
+.lt-sig-ok {
+  @apply border-accent-line bg-accent-dim text-accent;
+}
+.lt-sig-warn {
+  color: var(--amber);
+  background: rgba(245, 194, 107, 0.08);
+  border-color: rgba(245, 194, 107, 0.3);
+}
+
+.lt-act {
+  @apply flex justify-end gap-1.5;
+}
+.lt-act .btn {
+  @apply px-2.5 text-[11.5px];
+}
+
+/* Narrow viewport (Q3): preview を 1 セル化して Arrow のみ表示 */
+@media (max-width: 1080px) {
+  .lib-row {
+    grid-template-columns:
+      32px
+      28px
+      minmax(200px, 1.5fr)
+      140px
+      72px
+      96px
+      96px;
+    gap: 12px;
+  }
+  .lib-row.lib-head .lt-size,
+  .lib-row .lt-size {
+    display: none;
+  }
+  .lt-mini {
+    grid-template-columns: repeat(1, 14px);
+  }
+  .lt-mini > .lt-cell:nth-child(n + 2) {
+    display: none;
+  }
+}
