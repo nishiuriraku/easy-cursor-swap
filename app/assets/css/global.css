@@ -154,82 +154,8 @@ button {
   overflow: hidden;
 }
 
-.toolbar {
-  height: 56px;
-  border-bottom: 1px solid var(--line);
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 16px;
-  padding: 0 20px;
-  background: rgba(10, 11, 15, 0.45);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  flex-shrink: 0;
-}
-.bcrumb {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-}
-.bcrumb .crumb {
-  color: var(--fg-dim);
-}
-.bcrumb .crumb.active {
-  color: var(--fg);
-  font-weight: 600;
-}
-.bcrumb .sep {
-  color: var(--fg-faint);
-}
-
-.search {
-  height: 32px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  max-width: 360px;
-  width: 100%;
-  transition:
-    border-color 0.15s,
-    background 0.15s;
-}
-.search:focus-within {
-  border-color: var(--accent-line);
-  background: rgba(124, 242, 212, 0.04);
-}
-.search input {
-  background: transparent;
-  border: none;
-  outline: none;
-  color: var(--fg);
-  font-size: 12.5px;
-  width: 100%;
-  font-family: var(--font-body);
-}
-.search input::placeholder {
-  color: var(--fg-mute);
-}
-.search .kbd {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--fg-mute);
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--line);
-  padding: 1px 5px;
-  border-radius: 3px;
-}
-
-.tb-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
+/* .toolbar / .bcrumb / .search / .kbd / .tb-actions は
+ * tailwind.css に移行 (Phase 12-B) */
 
 /* =============================================
  * ボタン
@@ -754,13 +680,6 @@ button {
   flex-direction: column;
   gap: 12px;
 }
-/* tb-actions (toolbar 右側のボタン群) */
-.tb-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
 /* =============================================
  * ライトテーマ — html.light に付与してアプリ全体を切替
  * design/styles.css の `.win.light` から移植
@@ -806,13 +725,8 @@ html.light .win::before {
     radial-gradient(800px 500px at 12% -10%, rgba(15, 168, 133, 0.1), transparent 60%),
     radial-gradient(900px 600px at 110% 110%, rgba(106, 92, 255, 0.08), transparent 60%);
 }
-html.light .toolbar {
-  background: rgba(255, 255, 255, 0.55);
-}
-/* html.light .btn / .input 上書きは tailwind.css の :where(html.light) で対応 */
-html.light .search {
-  background: rgba(15, 20, 35, 0.025);
-}
+/* html.light .toolbar / .btn / .input / .search の上書きは tailwind.css の
+ * :where(html.light) で対応 (Phase 12-B) */
 html.light .cell {
   background: rgba(15, 20, 35, 0.025);
 }
