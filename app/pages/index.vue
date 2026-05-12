@@ -935,22 +935,6 @@ onUnmounted(() => {
               sortDir === 'asc' ? '↑' : '↓'
             }}</span>
           </div>
-          <div
-            :class="['lt-col', 'lt-cov', 'lt-sortable', { active: sortKey === 'coverage' }]"
-            role="columnheader"
-            :aria-sort="
-              sortKey === 'coverage' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'
-            "
-            tabindex="0"
-            @click="sortBy('coverage')"
-            @keydown.enter.prevent="sortBy('coverage')"
-            @keydown.space.prevent="sortBy('coverage')"
-          >
-            {{ t('library.colCoverage') }}
-            <span v-if="sortKey === 'coverage'" class="sort-dir">{{
-              sortDir === 'asc' ? '↑' : '↓'
-            }}</span>
-          </div>
           <div class="lt-col lt-ver" role="columnheader">{{ t('library.colVersion') }}</div>
           <div
             :class="['lt-col', 'lt-date', 'lt-sortable', { active: sortKey === 'updated' }]"

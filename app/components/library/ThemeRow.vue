@@ -6,15 +6,11 @@
  * グリッド表示の `ThemeCard.vue` と同じ emit を共有し、Library ページで
  * 表示モード切替 (`viewMode === 'list'`) に応じて差し替えられる。
  *
- * 9 列構成:
- *  fav | preview | name+tags | coverage bar | ver | date | size | sig | actions
- *
- * 狭幅では `.lt-mini` が media query で縦 1 セルに圧縮され、Arrow のみ残る
- * (Q3 で「非表示ではなく Arrow のみ」と決定)。
+ * 7 列構成 (Phase 13-A で coverage バーを撤去、preview を Arrow 1 個に):
+ *  fav | preview (Arrow 1 個) | name+tags | ver | date | size | sig
  */
 import { computed } from 'vue'
 import type { ThemeCardData } from '~/types/theme'
-import { CURSOR_ROLES } from '~/components/icons/CursorIcons'
 import { useI18n } from '~/composables/useI18n'
 
 const { t } = useI18n()
@@ -28,11 +24,8 @@ const emit = defineEmits<{
   showDetails: [id: string]
 }>()
 
-/** プレビュー列で表示する役割。Source of Truth は CURSOR_ROLES の先頭 8 件
- *  (= Arrow / Help / AppStarting / Wait / Crosshair / IBeam / NWPen / No)。 */
-const previewRoles = CURSOR_ROLES.slice(0, 8)
-
-const coveragePct = computed(() => Math.round((props.theme.includedRoles.length / 17) * 100))
+/** 行ビューでは Arrow 1 個だけアイコン表示する。included かどうかで描画切替。 */
+const hasArrow = computed(() => props.theme.includedRoles.includes('Arrow'))
 
 const isSystem = computed(() => props.theme.kind === 'system')
 
@@ -107,19 +100,14 @@ function onRowKeydown(e: KeyboardEvent) {
       </button>
     </div>
 
-    <!-- プレビュー (8 セル → 狭幅では Arrow のみ) -->
+    <!-- プレビュー (Arrow 1 アイコン) -->
     <div class="lt-col lt-preview" role="cell">
       <div
         class="lt-mini"
         :aria-label="t('library.coverage', { filled: theme.includedRoles.length })"
       >
-        <div
-          v-for="role in previewRoles"
-          :key="role.id"
-          :class="['lt-cell', { empty: !theme.includedRoles.includes(role.id) }]"
-          :title="role.jp"
-        >
-          <CursorIcon v-if="theme.includedRoles.includes(role.id)" :role="role.id" :size="11" />
+        <div :class="['lt-cell', { empty: !hasArrow }]">
+          <CursorIcon v-if="hasArrow" role="Arrow" :size="14" />
         </div>
       </div>
     </div>
@@ -135,18 +123,6 @@ function onRowKeydown(e: KeyboardEvent) {
           <span v-for="tag in theme.tags ?? []" :key="tag" class="lt-tag">{{ tag }}</span>
         </div>
         <div class="lt-author">@{{ theme.author ?? 'unknown' }}</div>
-      </div>
-    </div>
-
-    <!-- カバレッジ -->
-    <div class="lt-col lt-cov" role="cell">
-      <div class="lt-cov-wrap">
-        <div class="lt-cov-bar" aria-hidden="true">
-          <i :style="{ width: coveragePct + '%' }" />
-        </div>
-        <span class="lt-cov-num">
-          {{ theme.includedRoles.length }}<span class="lt-cov-tot">/17</span>
-        </span>
       </div>
     </div>
 

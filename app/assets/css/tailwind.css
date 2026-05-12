@@ -510,10 +510,11 @@
   animation: spin 0.6s linear infinite;
 }
 
-/* --- Library list view shared (Phase 11-E) ---
+/* --- Library list view shared (Phase 11-E / 13-A) ---
  * .lib-table (index.vue) + .lib-row.lib-head (index.vue) +
  * .lib-row (ThemeRow.vue) で同じグリッドレイアウトを共有するため shared utility に置く。
- * 9 列構成: fav | preview | name | coverage | ver | date | size | signed */
+ * 7 列構成: fav | preview (Arrow 1) | name | ver | date | size | signed
+ * (Phase 13-A で coverage バー列を撤去、preview は Arrow 1 個に縮小) */
 .lib-table {
   @apply overflow-hidden rounded-lg border border-line bg-bg-glass backdrop-blur-2xl;
 }
@@ -521,9 +522,8 @@
   @apply relative grid min-h-14 items-center gap-3.5 border-b border-line px-4;
   grid-template-columns:
     36px
-    140px
+    44px
     minmax(220px, 1.4fr)
-    160px
     78px
     104px
     72px
@@ -601,12 +601,13 @@
 .lt-preview {
   @apply py-2;
 }
+/* Phase 13-A: 行ビューは Arrow 1 アイコンだけ表示。
+ * `.lt-mini` は元 8 セルのグリッド名残だが、単一セルでも構造を変えずに維持。 */
 .lt-mini {
-  @apply grid gap-0.5;
-  grid-template-columns: repeat(8, 14px);
+  @apply grid place-items-center;
 }
 .lt-cell {
-  @apply grid size-[14px] place-items-center rounded-[3px] border border-line text-fg;
+  @apply grid size-7 place-items-center rounded-md border border-line text-fg;
   background: rgba(255, 255, 255, 0.04);
 }
 .lt-cell.empty {
@@ -666,26 +667,9 @@
   animation: pulse 1.6s infinite;
 }
 
-.lt-cov-wrap {
-  @apply flex w-full items-center gap-2;
-}
-.lt-cov-bar {
-  @apply h-1 flex-1 overflow-hidden rounded-[2px];
-  background: rgba(255, 255, 255, 0.06);
-}
-:where(html.light) .lt-cov-bar {
-  background: rgba(15, 20, 35, 0.06);
-}
-.lt-cov-bar > i {
-  @apply block h-full rounded-[2px];
-  background: linear-gradient(90deg, var(--accent), #5dd9bd);
-}
-.lt-cov-num {
-  @apply min-w-9 text-right font-mono text-[11px] text-fg;
-}
-.lt-cov-tot {
-  @apply text-fg-mute;
-}
+/* .lt-cov-* (coverage バー) は Phase 13-A で行ビューから撤去済み。
+ * ThemeDetailDrawer / ThemeCard ではまだ別ロジックでカバレッジを表示するが、
+ * 行ビュー用の CSS はここから削除。 */
 
 .lt-mono {
   @apply font-mono text-[11px] tracking-[0.02em] text-fg-dim;
@@ -929,14 +913,14 @@
   @apply border-accent-line bg-accent-dim text-accent;
 }
 
-/* Narrow viewport (Q3): preview を 1 セル化して Arrow のみ表示 */
+/* Narrow viewport (Phase 13-A 後): coverage 列廃止済み、preview は単一 Arrow セル。
+ * 7 列 → 6 列で .lt-size を hide してパス情報優先。 */
 @media (max-width: 1080px) {
   .lib-row {
     grid-template-columns:
       32px
-      28px
+      36px
       minmax(200px, 1.5fr)
-      140px
       72px
       96px
       96px;
@@ -944,12 +928,6 @@
   }
   .lib-row.lib-head .lt-size,
   .lib-row .lt-size {
-    display: none;
-  }
-  .lt-mini {
-    grid-template-columns: repeat(1, 14px);
-  }
-  .lt-mini > .lt-cell:nth-child(n + 2) {
     display: none;
   }
 }
