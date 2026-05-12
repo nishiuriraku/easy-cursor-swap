@@ -388,21 +388,25 @@ function centerHotspot() {
 }
 
 /**
- * AniThumb editable モードから emit された hotspot-pick / hotspot-drag を受けて
- * hotspotX/Y ref と setAsset に直結するハンドラ。
+ * 詳細設定で解像度 (`activeSize`) を切り替えたとき、ホットスポットを
+ * 「画面上の同じ比率位置」に保ったまま追従させる。
+ *
+ * - アセット未割当のロールでは `hotspotReferenceSize = activeSize` なので
+ *   解像度を変えると参照系が変わる。`(x/prevRef, y/prevRef)` の比率を
+ *   `nextRef` ピクセル系に再投影することで dot が動かないようにする。
+ * - アセット割当済みでは `hotspotReferenceSize = primarySize` 固定なので
+ *   参照系は不変、再スケールは発生しない (no-op)。
  */
-function onAniHotspotPick(p: { x: number; y: number }) {
-  hotspotX.value = p.x
-  hotspotY.value = p.y
-  const id = activeRoleId.value
-  if (!id) return
-  const a = assigned.value[id]
-  if (!a) return
-  setAsset(id, { ...a, hotspot: { x: p.x, y: p.y } })
-}
-
 function selectSize(s: number) {
+  const prevRef = hotspotReferenceSize.value
   activeSize.value = s
+  const nextRef = hotspotReferenceSize.value
+  if (prevRef !== nextRef && prevRef > 0) {
+    const ratioX = hotspotX.value / prevRef
+    const ratioY = hotspotY.value / prevRef
+    hotspotX.value = clamp(Math.round(ratioX * nextRef), 0, nextRef)
+    hotspotY.value = clamp(Math.round(ratioY * nextRef), 0, nextRef)
+  }
 }
 
 function isRequired(id: string): boolean {
@@ -1230,6 +1234,11 @@ async function onFileChange(e: Event) {
               >
                 <div class="crosshair-h" />
                 <div class="crosshair-v" />
+                <!--
+                  ホットスポット表示・操作は親 .bigpreview 側に一本化している
+                  (pointerdown/move/up + keydown + `.hot` ドット)。AniThumb は
+                  fit モードでアニメ表示だけを担当し、内部 overlay は使わない。
+                -->
                 <AniThumb
                   v-if="activeAniFrames"
                   :frame-pngs="activeAniFrames.framePngs"
@@ -1237,22 +1246,14 @@ async function onFileChange(e: Event) {
                   :durations="activeAniFrames.perStepDurationsMs"
                   :width="hotspotReferenceSize"
                   :height="hotspotReferenceSize"
-                  :hotspot="{ x: hotspotX, y: hotspotY }"
-                  editable
-                  @hotspot-pick="onAniHotspotPick"
-                  @hotspot-drag="onAniHotspotPick"
+                  fit
                 />
                 <img
                   v-else-if="activePreviewUrl"
                   :src="activePreviewUrl"
                   :alt="activeRole.jp"
                   draggable="false"
-                  style="
-                    max-width: 90%;
-                    max-height: 90%;
-                    image-rendering: pixelated;
-                    pointer-events: none;
-                  "
+                  style="width: 90%; height: 90%; image-rendering: pixelated; pointer-events: none"
                 />
                 <CursorIcon
                   v-else

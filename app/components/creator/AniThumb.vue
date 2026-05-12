@@ -2,9 +2,12 @@
 /**
  * .ani をアニメーション再生するサムネ / プレビュー要素。
  *
- * - `editable=false` (既定): 画像表示のみ。一括取り込みプレビューモーダル等で使用。
- * - `editable=true`: 十字線オーバーレイ + クリック/ドラッグで `hotspot-pick` / `hotspot-drag` emit。
- *   creator.vue メインパネルで使用する。
+ * - `editable=false` (既定): 画像表示のみ。
+ * - `editable=true`: 内部に十字線 + dot を描画し、クリック/ドラッグで `hotspot-pick` / `hotspot-drag` emit。
+ *   creator.vue は `fit` モードで親側の overlay にホットスポット表示を委譲しているため
+ *   editable は使用しない (一括インポートプレビュー等で将来再利用するために残置)。
+ * - `fit=true`: 親要素の 90% に合わせて伸縮 (`image-rendering: pixelated` で粗くスケール)。
+ *   `width/height` props はフレームの内在ピクセル幅として残し、CSS で表示サイズだけ揃える。
  */
 import { computed } from 'vue'
 import { useAniPlayer } from '~/composables/useAniPlayer'
@@ -17,10 +20,12 @@ interface Props {
   height: number
   editable?: boolean
   hotspot?: { x: number; y: number } | null
+  fit?: boolean
 }
 const props = withDefaults(defineProps<Props>(), {
   editable: false,
   hotspot: null,
+  fit: false,
 })
 
 const emit = defineEmits<{
@@ -76,8 +81,8 @@ function onMouseUp() {
 <template>
   <div
     class="ani-thumb"
-    :class="{ editable }"
-    :style="{ width: width + 'px', height: height + 'px' }"
+    :class="{ editable, fit }"
+    :style="fit ? undefined : { width: width + 'px', height: height + 'px' }"
     @mousedown="onMouseDown"
     @mousemove="onMouseMove"
     @mouseup="onMouseUp"
@@ -101,8 +106,18 @@ function onMouseUp() {
 .ani-thumb.editable {
   @apply cursor-crosshair;
 }
+.ani-thumb.fit {
+  width: 90%;
+  height: 90%;
+  aspect-ratio: 1 / 1;
+}
 .ani-thumb img {
   @apply pointer-events-none select-none;
+}
+.ani-thumb.fit img {
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
 }
 .crosshair-v {
   @apply pointer-events-none absolute top-0 bottom-0 w-px;
