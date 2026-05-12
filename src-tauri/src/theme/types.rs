@@ -4,9 +4,88 @@
 //! `untagged` enum で「単純文字列 / ロケールマップ」を吸収する。
 
 use crate::errors::AppResult;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
+
+/// 0.0..=1.0 に制約された比率。
+///
+/// - `new()` で NaN → 0.0、範囲外は `clamp(0.0, 1.0)` で正規化。
+/// - `Deserialize` は `f32` で受けて `new()` 経由 (不正値で deserialize 失敗しない)。
+/// - JSON 上は透過的に `number` (例: `0.0125`)。
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(transparent)]
+pub struct Ratio01(f32);
+
+impl Ratio01 {
+    pub const ZERO: Self = Self(0.0);
+    pub const ONE: Self = Self(1.0);
+
+    /// `v` を `[0.0, 1.0]` に正規化する。NaN は 0.0、無限大は範囲外として clamp。
+    pub fn new(v: f32) -> Self {
+        if v.is_nan() {
+            Self(0.0)
+        } else {
+            Self(v.clamp(0.0, 1.0))
+        }
+    }
+
+    pub fn get(self) -> f32 {
+        self.0
+    }
+
+    /// 比率 → 絶対 px (`round()` で四捨五入、`[0, size]` に clamp)。
+    pub fn to_px(self, size: u32) -> u32 {
+        let raw = (self.0 * size as f32).round() as i64;
+        raw.clamp(0, size as i64) as u32
+    }
+
+    /// 絶対 px → 比率。`size == 0` のとき `ZERO`。
+    pub fn from_px(px: u32, size: u32) -> Self {
+        if size == 0 {
+            Self::ZERO
+        } else {
+            Self::new(px as f32 / size as f32)
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Ratio01 {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let v = f32::deserialize(d)?;
+        Ok(Self::new(v))
+    }
+}
+
+/// ホットスポット (比率)。
+///
+/// `(x, y)` は表示画像の左上から見た比率 (0.0 = 左上、1.0 = 右下) で
+/// 絶対 px は持たない。`.cur` 書出時に `to_px(size)` で px に変換する。
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct Hotspot {
+    pub x: Ratio01,
+    pub y: Ratio01,
+}
+
+impl Hotspot {
+    pub const ZERO: Self = Self {
+        x: Ratio01::ZERO,
+        y: Ratio01::ZERO,
+    };
+
+    /// 絶対 px ペア (基準 `size`) から比率 Hotspot を作る。
+    pub fn from_px(x_px: u32, y_px: u32, size: u32) -> Self {
+        Self {
+            x: Ratio01::from_px(x_px, size),
+            y: Ratio01::from_px(y_px, size),
+        }
+    }
+
+    /// 比率 Hotspot を `size` 基準の px ペアに戻す。
+    pub fn to_px(self, size: u32) -> (u32, u32) {
+        (self.x.to_px(size), self.y.to_px(size))
+    }
+}
 
 /// テーマメタデータ (theme.json のスキーマ)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -238,6 +317,79 @@ pub(super) fn zip_dir_recursive<W: std::io::Write + std::io::Seek>(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod ratio_tests {
+    use super::*;
+
+    #[test]
+    fn ratio_new_clamps_below_zero() {
+        assert_eq!(Ratio01::new(-0.5).get(), 0.0);
+    }
+
+    #[test]
+    fn ratio_new_clamps_above_one() {
+        assert_eq!(Ratio01::new(1.5).get(), 1.0);
+    }
+
+    #[test]
+    fn ratio_new_handles_nan() {
+        assert_eq!(Ratio01::new(f32::NAN).get(), 0.0);
+    }
+
+    #[test]
+    fn ratio_new_handles_infinity() {
+        assert_eq!(Ratio01::new(f32::INFINITY).get(), 1.0);
+        assert_eq!(Ratio01::new(f32::NEG_INFINITY).get(), 0.0);
+    }
+
+    #[test]
+    fn ratio_to_px_rounds() {
+        assert_eq!(Ratio01::new(0.5).to_px(32), 16);
+        assert_eq!(Ratio01::new(0.5).to_px(33), 17); // 16.5 → 17
+        assert_eq!(Ratio01::new(0.0).to_px(32), 0);
+        assert_eq!(Ratio01::new(1.0).to_px(32), 32);
+    }
+
+    #[test]
+    fn ratio_from_px_zero_size() {
+        assert_eq!(Ratio01::from_px(5, 0), Ratio01::ZERO);
+    }
+
+    #[test]
+    fn ratio_roundtrip_within_one_px() {
+        for size in [16u32, 32, 64, 128, 256] {
+            for px in [0u32, 1, size / 4, size / 2, size - 1, size] {
+                let r = Ratio01::from_px(px, size);
+                let back = r.to_px(size);
+                assert!(
+                    back.abs_diff(px) <= 1,
+                    "size={size} px={px} → {back} (Δ={})",
+                    back.abs_diff(px)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn hotspot_serde_roundtrip() {
+        let h = Hotspot {
+            x: Ratio01::new(0.125),
+            y: Ratio01::new(0.875),
+        };
+        let json = serde_json::to_string(&h).unwrap();
+        assert_eq!(json, r#"{"x":0.125,"y":0.875}"#);
+        let back: Hotspot = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, h);
+    }
+
+    #[test]
+    fn hotspot_deserialize_clamps_invalid() {
+        let h: Hotspot = serde_json::from_str(r#"{"x":2.5,"y":-1.0}"#).unwrap();
+        assert_eq!(h.x.get(), 1.0);
+        assert_eq!(h.y.get(), 0.0);
+    }
 }
 
 #[cfg(test)]
