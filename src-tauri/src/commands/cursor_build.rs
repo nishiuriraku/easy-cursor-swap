@@ -397,7 +397,11 @@ pub fn export_cursorpack_streamed(
                         hot_map.insert(*size, override_hot.to_px(*size));
                     }
                 }
-                let hot_map_opt = if hot_map.is_empty() { None } else { Some(hot_map) };
+                let hot_map_opt = if hot_map.is_empty() {
+                    None
+                } else {
+                    Some(hot_map)
+                };
                 (Some(png_map), hot_map_opt)
             }
         };
