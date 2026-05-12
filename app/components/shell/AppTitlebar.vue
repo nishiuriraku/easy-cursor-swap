@@ -221,7 +221,11 @@ function onTitlebarMouseDown(e: MouseEvent) {
 @reference '~/assets/css/tailwind.css';
 
 .titlebar {
-  @apply relative z-[5] grid h-9 grid-cols-[1fr_auto] items-center border-b border-line bg-bg-titlebar pl-3.5 backdrop-blur-[20px];
+  @apply relative z-[5] grid h-9 select-none grid-cols-[1fr_auto] items-center border-b border-line bg-bg-titlebar pl-3.5 backdrop-blur-[20px];
+  /* タイトルバーをドラッグ操作するとテキストが選択されてカーソルが I-beam になり
+   * 移動 UX が崩れるため、全体でテキスト選択を無効化する。
+   * (Safari 互換のため -webkit-user-select も明示) */
+  -webkit-user-select: none;
 }
 .tb-title {
   @apply flex items-center gap-2.5 text-[12px] tracking-[0.02em] text-fg-dim;

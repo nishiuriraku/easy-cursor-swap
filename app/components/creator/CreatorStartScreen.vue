@@ -45,7 +45,7 @@ const emit = defineEmits<{
       <p>{{ t('creatorStart.description') }}</p>
 
       <div class="es-cta-row">
-        <button class="btn primary es-cta-primary" @click="emit('startNew')">
+        <button class="btn primary" @click="emit('startNew')">
           <UiIcon name="Plus" :size="14" />
           {{ t('creatorStart.btnNew') }}
         </button>
@@ -122,12 +122,6 @@ const emit = defineEmits<{
 }
 .es-cta-row {
   @apply mt-6 flex flex-wrap justify-center gap-2.5;
-}
-.es-cta-primary {
-  height: 40px !important;
-  padding: 0 20px !important;
-  font-size: 13.5px !important;
-  @apply font-semibold;
 }
 
 .es-creator-hero {

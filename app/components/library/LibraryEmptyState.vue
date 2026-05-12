@@ -31,7 +31,7 @@ defineEmits<{
       </p>
 
       <div class="es-cta-row">
-        <NuxtLink class="btn primary es-cta-primary" to="/creator">
+        <NuxtLink class="btn primary" to="/creator">
           <UiIcon name="Plus" :size="14" />新規作成
         </NuxtLink>
         <button class="btn" @click="$emit('open-import')">
@@ -104,12 +104,6 @@ defineEmits<{
 }
 .es-cta-row {
   @apply mt-6 flex flex-wrap justify-center gap-2.5;
-}
-.es-cta-primary {
-  height: 40px !important;
-  padding: 0 20px !important;
-  font-size: 13.5px !important;
-  @apply font-semibold;
 }
 .es-drop {
   @apply mt-[26px] w-full max-w-[560px] rounded-xl p-3.5;
