@@ -304,6 +304,113 @@
   @apply cursor-not-allowed opacity-50;
 }
 
+/* --- .ctl-row / .ctl-radio / .ctl-check (Variant A "Crisp") ---
+ * Claude Design "Save Dialog Controls" Variant A (推奨デフォルト) を
+ * tailwind shared utility 化したもの。原稿: project/styles-controls.css の
+ * .row-a / .radio-a / .check-a。design の `.win.light` スコープは本 repo の
+ * html.light に置換。
+ *
+ * 構造:
+ *   <label class="ctl-row">
+ *     <span class="ctl-radio" />       ← ラジオ (or .ctl-check + svg ティック)
+ *     <span><div class="label">…</div><div class="sub">…</div></span>
+ *     <span class="tail">…</span>      ← 任意の右側補助テキスト
+ *   </label>
+ *
+ * 採用理由: Win11 ネイティブ UI に最も近く、ヒット領域が広く、説明文 1 行を
+ * 添えられて Save ダイアログのレイアウトに合う。 */
+.ctl-row {
+  @apply grid cursor-pointer items-center gap-3 rounded-[8px] border border-transparent;
+  grid-template-columns: auto 1fr auto;
+  padding: 9px 10px;
+  transition: background 0.12s;
+}
+.ctl-row:hover {
+  background: rgba(255, 255, 255, 0.025);
+}
+:where(html.light) .ctl-row:hover {
+  background: rgba(15, 20, 35, 0.035);
+}
+.ctl-row:focus-within {
+  border-color: var(--accent-line);
+  background: var(--accent-dim);
+}
+.ctl-row .ctl-label {
+  @apply text-[13px] font-medium text-fg;
+}
+.ctl-row .ctl-sub {
+  @apply mt-0.5 text-[11.5px] text-fg-dim;
+}
+.ctl-row .ctl-tail {
+  @apply font-mono text-[10px] text-fg-mute;
+}
+.ctl-row input[type='radio'],
+.ctl-row input[type='checkbox'] {
+  @apply absolute size-0 opacity-0;
+}
+
+.ctl-radio {
+  @apply relative size-4 shrink-0 rounded-full border-[1.5px] border-line-strong;
+  background: rgba(255, 255, 255, 0.02);
+  transition:
+    border-color 0.12s,
+    background 0.12s,
+    box-shadow 0.12s;
+}
+:where(html.light) .ctl-radio {
+  background: rgba(15, 20, 35, 0.02);
+}
+.ctl-row:hover .ctl-radio {
+  @apply border-fg-dim;
+}
+.ctl-radio.on {
+  @apply border-accent;
+  background: var(--accent-dim);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+.ctl-radio.on::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-line);
+}
+.ctl-row input[type='radio']:focus-visible + .ctl-radio {
+  box-shadow: 0 0 0 3px rgba(124, 242, 212, 0.3);
+}
+
+.ctl-check {
+  @apply relative grid size-4 shrink-0 place-items-center rounded-[4px] border-[1.5px] border-line-strong;
+  background: rgba(255, 255, 255, 0.02);
+  color: transparent;
+  transition: all 0.12s;
+}
+:where(html.light) .ctl-check {
+  background: rgba(15, 20, 35, 0.02);
+}
+.ctl-row:hover .ctl-check {
+  @apply border-fg-dim;
+}
+.ctl-check.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0a0b0f;
+  box-shadow:
+    0 0 0 3px var(--accent-dim),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+:where(html.light) .ctl-check.on {
+  color: #ffffff;
+}
+.ctl-check svg {
+  @apply size-[11px];
+  stroke-width: 2.5;
+}
+.ctl-row input[type='checkbox']:focus-visible + .ctl-check {
+  box-shadow: 0 0 0 3px rgba(124, 242, 212, 0.3);
+}
+
 /* --- .ui-radio (card-row 形式の共有ラジオ) --- */
 .ui-radio {
   @apply mt-1.5 flex cursor-pointer items-center gap-2.5 rounded-md border border-line bg-white/[0.02] px-2.5 py-2 text-[12.5px] text-fg;
