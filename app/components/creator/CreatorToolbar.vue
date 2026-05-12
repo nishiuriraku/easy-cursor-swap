@@ -38,11 +38,11 @@ defineEmits<{
     <div class="tb-actions">
       <button
         class="btn ghost"
-        aria-label="クリアして初期画面に戻る"
-        title="編集中のアセットを破棄して初期画面に戻る"
+        :aria-label="t('creator.clearAria')"
+        :title="t('creator.clearTitle')"
         @click="$emit('reset')"
       >
-        <UiIcon name="X" :size="13" />クリア
+        <UiIcon name="X" :size="13" />{{ t('creator.clearLabel') }}
       </button>
       <span v-if="hasKeystoreSigning" class="tag ok">
         <UiIcon name="Shield" :size="11" />{{ t('creator.signedTag') }}

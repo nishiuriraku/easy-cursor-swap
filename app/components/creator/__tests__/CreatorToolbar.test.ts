@@ -5,13 +5,20 @@
  * Export ボタンは sign フラグ付き payload を emit するので、
  * 「sign=true / false の使い分け」を 2 つの異なるボタンで生成する点を確認。
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import CreatorToolbar from '../CreatorToolbar.vue'
+import { useI18n } from '~/composables/useI18n'
 
 const stubs = {
   UiIcon: { template: '<span></span>' },
 }
+
+// happy-dom の navigator.language は en-US 既定。テストは ja の aria-label セレクタを
+// 使うので、各テスト前に明示的に locale=ja に固定して i18n の出力を決定論的にする。
+beforeEach(() => {
+  useI18n().setLocale('ja')
+})
 
 const baseProps = {
   metaName: 'Untitled',

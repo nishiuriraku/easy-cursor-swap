@@ -191,7 +191,7 @@ watch(protectExisting, (v) => {
 const summaryLine = computed(() => {
   const auto = matches.value.filter((m) => m.decision === 'apply').length
   const conflicts = matches.value.filter((m) => m.conflict !== 'none').length
-  return `自動 ${auto} 件 ・ 未マッチ ${unmatched.value.length} 件 ・ 衝突 ${conflicts} 件`
+  return t('bulkImport.previewSummary', { auto, unmatched: unmatched.value.length, conflicts })
 })
 
 const allRoleRows = computed(() => {

@@ -189,7 +189,7 @@ defineEmits<{
     <Transition name="fade">
       <div v-if="exportMessage" class="import-banner" role="status">
         <UiIcon
-          :name="exportMessage.startsWith('エクスポート失敗') ? 'Alert' : 'Check'"
+          :name="exportMessage.startsWith(t('creator.exportFailPrefix')) ? 'Alert' : 'Check'"
           :size="13"
         />
         <span>{{ exportMessage }}</span>
@@ -243,7 +243,7 @@ defineEmits<{
             style="height: 24px; margin-left: auto"
             @click="$emit('cancel-export')"
           >
-            <UiIcon name="X" :size="11" />キャンセル
+            <UiIcon name="X" :size="11" />{{ t('creator.cancelExport') }}
           </button>
         </div>
         <div class="export-progress-bar">

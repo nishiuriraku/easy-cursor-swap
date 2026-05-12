@@ -86,7 +86,9 @@ const emit = defineEmits<{
               {{ d.name }}
               <span v-if="d.isDraft" class="es-draft">DRAFT</span>
             </div>
-            <div class="es-recent-sub">{{ d.modified }} · {{ d.roleCount }}/17 役割</div>
+            <div class="es-recent-sub">
+              {{ d.modified }} · {{ t('creator.recentRoleCount', { count: d.roleCount }) }}
+            </div>
           </div>
           <UiIcon
             name="ChevD"

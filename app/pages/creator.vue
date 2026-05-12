@@ -73,7 +73,7 @@ const showAdvancedResolutions = ref(false)
 // title / description / ogImage を定義しておく。
 useSeoMeta({
   title: 'EasyCursorSwap — Creator',
-  description: 'Windows 用カーソルテーマを 17 役割 × 6 解像度で作成しエクスポートする',
+  description: t('creator.appDescription'),
   ogImage: '/icon.png',
 })
 
@@ -361,7 +361,7 @@ onMounted(async () => {
       const parsed = await bulkImport.parseCursorpack(editPath)
       bulkCursorpack.value = parsed
       bulkResolved.value = null
-      bulkSourceLabel.value = '📦 編集中'
+      bulkSourceLabel.value = t('creator.bulkSourceEditing')
       bulkModalOpen.value = true
       stage.value = 'editing'
       // `?editPath` 経由のみ元テーマ ID を保持。SaveDestinationModal が
@@ -370,7 +370,9 @@ onMounted(async () => {
       // `?editPath` 由来のテーマは「編集 → 再適用」が典型。デフォルトを Library+Apply に。
       saveModalDefault.value = 'libraryAndApply'
     } catch (err) {
-      importMessage.value = `編集データの読込に失敗: ${err instanceof Error ? err.message : String(err)}`
+      importMessage.value = t('creator.errEditLoadFailed', {
+        detail: err instanceof Error ? err.message : String(err),
+      })
       stage.value = 'editing'
     }
   }
@@ -391,18 +393,21 @@ async function rasterizeSvgToPng(svgString: string, size: number): Promise<Uint8
     img.src = url
     await new Promise<void>((resolve, reject) => {
       img.onload = () => resolve()
-      img.onerror = () => reject(new Error('SVG イメージの読み込みに失敗'))
+      img.onerror = () => reject(new Error(t('creator.errSvgImageLoadFailed')))
     })
     const canvas = document.createElement('canvas')
     canvas.width = size
     canvas.height = size
     const ctx = canvas.getContext('2d')
-    if (!ctx) throw new Error('Canvas 2D コンテキスト取得失敗')
+    if (!ctx) throw new Error(t('creator.errCanvas2dContext'))
     ctx.imageSmoothingEnabled = true
     ctx.imageSmoothingQuality = 'high'
     ctx.drawImage(img, 0, 0, size, size)
     const pngBlob: Blob = await new Promise((resolve, reject) => {
-      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob 失敗'))), 'image/png')
+      canvas.toBlob(
+        (b) => (b ? resolve(b) : reject(new Error(t('creator.errToBlobFailed')))),
+        'image/png',
+      )
     })
     return new Uint8Array(await pngBlob.arrayBuffer())
   } finally {
@@ -596,7 +601,9 @@ async function onThemePickerSelect(id: string | null) {
       stage.value = 'editing'
     }
   } catch (err) {
-    importMessage.value = `既存テーマの複製に失敗: ${err instanceof Error ? err.message : String(err)}`
+    importMessage.value = t('creator.errDuplicateThemeFailed', {
+      detail: err instanceof Error ? err.message : String(err),
+    })
     stage.value = 'editing'
   }
 }
@@ -614,7 +621,7 @@ async function onFileChange(e: Event) {
   sanitizedRemovals.value = []
   try {
     if (file.size > 10 * 1024 * 1024) {
-      throw new Error('ファイルサイズが 10 MB を超えています')
+      throw new Error(t('creator.errFileSizeOverMb'))
     }
 
     const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
@@ -622,14 +629,15 @@ async function onFileChange(e: Event) {
     if (ext === 'svg') {
       const text = await file.text()
       const { sanitized, removed } = sanitizeSvg(text)
-      if (!sanitized) throw new Error('SVG が解析できません: ' + removed.join(', '))
+      if (!sanitized)
+        throw new Error(t('creator.errSvgUnparsable', { removed: removed.join(', ') }))
       sanitizedRemovals.value = removed
       // SVG → 256px PNG にラスタライズして Rust 側ビルダー用に保持
       pngBytes = await rasterizeSvgToPng(sanitized, 256)
       importMessage.value =
         removed.length > 0
-          ? `SVG を sanitize しました (除去: ${removed.length} 件)`
-          : `SVG をインポートしました`
+          ? t('creator.notifySvgSanitized', { count: removed.length })
+          : t('creator.notifySvgImported')
     } else if (ext === 'png') {
       // PNG は magic byte の弱検証のみ (89 50 4E 47)
       const fullBytes = new Uint8Array(await file.arrayBuffer())
@@ -640,12 +648,12 @@ async function onFileChange(e: Event) {
         fullBytes[2] !== 0x4e ||
         fullBytes[3] !== 0x47
       ) {
-        throw new Error('PNG ヘッダーが不正です (Magic Byte 不一致)')
+        throw new Error(t('creator.errPngBadHeader'))
       }
       pngBytes = fullBytes
-      importMessage.value = 'PNG をインポートしました'
+      importMessage.value = t('creator.notifyPngImported')
     } else {
-      throw new Error(`未対応の拡張子: .${ext} (PNG / SVG のみ受付)`)
+      throw new Error(t('creator.errUnsupportedExt', { ext }))
     }
 
     // 該当役割を partial → filled に
@@ -669,7 +677,9 @@ async function onFileChange(e: Event) {
       })
     }
   } catch (err) {
-    importMessage.value = `失敗: ${err instanceof Error ? err.message : String(err)}`
+    importMessage.value = t('creator.errImportFailed', {
+      detail: err instanceof Error ? err.message : String(err),
+    })
   } finally {
     importBusy.value = false
     if (fileInput.value) fileInput.value.value = ''
@@ -779,7 +789,10 @@ async function onFileChange(e: Event) {
           <!-- インポート結果メッセージ -->
           <Transition name="fade">
             <div v-if="importMessage" class="import-banner" role="status">
-              <UiIcon :name="importMessage.startsWith('失敗') ? 'Alert' : 'Check'" :size="13" />
+              <UiIcon
+                :name="importMessage.startsWith(t('creator.errImportPrefix')) ? 'Alert' : 'Check'"
+                :size="13"
+              />
               <span>{{ importMessage }}</span>
               <button
                 class="btn ghost"
@@ -898,9 +911,12 @@ async function onFileChange(e: Event) {
 
       <AppStatusbar
         :items="[
-          { dot: true, text: '編集中: ' + (metaName || 'Untitled') },
-          { text: `${filledCount}/17 役割 · ${sizesCovered}/6 解像度` },
-          { text: '未保存の変更 3件' },
+          {
+            dot: true,
+            text: t('creator.statusEditing', { name: metaName || t('creator.statusUntitled') }),
+          },
+          { text: t('creator.statusCoverage', { filled: filledCount, sizes: sizesCovered }) },
+          { text: t('creator.statusUnsaved', { count: 3 }) },
           { text: 'WebView2 132.0.2957' },
         ]"
       />
