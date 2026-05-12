@@ -4,6 +4,9 @@
  * カバレッジバーの色は accent プロップで切替 (light=amber, dark=mint)。
  */
 import { computed } from 'vue'
+import { useI18n } from '~/composables/useI18n'
+
+const { t } = useI18n()
 
 interface PairingTheme {
   name: string
@@ -51,7 +54,7 @@ const coveragePct = computed(() => Math.round((props.theme.includedRoles.length 
           <div class="card-author">@{{ theme.author }} · v{{ theme.version }}</div>
         </div>
         <button class="btn ghost change-btn" @click="$emit('change')">
-          変更<UiIcon name="ChevD" :size="11" />
+          {{ t('settings.pairingSlotChange') }}<UiIcon name="ChevD" :size="11" />
         </button>
       </div>
       <div class="coverage">

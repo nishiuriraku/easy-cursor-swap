@@ -34,8 +34,8 @@ defineEmits<{
             v-model="language"
             width="140px"
             :options="[
-              { value: 'ja', label: '日本語' },
-              { value: 'en', label: 'English' },
+              { value: 'ja', label: t('settings.languageOptionJa') },
+              { value: 'en', label: t('settings.languageOptionEn') },
             ]"
           />
         </SettingsRow>
