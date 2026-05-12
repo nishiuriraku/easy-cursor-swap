@@ -71,7 +71,7 @@ defineEmits<{
   (e: 'dismiss-export-message'): void
   (e: 'cancel-export'): void
   (e: 'retry-apply'): void
-  (e: 'enableSizedOverride'): void
+  (e: 'enable-sized-override'): void
 }>()
 </script>
 
@@ -176,8 +176,8 @@ defineEmits<{
           >
             <button
               class="btn"
-              :disabled="!canEditSizedOverride"
-              @click="$emit('enableSizedOverride')"
+              :disabled="!canEditSizedOverride || sizedOverrideActive"
+              @click="$emit('enable-sized-override')"
             >
               {{ sizedOverrideActive ? t('creator.perSizeActive') : t('creator.perSizeEnable') }}
             </button>

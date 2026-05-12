@@ -60,6 +60,42 @@ describe('useCreatorAssets', () => {
     })
   })
 
+  describe('SizedAsset hotspot override', () => {
+    it('sized.hotspot は per-size override として保持される', () => {
+      const { setAsset, assigned } = useCreatorAssets()
+      const sized = new Map([
+        [64, { png: new Uint8Array([1, 2, 3]), hotspot: { x: 0.25, y: 0.75 } }],
+      ])
+      setAsset('Arrow', {
+        primary: new Uint8Array([0]),
+        primarySize: 32,
+        hotspot: { x: 0.5, y: 0.5 },
+        sized,
+        source: 'manual',
+      })
+      expect(assigned.value.Arrow?.sized?.get(64)?.hotspot).toEqual({ x: 0.25, y: 0.75 })
+    })
+
+    it('toExportPayload は sizedOverrides に hotspot を含め、未設定は null にする', () => {
+      const { setAsset, toExportPayload } = useCreatorAssets()
+      setAsset('Arrow', {
+        primary: new Uint8Array([0]),
+        primarySize: 32,
+        hotspot: { x: 0.5, y: 0.5 },
+        sized: new Map([
+          [64, { png: new Uint8Array([1]), hotspot: { x: 0.25, y: 0.75 } }],
+          [128, { png: new Uint8Array([2]) }],
+        ]),
+        source: 'manual',
+      })
+      const payload = toExportPayload('lanczos')
+      const arrow = payload.find((p) => p.role === 'Arrow')!
+      expect(arrow.sizedOverrides).not.toBeNull()
+      expect(arrow.sizedOverrides?.['64']?.hotspot).toEqual({ x: 0.25, y: 0.75 })
+      expect(arrow.sizedOverrides?.['128']?.hotspot).toBeNull()
+    })
+  })
+
   it('removeAsset clears the role', () => {
     const c = useCreatorAssets()
     c.setAsset('Arrow', {
