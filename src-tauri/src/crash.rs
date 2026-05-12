@@ -199,7 +199,7 @@ pub fn list_reports() -> AppResult<Vec<CrashReport>> {
             Some((mtime, path))
         })
         .collect();
-    entries.sort_by(|a, b| b.0.cmp(&a.0));
+    entries.sort_by_key(|b| std::cmp::Reverse(b.0));
     entries.truncate(LIST_LIMIT);
 
     let mut reports = Vec::with_capacity(entries.len());

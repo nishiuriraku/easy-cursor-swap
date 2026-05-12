@@ -135,15 +135,13 @@ pub fn parse_ani(bytes: &[u8]) -> AppResult<ParsedAni> {
             b"anih" => anih = Some(parse_anih(data)?),
             b"rate" => rates = Some(parse_u32_array(data)),
             b"seq " => seq = Some(parse_u32_array(data)),
-            b"LIST" => {
-                if data.len() >= 4 && &data[0..4] == b"fram" {
-                    pending_lists.push(PendingList {
-                        offset: data_start + 4,
-                        data: data[4..].to_vec(),
-                    });
-                }
-                // 他の LIST (INFO など) は無視
+            b"LIST" if data.len() >= 4 && &data[0..4] == b"fram" => {
+                pending_lists.push(PendingList {
+                    offset: data_start + 4,
+                    data: data[4..].to_vec(),
+                });
             }
+            // 他の LIST (INFO など) と未対応チャンクは無視
             _ => {}
         }
 
