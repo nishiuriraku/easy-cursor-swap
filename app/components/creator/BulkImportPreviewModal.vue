@@ -13,6 +13,7 @@ import { initialHotspotFor } from '~/composables/useHotspotDefaults'
 import { useI18n } from '~/composables/useI18n'
 import BulkImportRoleRow from './BulkImportRoleRow.vue'
 import AniThumb from './AniThumb.vue'
+import SettingsToggle from '~/components/settings/SettingsToggle.vue'
 
 const { t } = useI18n()
 
@@ -320,10 +321,10 @@ onUnmounted(resetState)
       <div class="bi-body">
         <div class="bi-source">{{ sourceLabel }} — {{ summaryLine }}</div>
 
-        <label class="bi-protect">
-          <input v-model="protectExisting" type="checkbox" />
-          {{ t('bulkImport.protectExisting') }}
-        </label>
+        <div class="bi-protect">
+          <span class="bi-protect-label">{{ t('bulkImport.protectExisting') }}</span>
+          <SettingsToggle v-model="protectExisting" />
+        </div>
 
         <h4>{{ t('bulkImport.seventeenRoles') }}</h4>
         <BulkImportRoleRow
@@ -378,26 +379,39 @@ onUnmounted(resetState)
             {{ t('bulkImport.metadataAuthorLabel') }}: {{ cursorpack.metadata.author ?? '—' }} /
             {{ t('bulkImport.metadataVersionLabel') }}: {{ cursorpack.metadata.version ?? '—' }}
           </div>
-          <label
-            ><input v-model="metadataChoice" type="radio" value="keep" />
-            {{ t('bulkImport.metadataKeep') }}</label
-          >
-          <label
-            ><input v-model="metadataChoice" type="radio" value="overwrite" />
-            {{ t('bulkImport.metadataOverwrite') }}</label
-          >
-          <label
-            ><input v-model="metadataChoice" type="radio" value="name-only" />
-            {{ t('bulkImport.metadataNameOnly') }}</label
-          >
+          <label class="ui-radio" :class="{ 'is-checked': metadataChoice === 'keep' }">
+            <input v-model="metadataChoice" type="radio" name="bi-metadata-choice" value="keep" />
+            <span class="ui-radio-mark" aria-hidden="true" />
+            <span class="ui-radio-label">{{ t('bulkImport.metadataKeep') }}</span>
+          </label>
+          <label class="ui-radio" :class="{ 'is-checked': metadataChoice === 'overwrite' }">
+            <input
+              v-model="metadataChoice"
+              type="radio"
+              name="bi-metadata-choice"
+              value="overwrite"
+            />
+            <span class="ui-radio-mark" aria-hidden="true" />
+            <span class="ui-radio-label">{{ t('bulkImport.metadataOverwrite') }}</span>
+          </label>
+          <label class="ui-radio" :class="{ 'is-checked': metadataChoice === 'name-only' }">
+            <input
+              v-model="metadataChoice"
+              type="radio"
+              name="bi-metadata-choice"
+              value="name-only"
+            />
+            <span class="ui-radio-mark" aria-hidden="true" />
+            <span class="ui-radio-label">{{ t('bulkImport.metadataNameOnly') }}</span>
+          </label>
         </template>
       </div>
 
       <footer class="bi-foot">
-        <label class="bi-apply-immediately">
-          <input v-model="applyImmediately" type="checkbox" data-test="apply-immediately" />
-          {{ t('bulkImport.applyImmediately') }}
-        </label>
+        <div class="bi-apply-immediately">
+          <span class="bi-apply-immediately-label">{{ t('bulkImport.applyImmediately') }}</span>
+          <SettingsToggle v-model="applyImmediately" data-test="apply-immediately" />
+        </div>
         <button class="btn ghost ml-auto" @click="emit('cancel')">{{ t('common.cancel') }}</button>
         <button class="btn primary" @click="apply">
           ✓
@@ -438,10 +452,16 @@ onUnmounted(resetState)
   @apply mb-2 text-[12px] text-fg-mute;
 }
 .bi-protect {
-  @apply mb-3 inline-flex gap-1.5 text-[12px];
+  @apply mb-3 flex items-center justify-between gap-3 rounded-md border border-line bg-white/[0.02] px-3 py-2;
+}
+.bi-protect-label {
+  @apply text-[12.5px] font-medium text-fg;
 }
 .bi-apply-immediately {
-  @apply inline-flex items-center gap-1.5 text-[12px];
+  @apply inline-flex items-center gap-2 text-[12px];
+}
+.bi-apply-immediately-label {
+  @apply text-[12.5px] text-fg-dim;
 }
 .bi-unmatched {
   @apply flex items-center gap-2 py-1 text-[12px];

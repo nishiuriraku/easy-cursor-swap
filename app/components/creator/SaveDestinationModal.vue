@@ -11,6 +11,7 @@
  */
 import { ref, computed, watch } from 'vue'
 import { useI18n } from '~/composables/useI18n'
+import SettingsToggle from '~/components/settings/SettingsToggle.vue'
 
 const { t } = useI18n()
 
@@ -93,64 +94,70 @@ async function onSubmit() {
       <div class="sd-body">
         <section class="prop-section">
           <h4>{{ t('saveModal.destinationLabel') }}</h4>
-          <label>
+          <label class="ui-radio" :class="{ 'is-checked': destination === 'file' }">
             <input v-model="destination" type="radio" name="save-destination" value="file" />
-            {{ t('saveModal.destinationFile') }}
+            <span class="ui-radio-mark" aria-hidden="true" />
+            <span class="ui-radio-label">{{ t('saveModal.destinationFile') }}</span>
           </label>
-          <label>
+          <label class="ui-radio" :class="{ 'is-checked': destination === 'library' }">
             <input v-model="destination" type="radio" name="save-destination" value="library" />
-            {{ t('saveModal.destinationLibrary') }}
+            <span class="ui-radio-mark" aria-hidden="true" />
+            <span class="ui-radio-label">{{ t('saveModal.destinationLibrary') }}</span>
           </label>
-          <label>
+          <label class="ui-radio" :class="{ 'is-checked': destination === 'libraryAndApply' }">
             <input
               v-model="destination"
               type="radio"
               name="save-destination"
               value="libraryAndApply"
             />
-            {{ t('saveModal.destinationLibraryAndApply') }}
+            <span class="ui-radio-mark" aria-hidden="true" />
+            <span class="ui-radio-label">{{ t('saveModal.destinationLibraryAndApply') }}</span>
           </label>
         </section>
 
         <section v-if="showOverwriteSection" data-test="overwrite-section" class="prop-section">
           <h4>{{ t('saveModal.overwriteLabel') }}</h4>
-          <label>
+          <label class="ui-radio" :class="{ 'is-checked': overwriteExisting === true }">
             <input
               v-model="overwriteExisting"
               type="radio"
               name="save-overwrite-existing"
               :value="true"
             />
-            {{ t('saveModal.overwriteOverwrite') }}
+            <span class="ui-radio-mark" aria-hidden="true" />
+            <span class="ui-radio-label">{{ t('saveModal.overwriteOverwrite') }}</span>
           </label>
-          <label>
+          <label class="ui-radio" :class="{ 'is-checked': overwriteExisting === false }">
             <input
               v-model="overwriteExisting"
               type="radio"
               name="save-overwrite-existing"
               :value="false"
             />
-            {{ t('saveModal.overwriteDuplicate') }}
+            <span class="ui-radio-mark" aria-hidden="true" />
+            <span class="ui-radio-label">{{ t('saveModal.overwriteDuplicate') }}</span>
           </label>
         </section>
 
         <section class="prop-section">
-          <label>
-            <input
+          <div class="sd-toggle-row">
+            <div class="sd-toggle-text">
+              <div class="sd-toggle-label">{{ t('saveModal.sign') }}</div>
+              <p v-if="!hasKeystoreSigning" class="sd-hint">{{ t('saveModal.signDisabled') }}</p>
+            </div>
+            <SettingsToggle
               v-model="sign"
-              type="checkbox"
               data-test="sign-checkbox"
               :disabled="!hasKeystoreSigning"
             />
-            {{ t('saveModal.sign') }}
-          </label>
-          <p v-if="!hasKeystoreSigning" class="sd-hint">{{ t('saveModal.signDisabled') }}</p>
+          </div>
         </section>
 
         <section v-if="!props.metaName.trim()" data-test="name-field" class="prop-section">
-          <label>
-            {{ t('saveModal.nameLabel') }}
-            <input v-model="nameInput" type="text" :placeholder="namePlaceholder" />
+          <label class="sd-field">
+            <span class="sd-field-label">{{ t('saveModal.nameLabel') }}</span>
+            <input class="input" v-model="nameInput" type="text" :placeholder="namePlaceholder" />
           </label>
         </section>
       </div>
@@ -189,5 +196,24 @@ async function onSubmit() {
 }
 .sd-hint {
   @apply text-[11px] text-fg-mute;
+}
+
+/* --- Sign 行: ラベル + 説明 + Toggle (settings の SettingsRow に倣ったレイアウト) --- */
+.sd-toggle-row {
+  @apply flex items-start justify-between gap-3 rounded-md border border-line bg-white/[0.02] px-3 py-2.5;
+}
+.sd-toggle-text {
+  @apply flex flex-1 flex-col gap-0.5;
+}
+.sd-toggle-label {
+  @apply text-[13px] font-medium text-fg;
+}
+
+/* --- Name 入力フィールド --- */
+.sd-field {
+  @apply flex flex-col gap-1.5;
+}
+.sd-field-label {
+  @apply text-[12px] text-fg-dim;
 }
 </style>

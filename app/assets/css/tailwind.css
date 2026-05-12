@@ -300,6 +300,50 @@
 .toggle.on .knob {
   @apply left-4 bg-accent;
 }
+.toggle:disabled {
+  @apply cursor-not-allowed opacity-50;
+}
+
+/* --- .ui-radio (card-row 形式の共有ラジオ) --- */
+.ui-radio {
+  @apply mt-1.5 flex cursor-pointer items-center gap-2.5 rounded-md border border-line bg-white/[0.02] px-2.5 py-2 text-[12.5px] text-fg;
+  transition:
+    background 0.12s,
+    border-color 0.12s;
+}
+.ui-radio:hover {
+  @apply border-line-hi bg-white/[0.05];
+}
+.ui-radio.is-checked {
+  @apply border-accent-line;
+  background: var(--accent-dim);
+}
+.ui-radio input[type='radio'] {
+  @apply absolute size-0 opacity-0;
+}
+.ui-radio-mark {
+  @apply relative grid size-[15px] shrink-0 place-items-center rounded-full border border-line-strong bg-bg-0;
+  transition:
+    border-color 0.12s,
+    background 0.12s;
+}
+.ui-radio-mark::after {
+  content: '';
+  @apply size-[7px] scale-0 rounded-full bg-accent;
+  transition: transform 0.12s ease-out;
+}
+.ui-radio.is-checked .ui-radio-mark {
+  @apply border-accent;
+}
+.ui-radio.is-checked .ui-radio-mark::after {
+  @apply scale-100;
+}
+.ui-radio input[type='radio']:focus-visible + .ui-radio-mark {
+  box-shadow: 0 0 0 2px var(--accent-line);
+}
+.ui-radio-label {
+  @apply leading-[1.35];
+}
 
 .tag {
   @apply inline-flex items-center gap-1.5 rounded-[4px] border border-line bg-white/[0.02] px-2 py-[3px] font-mono text-[10px] tracking-[0.04em] text-fg-dim;

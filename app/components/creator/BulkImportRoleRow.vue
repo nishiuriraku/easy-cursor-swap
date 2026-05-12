@@ -6,6 +6,7 @@
 import { computed } from 'vue'
 import { useI18n } from '~/composables/useI18n'
 import AniThumb from './AniThumb.vue'
+import SettingsToggle from '~/components/settings/SettingsToggle.vue'
 
 const { t } = useI18n()
 
@@ -42,6 +43,11 @@ const emit = defineEmits<{ (e: 'toggle', value: 'apply' | 'skip'): void }>()
 const confidenceLabel = computed(() => {
   if (props.confidence === null) return ''
   return `${Math.round(props.confidence * 100)}%`
+})
+
+const decisionOn = computed({
+  get: () => props.decision === 'apply',
+  set: (v: boolean) => emit('toggle', v ? 'apply' : 'skip'),
 })
 const conflictTitle = computed(() => {
   if (props.conflict === 'overwrite-existing') return t('bulkImport.conflictOverwrite')
@@ -81,12 +87,7 @@ const conflictTitle = computed(() => {
       <span v-if="conflict !== 'none'" class="warn" :title="conflictTitle">⚠</span>
     </div>
     <div class="action-cell">
-      <input
-        type="checkbox"
-        :checked="decision === 'apply'"
-        :disabled="!previewUrl"
-        @change="emit('toggle', ($event.target as HTMLInputElement).checked ? 'apply' : 'skip')"
-      />
+      <SettingsToggle v-model="decisionOn" :disabled="!previewUrl" />
     </div>
   </div>
 </template>

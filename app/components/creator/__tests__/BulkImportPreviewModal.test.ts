@@ -38,8 +38,9 @@ describe('BulkImportPreviewModal applyImmediately', () => {
       props: baseProps,
       global: { stubs },
     })
-    const cb = wrapper.find('input[data-test="apply-immediately"]')
-    await cb.setValue(true)
+    // SettingsToggle に置き換わっているのでボタンを click して ON にする
+    const cb = wrapper.find('button[data-test="apply-immediately"]')
+    await cb.trigger('click')
     await wrapper.find('button.primary').trigger('click')
     const events = wrapper.emitted('apply')
     const payload = events![0][0] as { applyImmediately: boolean }
