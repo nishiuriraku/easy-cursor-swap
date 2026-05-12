@@ -452,7 +452,11 @@ onBeforeUnmount(() => {
     0 12px 32px -12px rgba(0, 0, 0, 0.55),
     0 0 0 1px rgba(0, 0, 0, 0.25);
   overflow-y: auto;
-  z-index: 80;
+  /* 全モーダル (.modal-page) が z-[100] のため、modal 内 UiSelect の listbox は
+   * それより上に出る必要がある。SubmitThemeDialog / NewThemeStartModal /
+   * BulkImportPreviewModal / SaveDestinationModal 等で modal 内 select の
+   * ドロップダウンが modal 下に隠れる回帰を防ぐ。 */
+  z-index: 110;
   /* glassmorphism の代わりにフラットで読みやすさ優先 */
 }
 html.light .ui-select-listbox {
