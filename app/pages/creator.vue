@@ -415,14 +415,7 @@ async function rasterizeSvgToPng(svgString: string, size: number): Promise<Uint8
   }
 }
 
-const {
-  importBusy,
-  importMessage,
-  sanitizedRemovals,
-  applyImportedRaster,
-  pickRasterFromPath,
-  pickCursorFromPath,
-} = useCreatorImport({
+const { importBusy, importMessage, sanitizedRemovals, applyImportedRaster } = useCreatorImport({
   creatorAssets,
   activeRoleId,
   activeSize,
@@ -480,8 +473,6 @@ const {
   importBusy,
   importMessage,
   sanitizedRemovals,
-  pickRasterFromPath,
-  pickCursorFromPath,
 })
 
 /** メイン取込ダイアログ → 拡張子 dispatch */

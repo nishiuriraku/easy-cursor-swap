@@ -3,11 +3,11 @@
  *
  * 役割:
  *  - BulkImportPreviewModal の open/close 状態と入力データ (`bulkResolved` / `bulkCursorpack`) を保持
- *  - dispatchBulkPaths: 入力パス群を「単一 fast-path」「.cursorpack 解析」「複数 bulk_resolve」に振り分け
+ *  - dispatchBulkPaths: 入力パス群を「.cursorpack 解析」または「bulk_resolve」に振り分け
  *  - applyBulkImport: モーダル apply イベントを受けて creatorAssets / メタデータに反映
  *  - cancelBulkImport: モーダルを閉じる
  *
- * 依存: useBulkImport, useCreatorImport の単一 fast-path 関数, creatorAssets, meta refs, 各種 UI ref。
+ * 依存: useBulkImport, creatorAssets, meta refs, 各種 UI ref。
  */
 import { ref, type Ref } from 'vue'
 import type { useBulkImport, ResolvedAsset, ParsedCursorpack } from './useBulkImport'
@@ -35,9 +35,6 @@ export interface CreatorBulkImportFlowDeps {
   importBusy: Ref<boolean>
   importMessage: Ref<string | null>
   sanitizedRemovals: Ref<string[]>
-  /** 単一ファイル fast-path 用 (useCreatorImport が提供) */
-  pickRasterFromPath: (path: string, ext: string) => Promise<void>
-  pickCursorFromPath: (path: string) => Promise<void>
 }
 
 export function useCreatorBulkImportFlow(deps: CreatorBulkImportFlowDeps) {
@@ -54,11 +51,8 @@ export function useCreatorBulkImportFlow(deps: CreatorBulkImportFlowDeps) {
     metaDescription,
     saveModalOpen,
     saveModalDefault,
-    importBusy,
     importMessage,
     sanitizedRemovals,
-    pickRasterFromPath,
-    pickCursorFromPath,
   } = deps
   const { setAsset } = creatorAssets
 
@@ -71,45 +65,20 @@ export function useCreatorBulkImportFlow(deps: CreatorBulkImportFlowDeps) {
    * 拡張子分岐の本体。`pickBulkAuto` から、または将来のドラッグ&ドロップから呼ばれる想定。
    *
    * 設計判断:
-   *  - 単一ファイル (1 件) で `.cursorpack` 以外 (= png/svg/cur/ico) の場合は、
-   *    bulk preview を経由せず **現在編集中のロールに直接代入** する fast-path に流す。
-   *  - 単一 `.ani` は static fast-path には乗せず、bulk preview 経路に通す
-   *    (アニメ再生 + ホットスポット調整 UI が必要なため)
+   *  - 「一括インポート」エントリは件数に関わらず **常に bulk preview を通す**。
+   *    過去には 1 件選択時に現在ロールへ直接代入する fast-path が存在したが、
+   *    ユーザーから見て「一括インポートを押したのにプレビューが開かず Arrow だけに
+   *    上書きされる」という不可解な挙動になっていたため削除した。単一ファイルでも
+   *    ロール推定 / ロール選択 UI / overwrite ガードを通すのが一貫した体験。
    *  - `.cursorpack` は他のファイルと一緒に取り込めない (パッケージ単位の取込なので)
    *  - 複数 `.cursorpack` の同時取込もサポートしない
+   *  - `sanitizedRemovals` は単一 SVG fast-path のみが使っていたので、bulk 経路では
+   *    そもそも参照しない (BulkImportPreviewModal が SVG sanitize メッセージを扱う)。
    */
   async function dispatchBulkPaths(paths: string[]) {
-    // Fast-path: 1 件かつ非 cursorpack なら現在ロールに直接代入
-    if (paths.length === 1) {
-      const p = paths[0]!
-      const ext = p.split('.').pop()?.toLowerCase() ?? ''
-      if (ext === 'cur' || ext === 'ico') {
-        importBusy.value = true
-        importMessage.value = null
-        try {
-          await pickCursorFromPath(p)
-        } catch (err) {
-          importMessage.value = `失敗: ${err instanceof Error ? err.message : String(err)}`
-        } finally {
-          importBusy.value = false
-        }
-        return
-      }
-      if (ext === 'png' || ext === 'svg') {
-        importBusy.value = true
-        importMessage.value = null
-        sanitizedRemovals.value = []
-        try {
-          await pickRasterFromPath(p, ext)
-        } catch (err) {
-          importMessage.value = `失敗: ${err instanceof Error ? err.message : String(err)}`
-        } finally {
-          importBusy.value = false
-        }
-        return
-      }
-      // .cursorpack / .ani は下の bulk preview ロジックに fallthrough
-    }
+    // 単一ファイルでも fast-path は使わず、cursorpack 判定 → bulk_resolve に進む。
+    // (`sanitizedRemovals` は単一 SVG 経路でのみ使っていたので、ここではクリアだけ行う)
+    sanitizedRemovals.value = []
 
     const packs = paths.filter((p) => p.toLowerCase().endsWith('.cursorpack'))
     const others = paths.filter((p) => !p.toLowerCase().endsWith('.cursorpack'))
