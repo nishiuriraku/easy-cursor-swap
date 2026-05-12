@@ -116,13 +116,12 @@ watch(
           // (export 時に Rust が rewrite_ani_with_hotspot のソースとして使う)
           sourcePath: parsed.aniSourcePath ?? '',
           kind: isAni ? 'ani' : 'cur',
-          pngBytes: parsed.primaryPngBytes,
-          svgText: null,
-          nativeSize: parsed.primarySize,
+          pngBytes: parsed.pngBytes,
+          width: parsed.width,
+          height: parsed.height,
           hotspot: parsed.hotspot,
-          availableSizes: isAni
-            ? [parsed.primarySize]
-            : Object.keys(parsed.sizedPngBytes).map(Number),
+          svgText: null,
+          availableSizes: isAni ? [parsed.width] : Object.keys(parsed.sizedPngBytes).map(Number),
           ani: parsed.ani,
         }
         const conflict = props.existingRoles.has(role) ? 'overwrite-existing' : 'none'
@@ -146,7 +145,7 @@ watch(
     for (const a of props.resolved ?? []) {
       const m = matchAssetWithContext(a.sourceFile, a.sourcePath)
       if (m) {
-        candidates.push({ sourceFile: a.sourceFile, nativeSize: a.nativeSize, match: m, asset: a })
+        candidates.push({ sourceFile: a.sourceFile, nativeSize: a.width, match: m, asset: a })
       } else {
         unmatched.value.push({
           asset: a,
@@ -226,11 +225,11 @@ function toRoleAsset(
     asset.kind === 'png' || asset.kind === 'svg' || (asset.hotspot.x === 0 && asset.hotspot.y === 0)
   const finalHotspot =
     isNewRole && noEmbeddedHotspot && !isAni
-      ? initialHotspotFor(roleId, asset.nativeSize)
+      ? initialHotspotFor(roleId, asset.width)
       : asset.hotspot
   const base: RoleAsset = {
     primary: new Uint8Array(asset.pngBytes),
-    primarySize: asset.nativeSize,
+    primarySize: asset.width,
     hotspot: finalHotspot,
     sized: undefined,
     source,
@@ -260,8 +259,8 @@ function apply() {
         sized.set(Number(k), { png: new Uint8Array(v) })
       }
       const asset: RoleAsset = {
-        primary: new Uint8Array(parsed.primaryPngBytes),
-        primarySize: parsed.primarySize,
+        primary: new Uint8Array(parsed.pngBytes),
+        primarySize: parsed.width,
         hotspot: parsed.hotspot,
         sized: sized.size > 0 ? sized : undefined,
         source: 'cursorpack',
@@ -336,7 +335,7 @@ onUnmounted(resetState)
           :required="row.required"
           :preview-url="row.match?.previewUrl ?? null"
           :source-file="row.match?.asset.sourceFile ?? null"
-          :native-size="row.match?.asset.nativeSize ?? null"
+          :native-size="row.match?.asset.width ?? null"
           :confidence="row.match?.confidence ?? null"
           :conflict="row.match?.conflict ?? 'none'"
           :decision="row.match?.decision ?? 'skip'"
@@ -358,7 +357,7 @@ onUnmounted(resetState)
             :height="32"
           />
           <img v-else :src="u.previewUrl" :alt="u.asset.sourceFile" />
-          <span>{{ u.asset.sourceFile }} ({{ u.asset.nativeSize }}px)</span>
+          <span>{{ u.asset.sourceFile }} ({{ u.asset.width }}px)</span>
           <UiSelect
             v-model="u.manuallyAssignedRole"
             width="180px"

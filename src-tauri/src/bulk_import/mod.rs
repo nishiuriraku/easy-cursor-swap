@@ -55,22 +55,16 @@ pub struct ResolvedAsset {
     pub source_file: String,
     pub source_path: String,
     pub kind: AssetKind,
-    pub png_bytes: Vec<u8>,
+    #[serde(flatten)]
+    pub asset: crate::theme::types::CursorAssetDescriptor,
     pub svg_text: Option<String>,
-    pub native_size: u32,
-    pub hotspot: crate::theme::types::Hotspot,
     pub available_sizes: Vec<u32>,
-    pub ani: Option<AniAssetData>,
+    pub ani: Option<crate::theme::types::AniFrameData>,
 }
 
-#[derive(Debug, Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct AniAssetData {
-    pub frame_pngs: Vec<Vec<u8>>,
-    pub sequence: Vec<u32>,
-    pub per_step_durations_ms: Vec<u32>,
-    pub is_legacy_raw_dib: bool,
-}
+// AniAssetData は theme::types::AniFrameData に統合済み (Phase 3a)。
+// 旧名で参照されないよう、ここでは re-export しない。
+// 利用側は `use crate::theme::types::AniFrameData;` に切り替えること。
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -141,14 +135,13 @@ pub struct CursorpackMetadata {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ParsedRole {
-    pub primary_size: u32,
-    pub primary_png_bytes: Vec<u8>,
-    pub hotspot: crate::theme::types::Hotspot,
+    #[serde(flatten)]
+    pub asset: crate::theme::types::CursorAssetDescriptor,
     pub sized_png_bytes: HashMap<u32, Vec<u8>>,
     /// `.ani` ロールのフレームデータ。`.cur` / `.ico` の場合は `None`。
     /// フロントエンドはこれがあれば「動くサムネ」を出し、`aniFrames` として
     /// RoleAsset に格納する (= ResolvedAsset の `ani` と同じ役割)。
-    pub ani: Option<AniAssetData>,
+    pub ani: Option<crate::theme::types::AniFrameData>,
     /// `.ani` ロールの元バイトを展開した絶対パス。export 時に `rewrite_ani_with_hotspot`
     /// のソースとして使う。`.cur` / `.ico` ロールでは `None`。
     /// `.cursorpack` の隣 `<cursorpack>.extracted/<role-filename>` に書き出される。
@@ -160,4 +153,61 @@ pub struct ParsedRole {
 pub struct ParsedCursorpack {
     pub metadata: CursorpackMetadata,
     pub roles: HashMap<String, ParsedRole>,
+}
+
+#[cfg(test)]
+mod ipc_shape_tests {
+    use super::*;
+    use crate::theme::types::{AniFrameData, CursorAssetDescriptor, Hotspot};
+
+    #[test]
+    fn resolved_asset_serializes_flat() {
+        let r = ResolvedAsset {
+            source_file: "a.png".into(),
+            source_path: "/a.png".into(),
+            kind: AssetKind::Png,
+            asset: CursorAssetDescriptor {
+                png_bytes: vec![0],
+                width: 64,
+                height: 64,
+                hotspot: Hotspot::ZERO,
+            },
+            svg_text: None,
+            available_sizes: vec![64],
+            ani: None,
+        };
+        let v = serde_json::to_value(&r).unwrap();
+        assert!(v.get("asset").is_none(), "asset must be flattened");
+        assert!(v.get("pngBytes").is_some());
+        assert_eq!(v["width"], 64);
+        assert_eq!(v["height"], 64);
+        assert_eq!(v["sourceFile"], "a.png");
+    }
+
+    #[test]
+    fn parsed_role_serializes_flat() {
+        let p = ParsedRole {
+            asset: CursorAssetDescriptor {
+                png_bytes: vec![0],
+                width: 32,
+                height: 32,
+                hotspot: Hotspot::ZERO,
+            },
+            sized_png_bytes: HashMap::new(),
+            ani: Some(AniFrameData {
+                frame_pngs: vec![vec![1]],
+                sequence: vec![0],
+                per_step_durations_ms: vec![100],
+                is_legacy_raw_dib: false,
+            }),
+            ani_source_path: None,
+        };
+        let v = serde_json::to_value(&p).unwrap();
+        assert!(v.get("asset").is_none());
+        assert!(v.get("pngBytes").is_some());
+        assert_eq!(v["width"], 32);
+        // ani は flatten せず Option として残るので key として存在
+        assert!(v.get("ani").is_some());
+        assert!(v["ani"]["framePngs"].is_array());
+    }
 }

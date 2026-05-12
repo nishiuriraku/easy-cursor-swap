@@ -34,7 +34,7 @@ interface PreviewCacheEntry {
 }
 
 interface IpcRolePreview {
-  png: number[]
+  pngBytes: number[]
   width: number
   height: number
   hotspot: { x: number; y: number }
@@ -86,7 +86,7 @@ async function fetchPreviews(themeId: string, roles?: string[]): Promise<Preview
       const urls: Record<string, string> = {}
       const details: Record<string, RolePreviewDetail> = {}
       for (const [role, info] of Object.entries(result)) {
-        const u8 = new Uint8Array(info.png)
+        const u8 = new Uint8Array(info.pngBytes)
         const blob = new Blob([u8], { type: 'image/png' })
         const url = URL.createObjectURL(blob)
         urls[role] = url

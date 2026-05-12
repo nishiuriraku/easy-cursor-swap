@@ -99,10 +99,13 @@ fn resolve_png(path: &str, basename: String, bytes: &[u8]) -> Result<ResolvedAss
         source_file: basename,
         source_path: path.to_string(),
         kind: AssetKind::Png,
-        png_bytes: bytes.to_vec(),
+        asset: crate::theme::types::CursorAssetDescriptor {
+            png_bytes: bytes.to_vec(),
+            width: size,
+            height: size,
+            hotspot: crate::theme::types::Hotspot::ZERO,
+        },
         svg_text: None,
-        native_size: size,
-        hotspot: crate::theme::types::Hotspot::ZERO,
         available_sizes: vec![size],
         ani: None,
     })
@@ -116,10 +119,13 @@ fn resolve_svg(path: &str, basename: String, bytes: &[u8]) -> Result<ResolvedAss
         source_file: basename,
         source_path: path.to_string(),
         kind: AssetKind::Svg,
-        png_bytes: Vec::new(),
+        asset: crate::theme::types::CursorAssetDescriptor {
+            png_bytes: Vec::new(),
+            width: 256,
+            height: 256,
+            hotspot: crate::theme::types::Hotspot::ZERO,
+        },
         svg_text: Some(text),
-        native_size: 256,
-        hotspot: crate::theme::types::Hotspot::ZERO,
         available_sizes: vec![256],
         ani: None,
     })
@@ -166,12 +172,15 @@ fn resolve_ani(path: &str, basename: String, bytes: &[u8]) -> Result<ResolvedAss
         source_file: basename,
         source_path: path.to_string(),
         kind: AssetKind::Ani,
-        png_bytes: primary_png,
+        asset: crate::theme::types::CursorAssetDescriptor {
+            png_bytes: primary_png,
+            width,
+            height: width,
+            hotspot,
+        },
         svg_text: None,
-        native_size: width,
-        hotspot,
         available_sizes: vec![width],
-        ani: Some(super::AniAssetData {
+        ani: Some(crate::theme::types::AniFrameData {
             frame_pngs,
             sequence: parsed.sequence,
             per_step_durations_ms,
@@ -198,14 +207,17 @@ fn resolve_cur_or_ico(
         source_file: basename,
         source_path: path.to_string(),
         kind,
-        png_bytes,
+        asset: crate::theme::types::CursorAssetDescriptor {
+            png_bytes,
+            width: largest.width,
+            height: largest.height,
+            hotspot: crate::theme::types::Hotspot::from_px(
+                largest.hotspot_x,
+                largest.hotspot_y,
+                largest.width,
+            ),
+        },
         svg_text: None,
-        native_size: largest.width,
-        hotspot: crate::theme::types::Hotspot::from_px(
-            largest.hotspot_x,
-            largest.hotspot_y,
-            largest.width,
-        ),
         available_sizes,
         ani: None,
     })
@@ -243,7 +255,7 @@ pub fn bulk_resolve_inner(
         }
         match resolve_one(path) {
             Ok(asset) => {
-                total_bytes = total_bytes.saturating_add(asset.png_bytes.len() as u64);
+                total_bytes = total_bytes.saturating_add(asset.asset.png_bytes.len() as u64);
                 if total_bytes > MAX_TOTAL_BYTES {
                     failures.push(ResolveFailure {
                         source_path: path.clone(),
@@ -370,11 +382,12 @@ mod tests {
         let asset = resolve_one(&p.to_string_lossy()).unwrap();
         assert_eq!(asset.kind, AssetKind::Png);
         // sample-icon の PNG はすべて 128x128
-        assert_eq!(asset.native_size, 128);
-        assert_eq!(asset.hotspot, crate::theme::types::Hotspot::ZERO);
+        assert_eq!(asset.asset.width, 128);
+        assert_eq!(asset.asset.height, 128);
+        assert_eq!(asset.asset.hotspot, crate::theme::types::Hotspot::ZERO);
         assert_eq!(asset.source_file, "easy-cursor-swap-mint__Arrow.png");
         assert!(asset.svg_text.is_none());
-        assert!(!asset.png_bytes.is_empty());
+        assert!(!asset.asset.png_bytes.is_empty());
     }
 
     #[test]
@@ -478,10 +491,10 @@ mod tests {
 
         let resolved = resolve_one(path.to_str().unwrap()).expect("resolve");
         assert_eq!(resolved.kind, AssetKind::Ani);
-        assert_eq!(resolved.native_size, 16);
+        assert_eq!(resolved.asset.width, 16);
         // hotspot は px(2,3) を size=16 で比率化した値と一致するはず
         let expected_hotspot = crate::theme::types::Hotspot::from_px(2, 3, 16);
-        assert_eq!(resolved.hotspot, expected_hotspot);
+        assert_eq!(resolved.asset.hotspot, expected_hotspot);
         let ani_data = resolved.ani.expect("ani field");
         assert_eq!(ani_data.frame_pngs.len(), 1);
         assert!(!ani_data.is_legacy_raw_dib);

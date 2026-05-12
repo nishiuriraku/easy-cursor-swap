@@ -112,14 +112,14 @@ pub fn take_pending_cursorpack(state: State<PendingCursorpack>) -> Option<String
 ///
 /// `pngBytes` が最大解像度のラスタ画像 (RGBA PNG)。
 /// `availableSizes` は元ファイルに含まれていた全エントリの幅 (= 高さ前提)。
+/// `CursorAssetDescriptor` を `#[serde(flatten)]` で埋め込み、JSON 上は従来通り
+/// `{ isCur, pngBytes, width, height, hotspot, availableSizes }` の平坦構造。
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportedCursorFile {
     pub is_cur: bool,
-    pub width: u32,
-    pub height: u32,
-    pub hotspot: crate::theme::types::Hotspot,
-    pub png_bytes: Vec<u8>,
+    #[serde(flatten)]
+    pub asset: crate::theme::types::CursorAssetDescriptor,
     pub available_sizes: Vec<u32>,
 }
 
@@ -148,39 +148,40 @@ pub fn import_cursor_file(path: String) -> Result<ImportedCursorFile, AppError> 
     );
     Ok(ImportedCursorFile {
         is_cur: parsed.is_cur,
-        width: largest.width,
-        height: largest.height,
-        hotspot: crate::theme::types::Hotspot::from_px(
-            largest.hotspot_x,
-            largest.hotspot_y,
-            largest.width,
-        ),
-        png_bytes,
+        asset: crate::theme::types::CursorAssetDescriptor {
+            png_bytes,
+            width: largest.width,
+            height: largest.height,
+            hotspot: crate::theme::types::Hotspot::from_px(
+                largest.hotspot_x,
+                largest.hotspot_y,
+                largest.width,
+            ),
+        },
         available_sizes,
     })
 }
 
 /// `.ani` ファイル検査結果。クリエイター UI のプレビュー / 情報表示用。
 ///
-/// `framePngs` は再生順 (= sequence インデックスを展開した順) ではなく、
-/// 格納順 (フレーム 0..num_frames-1) に並ぶ。UI 側で `sequence` と
-/// `perStepDurationsMs` を見ながら setInterval / requestAnimationFrame で
+/// `frames.framePngs` は再生順 (= sequence インデックスを展開した順) ではなく、
+/// 格納順 (フレーム 0..num_frames-1) に並ぶ。UI 側で `frames.sequence` と
+/// `frames.perStepDurationsMs` を見ながら setInterval / requestAnimationFrame で
 /// アニメーション再生する。
+///
+/// `CursorAssetDescriptor` と `AniFrameData` を `#[serde(flatten)]` で埋め込み、
+/// JSON 上は全フィールド top-level に展開される。
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AniInspection {
     pub num_frames: u32,
     pub num_steps: u32,
     pub default_rate_jiffies: u32,
-    pub per_step_durations_ms: Vec<u32>,
-    pub sequence: Vec<u32>,
     pub total_duration_ms: u64,
-    /// 各フレームの最大解像度 PNG バイト列
-    pub frame_pngs: Vec<Vec<u8>>,
-    pub width: u32,
-    pub height: u32,
-    pub hotspot: crate::theme::types::Hotspot,
-    pub is_legacy_raw_dib: bool,
+    #[serde(flatten)]
+    pub asset: crate::theme::types::CursorAssetDescriptor,
+    #[serde(flatten)]
+    pub frames: crate::theme::types::AniFrameData,
 }
 
 /// `.ani` ファイルを読み込み、フレームごとの PNG とアニメーション情報を返す。
@@ -237,14 +238,19 @@ pub fn inspect_ani_file(path: String) -> Result<AniInspection, AppError> {
         num_frames: parsed.num_frames,
         num_steps: parsed.num_steps,
         default_rate_jiffies: parsed.default_rate_jiffies,
-        per_step_durations_ms,
-        sequence: parsed.sequence,
         total_duration_ms,
-        frame_pngs,
-        width,
-        height,
-        hotspot,
-        is_legacy_raw_dib: parsed.is_legacy_raw_dib,
+        asset: crate::theme::types::CursorAssetDescriptor {
+            png_bytes: frame_pngs.first().cloned().unwrap_or_default(),
+            width,
+            height,
+            hotspot,
+        },
+        frames: crate::theme::types::AniFrameData {
+            frame_pngs,
+            sequence: parsed.sequence,
+            per_step_durations_ms,
+            is_legacy_raw_dib: parsed.is_legacy_raw_dib,
+        },
     })
 }
 
@@ -341,5 +347,64 @@ mod tests {
         assert_eq!(taken, Some(PathBuf::from(r"C:\second.cursorpack")));
         // take 後は空
         assert!(pending.0.lock().unwrap().is_none());
+    }
+}
+
+#[cfg(test)]
+mod ipc_shape_tests {
+    use super::*;
+    use crate::theme::types::{AniFrameData, CursorAssetDescriptor, Hotspot};
+
+    #[test]
+    fn imported_cursor_file_serializes_flat() {
+        let imp = ImportedCursorFile {
+            is_cur: true,
+            asset: CursorAssetDescriptor {
+                png_bytes: vec![0],
+                width: 32,
+                height: 32,
+                hotspot: Hotspot::ZERO,
+            },
+            available_sizes: vec![16, 32],
+        };
+        let v = serde_json::to_value(&imp).unwrap();
+        assert!(v.get("asset").is_none(), "asset must be flattened away");
+        assert_eq!(v["isCur"], true);
+        assert!(v.get("pngBytes").is_some());
+        assert_eq!(v["width"], 32);
+        assert_eq!(v["height"], 32);
+        assert!(v.get("hotspot").is_some());
+        assert_eq!(v["availableSizes"], serde_json::json!([16, 32]));
+    }
+
+    #[test]
+    fn ani_inspection_serializes_flat() {
+        let ani = AniInspection {
+            num_frames: 3,
+            num_steps: 3,
+            default_rate_jiffies: 6,
+            total_duration_ms: 300,
+            asset: CursorAssetDescriptor {
+                png_bytes: vec![0],
+                width: 32,
+                height: 32,
+                hotspot: Hotspot::ZERO,
+            },
+            frames: AniFrameData {
+                frame_pngs: vec![vec![0]; 3],
+                sequence: vec![0, 1, 2],
+                per_step_durations_ms: vec![100, 100, 100],
+                is_legacy_raw_dib: false,
+            },
+        };
+        let v = serde_json::to_value(&ani).unwrap();
+        assert!(v.get("asset").is_none());
+        assert!(v.get("frames").is_none());
+        assert_eq!(v["numFrames"], 3);
+        assert_eq!(v["numSteps"], 3);
+        assert!(v.get("pngBytes").is_some());
+        assert!(v.get("framePngs").is_some());
+        assert!(v.get("sequence").is_some());
+        assert_eq!(v["isLegacyRawDib"], false);
     }
 }

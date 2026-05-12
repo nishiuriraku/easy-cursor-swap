@@ -87,6 +87,39 @@ impl Hotspot {
     }
 }
 
+/// IPC レスポンスが「カーソル素材の絵」を表現する共通基底。
+///
+/// 各 IPC レスポンス型は `#[serde(flatten)]` でこれを埋め込み、JSON 上は
+/// 今までと同じ平坦構造 (`{ pngBytes, width, height, hotspot, ... }`) を保つ。
+/// `width != height` の非正方画像にも対応する。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CursorAssetDescriptor {
+    /// 最大解像度の RGBA PNG バイト列。Vue 側は Blob 化して `<img>` の src に使う。
+    pub png_bytes: Vec<u8>,
+    /// PNG のネイティブ幅 (px)。
+    pub width: u32,
+    /// PNG のネイティブ高さ (px)。
+    pub height: u32,
+    /// ホットスポット (比率 0.0..=1.0)。
+    pub hotspot: Hotspot,
+}
+
+/// `.ani` フレーム情報の共通コア。`inspect_ani_file` / bulk import 双方で共有する。
+///
+/// - `frame_pngs`: 各フレームの最大解像度 PNG バイト列 (格納順)。
+/// - `sequence`: 再生順 (sequence インデックスをフレーム 0..num_frames-1 にマップ)。
+/// - `per_step_durations_ms`: 各 step の duration。`length == sequence.len()`。
+/// - `is_legacy_raw_dib`: 元 ANI が `RIFF` ICO エントリではなく生 DIB (旧形式) かどうか。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AniFrameData {
+    pub frame_pngs: Vec<Vec<u8>>,
+    pub sequence: Vec<u32>,
+    pub per_step_durations_ms: Vec<u32>,
+    pub is_legacy_raw_dib: bool,
+}
+
 /// テーマメタデータ (theme.json のスキーマ)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ThemeMetadata {
@@ -385,6 +418,36 @@ mod ratio_tests {
         let h: Hotspot = serde_json::from_str(r#"{"x":2.5,"y":-1.0}"#).unwrap();
         assert_eq!(h.x.get(), 1.0);
         assert_eq!(h.y.get(), 0.0);
+    }
+
+    #[test]
+    fn cursor_asset_descriptor_serializes_with_expected_keys() {
+        let d = CursorAssetDescriptor {
+            png_bytes: vec![0xDE, 0xAD],
+            width: 32,
+            height: 32,
+            hotspot: Hotspot::ZERO,
+        };
+        let v = serde_json::to_value(&d).unwrap();
+        assert!(v.get("pngBytes").is_some(), "pngBytes missing: {v}");
+        assert_eq!(v["width"], 32);
+        assert_eq!(v["height"], 32);
+        assert!(v.get("hotspot").is_some());
+    }
+
+    #[test]
+    fn ani_frame_data_serializes_with_expected_keys() {
+        let a = AniFrameData {
+            frame_pngs: vec![vec![1, 2]],
+            sequence: vec![0],
+            per_step_durations_ms: vec![100],
+            is_legacy_raw_dib: false,
+        };
+        let v = serde_json::to_value(&a).unwrap();
+        assert!(v.get("framePngs").is_some());
+        assert!(v.get("sequence").is_some());
+        assert!(v.get("perStepDurationsMs").is_some());
+        assert_eq!(v["isLegacyRawDib"], false);
     }
 }
 

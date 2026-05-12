@@ -4,10 +4,9 @@
 //! Creator の「既存パックを取り込んで編集」フローではディスク書き込みせず
 //! メモリ上で PNG バイトを取り出す必要がある。本モジュールはその専用パイプライン。
 
-use super::{
-    AniAssetData, BulkImportProgress, ParseCursorpackRequest, ParsedCursorpack, ParsedRole,
-};
+use super::{BulkImportProgress, ParseCursorpackRequest, ParsedCursorpack, ParsedRole};
 use crate::errors::AppError;
+use crate::theme::types::AniFrameData;
 use std::collections::HashMap;
 use std::io::Read;
 use std::path::Path;
@@ -65,7 +64,7 @@ struct AniRoleParseResult {
     primary_size: u32,
     primary_png: Vec<u8>,
     hotspot: crate::theme::types::Hotspot,
-    ani: AniAssetData,
+    ani: AniFrameData,
     ani_source_path: Option<String>,
 }
 
@@ -143,7 +142,7 @@ fn parse_ani_role(
             frame0.hotspot_y,
             frame0.image.width(),
         ),
-        ani: AniAssetData {
+        ani: AniFrameData {
             frame_pngs,
             sequence: parsed.sequence,
             per_step_durations_ms,
@@ -225,9 +224,12 @@ pub fn parse_cursorpack_inner_with_extract(
             roles.insert(
                 role_id.clone(),
                 ParsedRole {
-                    primary_size: r.primary_size,
-                    primary_png_bytes: r.primary_png,
-                    hotspot: r.hotspot,
+                    asset: crate::theme::types::CursorAssetDescriptor {
+                        png_bytes: r.primary_png,
+                        width: r.primary_size,
+                        height: r.primary_size,
+                        hotspot: r.hotspot,
+                    },
                     sized_png_bytes: HashMap::new(),
                     ani: Some(r.ani),
                     ani_source_path: r.ani_source_path,
@@ -273,9 +275,12 @@ pub fn parse_cursorpack_inner_with_extract(
         roles.insert(
             role_id.clone(),
             ParsedRole {
-                primary_size: largest.width,
-                primary_png_bytes: primary_png,
-                hotspot: def.hotspot,
+                asset: crate::theme::types::CursorAssetDescriptor {
+                    png_bytes: primary_png,
+                    width: largest.width,
+                    height: largest.height,
+                    hotspot: def.hotspot,
+                },
                 sized_png_bytes: sized,
                 ani: None,
                 ani_source_path: None,

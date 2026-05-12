@@ -31,22 +31,14 @@ use uuid::Uuid;
 
 /// 1 ロールあたりのプレビュー詳細。
 ///
-/// テーマ詳細ドロワーやクリエイターの大型プレビューで「ホットスポット位置」を
-/// 正しく描画するために、PNG バイト列に加えて画像のネイティブ寸法と
-/// ホットスポット座標 (比率) を返す。
-///
-/// `width` / `height` は実 PNG をデコードして得たピクセル寸法。
-/// `hotspot` は比率 (0.0..=1.0) で表したホットスポット位置。
+/// `CursorAssetDescriptor` を `#[serde(flatten)]` で埋め込み、JSON 上は
+/// `{ pngBytes, width, height, hotspot }` の平坦構造で返す。
+/// (旧フィールド `png` は `pngBytes` にリネーム — Phase 3a での breaking change)
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RolePreview {
-    /// PNG バイト列。フロントは Blob 化して `<img>` の src に使う。
-    pub png: Vec<u8>,
-    /// PNG のネイティブ幅 (px)
-    pub width: u32,
-    /// PNG のネイティブ高さ (px)
-    pub height: u32,
-    /// ホットスポット (比率)。
-    pub hotspot: types::Hotspot,
+    #[serde(flatten)]
+    pub asset: types::CursorAssetDescriptor,
 }
 
 /// テーママネージャー
@@ -297,10 +289,12 @@ impl ThemeManager {
             let preview = if ext == "png" {
                 match image::load_from_memory_with_format(&bytes, image::ImageFormat::Png) {
                     Ok(img) => RolePreview {
-                        png: bytes,
-                        width: img.width(),
-                        height: img.height(),
-                        hotspot: def.hotspot,
+                        asset: types::CursorAssetDescriptor {
+                            png_bytes: bytes,
+                            width: img.width(),
+                            height: img.height(),
+                            hotspot: def.hotspot,
+                        },
                     },
                     Err(e) => {
                         tracing::warn!("{} の PNG デコード失敗: {}", role, e);
@@ -335,10 +329,12 @@ impl ThemeManager {
                         ))
                     })?;
                     Ok(RolePreview {
-                        png,
-                        width: w,
-                        height: h,
-                        hotspot,
+                        asset: types::CursorAssetDescriptor {
+                            png_bytes: png,
+                            width: w,
+                            height: h,
+                            hotspot,
+                        },
                     })
                 }) {
                     Ok(p) => p,
@@ -350,14 +346,16 @@ impl ThemeManager {
             } else {
                 match parse_ico_cur(&bytes).and_then(|p| pick_largest_as_png(&p)) {
                     Ok((entry, png)) => RolePreview {
-                        png,
-                        width: entry.width,
-                        height: entry.height,
-                        hotspot: types::Hotspot::from_px(
-                            entry.hotspot_x,
-                            entry.hotspot_y,
-                            entry.width,
-                        ),
+                        asset: types::CursorAssetDescriptor {
+                            png_bytes: png,
+                            width: entry.width,
+                            height: entry.height,
+                            hotspot: types::Hotspot::from_px(
+                                entry.hotspot_x,
+                                entry.hotspot_y,
+                                entry.width,
+                            ),
+                        },
                     },
                     Err(e) => {
                         tracing::warn!("{} の PNG 化に失敗: {}", role, e);
@@ -517,10 +515,12 @@ impl ThemeManager {
             let preview = if ext == "png" {
                 match image::load_from_memory_with_format(&bytes, image::ImageFormat::Png) {
                     Ok(img) => RolePreview {
-                        png: bytes,
-                        width: img.width(),
-                        height: img.height(),
-                        hotspot: types::Hotspot::ZERO,
+                        asset: types::CursorAssetDescriptor {
+                            png_bytes: bytes,
+                            width: img.width(),
+                            height: img.height(),
+                            hotspot: types::Hotspot::ZERO,
+                        },
                     },
                     Err(e) => {
                         tracing::warn!("scheme preview {} の PNG デコード失敗: {}", role, e);
@@ -556,10 +556,12 @@ impl ThemeManager {
                     Ok((w, h, png))
                 }) {
                     Ok((w, h, png)) => RolePreview {
-                        png,
-                        width: w,
-                        height: h,
-                        hotspot: types::Hotspot::ZERO,
+                        asset: types::CursorAssetDescriptor {
+                            png_bytes: png,
+                            width: w,
+                            height: h,
+                            hotspot: types::Hotspot::ZERO,
+                        },
                     },
                     Err(e) => {
                         tracing::warn!("scheme preview {} の .ani 変換失敗: {}", role, e);
@@ -569,14 +571,16 @@ impl ThemeManager {
             } else {
                 match parse_ico_cur(&bytes).and_then(|p| pick_largest_as_png(&p)) {
                     Ok((entry, png)) => RolePreview {
-                        png,
-                        width: entry.width,
-                        height: entry.height,
-                        hotspot: types::Hotspot::from_px(
-                            entry.hotspot_x,
-                            entry.hotspot_y,
-                            entry.width,
-                        ),
+                        asset: types::CursorAssetDescriptor {
+                            png_bytes: png,
+                            width: entry.width,
+                            height: entry.height,
+                            hotspot: types::Hotspot::from_px(
+                                entry.hotspot_x,
+                                entry.hotspot_y,
+                                entry.width,
+                            ),
+                        },
                     },
                     Err(e) => {
                         tracing::warn!("scheme preview {} の .cur/.ico 変換失敗: {}", role, e);
@@ -1383,5 +1387,30 @@ mod tests {
             archive.by_name("cursors/Arrow.cur").is_err(),
             "Arrow.ani が誤って Arrow.cur に書かれていない"
         );
+    }
+}
+
+#[cfg(test)]
+mod role_preview_tests {
+    use super::*;
+    use crate::theme::types::{CursorAssetDescriptor, Hotspot};
+
+    #[test]
+    fn role_preview_serializes_with_flat_keys() {
+        let p = RolePreview {
+            asset: CursorAssetDescriptor {
+                png_bytes: vec![1, 2, 3],
+                width: 32,
+                height: 32,
+                hotspot: Hotspot::ZERO,
+            },
+        };
+        let v = serde_json::to_value(&p).unwrap();
+        // flatten 後は asset サブオブジェクトが出ず、top-level に展開される
+        assert!(v.get("asset").is_none(), "asset should be flattened away");
+        assert!(v.get("pngBytes").is_some());
+        assert_eq!(v["width"], 32);
+        assert_eq!(v["height"], 32);
+        assert!(v.get("hotspot").is_some());
     }
 }

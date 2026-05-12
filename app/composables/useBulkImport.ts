@@ -1,6 +1,10 @@
 import { ref } from 'vue'
 import { invokeTauri } from '~/composables/useTauri'
 
+/**
+ * Rust 側 theme::types::AniFrameData に対応する TS 型 (Phase 3a 以降)。
+ * フィールド名は flatten 後の JSON とそのまま一致。
+ */
 export interface AniAssetData {
   framePngs: number[][]
   sequence: number[]
@@ -8,14 +12,20 @@ export interface AniAssetData {
   isLegacyRawDib: boolean
 }
 
+/**
+ * Rust 側 bulk_import::ResolvedAsset に対応 (Phase 3a 以降)。
+ * `CursorAssetDescriptor` (`pngBytes` / `width` / `height` / `hotspot`) が
+ * `#[serde(flatten)]` で top-level に展開された JSON 形に一致。
+ */
 export interface ResolvedAsset {
   sourceFile: string
   sourcePath: string
   kind: 'png' | 'svg' | 'cur' | 'ico' | 'ani'
   pngBytes: number[]
-  svgText: string | null
-  nativeSize: number
+  width: number
+  height: number
   hotspot: { x: number; y: number } // ratio
+  svgText: string | null
   availableSizes: number[]
   ani: AniAssetData | null
 }
@@ -30,11 +40,17 @@ export interface BulkResolveResult {
   failures: ResolveFailure[]
 }
 
+/**
+ * Rust 側 bulk_import::ParsedRole に対応 (Phase 3a 以降)。
+ * `CursorAssetDescriptor` が flatten された JSON 形に一致。
+ * 旧 `primarySize` / `primaryPngBytes` は廃止 (`width` / `pngBytes` に統一)。
+ */
 export interface ParsedRole {
-  primarySize: number
-  primaryPngBytes: number[]
+  pngBytes: number[]
+  width: number
+  height: number
   hotspot: { x: number; y: number } // ratio
-  sizedPngBytes: Record<string, number[]> // 当面この形は維持 (Task 5 で見直し可能)
+  sizedPngBytes: Record<string, number[]>
   /** `.ani` ロールのフレームデータ。`.cur`/`.ico` ロールでは null。 */
   ani: AniAssetData | null
   /** `.ani` ロールの展開先絶対パス。`.cur`/`.ico` ロールでは null。
