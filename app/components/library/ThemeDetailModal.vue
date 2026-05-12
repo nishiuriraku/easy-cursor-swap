@@ -84,7 +84,7 @@ onBeforeUnmount(() => {
         class="td-modal-backdrop"
         role="dialog"
         aria-modal="true"
-        :aria-label="`${theme.name} の詳細`"
+        :aria-label="t('themeDetail.modalAria', { name: theme.name })"
         @click.self="close"
       >
         <div class="td-standalone td-modal-shell" @click.stop>

@@ -68,7 +68,7 @@ watch(() => props.theme.id, fetchPreview)
 <template>
   <article
     :class="['card', { active: theme.isActive }, 'interactive']"
-    :aria-label="`${theme.name} の詳細を開く`"
+    :aria-label="t('library.detailAria', { name: theme.name })"
     tabindex="0"
     role="button"
     @click="onCardActivate"
@@ -78,7 +78,7 @@ watch(() => props.theme.id, fetchPreview)
       <div v-if="theme.isActive" class="card-active-tag">
         <span class="pulse" aria-hidden="true" />{{ t('library.activeTag') }}
       </div>
-      <div v-if="isSystem" class="card-source-tag" aria-label="Windows システムスキーム">
+      <div v-if="isSystem" class="card-source-tag" :aria-label="t('library.sourceTagSchemeAria')">
         WINDOWS
       </div>
       <CursorMatrix
@@ -96,11 +96,7 @@ watch(() => props.theme.id, fetchPreview)
         <button
           v-if="!isSystem"
           :class="['star', { on: theme.isFavorite }]"
-          :aria-label="
-            theme.isFavorite
-              ? t('library.filterFavorites') + 'から削除'
-              : t('library.filterFavorites') + 'に追加'
-          "
+          :aria-label="theme.isFavorite ? t('library.favRemove') : t('library.favAdd')"
           :aria-pressed="theme.isFavorite"
           @click="emit('toggleFavorite', theme.id)"
         >
@@ -112,7 +108,10 @@ watch(() => props.theme.id, fetchPreview)
         <span class="m" aria-hidden="true">{{ displayDate }}</span>
         <span class="m" aria-hidden="true">×{{ theme.applyCount }}</span>
       </div>
-      <div class="coverage" aria-label="カバレッジ {{ theme.includedRoles.length }}/17">
+      <div
+        class="coverage"
+        :aria-label="t('library.coverageAria', { filled: theme.includedRoles.length })"
+      >
         <div class="bar" aria-hidden="true"><i :style="{ width: coveragePct + '%' }" /></div>
         <span class="num" aria-hidden="true">{{ theme.includedRoles.length }}/17</span>
       </div>

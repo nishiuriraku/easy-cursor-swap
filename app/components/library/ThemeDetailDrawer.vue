@@ -96,7 +96,7 @@ function selectRole(id: string) {
 const descriptionText = computed<string | null>(() => {
   if (props.theme.description) return props.theme.description
   if (isSystem.value) {
-    return 'Windows のマウスのプロパティに保存された配色スキームです。EasyCursorSwap では適用のみ可能で、編集・エクスポート・署名検証は行いません。'
+    return t('themeDetail.systemSchemeDesc')
   }
   return null
 })
@@ -231,12 +231,18 @@ async function openHomepage() {
             {{ theme.applyCount }}
           </span>
           <span style="color: var(--fg-dim); font-size: 12px; font-weight: 400; margin-left: 4px">
-            回適用
+            {{ t('themeDetail.applyCountSuffix') }}
           </span>
         </div>
         <div class="td-cell-sub">
           <span>
-            {{ theme.isActive ? '現在適用中' : theme.applyCount > 0 ? '未適用' : '一度も適用なし' }}
+            {{
+              theme.isActive
+                ? t('themeDetail.usageActive')
+                : theme.applyCount > 0
+                  ? t('themeDetail.usageInactive')
+                  : t('themeDetail.usageNever')
+            }}
           </span>
           <template v-if="lastAppliedDate">
             <span class="td-dot">·</span>
@@ -256,7 +262,7 @@ async function openHomepage() {
           {{ isSystem ? 'HKCU\\Cursors\\Schemes' : `@${theme.author ?? 'unknown'}` }}
         </div>
         <div class="td-cell-sub">
-          <span>{{ isSystem ? 'OS レジストリ' : `v${theme.version}` }}</span>
+          <span>{{ isSystem ? t('themeDetail.sourceOsRegistry') : `v${theme.version}` }}</span>
           <template v-if="!isSystem && theme.license">
             <span class="td-dot">·</span>
             <span>{{ theme.license }}</span>
@@ -282,31 +288,31 @@ async function openHomepage() {
         <template v-if="!isSystem">
           <button
             class="td-act"
-            :aria-label="`${theme.name} を Creator で編集`"
+            :aria-label="t('themeDetail.editAria', { name: theme.name })"
             @click="emit('edit', theme.id)"
           >
-            <UiIcon name="Brush" :size="13" />Creator で編集
+            <UiIcon name="Brush" :size="13" />{{ t('themeDetail.editLabel') }}
           </button>
           <button
             class="td-act"
-            :aria-label="`${theme.name} をエクスポート`"
+            :aria-label="t('themeDetail.exportAria', { name: theme.name })"
             @click="emit('exportPack', theme.id)"
           >
-            <UiIcon name="Export" :size="13" />エクスポート
+            <UiIcon name="Export" :size="13" />{{ t('themeDetail.exportLabel') }}
           </button>
           <button
             class="td-act"
-            :aria-label="`${theme.name} を複製`"
+            :aria-label="t('themeDetail.duplicateAria', { name: theme.name })"
             @click="emit('duplicate', theme.id)"
           >
-            <UiIcon name="Plus" :size="13" />複製
+            <UiIcon name="Plus" :size="13" />{{ t('themeDetail.duplicateLabel') }}
           </button>
           <button
             class="td-act danger"
-            :aria-label="`${theme.name} を削除`"
+            :aria-label="t('themeDetail.deleteAria', { name: theme.name })"
             @click="emit('delete', theme.id)"
           >
-            削除
+            {{ t('themeDetail.deleteLabel') }}
           </button>
         </template>
         <template v-else>
@@ -318,13 +324,13 @@ async function openHomepage() {
           -->
           <button
             class="td-act"
-            :aria-label="`${theme.name} を .cursorpack としてエクスポート`"
+            :aria-label="t('themeDetail.exportSchemeAria', { name: theme.name })"
             @click="emit('exportPack', theme.id)"
           >
-            <UiIcon name="Export" :size="13" />.cursorpack に書き出し
+            <UiIcon name="Export" :size="13" />{{ t('themeDetail.exportSchemeLabel') }}
           </button>
           <span class="td-source mono">
-            <UiIcon name="Globe" :size="11" />システムスキームは編集・複製不可
+            <UiIcon name="Globe" :size="11" />{{ t('themeDetail.systemSchemeReadOnly') }}
           </span>
         </template>
       </div>
@@ -335,10 +341,10 @@ async function openHomepage() {
           disabled
           style="opacity: 0.6; cursor: default; height: 32px"
         >
-          <UiIcon name="Check" :size="13" />適用中
+          <UiIcon name="Check" :size="13" />{{ t('themeDetail.applyingNow') }}
         </button>
         <button v-else class="btn primary" style="height: 32px" @click="emit('apply', theme.id)">
-          テーマを適用
+          {{ t('themeDetail.applyTheme') }}
         </button>
       </div>
     </footer>

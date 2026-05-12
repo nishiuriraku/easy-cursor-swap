@@ -26,19 +26,18 @@ defineEmits<{
       <div class="es-eyebrow" style="color: var(--fg-mute)">EMPTY · NO THEMES</div>
       <h1>{{ t('library.emptyTitle') }}</h1>
       <p>
-        <code>.cursorpack</code> をこのウィンドウへドラッグするか、
-        公式インデックスから取り込み、または Creator で新しく作りましょう。
+        {{ t('library.emptyBodyPrefix') }}<code>.cursorpack</code>{{ t('library.emptyBodySuffix') }}
       </p>
 
       <div class="es-cta-row">
         <NuxtLink class="btn primary" to="/creator">
-          <UiIcon name="Plus" :size="14" />新規作成
+          <UiIcon name="Plus" :size="14" />{{ t('library.emptyNew') }}
         </NuxtLink>
         <button class="btn" @click="$emit('open-import')">
-          <UiIcon name="Import" :size="13" />.cursorpack をインポート
+          <UiIcon name="Import" :size="13" />{{ t('library.emptyImport') }}
         </button>
         <NuxtLink class="btn ghost" to="/marketplace">
-          <UiIcon name="Globe" :size="13" />インデックスを開く
+          <UiIcon name="Globe" :size="13" />{{ t('library.emptyOpenIndex') }}
         </NuxtLink>
       </div>
 
@@ -46,7 +45,7 @@ defineEmits<{
         <div class="es-drop-inner">
           <UiIcon name="Import" :size="20" style="color: var(--accent)" />
           <div>
-            <div class="es-drop-t">.cursorpack をここにドロップ</div>
+            <div class="es-drop-t">{{ t('library.emptyDropText') }}</div>
             <div class="es-drop-s">{{ t('drop.autoVerify') }}</div>
           </div>
         </div>

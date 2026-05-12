@@ -12,9 +12,27 @@ import { mount } from '@vue/test-utils'
 import ThemeDetailDrawer from '../ThemeDetailDrawer.vue'
 import type { ThemeCardData } from '~/types/theme'
 
-vi.mock('~/composables/useI18n', () => ({
-  useI18n: () => ({ t: (k: string) => k }),
-}))
+// `vi.mock` のファクトリは hoist されるため、ja リソースの import も
+// `vi.hoisted` 経由で巻き上げる。`t(key, params)` で {var} 展開まで再現する。
+vi.mock('~/composables/useI18n', async () => {
+  const ja = (await import('~/locales/ja')).default
+  function resolveJa(key: string, params?: Record<string, string | number>): string {
+    const parts = key.split('.')
+    let cursor: unknown = ja
+    for (const p of parts) {
+      if (typeof cursor !== 'object' || cursor === null) return key
+      cursor = (cursor as Record<string, unknown>)[p]
+    }
+    if (typeof cursor !== 'string') return key
+    if (!params) return cursor
+    return cursor.replace(/\{(\w+)\}/g, (_, k: string) =>
+      params[k] === undefined ? `{${k}}` : String(params[k]),
+    )
+  }
+  return {
+    useI18n: () => ({ t: resolveJa }),
+  }
+})
 
 vi.mock('~/composables/useTauri', () => ({
   invokeTauri: vi.fn().mockResolvedValue(undefined),
@@ -109,7 +127,8 @@ describe('ThemeDetailDrawer — 静的要素の整理', () => {
   it('lastAppliedAt があれば USAGE サブに「lastAppliedPrefix YYYY-MM-DD」を出す', () => {
     const w = mountDrawer(makeTheme({ applyCount: 5, lastAppliedAt: '2026-05-10T12:00:00Z' }))
     const usage = w.findAll('.td-cell')[1]!
-    expect(usage.find('.td-cell-sub').text()).toContain('themePicker.lastAppliedPrefix')
+    // 実 ja リソースを解決して描画される接頭辞 (「前回」) と日付の双方を確認。
+    expect(usage.find('.td-cell-sub').text()).toContain('前回')
     expect(usage.find('.td-cell-sub').text()).toContain('2026-05-10')
   })
 

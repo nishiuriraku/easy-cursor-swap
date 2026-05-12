@@ -79,7 +79,7 @@ function onRowKeydown(e: KeyboardEvent) {
     :class="['lib-row', { active: theme.isActive }]"
     role="row"
     tabindex="0"
-    :aria-label="`${theme.name} の詳細を開く`"
+    :aria-label="t('library.detailAria', { name: theme.name })"
     @click="onRowActivate"
     @keydown="onRowKeydown"
   >
@@ -88,11 +88,7 @@ function onRowKeydown(e: KeyboardEvent) {
       <button
         v-if="!isSystem"
         :class="['star', { on: theme.isFavorite }]"
-        :aria-label="
-          theme.isFavorite
-            ? t('library.filterFavorites') + 'から削除'
-            : t('library.filterFavorites') + 'に追加'
-        "
+        :aria-label="theme.isFavorite ? t('library.favRemove') : t('library.favAdd')"
         :aria-pressed="theme.isFavorite"
         @click="onFav"
       >

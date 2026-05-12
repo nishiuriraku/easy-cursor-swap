@@ -26,7 +26,7 @@ defineEmits<{
 
 <template>
   <div class="filters" role="group" :aria-label="t('common.search')">
-    <div class="chips" role="group" aria-label="フィルター">
+    <div class="chips" role="group" :aria-label="t('library.filterGroupAria')">
       <button
         :class="['chip', { active: filter === 'all' }]"
         :aria-pressed="filter === 'all'"
