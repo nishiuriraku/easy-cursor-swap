@@ -171,10 +171,8 @@ impl LocalizedString {
 pub struct CursorDefinition {
     /// カーソルファイルのパス（.cursorpack 内の相対パス）
     pub file: String,
-    /// ホットスポット X座標（元画像のピクセル値）
-    pub hotspot_x: u32,
-    /// ホットスポット Y座標（元画像のピクセル値）
-    pub hotspot_y: u32,
+    /// ホットスポット (比率, 0.0..=1.0)。`.cur` 書出時に primarySize と乗算して px に変換する。
+    pub hotspot: Hotspot,
     /// リサイズアルゴリズム ("lanczos" / "nearest")
     #[serde(default = "default_resize_method")]
     pub resize_method: String,
@@ -188,12 +186,10 @@ pub struct CursorDefinition {
 pub struct SizeOverride {
     /// このサイズ専用の画像ファイルパス
     pub file: String,
-    /// このサイズ専用のホットスポット X（未指定時は基準サイズから比例計算）
+    /// このサイズ専用のホットスポット比率。
+    /// `None` なら親 `CursorDefinition.hotspot` を継承。
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub hotspot_x: Option<u32>,
-    /// このサイズ専用のホットスポット Y
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub hotspot_y: Option<u32>,
+    pub hotspot: Option<Hotspot>,
 }
 
 fn default_resize_method() -> String {

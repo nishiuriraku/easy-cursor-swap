@@ -118,8 +118,7 @@ pub struct ImportedCursorFile {
     pub is_cur: bool,
     pub width: u32,
     pub height: u32,
-    pub hotspot_x: u32,
-    pub hotspot_y: u32,
+    pub hotspot: crate::theme::types::Hotspot,
     pub png_bytes: Vec<u8>,
     pub available_sizes: Vec<u32>,
 }
@@ -151,8 +150,11 @@ pub fn import_cursor_file(path: String) -> Result<ImportedCursorFile, AppError> 
         is_cur: parsed.is_cur,
         width: largest.width,
         height: largest.height,
-        hotspot_x: largest.hotspot_x,
-        hotspot_y: largest.hotspot_y,
+        hotspot: crate::theme::types::Hotspot::from_px(
+            largest.hotspot_x,
+            largest.hotspot_y,
+            largest.width,
+        ),
         png_bytes,
         available_sizes,
     })
@@ -177,8 +179,7 @@ pub struct AniInspection {
     pub frame_pngs: Vec<Vec<u8>>,
     pub width: u32,
     pub height: u32,
-    pub hotspot_x: u32,
-    pub hotspot_y: u32,
+    pub hotspot: crate::theme::types::Hotspot,
     pub is_legacy_raw_dib: bool,
 }
 
@@ -216,11 +217,14 @@ pub fn inspect_ani_file(path: String) -> Result<AniInspection, AppError> {
         .collect();
     let total_duration_ms = parsed.total_duration_ms();
 
-    let (width, height, hotspot_x, hotspot_y) = parsed
+    let (width, height, hotspot) = parsed
         .frames
         .first()
-        .map(|f| (f.width, f.height, f.hotspot_x, f.hotspot_y))
-        .unwrap_or((0, 0, 0, 0));
+        .map(|f| {
+            let hs = crate::theme::types::Hotspot::from_px(f.hotspot_x, f.hotspot_y, f.width);
+            (f.width, f.height, hs)
+        })
+        .unwrap_or((0, 0, crate::theme::types::Hotspot::ZERO));
 
     tracing::info!(
         "inspect_ani_file: frames={} steps={} total={}ms",
@@ -239,8 +243,7 @@ pub fn inspect_ani_file(path: String) -> Result<AniInspection, AppError> {
         frame_pngs,
         width,
         height,
-        hotspot_x,
-        hotspot_y,
+        hotspot,
         is_legacy_raw_dib: parsed.is_legacy_raw_dib,
     })
 }

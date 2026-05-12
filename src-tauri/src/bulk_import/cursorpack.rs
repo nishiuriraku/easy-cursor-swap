@@ -64,8 +64,7 @@ fn encode_entry_to_png(entry: &crate::cursor::ParsedIcoCurEntry) -> Result<Vec<u
 struct AniRoleParseResult {
     primary_size: u32,
     primary_png: Vec<u8>,
-    hotspot_x: u32,
-    hotspot_y: u32,
+    hotspot: crate::theme::types::Hotspot,
     ani: AniAssetData,
     ani_source_path: Option<String>,
 }
@@ -139,8 +138,11 @@ fn parse_ani_role(
     Ok(AniRoleParseResult {
         primary_size: frame0.image.width(),
         primary_png,
-        hotspot_x: frame0.hotspot_x,
-        hotspot_y: frame0.hotspot_y,
+        hotspot: crate::theme::types::Hotspot::from_px(
+            frame0.hotspot_x,
+            frame0.hotspot_y,
+            frame0.image.width(),
+        ),
         ani: AniAssetData {
             frame_pngs,
             sequence: parsed.sequence,
@@ -225,8 +227,7 @@ pub fn parse_cursorpack_inner_with_extract(
                 ParsedRole {
                     primary_size: r.primary_size,
                     primary_png_bytes: r.primary_png,
-                    hotspot_x: r.hotspot_x,
-                    hotspot_y: r.hotspot_y,
+                    hotspot: r.hotspot,
                     sized_png_bytes: HashMap::new(),
                     ani: Some(r.ani),
                     ani_source_path: r.ani_source_path,
@@ -274,8 +275,7 @@ pub fn parse_cursorpack_inner_with_extract(
             ParsedRole {
                 primary_size: largest.width,
                 primary_png_bytes: primary_png,
-                hotspot_x: def.hotspot_x,
-                hotspot_y: def.hotspot_y,
+                hotspot: def.hotspot,
                 sized_png_bytes: sized,
                 ani: None,
                 ani_source_path: None,

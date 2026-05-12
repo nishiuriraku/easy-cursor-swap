@@ -33,11 +33,10 @@ use uuid::Uuid;
 ///
 /// テーマ詳細ドロワーやクリエイターの大型プレビューで「ホットスポット位置」を
 /// 正しく描画するために、PNG バイト列に加えて画像のネイティブ寸法と
-/// ホットスポット座標 (元画像 px) を返す。
+/// ホットスポット座標 (比率) を返す。
 ///
 /// `width` / `height` は実 PNG をデコードして得たピクセル寸法。
-/// `hotspot_x` / `hotspot_y` は theme.json の値 (`.cursorpack`) または
-/// `.cur` ヘッダ値 (Windows スキーム) を採用する。
+/// `hotspot` は比率 (0.0..=1.0) で表したホットスポット位置。
 #[derive(Debug, Clone, Serialize)]
 pub struct RolePreview {
     /// PNG バイト列。フロントは Blob 化して `<img>` の src に使う。
@@ -46,10 +45,8 @@ pub struct RolePreview {
     pub width: u32,
     /// PNG のネイティブ高さ (px)
     pub height: u32,
-    /// ホットスポット X (元画像 px。`width` と同じ座標系)
-    pub hotspot_x: u32,
-    /// ホットスポット Y (元画像 px。`height` と同じ座標系)
-    pub hotspot_y: u32,
+    /// ホットスポット (比率)。
+    pub hotspot: types::Hotspot,
 }
 
 /// テーママネージャー
@@ -303,8 +300,7 @@ impl ThemeManager {
                         png: bytes,
                         width: img.width(),
                         height: img.height(),
-                        hotspot_x: def.hotspot_x,
-                        hotspot_y: def.hotspot_y,
+                        hotspot: def.hotspot,
                     },
                     Err(e) => {
                         tracing::warn!("{} の PNG デコード失敗: {}", role, e);
@@ -312,21 +308,24 @@ impl ThemeManager {
                     }
                 }
             } else if ext == "ani" {
-                // .ani: 先頭フレームを PNG 化。ホットスポットは theme.json 値ではなく
-                // フレーム内蔵の値を採用 (フレーム寸法と同じ座標系で取り回せるため)。
+                // .ani: 先頭フレームを PNG 化。ホットスポットはフレーム内蔵の px 値を
+                // フレーム幅で比率化して採用する。
                 match parse_ani(&bytes).and_then(|parsed| {
                     let frame = parsed.frames.into_iter().next().ok_or_else(|| {
                         crate::errors::AppError::ImageProcessing(
                             ".ani にフレームがありません".to_string(),
                         )
                     })?;
+                    let w = frame.image.width();
+                    let h = frame.image.height();
+                    let hotspot = types::Hotspot::from_px(frame.hotspot_x, frame.hotspot_y, w);
                     let mut png = Vec::new();
                     let encoder = image::codecs::png::PngEncoder::new(&mut png);
                     image::ImageEncoder::write_image(
                         encoder,
                         frame.image.as_raw(),
-                        frame.image.width(),
-                        frame.image.height(),
+                        w,
+                        h,
                         image::ExtendedColorType::Rgba8,
                     )
                     .map_err(|e| {
@@ -337,10 +336,9 @@ impl ThemeManager {
                     })?;
                     Ok(RolePreview {
                         png,
-                        width: frame.image.width(),
-                        height: frame.image.height(),
-                        hotspot_x: frame.hotspot_x,
-                        hotspot_y: frame.hotspot_y,
+                        width: w,
+                        height: h,
+                        hotspot,
                     })
                 }) {
                     Ok(p) => p,
@@ -355,8 +353,11 @@ impl ThemeManager {
                         png,
                         width: entry.width,
                         height: entry.height,
-                        hotspot_x: entry.hotspot_x,
-                        hotspot_y: entry.hotspot_y,
+                        hotspot: types::Hotspot::from_px(
+                            entry.hotspot_x,
+                            entry.hotspot_y,
+                            entry.width,
+                        ),
                     },
                     Err(e) => {
                         tracing::warn!("{} の PNG 化に失敗: {}", role, e);
@@ -519,8 +520,7 @@ impl ThemeManager {
                         png: bytes,
                         width: img.width(),
                         height: img.height(),
-                        hotspot_x: 0,
-                        hotspot_y: 0,
+                        hotspot: types::Hotspot::ZERO,
                     },
                     Err(e) => {
                         tracing::warn!("scheme preview {} の PNG デコード失敗: {}", role, e);
@@ -536,13 +536,15 @@ impl ThemeManager {
                             ".ani にフレームがありません".to_string(),
                         )
                     })?;
+                    let w = frame.image.width();
+                    let h = frame.image.height();
                     let mut png = Vec::new();
                     let encoder = image::codecs::png::PngEncoder::new(&mut png);
                     image::ImageEncoder::write_image(
                         encoder,
                         frame.image.as_raw(),
-                        frame.image.width(),
-                        frame.image.height(),
+                        w,
+                        h,
                         image::ExtendedColorType::Rgba8,
                     )
                     .map_err(|e| {
@@ -551,14 +553,13 @@ impl ThemeManager {
                             e
                         ))
                     })?;
-                    Ok((frame.image.width(), frame.image.height(), png))
+                    Ok((w, h, png))
                 }) {
                     Ok((w, h, png)) => RolePreview {
                         png,
                         width: w,
                         height: h,
-                        hotspot_x: 0,
-                        hotspot_y: 0,
+                        hotspot: types::Hotspot::ZERO,
                     },
                     Err(e) => {
                         tracing::warn!("scheme preview {} の .ani 変換失敗: {}", role, e);
@@ -571,8 +572,11 @@ impl ThemeManager {
                         png,
                         width: entry.width,
                         height: entry.height,
-                        hotspot_x: entry.hotspot_x,
-                        hotspot_y: entry.hotspot_y,
+                        hotspot: types::Hotspot::from_px(
+                            entry.hotspot_x,
+                            entry.hotspot_y,
+                            entry.width,
+                        ),
                     },
                     Err(e) => {
                         tracing::warn!("scheme preview {} の .cur/.ico 変換失敗: {}", role, e);
@@ -641,8 +645,7 @@ impl ThemeManager {
                 role.clone(),
                 CursorDefinition {
                     file: rel.clone(),
-                    hotspot_x: 0,
-                    hotspot_y: 0,
+                    hotspot: types::Hotspot::ZERO,
                     resize_method: "lanczos".to_string(),
                     size_overrides: None,
                 },
@@ -651,7 +654,7 @@ impl ThemeManager {
         }
 
         let metadata = ThemeMetadata {
-            schema_version: 1,
+            schema_version: 2,
             id: Uuid::new_v4(),
             name: LocalizedString::Localized(name_map),
             version: "1.0.0".to_string(),
@@ -711,6 +714,19 @@ impl ThemeManager {
     ) -> AppResult<ThemeSummary> {
         let content = std::fs::read_to_string(theme_json_path)?;
         let metadata: ThemeMetadata = serde_json::from_str(&content)?;
+
+        // schema_version 検証: v2 以外はスキップ (v1 → v2 マイグレーションなし)
+        if metadata.schema_version != 2 {
+            tracing::warn!(
+                "テーマ {} スキップ: 非対応 schema_version {} (expected 2)",
+                crate::logging::short_hash(metadata.id.to_string().as_bytes()),
+                metadata.schema_version
+            );
+            return Err(crate::errors::AppError::Theme(format!(
+                "schema_version {} は非対応 (expected 2)",
+                metadata.schema_version
+            )));
+        }
 
         let included_roles: Vec<String> = metadata.cursors.keys().cloned().collect();
         let is_active = active_id == Some(metadata.id);
@@ -1263,7 +1279,7 @@ mod tests {
     #[test]
     fn write_cursorpack_to_buffer_produces_valid_zip() {
         let mut metadata = crate::theme::types::ThemeMetadata {
-            schema_version: 1,
+            schema_version: 2,
             id: uuid::Uuid::new_v4(),
             name: crate::theme::types::LocalizedString::Simple("Buf Test".to_string()),
             version: "1.0.0".to_string(),
@@ -1302,8 +1318,7 @@ mod tests {
             "Arrow".to_string(),
             CursorDefinition {
                 file: "cursors/Arrow.ani".to_string(),
-                hotspot_x: 0,
-                hotspot_y: 0,
+                hotspot: crate::theme::types::Hotspot::ZERO,
                 resize_method: "lanczos".to_string(),
                 size_overrides: None,
             },
@@ -1312,14 +1327,13 @@ mod tests {
             "IBeam".to_string(),
             CursorDefinition {
                 file: "cursors/IBeam.cur".to_string(),
-                hotspot_x: 0,
-                hotspot_y: 0,
+                hotspot: crate::theme::types::Hotspot::ZERO,
                 resize_method: "lanczos".to_string(),
                 size_overrides: None,
             },
         );
         let mut metadata = crate::theme::types::ThemeMetadata {
-            schema_version: 1,
+            schema_version: 2,
             id: uuid::Uuid::new_v4(),
             name: LocalizedString::Simple("Ani Mix".to_string()),
             version: "1.0.0".to_string(),

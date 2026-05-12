@@ -27,8 +27,8 @@ pub struct ExportCursorpackRequest {
     pub author: Option<String>,
     pub version: String,
     pub requires_os_shadow: bool,
-    /// 役割名 → 元画像ホットスポット (`{ "Arrow": { x: 4, y: 4 } }`)
-    pub hotspots: std::collections::HashMap<String, Hotspot>,
+    /// 役割名 → 元画像ホットスポット比率 (`{ "Arrow": { x: 0.125, y: 0.125 } }`)
+    pub hotspots: std::collections::HashMap<String, crate::theme::types::Hotspot>,
     /// 役割名 → ローカル `.cur` ファイルパス
     pub cur_paths: std::collections::HashMap<String, String>,
     pub output_path: String,
@@ -48,12 +48,6 @@ pub enum ExportDestination {
         #[serde(default)]
         apply_after: bool,
     },
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct Hotspot {
-    pub x: u32,
-    pub y: u32,
 }
 
 #[derive(Debug, Serialize)]
@@ -89,13 +83,12 @@ pub fn export_cursorpack(req: ExportCursorpackRequest) -> Result<ExportResult, A
             .hotspots
             .get(role)
             .cloned()
-            .unwrap_or(Hotspot { x: 0, y: 0 });
+            .unwrap_or(crate::theme::types::Hotspot::ZERO);
         cursors_meta.insert(
             role.clone(),
             CursorDefinition {
                 file: format!("cursors/{}.cur", role),
-                hotspot_x: hot.x,
-                hotspot_y: hot.y,
+                hotspot: hot,
                 resize_method: "lanczos".to_string(),
                 size_overrides: None,
             },
@@ -111,7 +104,7 @@ pub fn export_cursorpack(req: ExportCursorpackRequest) -> Result<ExportResult, A
     }
 
     let mut metadata = ThemeMetadata {
-        schema_version: 1,
+        schema_version: 2,
         id: uuid::Uuid::new_v4(),
         name: LocalizedString::Localized(name_map),
         version: req.version.clone(),
@@ -204,26 +197,35 @@ fn clear_cancel(build_id: &str) {
     }
 }
 
-/// 1 役割分の入力 (PNG バイト列 + ホットスポット + リサンプル指定)
+/// 1 役割分の入力 (PNG バイト列 + ホットスポット比率 + リサンプル指定)
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RoleBuildEntry {
     pub role: String,
     pub png_bytes: Vec<u8>,
-    pub hotspot_x: u32,
-    pub hotspot_y: u32,
+    /// ホットスポット (比率, 0.0..=1.0)。`.cur` 書出直前に `to_px(size)` で px 変換する。
+    pub hotspot: crate::theme::types::Hotspot,
     /// "lanczos" / "nearest" / "auto"
     pub resample: String,
-    /// サイズ別オーバーライド (px → PNG bytes)。
+    /// サイズ別オーバーライド (px → PNG bytes + optional 独立 hotspot)。
     /// Some の場合、対応サイズはリサンプルせずそのまま使用。
     /// None / 空なら従来どおり png_bytes をリサンプル。
     #[serde(default)]
-    pub sized_png_bytes: Option<std::collections::HashMap<u32, Vec<u8>>>,
+    pub sized_overrides: Option<std::collections::HashMap<u32, SizedOverridePayload>>,
     /// `.ani` 由来ロールのソースファイル絶対パス。
     /// セットされている場合、PNG → CUR ビルダではなく rewrite_ani_with_hotspot を経由して
     /// cursors/<role>.ani として書き出す。
     #[serde(default)]
     pub ani_source_path: Option<String>,
+}
+
+/// サイズ別オーバーライド (PNG + optional 独立 hotspot)。
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SizedOverridePayload {
+    pub png_bytes: Vec<u8>,
+    #[serde(default)]
+    pub hotspot: Option<crate::theme::types::Hotspot>,
 }
 
 /// ストリーム式 .cursorpack ビルドリクエスト
@@ -331,17 +333,25 @@ pub fn export_cursorpack_streamed(
                     e
                 ))
             })?;
+            // ANI の primary_size は png_bytes から取得 (空の場合は 32px 既定)
+            let primary_size = if !entry.png_bytes.is_empty() {
+                image::load_from_memory(&entry.png_bytes)
+                    .map(|img| img.width())
+                    .unwrap_or(32)
+            } else {
+                32
+            };
+            let (hot_x_px, hot_y_px) = entry.hotspot.to_px(primary_size);
             let rewritten = crate::cursor::rewrite_ani_with_hotspot(
                 &bytes,
-                (entry.hotspot_x as u16, entry.hotspot_y as u16),
+                (hot_x_px as u16, hot_y_px as u16),
             )?;
             cursor_bytes.insert(entry.role.clone(), rewritten);
             cursors_meta.insert(
                 entry.role.clone(),
                 CursorDefinition {
                     file: format!("cursors/{}.ani", entry.role),
-                    hotspot_x: entry.hotspot_x,
-                    hotspot_y: entry.hotspot_y,
+                    hotspot: entry.hotspot,
                     resize_method: entry.resample.clone(),
                     size_overrides: None,
                 },
@@ -363,20 +373,35 @@ pub fn export_cursorpack_streamed(
             "auto" => ResizeMethod::Lanczos,
             other => ResizeMethod::from_str(other),
         };
+
+        // primary_size を PNG ヘッダから取得して ratio→px 変換する
+        let primary_size = image::load_from_memory(&entry.png_bytes)
+            .map(|img| img.width())
+            .unwrap_or(32);
+        let (hot_x_px, hot_y_px) = entry.hotspot.to_px(primary_size);
+
+        // sized_overrides を sized_png_bytes 形式に変換 (build_cur_from_png への境界)
+        let sized_png_map: Option<std::collections::HashMap<u32, Vec<u8>>> =
+            entry.sized_overrides.as_ref().map(|overrides| {
+                overrides
+                    .iter()
+                    .map(|(size, payload)| (*size, payload.png_bytes.clone()))
+                    .collect()
+            });
+
         let bin = build_cur_from_png(
             &entry.png_bytes,
-            entry.hotspot_x,
-            entry.hotspot_y,
+            hot_x_px,
+            hot_y_px,
             resample,
-            entry.sized_png_bytes.as_ref(),
+            sized_png_map.as_ref(),
         )?;
         cursor_bytes.insert(entry.role.clone(), bin);
         cursors_meta.insert(
             entry.role.clone(),
             CursorDefinition {
                 file: format!("cursors/{}.cur", entry.role),
-                hotspot_x: entry.hotspot_x,
-                hotspot_y: entry.hotspot_y,
+                hotspot: entry.hotspot,
                 resize_method: entry.resample.clone(),
                 size_overrides: None,
             },
@@ -401,7 +426,7 @@ pub fn export_cursorpack_streamed(
         name_map.insert("en".to_string(), en);
     }
     let mut metadata = ThemeMetadata {
-        schema_version: 1,
+        schema_version: 2,
         id: resolve_metadata_id(req.existing_theme_id),
         name: LocalizedString::Localized(name_map),
         version: req.version.clone(),
@@ -546,7 +571,7 @@ pub fn export_cursorpack_streamed(
 
 #[cfg(test)]
 mod tests {
-    use super::{clear_cancel, is_cancelled, mark_cancelled};
+    use super::{clear_cancel, is_cancelled, mark_cancelled, SizedOverridePayload};
 
     #[test]
     fn cancel_flag_lifecycle() {
@@ -641,7 +666,7 @@ mod tests {
         // (フル展開は手動 E2E に委ねる)。
         use std::collections::HashMap;
         let mut metadata = crate::theme::types::ThemeMetadata {
-            schema_version: 1,
+            schema_version: 2,
             id: uuid::Uuid::new_v4(),
             name: crate::theme::types::LocalizedString::Simple("Lib Test".to_string()),
             version: "1.2.3".to_string(),
@@ -663,5 +688,37 @@ mod tests {
         let inspected = crate::theme::ThemeManager::inspect_cursorpack_bytes(&bytes).unwrap();
         assert_eq!(inspected.id, target_id, "ID が引き継がれているはず");
         assert_eq!(inspected.version, "1.2.3");
+    }
+
+    #[test]
+    fn ratio_hotspot_converts_to_px_at_each_size() {
+        use crate::theme::types::{Hotspot, Ratio01};
+        let h = Hotspot {
+            x: Ratio01::new(0.5),
+            y: Ratio01::new(0.5),
+        };
+        assert_eq!(h.to_px(32), (16, 16));
+        assert_eq!(h.to_px(64), (32, 32));
+        assert_eq!(h.to_px(128), (64, 64));
+        assert_eq!(h.to_px(256), (128, 128));
+    }
+
+    #[test]
+    fn sized_override_hotspot_overrides_primary() {
+        use crate::theme::types::{Hotspot, Ratio01};
+        let primary = Hotspot {
+            x: Ratio01::new(0.0),
+            y: Ratio01::new(0.0),
+        };
+        let override_h = Hotspot {
+            x: Ratio01::new(0.5),
+            y: Ratio01::new(0.5),
+        };
+        let payload = SizedOverridePayload {
+            png_bytes: vec![],
+            hotspot: Some(override_h),
+        };
+        let effective = payload.hotspot.unwrap_or(primary);
+        assert_eq!(effective, override_h);
     }
 }

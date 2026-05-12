@@ -102,8 +102,7 @@ fn resolve_png(path: &str, basename: String, bytes: &[u8]) -> Result<ResolvedAss
         png_bytes: bytes.to_vec(),
         svg_text: None,
         native_size: size,
-        hotspot_x: 0,
-        hotspot_y: 0,
+        hotspot: crate::theme::types::Hotspot::ZERO,
         available_sizes: vec![size],
         ani: None,
     })
@@ -120,8 +119,7 @@ fn resolve_svg(path: &str, basename: String, bytes: &[u8]) -> Result<ResolvedAss
         png_bytes: Vec::new(),
         svg_text: Some(text),
         native_size: 256,
-        hotspot_x: 0,
-        hotspot_y: 0,
+        hotspot: crate::theme::types::Hotspot::ZERO,
         available_sizes: vec![256],
         ani: None,
     })
@@ -153,11 +151,14 @@ fn resolve_ani(path: &str, basename: String, bytes: &[u8]) -> Result<ResolvedAss
         .map(|j| ((*j as u64 * 1000) / 60) as u32)
         .collect();
 
-    let (width, hotspot_x, hotspot_y) = parsed
+    let (width, hotspot) = parsed
         .frames
         .first()
-        .map(|f| (f.width, f.hotspot_x, f.hotspot_y))
-        .unwrap_or((0, 0, 0));
+        .map(|f| {
+            let hs = crate::theme::types::Hotspot::from_px(f.hotspot_x, f.hotspot_y, f.width);
+            (f.width, hs)
+        })
+        .unwrap_or((0, crate::theme::types::Hotspot::ZERO));
 
     let primary_png = frame_pngs.first().cloned().unwrap_or_default();
 
@@ -168,8 +169,7 @@ fn resolve_ani(path: &str, basename: String, bytes: &[u8]) -> Result<ResolvedAss
         png_bytes: primary_png,
         svg_text: None,
         native_size: width,
-        hotspot_x,
-        hotspot_y,
+        hotspot,
         available_sizes: vec![width],
         ani: Some(super::AniAssetData {
             frame_pngs,
@@ -201,8 +201,11 @@ fn resolve_cur_or_ico(
         png_bytes,
         svg_text: None,
         native_size: largest.width,
-        hotspot_x: largest.hotspot_x,
-        hotspot_y: largest.hotspot_y,
+        hotspot: crate::theme::types::Hotspot::from_px(
+            largest.hotspot_x,
+            largest.hotspot_y,
+            largest.width,
+        ),
         available_sizes,
         ani: None,
     })
@@ -368,7 +371,7 @@ mod tests {
         assert_eq!(asset.kind, AssetKind::Png);
         // sample-icon の PNG はすべて 128x128
         assert_eq!(asset.native_size, 128);
-        assert_eq!(asset.hotspot_x, 0);
+        assert_eq!(asset.hotspot, crate::theme::types::Hotspot::ZERO);
         assert_eq!(asset.source_file, "easy-cursor-swap-mint__Arrow.png");
         assert!(asset.svg_text.is_none());
         assert!(!asset.png_bytes.is_empty());
@@ -476,8 +479,9 @@ mod tests {
         let resolved = resolve_one(path.to_str().unwrap()).expect("resolve");
         assert_eq!(resolved.kind, AssetKind::Ani);
         assert_eq!(resolved.native_size, 16);
-        assert_eq!(resolved.hotspot_x, 2);
-        assert_eq!(resolved.hotspot_y, 3);
+        // hotspot は px(2,3) を size=16 で比率化した値と一致するはず
+        let expected_hotspot = crate::theme::types::Hotspot::from_px(2, 3, 16);
+        assert_eq!(resolved.hotspot, expected_hotspot);
         let ani_data = resolved.ani.expect("ani field");
         assert_eq!(ani_data.frame_pngs.len(), 1);
         assert!(!ani_data.is_legacy_raw_dib);

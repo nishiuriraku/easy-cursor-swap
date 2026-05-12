@@ -58,8 +58,7 @@ pub struct ResolvedAsset {
     pub png_bytes: Vec<u8>,
     pub svg_text: Option<String>,
     pub native_size: u32,
-    pub hotspot_x: u32,
-    pub hotspot_y: u32,
+    pub hotspot: crate::theme::types::Hotspot,
     pub available_sizes: Vec<u32>,
     pub ani: Option<AniAssetData>,
 }
@@ -144,8 +143,7 @@ pub struct CursorpackMetadata {
 pub struct ParsedRole {
     pub primary_size: u32,
     pub primary_png_bytes: Vec<u8>,
-    pub hotspot_x: u32,
-    pub hotspot_y: u32,
+    pub hotspot: crate::theme::types::Hotspot,
     pub sized_png_bytes: HashMap<u32, Vec<u8>>,
     /// `.ani` ロールのフレームデータ。`.cur` / `.ico` の場合は `None`。
     /// フロントエンドはこれがあれば「動くサムネ」を出し、`aniFrames` として
