@@ -241,8 +241,8 @@ function logMark(s: LogEntry['status']): string {
             <button v-if="phase === 'idle'" class="btn ghost" @click="close">
               {{ t('common.cancel') }}
             </button>
-            <button v-if="phase === 'idle'" class="btn danger" @click="execute">
-              <UiIcon name="Alert" :size="13" />{{ t('panic.runStage', { n: stage }) }}
+            <button v-if="phase === 'idle'" class="btn primary" @click="execute">
+              <UiIcon name="Check" :size="13" />{{ t('panic.runStage', { n: stage }) }}
             </button>
             <button v-else-if="phase === 'running'" class="btn" disabled>
               <span class="spinner" style="width: 13px; height: 13px" />
@@ -264,28 +264,26 @@ function logMark(s: LogEntry['status']): string {
 .panic-overlay {
   @apply fixed inset-0 z-[100] grid place-items-center p-8 backdrop-blur-[10px];
   background:
-    radial-gradient(900px 600px at 50% 30%, rgba(255, 107, 138, 0.1), transparent 60%),
+    radial-gradient(900px 600px at 50% 30%, rgba(124, 242, 212, 0.08), transparent 60%),
     radial-gradient(700px 400px at 80% 100%, rgba(139, 125, 255, 0.06), transparent 60%),
     rgba(0, 0, 0, 0.55);
 }
 
 .panic-card {
-  @apply w-[720px] max-w-full overflow-hidden rounded-2xl border bg-bg-glass-hi backdrop-blur-[24px];
-  border-color: rgba(255, 107, 138, 0.25);
+  @apply w-[720px] max-w-full overflow-hidden rounded-2xl border border-line-hi bg-bg-glass-hi backdrop-blur-[24px];
   box-shadow:
     0 30px 80px -20px rgba(0, 0, 0, 0.7),
-    0 0 0 1px rgba(255, 107, 138, 0.15);
+    0 0 0 1px rgba(255, 255, 255, 0.04);
 }
 
 .panic-head {
   @apply flex items-center gap-4 border-b border-line px-[26px] pb-[18px] pt-[22px];
-  background: linear-gradient(180deg, rgba(255, 107, 138, 0.06), transparent);
+  background: linear-gradient(180deg, rgba(124, 242, 212, 0.05), transparent);
 }
 .panic-icon {
-  @apply grid size-12 shrink-0 place-items-center rounded-[12px] border text-rose;
-  background: rgba(255, 107, 138, 0.12);
-  border-color: rgba(255, 107, 138, 0.35);
-  box-shadow: 0 0 20px rgba(255, 107, 138, 0.3);
+  @apply grid size-12 shrink-0 place-items-center rounded-[12px] border border-accent-line text-accent;
+  background: rgba(124, 242, 212, 0.1);
+  box-shadow: 0 0 20px rgba(124, 242, 212, 0.22);
 }
 .panic-title-block {
   @apply min-w-0 flex-1;
@@ -300,7 +298,7 @@ function logMark(s: LogEntry['status']): string {
   margin-bottom: 0;
 }
 .hotkey {
-  @apply font-mono text-[9.5px] tracking-[0.12em] text-rose;
+  @apply font-mono text-[9.5px] tracking-[0.12em] text-fg-mute;
 }
 
 /* ステージ選択 */
@@ -323,8 +321,8 @@ function logMark(s: LogEntry['status']): string {
   @apply border-line-hi;
 }
 .stage-card.selected {
-  border-color: rgba(255, 107, 138, 0.5);
-  background: rgba(255, 107, 138, 0.05);
+  border-color: var(--accent-line);
+  background: rgba(124, 242, 212, 0.06);
 }
 .stage-card h3 {
   @apply m-0 font-display text-[14px] font-semibold;
@@ -342,9 +340,9 @@ function logMark(s: LogEntry['status']): string {
   @apply rounded border border-line px-2 py-0.5 font-mono text-[10px] text-fg-dim;
 }
 .badge.danger {
-  @apply text-rose;
-  border-color: rgba(255, 107, 138, 0.25);
-  background: rgba(255, 107, 138, 0.06);
+  @apply text-accent;
+  border-color: var(--accent-line);
+  background: rgba(124, 242, 212, 0.06);
 }
 
 /* トレース */
@@ -355,8 +353,8 @@ function logMark(s: LogEntry['status']): string {
   @apply mb-3.5 flex items-center gap-2.5;
 }
 .phase-dot {
-  @apply size-2.5 rounded-full bg-rose;
-  box-shadow: 0 0 10px var(--rose);
+  @apply size-2.5 rounded-full bg-accent;
+  box-shadow: 0 0 10px var(--accent);
   animation: pulse 1.4s infinite;
 }
 .phase-dot.done {
@@ -369,7 +367,7 @@ function logMark(s: LogEntry['status']): string {
   animation: none;
 }
 .phase-label {
-  @apply flex-1 font-mono text-[11px] uppercase tracking-[0.08em] text-rose;
+  @apply flex-1 font-mono text-[11px] uppercase tracking-[0.08em] text-accent;
 }
 .role-count {
   @apply font-mono text-[10.5px] text-fg-mute;
@@ -380,8 +378,8 @@ function logMark(s: LogEntry['status']): string {
 }
 .progress-fill {
   @apply h-full;
-  background: linear-gradient(90deg, var(--rose), #ff9bb0);
-  box-shadow: 0 0 8px rgba(255, 107, 138, 0.6);
+  background: linear-gradient(90deg, var(--accent), #5dd9bd);
+  box-shadow: 0 0 8px rgba(124, 242, 212, 0.5);
   transition: width 0.2s ease-out;
 }
 
@@ -401,7 +399,7 @@ function logMark(s: LogEntry['status']): string {
   @apply text-accent;
 }
 .log-line.running .log-mark {
-  @apply text-rose;
+  @apply text-accent;
 }
 .log-line.pending .log-mark {
   @apply text-fg-faint;
@@ -430,9 +428,9 @@ function logMark(s: LogEntry['status']): string {
   background: rgba(124, 242, 212, 0.1);
 }
 .rg-cell.running {
-  @apply text-rose;
-  background: rgba(255, 107, 138, 0.12);
-  border-color: rgba(255, 107, 138, 0.4);
+  @apply text-accent;
+  background: rgba(124, 242, 212, 0.12);
+  border-color: var(--accent-line);
   animation: pulse 1s infinite;
 }
 

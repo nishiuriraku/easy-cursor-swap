@@ -611,6 +611,10 @@
   @apply flex h-[38px] shrink-0 gap-1 border-b border-line px-6;
   background: rgba(10, 11, 15, 0.4);
 }
+:where(html.light) .tabs {
+  /* ライトテーマでは半透明の白で背景を浮かせ、tab ボタンを灰色ベタに見せないようにする。 */
+  background: rgba(255, 255, 255, 0.55);
+}
 .tab {
   @apply relative -mb-px flex cursor-pointer items-center gap-2 border-0 border-b-2 border-transparent bg-transparent px-3.5 text-[12.5px] text-fg-dim;
 }
@@ -623,6 +627,9 @@
 .tab .num {
   @apply rounded-[3px] border border-line px-[5px] py-px font-mono text-[9.5px] text-fg-mute;
   background: rgba(255, 255, 255, 0.04);
+}
+:where(html.light) .tab .num {
+  background: rgba(15, 20, 35, 0.04);
 }
 
 /* --- .toolbar / .bcrumb / .search / .kbd / .tb-actions (Phase 12-B) --- */

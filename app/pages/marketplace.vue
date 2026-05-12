@@ -10,10 +10,11 @@
  * - Ed25519 署名検証済みのテーマのみ掲載 (CI 自動検証)
  * - インポートは Rust 側の `import_from_marketplace` (将来実装) に委譲
  */
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import type { MarketplaceEntry, MarketplaceTag } from '~/types/marketplace'
 import { invokeTauri } from '~/composables/useTauri'
 import { useI18n } from '~/composables/useI18n'
+import { useThemes } from '~/composables/useThemes'
 
 const { t } = useI18n()
 
@@ -25,6 +26,33 @@ const filter = ref<MarketplaceTag>('all')
 const searchQuery = ref('')
 const installingId = ref<string | null>(null)
 const lastSync = computed(() => t('marketplace.lastSyncJustNow'))
+
+/**
+ * インストール結果バナー。
+ *  - 成功時: `{ kind: 'ok', name }` を表示しテーマ一覧をリフレッシュ
+ *  - 失敗時: `{ kind: 'err', name, message }` を残す
+ * 3.5 秒で自動消去する (creator のトーストと同じ仕様)。
+ */
+type InstallStatus = { kind: 'ok'; name: string } | { kind: 'err'; name: string; message: string }
+const installStatus = ref<InstallStatus | null>(null)
+let installStatusTimer: ReturnType<typeof setTimeout> | null = null
+const INSTALL_TOAST_MS = 3500
+watch(installStatus, (next) => {
+  if (installStatusTimer) {
+    clearTimeout(installStatusTimer)
+    installStatusTimer = null
+  }
+  if (next !== null) {
+    installStatusTimer = setTimeout(() => {
+      installStatus.value = null
+      installStatusTimer = null
+    }, INSTALL_TOAST_MS)
+  }
+})
+
+// テーマ一覧のシングルトンに直接アクセスし、インストール成功時に再取得する。
+// これで「Marketplace でインポート → サイドバーバッジ・Library 画面に即時反映」が実現する。
+const { refresh: refreshThemes } = useThemes()
 
 // --- IPC 経由で受け取る Rust 側スキーマ (snake_case) ---
 interface RustMarketplaceEntry {
@@ -122,9 +150,11 @@ async function installEntry(id: string) {
   const e = entries.value.find((x) => x.id === id)
   if (!e) return
   installingId.value = id
+  installStatus.value = null
   try {
-    // 将来: invoke('marketplace_install', { downloadUrl, sha256, signature, authorPubkeyId })
-    await invokeTauri<void>('marketplace_install', {
+    // Rust 側 (marketplace::MarketplaceClient::install) は検証成功時にテーマ ID を返す。
+    // 戻り値は使わないが、await することで成否判定する。
+    await invokeTauri<string>('marketplace_install', {
       req: {
         downloadUrl: e.downloadUrl,
         sha256: e.sha256,
@@ -133,8 +163,14 @@ async function installEntry(id: string) {
         authorPubkeyId: e.authorPubkeyId,
       },
     })
+    installStatus.value = { kind: 'ok', name: e.name }
+    // インストール直後にライブラリの一覧をリフレッシュ。
+    // useThemes はシングルトンなので Library / サイドバーバッジに即反映される。
+    void refreshThemes()
     console.info('[Marketplace] installed', e.name)
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    installStatus.value = { kind: 'err', name: e.name, message }
     console.error('[Marketplace] install failed:', err)
   } finally {
     installingId.value = null
@@ -214,6 +250,37 @@ onMounted(loadIndex)
           </div>
         </div>
       </div>
+
+      <!-- インストール結果バナー -->
+      <Transition name="fade">
+        <div
+          v-if="installStatus"
+          :class="['install-banner', installStatus.kind]"
+          role="status"
+          aria-live="polite"
+        >
+          <UiIcon :name="installStatus.kind === 'ok' ? 'Check' : 'AlertTriangle'" :size="14" />
+          <span v-if="installStatus.kind === 'ok'">
+            {{ t('marketplace.installedToast', { name: installStatus.name }) }}
+          </span>
+          <span v-else>
+            {{
+              t('marketplace.installFailedToast', {
+                name: installStatus.name,
+                error: installStatus.message,
+              })
+            }}
+          </span>
+          <button
+            type="button"
+            class="install-banner-close"
+            :aria-label="t('common.close')"
+            @click="installStatus = null"
+          >
+            <UiIcon name="X" :size="11" />
+          </button>
+        </div>
+      </Transition>
 
       <!-- 取得失敗 -->
       <div v-if="fetchError" class="error-state">
@@ -315,6 +382,37 @@ onMounted(loadIndex)
 }
 .empty-state p {
   @apply m-0 text-[13px] text-fg-dim;
+}
+
+.install-banner {
+  @apply mb-4 flex items-center gap-2 rounded-[8px] border px-3 py-2 text-[12.5px];
+}
+.install-banner.ok {
+  @apply border-accent-line text-accent;
+  background: rgba(124, 242, 212, 0.08);
+}
+.install-banner.err {
+  @apply text-rose;
+  background: rgba(255, 107, 138, 0.08);
+  border-color: rgba(255, 107, 138, 0.3);
+}
+.install-banner-close {
+  @apply ml-auto inline-flex size-5 cursor-pointer items-center justify-center rounded-[4px] border-0 bg-transparent text-fg-mute;
+}
+.install-banner-close:hover {
+  @apply text-fg;
+  background: rgba(255, 255, 255, 0.06);
+}
+:where(html.light) .install-banner-close:hover {
+  background: rgba(15, 20, 35, 0.06);
+}
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
 .skeleton-card {

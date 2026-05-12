@@ -101,7 +101,7 @@ function navigate(id: string) {
         title="Ctrl+Alt+Shift+R"
         @click="emit('panic')"
       >
-        <UiIcon name="Alert" :size="14" aria-hidden="true" />
+        <UiIcon name="Refresh" :size="14" aria-hidden="true" />
         <span>{{ t('common.panic') }}</span>
         <span class="kbd" aria-hidden="true">⌃⌥⇧R</span>
       </button>
@@ -178,21 +178,23 @@ nav {
   @apply mt-auto flex flex-col gap-2;
 }
 .panic {
-  @apply flex cursor-pointer items-center gap-2 rounded-[8px] text-[12px] font-medium;
+  @apply flex cursor-pointer items-center gap-2 rounded-[8px] border border-line text-fg-dim text-[12px] font-medium;
   padding: 9px 12px;
-  background: linear-gradient(180deg, rgba(255, 107, 138, 0.1), rgba(255, 107, 138, 0.04));
-  border: 1px solid rgba(255, 107, 138, 0.25);
-  color: #ffb8c5;
+  background: rgba(255, 255, 255, 0.02);
   transition: all 0.15s;
 }
 .panic:hover {
-  border-color: rgba(255, 107, 138, 0.45);
-  color: #fff;
-  background: linear-gradient(180deg, rgba(255, 107, 138, 0.18), rgba(255, 107, 138, 0.08));
+  @apply border-line-hi text-fg;
+  background: rgba(255, 255, 255, 0.05);
+}
+:where(html.light) .panic {
+  background: rgba(15, 20, 35, 0.025);
+}
+:where(html.light) .panic:hover {
+  background: rgba(15, 20, 35, 0.05);
 }
 .panic .kbd {
-  @apply ml-auto font-mono text-[9.5px] tracking-[0.08em];
-  color: rgba(255, 255, 255, 0.5);
+  @apply ml-auto font-mono text-[9.5px] tracking-[0.08em] text-fg-mute;
 }
 .session {
   @apply flex items-center gap-2.5 border-t border-line px-2 py-2.5 text-[11.5px] text-fg-dim;

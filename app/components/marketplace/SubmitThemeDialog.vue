@@ -133,21 +133,29 @@ onMounted(async () => {
   <Teleport to="body">
     <div
       v-if="open"
-      class="modal-backdrop"
+      class="modal-page"
       role="dialog"
       aria-modal="true"
       aria-labelledby="submit-dialog-title"
       @click.self="close"
     >
-      <div class="modal">
-        <div class="modal-header">
-          <h2 id="submit-dialog-title">{{ t('marketplace.submitTitle') }}</h2>
-          <button class="close-btn" :aria-label="t('common.close')" @click="close">
-            <UiIcon name="X" :size="16" />
+      <div class="modal submit-modal" @click.stop>
+        <div class="modal-head">
+          <div class="modal-icon" aria-hidden="true"><UiIcon name="Upload" :size="18" /></div>
+          <div style="flex: 1; min-width: 0">
+            <h2 id="submit-dialog-title">{{ t('marketplace.submitTitle') }}</h2>
+          </div>
+          <button
+            type="button"
+            class="btn ghost btn-close"
+            :aria-label="t('common.close')"
+            @click="close"
+          >
+            <UiIcon name="X" :size="14" />
           </button>
         </div>
 
-        <div class="modal-body">
+        <div class="modal-body submit-body">
           <!-- Step 1: テーマ選択 + GitHub ユーザー名 -->
           <template v-if="step === 'select'">
             <p class="hint">{{ t('marketplace.submitHint') }}</p>
@@ -173,6 +181,7 @@ onMounted(async () => {
                 id="submit-github"
                 v-model="githubUsername"
                 type="text"
+                class="input"
                 :placeholder="t('marketplace.submitGithubUserPlaceholder')"
               />
             </div>
@@ -183,6 +192,7 @@ onMounted(async () => {
                 id="submit-dl-url"
                 v-model="downloadUrl"
                 type="url"
+                class="input"
                 :placeholder="t('marketplace.submitDownloadUrlPlaceholder')"
               />
               <span class="field-note">{{ t('marketplace.submitDownloadUrlNote') }}</span>
@@ -204,29 +214,32 @@ onMounted(async () => {
           </template>
         </div>
 
-        <div class="modal-footer">
-          <button v-if="step === 'select'" class="btn" @click="close">
-            {{ t('common.cancel') }}
-          </button>
-          <button
-            v-if="step === 'select'"
-            class="btn primary"
-            :disabled="!canProceed"
-            @click="step = 'preview'"
-          >
-            {{ t('marketplace.submitPreviewBtn') }}
-          </button>
+        <div class="modal-foot">
+          <span class="left-note">step {{ step === 'select' ? '1' : '2' }} / 2</span>
+          <div class="actions">
+            <button v-if="step === 'select'" class="btn" @click="close">
+              {{ t('common.cancel') }}
+            </button>
+            <button
+              v-if="step === 'select'"
+              class="btn primary"
+              :disabled="!canProceed"
+              @click="step = 'preview'"
+            >
+              {{ t('marketplace.submitPreviewBtn') }}
+            </button>
 
-          <button v-if="step === 'preview'" class="btn" @click="step = 'select'">
-            {{ t('common.back') }}
-          </button>
-          <button v-if="step === 'preview'" class="btn ghost" @click="copyJson">
-            {{ copyDone ? t('common.copied') : t('common.copyJson') }}
-          </button>
-          <button v-if="step === 'preview'" class="btn primary" @click="openGitHub">
-            <UiIcon name="Globe" :size="14" />
-            {{ t('marketplace.submitOpenGithub') }}
-          </button>
+            <button v-if="step === 'preview'" class="btn" @click="step = 'select'">
+              {{ t('common.back') }}
+            </button>
+            <button v-if="step === 'preview'" class="btn ghost" @click="copyJson">
+              {{ copyDone ? t('common.copied') : t('common.copyJson') }}
+            </button>
+            <button v-if="step === 'preview'" class="btn primary" @click="openGitHub">
+              <UiIcon name="Globe" :size="14" />
+              {{ t('marketplace.submitOpenGithub') }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -236,45 +249,21 @@ onMounted(async () => {
 <style scoped>
 @reference '~/assets/css/tailwind.css';
 
-/* NOTE: --surface / --surface-raised / --surface-hover / --border / --warning は
- * 未定義トークン (元コードの leftover)。それらを参照する declaration は invalid
- * で discarded されていた。global に同名ルールが無いコンポーネント固有なので、
- * 視覚的な現状維持のためそれらの行はそのまま literal CSS で残置する。 */
+/* 共有 modal 系 (.modal-page / .modal / .modal-head / .modal-body / .modal-foot) と
+ * .input / .btn は tailwind.css の top-level shared utility に集約済み。
+ * 本コンポーネントは独自フィールドレイアウト + JSON プレビュー枠のみ scoped で持つ。 */
 
-.modal-backdrop {
-  @apply fixed inset-0 z-[1000] flex items-center justify-center bg-black/55;
+.submit-modal {
+  @apply flex w-[640px] max-w-[92vw] flex-col;
+  max-height: 80vh;
 }
 
-.modal {
-  @apply flex max-h-[80vh] w-[560px] max-w-[90vw] flex-col rounded-[8px] border shadow-[0_16px_48px_rgba(0,0,0,0.4)];
-  background: var(--surface);
-  border-color: var(--border);
+.submit-body {
+  @apply flex max-h-[60vh] flex-col gap-3 overflow-y-auto;
 }
 
-.modal-header {
-  @apply flex items-center justify-between border-b px-5 pb-3 pt-4;
-  border-bottom-color: var(--border);
-}
-
-.modal-header h2 {
-  @apply m-0 text-[15px] font-semibold;
-}
-
-.close-btn {
-  @apply flex cursor-pointer items-center border-none bg-transparent p-1 text-fg-mute;
-}
-
-.close-btn:hover {
-  @apply text-fg;
-}
-
-.modal-body {
-  @apply flex flex-1 flex-col gap-3 overflow-y-auto px-5 py-4;
-}
-
-.modal-footer {
-  @apply flex justify-end gap-2 border-t px-5 py-3;
-  border-top-color: var(--border);
+.btn-close {
+  @apply size-7 shrink-0 px-0;
 }
 
 .field {
@@ -285,74 +274,34 @@ onMounted(async () => {
   @apply text-[12px] font-medium text-fg-mute;
 }
 
-.field select,
-.field input[type='text'],
-.field input[type='url'] {
-  @apply rounded border px-2 py-1.5 text-[13px];
-  background: var(--surface-raised);
-  border-color: var(--border);
-  color: var(--fg);
-}
-
 .field-note {
   @apply text-[11px] text-fg-mute;
 }
 
 .hint {
-  @apply m-0 text-[13px] text-fg-mute;
+  @apply m-0 text-[13px] text-fg-dim;
 }
 
 .hint.small {
-  @apply text-[11px];
+  @apply text-[11px] text-fg-mute;
 }
 
 .json-preview {
-  @apply max-h-[280px] overflow-auto rounded border;
-  background: var(--surface-raised);
-  border-color: var(--border);
+  @apply max-h-[300px] overflow-auto rounded-[8px] border border-line bg-black/30;
 }
 
 .json-preview pre {
   @apply m-0 whitespace-pre p-3 font-mono text-[12px] leading-[1.5] text-fg;
 }
 
+:where(html.light) .json-preview {
+  background: rgba(15, 20, 35, 0.04);
+}
+
 .warn-box {
-  @apply flex items-center gap-1.5 rounded border px-2.5 py-2 text-[12px];
-  background: rgba(245, 158, 11, 0.1);
-  border-color: rgba(245, 158, 11, 0.3);
-  color: var(--warning, #f59e0b);
-}
-
-.btn {
-  @apply flex cursor-pointer items-center gap-1.5 rounded border px-3.5 py-1.5 text-[13px];
-  border-color: var(--border);
-  background: var(--surface-raised);
-  color: var(--fg);
-}
-
-.btn:hover {
-  background: var(--surface-hover);
-}
-
-.btn.primary {
-  @apply text-white;
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
-.btn.primary:hover:not(:disabled) {
-  @apply opacity-90;
-}
-
-.btn.primary:disabled {
-  @apply cursor-not-allowed opacity-40;
-}
-
-.btn.ghost {
-  @apply border-transparent bg-transparent;
-}
-
-.btn.ghost:hover {
-  background: var(--surface-raised);
+  @apply flex items-center gap-1.5 rounded-[8px] border px-2.5 py-2 text-[12px];
+  background: rgba(245, 194, 107, 0.1);
+  border-color: rgba(245, 194, 107, 0.3);
+  color: var(--amber);
 }
 </style>

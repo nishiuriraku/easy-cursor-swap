@@ -99,4 +99,16 @@ export const UI_ICONS: Record<string, UiIconDef> = {
     viewBox: '0 0 16 16',
     body: '<path d="M8 1.5l5.5 2v4.5c0 3-2.5 5.5-5.5 6.5-3-1-5.5-3.5-5.5-6.5V3.5z"/><path d="M5.5 8 7 9.5l3.5-3.5"/>',
   },
+  Refresh: {
+    viewBox: '0 0 16 16',
+    body: '<path d="M13.5 4.5A6 6 0 1 0 14 8"/><path d="M14 2v3.5h-3.5"/>',
+  },
+  Upload: {
+    viewBox: '0 0 16 16',
+    body: '<path d="M8 11V3M5 6l3-3 3 3M2.5 13h11"/>',
+  },
+  AlertTriangle: {
+    viewBox: '0 0 16 16',
+    body: '<path d="M8 2L1.5 13.5h13z"/><path d="M8 6.5v3M8 11.5v.1"/>',
+  },
 }

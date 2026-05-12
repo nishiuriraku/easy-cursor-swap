@@ -28,7 +28,7 @@ export default {
     confirm: 'Confirm',
     close: 'Close',
     search: 'Search',
-    panic: 'Panic reset',
+    panic: 'Reset',
     trayResident: 'Tray resident',
     back: 'Back',
     copied: 'Copied!',
@@ -140,7 +140,7 @@ export default {
     perSizeActive: 'Override active',
   },
   panic: {
-    title: 'Run Panic Reset',
+    title: 'Run Reset',
     description: 'Discard current cursor configuration and restore the selected state.',
     stage1Title: 'Reset to Windows default',
     stage1Desc: 'Force reset to the factory system scheme. Always available as a last resort.',
@@ -334,6 +334,8 @@ export default {
     fetchError: 'Failed to fetch index',
     fetchRetry: 'Retry',
     lastSyncJustNow: 'Just synced',
+    installedToast: 'Imported {name} into your library',
+    installFailedToast: 'Failed to import {name}: {error}',
   },
   conflict: {
     headerNewer: 'Update to a newer version',

@@ -27,7 +27,7 @@ export default {
     confirm: '確定',
     close: '閉じる',
     search: '検索',
-    panic: 'パニックリセット',
+    panic: 'リセット',
     trayResident: 'トレイ常駐',
     back: '戻る',
     copied: 'コピー完了',
@@ -139,7 +139,7 @@ export default {
     perSizeActive: '個別 hotspot 設定中',
   },
   panic: {
-    title: 'パニックリセットを実行',
+    title: 'リセットを実行',
     description: '現在のカーソル設定を破棄し、選択した状態へ強制復元します。',
     stage1Title: 'Windows 既定に戻す',
     stage1Desc: 'OS 出荷時のシステムスキームへ強制リセット。最終救済として常にアクセス可能。',
@@ -333,6 +333,8 @@ export default {
     fetchError: 'インデックスの取得に失敗しました',
     fetchRetry: '再試行',
     lastSyncJustNow: '取得済み',
+    installedToast: '{name} をライブラリに取り込みました',
+    installFailedToast: '{name} のインポートに失敗: {error}',
   },
   conflict: {
     headerNewer: '新しいバージョンへの更新',

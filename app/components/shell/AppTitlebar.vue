@@ -33,25 +33,47 @@ const themeLabel = computed(() =>
 const isMaximized = ref(false)
 let unlistenResize: (() => void) | null = null
 
-async function refreshMaximizeState() {
+/**
+ * Tauri window API は SSR/Web 開発時に存在しないため動的 import するが、
+ * mousedown のたびに import すると WebView2 のリクエスト解決が走って
+ * クリックの数 frame ぶん UI がちらつく原因になっていた。
+ * mount 時に一度だけ解決して以降は同期参照する。
+ */
+type TauriWindow = {
+  minimize(): Promise<void>
+  toggleMaximize(): Promise<void>
+  close(): Promise<void>
+  isMaximized(): Promise<boolean>
+  startDragging(): Promise<void>
+  onResized(cb: () => void): Promise<() => void>
+}
+let tauriWindow: TauriWindow | null = null
+
+async function loadTauriWindow(): Promise<TauriWindow | null> {
+  if (tauriWindow) return tauriWindow
   try {
     const { getCurrentWindow } = await import('@tauri-apps/api/window')
-    isMaximized.value = await getCurrentWindow().isMaximized()
+    tauriWindow = getCurrentWindow() as TauriWindow
+    return tauriWindow
   } catch {
     // Web 開発時は Tauri API が無いので無視
+    return null
   }
 }
 
+async function refreshMaximizeState() {
+  const w = await loadTauriWindow()
+  if (!w) return
+  isMaximized.value = await w.isMaximized()
+}
+
 onMounted(async () => {
-  await refreshMaximizeState()
-  try {
-    const { getCurrentWindow } = await import('@tauri-apps/api/window')
-    unlistenResize = await getCurrentWindow().onResized(() => {
-      void refreshMaximizeState()
-    })
-  } catch {
-    // Tauri API 未接続環境では購読をスキップ
-  }
+  const w = await loadTauriWindow()
+  if (!w) return
+  isMaximized.value = await w.isMaximized()
+  unlistenResize = await w.onResized(() => {
+    void refreshMaximizeState()
+  })
 })
 
 onBeforeUnmount(() => {
@@ -62,10 +84,12 @@ onBeforeUnmount(() => {
 })
 
 async function call(cmd: 'minimize' | 'toggleMaximize' | 'close') {
-  // Tauri v2 のウィンドウ API を遅延 import して SSR/Web 開発時のクラッシュを回避。
+  const w = tauriWindow ?? (await loadTauriWindow())
+  if (!w) {
+    console.warn('[Titlebar] Tauri API unavailable')
+    return
+  }
   try {
-    const { getCurrentWindow } = await import('@tauri-apps/api/window')
-    const w = getCurrentWindow()
     if (cmd === 'minimize') await w.minimize()
     else if (cmd === 'toggleMaximize') {
       await w.toggleMaximize()
@@ -73,7 +97,7 @@ async function call(cmd: 'minimize' | 'toggleMaximize' | 'close') {
       isMaximized.value = await w.isMaximized()
     } else await w.close()
   } catch (err) {
-    console.warn('[Titlebar] Tauri API unavailable:', err)
+    console.warn('[Titlebar] window command failed:', err)
   }
 }
 
@@ -91,24 +115,38 @@ async function call(cmd: 'minimize' | 'toggleMaximize' | 'close') {
  *   - 左クリック以外は無視
  *   - e.detail === 2 (ダブルクリックの 2 発目) → toggleMaximize()
  *   - それ以外 → startDragging() で OS にウィンドウ移動を委譲
+ *
+ * tauriWindow は onMounted で一度解決済みなので、本ハンドラは同期的に呼び出せて
+ * mousedown → startDragging の往復にちらつき (Vue 再描画 + WebView 再 layout)
+ * が挟まらない。Tauri API 未解決の場合のみ遅延 import にフォールバックする。
  */
-async function onTitlebarMouseDown(e: MouseEvent) {
+function onTitlebarMouseDown(e: MouseEvent) {
   if (e.button !== 0) return
   const target = e.target as HTMLElement | null
   if (target?.closest('button')) return
-  try {
-    const { getCurrentWindow } = await import('@tauri-apps/api/window')
-    const w = getCurrentWindow()
-    if (e.detail === 2) {
-      await w.toggleMaximize()
+  const w = tauriWindow
+  if (!w) {
+    // mount 完了前の極端なタイミング: 同期処理を諦めて遅延 import 経由で実行する。
+    void (async () => {
+      const lazy = await loadTauriWindow()
+      if (!lazy) return
+      if (e.detail === 2) {
+        await lazy.toggleMaximize()
+        isMaximized.value = await lazy.isMaximized()
+      } else {
+        await lazy.startDragging()
+      }
+    })()
+    return
+  }
+  if (e.detail === 2) {
+    void w.toggleMaximize().then(async () => {
       isMaximized.value = await w.isMaximized()
-    } else {
-      // startDragging は OS の WM_NCLBUTTONDOWN 経由でドラッグループに入るので
-      // pointermove イベント等を自前で監視する必要はない。
-      await w.startDragging()
-    }
-  } catch (err) {
-    console.warn('[Titlebar] drag/maximize failed:', err)
+    })
+  } else {
+    // startDragging は OS の WM_NCLBUTTONDOWN 経由でドラッグループに入るので
+    // pointermove イベント等を自前で監視する必要はない。
+    void w.startDragging()
   }
 }
 </script>

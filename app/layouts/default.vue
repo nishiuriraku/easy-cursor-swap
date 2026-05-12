@@ -9,14 +9,35 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAppSettings } from '~/composables/useAppSettings'
 import { useI18n } from '~/composables/useI18n'
+import { useThemes } from '~/composables/useThemes'
+import { invokeTauri } from '~/composables/useTauri'
 // `useRoute` / `useRouter` / コンポーネント類は Nuxt の自動インポートで解決
 
 const { config: appConfig, load: loadAppConfig } = useAppSettings()
 const { syncFromConfig } = useI18n()
+const { themes, refresh: refreshThemes } = useThemes()
 
 const route = useRoute()
 const router = useRouter()
 const panicOpen = ref(false)
+
+/** サイドバー Marketplace バッジ用: 公式インデックスのテーマ数。 */
+const marketplaceCount = ref(0)
+const themeCount = computed(() => themes.value.length)
+
+/**
+ * Marketplace 件数を 1 度だけ取得しキャッシュする。
+ * 失敗時は 0 のまま (バッジを出さない代わりに 0 を表示)。
+ * 公式インデックスへの HTTP は app 起動時の 1 回のみ走らせる。
+ */
+async function loadMarketplaceCount() {
+  try {
+    const idx = await invokeTauri<{ entries: unknown[] }>('marketplace_fetch_index')
+    marketplaceCount.value = idx?.entries?.length ?? 0
+  } catch {
+    marketplaceCount.value = 0
+  }
+}
 
 const NAV_ROUTES: Record<string, string> = {
   library: '/',
@@ -86,6 +107,10 @@ onMounted(async () => {
   }
   await loadAppConfig()
   syncFromConfig(appConfig.value?.general.language)
+  // テーマ一覧 / Marketplace 件数の取得は app 起動の他処理と並行で OK なので await しない。
+  // useThemes はシングルトンなので、ここで refresh しておけばどのページでも最新値が読める。
+  void refreshThemes()
+  void loadMarketplaceCount()
 })
 
 // config が後から変わった場合にも追随
@@ -110,8 +135,8 @@ onUnmounted(() => {
     <div class="body">
       <AppSidebar
         :active="activeNav"
-        :theme-count="0"
-        :marketplace-count="248"
+        :theme-count="themeCount"
+        :marketplace-count="marketplaceCount"
         @update:active="onNavigate"
         @panic="onPanic"
       />

@@ -142,6 +142,16 @@ const emit = defineEmits<{
     0 24px 60px -20px rgba(124, 242, 212, 0.45),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
+:where(html.light) .es-mark {
+  /* ライトテーマでは黒地の radial gradient が暗く見えるため、
+     light tokens の accent (#0fa885) に寄せた淡い背景に差し替える。 */
+  background:
+    radial-gradient(70% 70% at 30% 30%, rgba(15, 168, 133, 0.18), rgba(15, 168, 133, 0.04) 60%),
+    rgba(255, 255, 255, 0.7);
+  box-shadow:
+    0 24px 60px -20px rgba(15, 168, 133, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
 .es-mark::after {
   content: '';
   position: absolute;
@@ -158,6 +168,11 @@ const emit = defineEmits<{
   opacity: 0.35;
   z-index: -1;
   filter: blur(14px);
+}
+:where(html.light) .es-mark::after {
+  /* ライトテーマでは accent token が #0fa885 になるので
+     conic gradient はトークン値で自動的に追従するが、blur の不透明度を上げて視認性を確保する。 */
+  opacity: 0.5;
 }
 .es-creator-hero h1 {
   @apply m-0 font-display text-[32px] font-semibold tracking-[-0.025em];
