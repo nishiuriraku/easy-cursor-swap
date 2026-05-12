@@ -4,10 +4,27 @@
  *
  * バージョン情報・ホームページリンク・OSS ライセンス表示の固定 UI のみで、
  * 動的な状態を持たないので props/emit なしの完全独立コンポーネント。
+ *
+ * 外部 URL を開く際は Tauri 2 webview の制限上 `<a href target=_blank>` では動かない。
+ * Rust 側 `open_url` IPC (内部で Win32 ShellExecuteW) を経由してホスト OS の
+ * ブラウザを起動する。SubmitThemeDialog / marketplace.vue と同じパターン。
  */
 import { useI18n } from '~/composables/useI18n'
+import { invokeTauri } from '~/composables/useTauri'
 
 const { t } = useI18n()
+
+async function openExternal(url: string) {
+  try {
+    await invokeTauri<void>('open_url', { url })
+  } catch (e) {
+    // Tauri コンテキスト外 (nuxt dev) のフォールバック
+    if (typeof window !== 'undefined') {
+      window.open(url, '_blank', 'noopener,noreferrer')
+    }
+    console.error('openExternal failed:', e)
+  }
+}
 </script>
 
 <template>
@@ -23,24 +40,22 @@ const { t } = useI18n()
       </div>
       <div class="prop-body">
         <SettingsRow :label="t('settings.homepageLabel')" mono>
-          <a
+          <button
             class="btn ghost"
-            href="https://github.com/nishiuriraku/easy-cursor-swap"
-            target="_blank"
-            rel="noopener"
+            type="button"
+            @click="openExternal('https://github.com/nishiuriraku/easy-cursor-swap')"
           >
             <UiIcon name="Globe" :size="13" />github.com/nishiuriraku/easy-cursor-swap
-          </a>
+          </button>
         </SettingsRow>
         <SettingsRow :label="t('settings.issuesLabel')" mono>
-          <a
+          <button
             class="btn ghost"
-            href="https://github.com/nishiuriraku/easy-cursor-swap/issues"
-            target="_blank"
-            rel="noopener"
+            type="button"
+            @click="openExternal('https://github.com/nishiuriraku/easy-cursor-swap/issues')"
           >
             <UiIcon name="Alert" :size="13" />Issues
-          </a>
+          </button>
         </SettingsRow>
         <SettingsRow :label="t('settings.ossLicenseLabel')">
           <button class="btn">{{ t('settings.btnView') }}</button>

@@ -177,14 +177,19 @@ async function installEntry(id: string) {
   }
 }
 
-function openGithub() {
-  // 将来: invoke('open_external', { url: 'https://github.com/nishiuriraku/easy-cursor-swap-index' })
-  if (typeof window !== 'undefined') {
-    window.open(
-      'https://github.com/nishiuriraku/easy-cursor-swap-index',
-      '_blank',
-      'noopener,noreferrer',
-    )
+async function openGithub() {
+  // Tauri 2 webview は window.open() を許さないので、Rust 側 `open_url` IPC を経由する
+  // (内部で Win32 ShellExecuteW を叩いてホスト OS のブラウザを起動)。
+  // SubmitThemeDialog と同じパターン。
+  const url = 'https://github.com/nishiuriraku/easy-cursor-swap-index'
+  try {
+    await invokeTauri<void>('open_url', { url })
+  } catch (e) {
+    // Tauri コンテキスト外 (nuxt dev) のフォールバック
+    if (typeof window !== 'undefined') {
+      window.open(url, '_blank', 'noopener,noreferrer')
+    }
+    console.error('openGithub failed:', e)
   }
 }
 
