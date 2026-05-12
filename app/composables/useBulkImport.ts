@@ -15,8 +15,7 @@ export interface ResolvedAsset {
   pngBytes: number[]
   svgText: string | null
   nativeSize: number
-  hotspotX: number
-  hotspotY: number
+  hotspot: { x: number; y: number } // ratio
   availableSizes: number[]
   ani: AniAssetData | null
 }
@@ -34,9 +33,8 @@ export interface BulkResolveResult {
 export interface ParsedRole {
   primarySize: number
   primaryPngBytes: number[]
-  hotspotX: number
-  hotspotY: number
-  sizedPngBytes: Record<string, number[]>
+  hotspot: { x: number; y: number } // ratio
+  sizedPngBytes: Record<string, number[]> // 当面この形は維持 (Task 5 で見直し可能)
   /** `.ani` ロールのフレームデータ。`.cur`/`.ico` ロールでは null。 */
   ani: AniAssetData | null
   /** `.ani` ロールの展開先絶対パス。`.cur`/`.ico` ロールでは null。

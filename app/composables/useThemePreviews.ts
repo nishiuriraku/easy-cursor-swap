@@ -13,7 +13,7 @@ import { invokeTauri } from './useTauri'
  * 個別ロールのプレビュー詳細。
  *
  * - `url`: PNG を Blob 化した ObjectURL (`<img>` の src に使う)
- * - `hotspotX/Y`: 元画像のピクセル座標 (`width/height` と同じ座標系)
+ * - `hotspot`: ratio 0.0-1.0 のホットスポット座標
  * - `width/height`: PNG のネイティブ寸法 (px)
  *
  * `width/height` が 0 のときはホットスポット位置を計算できないので、
@@ -21,8 +21,7 @@ import { invokeTauri } from './useTauri'
  */
 export interface RolePreviewDetail {
   url: string
-  hotspotX: number
-  hotspotY: number
+  hotspot: { x: number; y: number } // ratio 0.0-1.0
   width: number
   height: number
 }
@@ -38,8 +37,7 @@ interface IpcRolePreview {
   png: number[]
   width: number
   height: number
-  hotspot_x: number
-  hotspot_y: number
+  hotspot: { x: number; y: number }
 }
 
 const cache = new Map<string, PreviewCacheEntry>()
@@ -94,8 +92,7 @@ async function fetchPreviews(themeId: string, roles?: string[]): Promise<Preview
         urls[role] = url
         details[role] = {
           url,
-          hotspotX: info.hotspot_x,
-          hotspotY: info.hotspot_y,
+          hotspot: info.hotspot,
           width: info.width,
           height: info.height,
         }
