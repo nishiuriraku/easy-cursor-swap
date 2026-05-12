@@ -52,8 +52,8 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         theme::repackage_theme,
         // .cur / .cursorpack ビルド
         cursor_build::export_cursorpack,
-        cursor_build::export_cursorpack_streamed,
-        cursor_build::cancel_build,
+        cursor_build::stream::export_cursorpack_streamed,
+        cursor_build::cancel::cancel_build,
         // .cur / .ico / .ani 取り込み
         cursor_io::import_cursor_file,
         cursor_io::inspect_ani_file,
