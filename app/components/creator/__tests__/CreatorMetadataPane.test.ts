@@ -41,6 +41,8 @@ const baseProps = {
   perSizeHotspot: false,
   activeRoleJp: '通常の選択',
   showAdvancedResolutions: false,
+  sizedOverrideActive: false,
+  canEditSizedOverride: false,
 }
 
 describe('CreatorMetadataPane', () => {

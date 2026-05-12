@@ -134,6 +134,9 @@ export default {
     optionalRoleNote: '{en}。任意。未指定時は Windows 既定を継承します。',
     requiredMark: '必須',
     hotspotHint: 'クリック または ドラッグでホットスポットを移動',
+    perSizeOverride: '解像度別ホットスポット',
+    perSizeEnable: 'このサイズに個別 hotspot を設定',
+    perSizeActive: '個別 hotspot 設定中',
   },
   panic: {
     title: 'パニックリセットを実行',

@@ -42,6 +42,10 @@ const props = defineProps<{
   failedApplyThemeId: string | null
   /** px ⇔ ratio 変換の基準サイズ */
   primarySize: number
+  /** 現在のサイズに sized.hotspot override が有効かどうか */
+  sizedOverrideActive: boolean
+  /** enableSizedOverride ボタンを押せる条件 (アセット割当済み + perSizeHotspot=ON) */
+  canEditSizedOverride: boolean
 }>()
 
 /** px 入力 ⇔ ratio model の双方向ブリッジ */
@@ -67,6 +71,7 @@ defineEmits<{
   (e: 'dismiss-export-message'): void
   (e: 'cancel-export'): void
   (e: 'retry-apply'): void
+  (e: 'enableSizedOverride'): void
 }>()
 </script>
 
@@ -164,6 +169,18 @@ defineEmits<{
           </SettingsRow>
           <SettingsRow v-if="showAdvancedResolutions" :label="t('creatorStart.propPerSize')">
             <SettingsToggle v-model="perSizeHotspot" />
+          </SettingsRow>
+          <SettingsRow
+            v-if="showAdvancedResolutions && perSizeHotspot"
+            :label="t('creator.perSizeOverride')"
+          >
+            <button
+              class="btn"
+              :disabled="!canEditSizedOverride"
+              @click="$emit('enableSizedOverride')"
+            >
+              {{ sizedOverrideActive ? t('creator.perSizeActive') : t('creator.perSizeEnable') }}
+            </button>
           </SettingsRow>
         </div>
       </div>

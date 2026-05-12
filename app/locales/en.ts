@@ -135,6 +135,9 @@ export default {
     optionalRoleNote: '{en}. Optional. Inherits Windows default when unset.',
     requiredMark: 'Required',
     hotspotHint: 'Click or drag to move the hotspot',
+    perSizeOverride: 'Per-size hotspot',
+    perSizeEnable: 'Enable override for this size',
+    perSizeActive: 'Override active',
   },
   panic: {
     title: 'Run Panic Reset',
