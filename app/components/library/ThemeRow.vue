@@ -48,7 +48,7 @@ const displaySize = computed(() => {
   return `${(b / (1024 * 1024)).toFixed(1)} MB`
 })
 
-const isSigned = computed(() => props.theme.signed !== false)
+const isSigned = computed(() => props.theme.signed === true)
 
 function onFav(e: Event) {
   e.stopPropagation()

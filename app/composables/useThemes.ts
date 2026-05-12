@@ -7,6 +7,16 @@ import { ref } from 'vue'
 import type { ThemeCardData } from '~/types/theme'
 import { invokeTauri } from './useTauri'
 
+/**
+ * Rust 側 theme::types::ThemeSummary に対応する IPC ペイロード。
+ * フィールド名は serde 既定 (snake_case) のままで、フロント型 ThemeCardData
+ * には mapSummary で camelCase に揃えてコピーする。
+ *
+ * 過去にここで description / signed / tags / size_bytes / last_applied_at /
+ * schema_version / license / homepage を **取りこぼしていた** ため、
+ * テーマ詳細モーダルの DESCRIPTION 段落が出ず、ThemeRow の signed 判定が
+ * 全テーマ "署名済" 扱いになるバグの原因になっていた。Rust を真とする。
+ */
 interface IpcThemeSummary {
   id: string
   name: string
@@ -16,8 +26,16 @@ interface IpcThemeSummary {
   is_active: boolean
   is_favorite: boolean
   apply_count: number
+  last_applied_at: string | null
   included_roles: string[]
   path: string
+  tags: string[]
+  size_bytes: number
+  signed: boolean
+  description?: string | null
+  schema_version: number
+  license?: string | null
+  homepage?: string | null
 }
 
 const themes = ref<ThemeCardData[]>([])
@@ -36,6 +54,14 @@ function mapSummary(t: IpcThemeSummary): ThemeCardData {
     isFavorite: t.is_favorite,
     isActive: t.is_active,
     includedRoles: t.included_roles,
+    tags: t.tags,
+    sizeBytes: t.size_bytes,
+    signed: t.signed,
+    description: t.description ?? null,
+    schemaVersion: t.schema_version,
+    license: t.license ?? null,
+    homepage: t.homepage ?? null,
+    lastAppliedAt: t.last_applied_at,
   }
 }
 
