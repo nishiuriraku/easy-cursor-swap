@@ -839,8 +839,10 @@
  * ThemeDetail / SubmitTheme / PassphrasePrompt) で共有。 */
 .modal-page {
   @apply fixed inset-0 z-[100] grid place-items-center p-6;
-  background:
-    rgba(0, 0, 0, 0.5),
+  /* color と gradient を background shorthand で並べる CSS は spec 違反で全体が無効化されるため、
+   * 半透明黒オーバーレイは background-color、装飾グラデーションは background-image に分ける。 */
+  background-color: rgba(0, 0, 0, 0.5);
+  background-image:
     radial-gradient(800px 500px at 30% 20%, rgba(139, 125, 255, 0.08), transparent 60%),
     radial-gradient(900px 500px at 80% 80%, rgba(124, 242, 212, 0.06), transparent 60%);
   backdrop-filter: blur(8px);
