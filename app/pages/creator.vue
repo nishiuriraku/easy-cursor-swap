@@ -16,7 +16,8 @@ import { sanitizeSvg } from '~/composables/sanitizeSvg'
 import { invokeTauri } from '~/composables/useTauri'
 import { useKeystore } from '~/composables/useKeystore'
 import { useI18n } from '~/composables/useI18n'
-import { useCreatorAssets, scaleHotspot } from '~/composables/useCreatorAssets'
+import { useCreatorAssets } from '~/composables/useCreatorAssets'
+import type { Hotspot } from '~/composables/useCreatorAssets'
 import { initialHotspotFor } from '~/composables/useHotspotDefaults'
 import {
   useBulkImport,
@@ -110,9 +111,7 @@ const filledSizesByRole = ref<Record<string, number[]>>({
   Arrow: [32, 48, 64, 128],
 })
 const resample = ref<ResampleMode>('lanczos')
-const hotspotX = ref(4)
-const hotspotY = ref(4)
-const perSizeHotspot = ref(true)
+const perSizeHotspot = ref(false) // Task 5 で配線、当面デフォルト OFF
 /**
  * `?editPath` で既存テーマを Creator に取り込んでいる場合、その元テーマの UUID。
  * SaveDestinationModal の「上書き保存 / 複製」選択肢の表示と、
@@ -218,10 +217,29 @@ const activePreviewUrl = computed<string | null>(() => {
   return importedPreviewUrl.value
 })
 
-/** ホットスポットの基準サイズ。アセットがあればその primarySize、なければ現在の activeSize。 */
-const hotspotReferenceSize = computed(
-  () => assigned.value[activeRoleId.value]?.primarySize ?? activeSize.value,
-)
+/**
+ * 現在のロール + サイズで「表示・操作対象」のホットスポット (ratio)。
+ * Task 5 で perSizeHotspot=ON + sized.hotspot=Some の場合に sized 側を返す分岐を入れる。
+ */
+const activeHotspot = computed<Hotspot>(() => {
+  const a = assigned.value[activeRoleId.value]
+  if (!a) return { x: 0, y: 0 }
+  return a.hotspot
+})
+
+/**
+ * activeHotspot の writable 版。pointer / keyboard ハンドラから setter 経由で更新する。
+ * Task 5 で perSizeHotspot=ON 時に sized へ書き込むよう writeActiveHotspot を介する形に差し替え。
+ */
+const activeHotspotModel = computed<Hotspot>({
+  get: () => activeHotspot.value,
+  set: (next) => {
+    const id = activeRoleId.value
+    const a = assigned.value[id]
+    if (!a) return
+    setAsset(id, { ...a, hotspot: next })
+  },
+})
 
 /**
  * `.bigpreview` 内で `<img>` が占める最大寸法 (CSS の `max-width`/`max-height` と一致)。
@@ -244,15 +262,6 @@ const activeAniSourcePath = computed(() => {
   return assigned.value[id]?.aniSourcePath ?? null
 })
 
-/** ロールが切り替わったら、そのロールの保存済みホットスポットを反映する。 */
-watch(activeRoleId, (id) => {
-  const a = assigned.value[id]
-  if (a) {
-    hotspotX.value = a.hotspot.x
-    hotspotY.value = a.hotspot.y
-  }
-})
-
 onBeforeUnmount(() => {
   for (const { url } of roleBlobCache.values()) URL.revokeObjectURL(url)
   roleBlobCache.clear()
@@ -270,20 +279,19 @@ function updateHotspotFromEvent(e: PointerEvent) {
   const el = bigpreviewEl.value
   if (!el) return
   const rect = el.getBoundingClientRect()
-  // 画像は中央配置で 90% サイズなので、コンテナ左右に各 5% (px = rect.width * 0.05)
-  // の余白がある。ホットスポット 0 / refSize の境界を画像領域にそろえるため、
-  // ポインタ位置をその余白を引いた値で割合化し、0-1 にクランプする。
-  // ドット表示 (hotspotStyle) もこの座標系に合わせて 90% スケールしている。
+  // 画像は中央配置で 90% サイズなので、コンテナ左右に各 5% の余白がある。
+  // その内側 90% を ratio 0..1 にマッピングする。
   const margin = (100 - IMAGE_DISPLAY_PCT) / 2 / 100 // 0.05
   const innerLeft = rect.left + rect.width * margin
   const innerTop = rect.top + rect.height * margin
   const innerWidth = rect.width * (IMAGE_DISPLAY_PCT / 100)
   const innerHeight = rect.height * (IMAGE_DISPLAY_PCT / 100)
-  const ratioX = clamp((e.clientX - innerLeft) / innerWidth, 0, 1)
-  const ratioY = clamp((e.clientY - innerTop) / innerHeight, 0, 1)
-  const ref = hotspotReferenceSize.value
-  hotspotX.value = Math.round(ratioX * ref)
-  hotspotY.value = Math.round(ratioY * ref)
+  const x = clamp((e.clientX - innerLeft) / innerWidth, 0, 1)
+  const y = clamp((e.clientY - innerTop) / innerHeight, 0, 1)
+  const id = activeRoleId.value
+  const a = assigned.value[id]
+  if (!a) return
+  setAsset(id, { ...a, hotspot: { x, y } })
 }
 
 function onHotspotPointerDown(e: PointerEvent) {
@@ -304,14 +312,6 @@ function onHotspotPointerUp(e: PointerEvent) {
   if (!hotspotDragging.value) return
   hotspotDragging.value = false
   ;(e.currentTarget as Element).releasePointerCapture?.(e.pointerId)
-  // 保存済みアセットがあればホットスポット値を反映する
-  const a = assigned.value[activeRoleId.value]
-  if (a) {
-    setAsset(activeRoleId.value, {
-      ...a,
-      hotspot: { x: hotspotX.value, y: hotspotY.value },
-    })
-  }
 }
 
 /**
@@ -326,87 +326,65 @@ function onHotspotKeydown(e: KeyboardEvent) {
   const tag = (e.target as HTMLElement).tagName
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
 
-  const ref = hotspotReferenceSize.value
-  const step = e.shiftKey ? 10 : 1
-  let nx = hotspotX.value
-  let ny = hotspotY.value
+  const id = activeRoleId.value
+  const a = assigned.value[id]
+  if (!a) return
+
+  const px = e.shiftKey ? 10 : 1
+  const refSize = a.primarySize > 0 ? a.primarySize : activeSize.value
+  const step = refSize > 0 ? px / refSize : 0
+  let { x, y } = a.hotspot
 
   switch (e.key) {
     case 'ArrowLeft':
-      nx -= step
+      x -= step
       break
     case 'ArrowRight':
-      nx += step
+      x += step
       break
     case 'ArrowUp':
-      ny -= step
+      y -= step
       break
     case 'ArrowDown':
-      ny += step
+      y += step
       break
     case 'Home':
-      nx = 0
+      x = 0
       break
     case 'End':
-      nx = ref
+      x = 1
       break
     case 'PageUp':
-      ny = 0
+      y = 0
       break
     case 'PageDown':
-      ny = ref
+      y = 1
       break
     default:
       return
   }
   e.preventDefault()
-  hotspotX.value = clamp(nx, 0, ref)
-  hotspotY.value = clamp(ny, 0, ref)
-  // 既存アセットがあればホットスポット値を永続化する
-  const a = assigned.value[activeRoleId.value]
-  if (a) {
-    setAsset(activeRoleId.value, {
-      ...a,
-      hotspot: { x: hotspotX.value, y: hotspotY.value },
-    })
-  }
+  x = clamp(x, 0, 1)
+  y = clamp(y, 0, 1)
+  setAsset(id, { ...a, hotspot: { x, y } })
 }
 
 /**
- * 現在ロールのホットスポットを画像中央 (primarySize / 2) に移動する。
- * 既存アセットがあれば永続化、未割当なら UI 表示のみ更新。
+ * 現在ロールのホットスポットを画像中央 (0.5, 0.5) に移動する。
  */
 function centerHotspot() {
-  const ref = hotspotReferenceSize.value
-  const center = Math.round(ref / 2)
-  hotspotX.value = center
-  hotspotY.value = center
-  const a = assigned.value[activeRoleId.value]
-  if (a) {
-    setAsset(activeRoleId.value, { ...a, hotspot: { x: center, y: center } })
-  }
+  const id = activeRoleId.value
+  const a = assigned.value[id]
+  if (!a) return
+  setAsset(id, { ...a, hotspot: { x: 0.5, y: 0.5 } })
 }
 
 /**
- * 詳細設定で解像度 (`activeSize`) を切り替えたとき、ホットスポットを
- * 「画面上の同じ比率位置」に保ったまま追従させる。
- *
- * - アセット未割当のロールでは `hotspotReferenceSize = activeSize` なので
- *   解像度を変えると参照系が変わる。`(x/prevRef, y/prevRef)` の比率を
- *   `nextRef` ピクセル系に再投影することで dot が動かないようにする。
- * - アセット割当済みでは `hotspotReferenceSize = primarySize` 固定なので
- *   参照系は不変、再スケールは発生しない (no-op)。
+ * 詳細設定で解像度 (`activeSize`) を切り替える。
+ * ratio は size 非依存なので再投影不要。
  */
 function selectSize(s: number) {
-  const prevRef = hotspotReferenceSize.value
   activeSize.value = s
-  const nextRef = hotspotReferenceSize.value
-  if (prevRef !== nextRef && prevRef > 0) {
-    const ratioX = hotspotX.value / prevRef
-    const ratioY = hotspotY.value / prevRef
-    hotspotX.value = clamp(Math.round(ratioX * nextRef), 0, nextRef)
-    hotspotY.value = clamp(Math.round(ratioY * nextRef), 0, nextRef)
-  }
 }
 
 function isRequired(id: string): boolean {
@@ -499,23 +477,15 @@ function applyImportedRaster(png: Uint8Array, primarySize: number) {
   if (!map.includes(activeSize.value)) {
     filledSizesByRole.value[activeRoleId.value] = [...map, activeSize.value]
   }
-  // 新規ロールかつホットスポット未編集 (デフォ 4,4) の場合のみ中央既定値を適用。
-  // PNG/SVG はホットスポット情報を持たないので、ロールに応じて中央 or 左上を選ぶ。
-  const isNewRole = !creatorAssets.hasAsset(activeRoleId.value)
-  const isDefault = hotspotX.value === 4 && hotspotY.value === 4
-  const fromSize = hotspotReferenceSize.value
-  const finalHotspot =
-    isNewRole && isDefault
-      ? initialHotspotFor(activeRoleId.value, primarySize)
-      : scaleHotspot({ x: hotspotX.value, y: hotspotY.value }, fromSize, primarySize)
+  // 新規ロールならデフォルト hotspot を当てる。既存ロールは現在の hotspot を維持。
+  const existing = assigned.value[activeRoleId.value]
+  const hotspot = existing?.hotspot ?? initialHotspotFor(activeRoleId.value, primarySize)
   setAsset(activeRoleId.value, {
     primary: png,
     primarySize,
-    hotspot: finalHotspot,
+    hotspot,
     source: 'manual',
   })
-  hotspotX.value = finalHotspot.x
-  hotspotY.value = finalHotspot.y
 }
 
 /** `.cur` / `.ico` ファイルをパスから直接 Rust 側でパースする (ダイアログを開かない版)。 */
@@ -524,8 +494,7 @@ async function pickCursorFromPath(picked: string) {
     isCur: boolean
     width: number
     height: number
-    hotspotX: number
-    hotspotY: number
+    hotspot: { x: number; y: number }
     pngBytes: number[]
     availableSizes: number[]
   }>('import_cursor_file', { path: picked })
@@ -544,20 +513,17 @@ async function pickCursorFromPath(picked: string) {
   if (!map.includes(activeSize.value)) {
     filledSizesByRole.value[activeRoleId.value] = [...map, activeSize.value]
   }
-  // .cur/.ico に埋め込まれた hotspot が (0, 0) かつロール新規なら中央既定値を適用。
-  // それ以外は元ファイルのホットスポット情報を尊重する。
+  // .cur/.ico に hotspot ratio が (0, 0) かつ新規ロールなら、初期値を当てる。
   const isNewRole = !creatorAssets.hasAsset(activeRoleId.value)
-  const noEmbeddedHotspot = result.hotspotX === 0 && result.hotspotY === 0
-  const finalHotspot =
+  const noEmbeddedHotspot = result.hotspot.x === 0 && result.hotspot.y === 0
+  const hotspot =
     isNewRole && noEmbeddedHotspot
       ? initialHotspotFor(activeRoleId.value, result.width)
-      : { x: result.hotspotX, y: result.hotspotY }
-  hotspotX.value = finalHotspot.x
-  hotspotY.value = finalHotspot.y
+      : result.hotspot
   setAsset(activeRoleId.value, {
     primary: png,
     primarySize: result.width,
-    hotspot: finalHotspot,
+    hotspot,
     source: 'manual',
   })
   const sizeList = result.availableSizes.length > 0 ? result.availableSizes.join('/') : '?'
@@ -923,8 +889,6 @@ function resetCreator() {
   saveModalDefault.value = 'file'
   saveModalOpen.value = false
   activeSize.value = 64
-  hotspotX.value = 4
-  hotspotY.value = 4
   metaName.value = 'Untitled Theme'
   metaNameEn.value = ''
   metaAuthor.value = ''
@@ -1077,26 +1041,17 @@ async function onFileChange(e: Event) {
     }
 
     // 役割マップに登録 (エクスポート時に使用)
-    // PNG/SVG はホットスポット情報を持たないので、現在表示されている比率を維持して
-    // 新しい primarySize (= 256) 基準の px 値に変換する。
-    // ref サイズは「既存アセットの primarySize」優先、なければ activeSize (UI 入力時の基準)。
-    // これにより画像サイズが大きく変わっても見た目のホットスポット位置がずれない。
+    // PNG/SVG はホットスポット情報を持たないので、既存 hotspot を維持するか、
+    // 新規ロールならロールに応じた初期値を適用する。ratio は size 非依存。
     if (pngBytes) {
-      const isNewRole = !creatorAssets.hasAsset(activeRoleId.value)
-      const isDefault = hotspotX.value === 4 && hotspotY.value === 4
-      const fromSize = hotspotReferenceSize.value
-      const finalHotspot =
-        isNewRole && isDefault
-          ? initialHotspotFor(activeRoleId.value, 256)
-          : scaleHotspot({ x: hotspotX.value, y: hotspotY.value }, fromSize, 256)
+      const existing = assigned.value[activeRoleId.value]
+      const hotspot = existing?.hotspot ?? initialHotspotFor(activeRoleId.value, 256)
       setAsset(activeRoleId.value, {
         primary: pngBytes,
         primarySize: 256,
-        hotspot: finalHotspot,
+        hotspot,
         source: 'manual',
       })
-      hotspotX.value = finalHotspot.x
-      hotspotY.value = finalHotspot.y
     }
   } catch (err) {
     importMessage.value = `失敗: ${err instanceof Error ? err.message : String(err)}`
@@ -1146,8 +1101,8 @@ async function onFileChange(e: Event) {
         v-model:meta-version="metaVersion"
         v-model:meta-description="metaDescription"
         v-model:shadow-enabled="shadowEnabled"
-        v-model:hotspot-x="hotspotX"
-        v-model:hotspot-y="hotspotY"
+        v-model:hotspot="activeHotspotModel"
+        :primary-size="assigned[activeRoleId]?.primarySize ?? activeSize"
         v-model:per-size-hotspot="perSizeHotspot"
         :arrow-assigned="arrowAssigned"
         :assigned-role-count="assignedRoleCount"
@@ -1244,8 +1199,8 @@ async function onFileChange(e: Event) {
                   :frame-pngs="activeAniFrames.framePngs"
                   :sequence="activeAniFrames.sequence"
                   :durations="activeAniFrames.perStepDurationsMs"
-                  :width="hotspotReferenceSize"
-                  :height="hotspotReferenceSize"
+                  :width="assigned[activeRoleId]?.primarySize ?? activeSize"
+                  :height="assigned[activeRoleId]?.primarySize ?? activeSize"
                   fit
                 />
                 <img
@@ -1262,18 +1217,14 @@ async function onFileChange(e: Event) {
                   style="color: var(--fg); pointer-events: none"
                 />
                 <!--
-                  画像は `max-width: 90%; max-height: 90%` で中央配置される。
-                  純粋に `(hotspotX / refSize) * 100%` で左/上を指定すると
-                  220px コンテナの端から計算されてしまい、5% (= 11px) 分の
-                  余白を含めてしまうため、実際のホットスポット位置からずれる。
-                  ここでは「コンテナ中央 ± 画像サイズの (比率 - 0.5)」で
-                  画像領域内の正しいピクセル位置に揃える。
+                  画像は中央配置で 90% サイズ。activeHotspot は ratio (0..1) なので
+                  コンテナ中央 ± (ratio - 0.5) × IMAGE_DISPLAY_PCT% でドットを配置。
                 -->
                 <div
                   class="hot"
                   :style="{
-                    left: `calc(50% + ${(hotspotX / hotspotReferenceSize - 0.5) * IMAGE_DISPLAY_PCT}%)`,
-                    top: `calc(50% + ${(hotspotY / hotspotReferenceSize - 0.5) * IMAGE_DISPLAY_PCT}%)`,
+                    left: `calc(50% + ${(activeHotspot.x - 0.5) * IMAGE_DISPLAY_PCT}%)`,
+                    top: `calc(50% + ${(activeHotspot.y - 0.5) * IMAGE_DISPLAY_PCT}%)`,
                   }"
                 />
                 <div class="preview-meta tl">{{ activeSize }} × {{ activeSize }}</div>
@@ -1285,7 +1236,9 @@ async function onFileChange(e: Event) {
                 >
                   <UiIcon name="Crosshair" :size="11" />
                 </button>
-                <div class="preview-meta tr">hotspot {{ hotspotX }},{{ hotspotY }}</div>
+                <div class="preview-meta tr">
+                  hotspot {{ activeHotspot.x.toFixed(3) }},{{ activeHotspot.y.toFixed(3) }}
+                </div>
               </div>
 
               <!-- 詳細設定トグル: 解像度別ワークフローを ON/OFF -->

@@ -36,8 +36,8 @@ const baseProps = {
   exportMessage: null as string | null,
   exportProgress: null,
   exportBusy: false,
-  hotspotX: 4,
-  hotspotY: 4,
+  hotspot: { x: 0.125, y: 0.125 }, // 4 / 32 = 0.125
+  primarySize: 32,
   perSizeHotspot: false,
   activeRoleJp: '通常の選択',
   showAdvancedResolutions: false,
@@ -186,15 +186,18 @@ describe('CreatorMetadataPane', () => {
     expect(wrapper.text()).toMatch(/(ホットスポット \(現在ロール\)|Hotspot \(current role\))/)
     expect(wrapper.text()).toContain('通常の選択')
 
-    // 2 number inputs (X / Y) are mounted with the bound values
+    // 2 number inputs (X / Y) are mounted with the px-derived values (0.125 * 32 = 4)
     const numberInputs = wrapper.findAll<HTMLInputElement>('input[type="number"]')
     expect(numberInputs.length).toBe(2)
     expect(numberInputs[0]!.element.value).toBe('4')
     expect(numberInputs[1]!.element.value).toBe('4')
 
-    // Updating X emits update:hotspotX (defineModel pattern)
+    // Updating X emits update:hotspot with ratio (defineModel pattern)
     await numberInputs[0]!.setValue(12)
-    expect(wrapper.emitted('update:hotspotX')?.[0]).toEqual([12])
+    const emitted = wrapper.emitted('update:hotspot')
+    expect(emitted).toBeTruthy()
+    // ratio = 12 / 32 = 0.375
+    expect((emitted![0]![0] as { x: number }).x).toBeCloseTo(0.375)
 
     // Per-size toggle is hidden when showAdvancedResolutions is false
     const toggleButtons = wrapper.findAll('.toggle-stub')

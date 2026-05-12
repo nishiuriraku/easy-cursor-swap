@@ -84,14 +84,12 @@ const activePreviewDetail = computed<RolePreviewDetail | null>(
 const HOT_DOT_DISPLAY_SIZE = 64
 const hotspotStyle = computed(() => {
   const detail = activePreviewDetail.value
-  if (!detail || detail.width <= 0 || detail.height <= 0) {
+  if (!detail) {
     return { left: '50%', top: '50%' }
   }
-  const ratioX = detail.hotspotX / detail.width
-  const ratioY = detail.hotspotY / detail.height
-  // 画像中心からの px オフセット (画像左上 = (-32, -32)、右下 = (+32, +32))
-  const offsetX = (ratioX - 0.5) * HOT_DOT_DISPLAY_SIZE
-  const offsetY = (ratioY - 0.5) * HOT_DOT_DISPLAY_SIZE
+  // detail.hotspot は ratio (0.0-1.0)。画像中心からの px オフセットに変換。
+  const offsetX = (detail.hotspot.x - 0.5) * HOT_DOT_DISPLAY_SIZE
+  const offsetY = (detail.hotspot.y - 0.5) * HOT_DOT_DISPLAY_SIZE
   return {
     left: `calc(50% + ${offsetX}px)`,
     top: `calc(50% + ${offsetY}px)`,

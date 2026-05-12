@@ -8,7 +8,9 @@
  * 純粋なフォーム + 進捗表示なので 6 つの v-model + 数件の read-only props +
  * 2 つの emit (dismiss-export-message, cancel-export) で creator.vue から切り出している。
  */
+import { computed } from 'vue'
 import { useI18n } from '~/composables/useI18n'
+import type { Hotspot } from '~/composables/useCreatorAssets'
 
 const { t } = useI18n()
 
@@ -18,8 +20,7 @@ const metaAuthor = defineModel<string>('metaAuthor', { required: true })
 const metaVersion = defineModel<string>('metaVersion', { required: true })
 const metaDescription = defineModel<string>('metaDescription', { required: true })
 const shadowEnabled = defineModel<boolean>('shadowEnabled', { required: true })
-const hotspotX = defineModel<number>('hotspotX', { required: true })
-const hotspotY = defineModel<number>('hotspotY', { required: true })
+const hotspot = defineModel<Hotspot>('hotspot', { required: true })
 const perSizeHotspot = defineModel<boolean>('perSizeHotspot', { required: true })
 
 interface ExportProgress {
@@ -30,7 +31,7 @@ interface ExportProgress {
   message: string | null
 }
 
-defineProps<{
+const props = defineProps<{
   arrowAssigned: boolean
   assignedRoleCount: number
   exportMessage: string | null
@@ -39,7 +40,28 @@ defineProps<{
   activeRoleJp: string
   showAdvancedResolutions: boolean
   failedApplyThemeId: string | null
+  /** px ⇔ ratio 変換の基準サイズ */
+  primarySize: number
 }>()
+
+/** px 入力 ⇔ ratio model の双方向ブリッジ */
+const hotspotXPx = computed<number>({
+  get: () => Math.round(hotspot.value.x * (props.primarySize || 1)),
+  set: (px: number) => {
+    const size = props.primarySize || 1
+    const x = Math.max(0, Math.min(1, px / size))
+    hotspot.value = { ...hotspot.value, x }
+  },
+})
+
+const hotspotYPx = computed<number>({
+  get: () => Math.round(hotspot.value.y * (props.primarySize || 1)),
+  set: (px: number) => {
+    const size = props.primarySize || 1
+    const y = Math.max(0, Math.min(1, px / size))
+    hotspot.value = { ...hotspot.value, y }
+  },
+})
 
 defineEmits<{
   (e: 'dismiss-export-message'): void
@@ -122,19 +144,21 @@ defineEmits<{
         <div class="prop-body" style="padding: 4px 16px">
           <SettingsRow :label="t('creatorStart.propHotspotX')">
             <input
-              v-model.number="hotspotX"
+              v-model.number="hotspotXPx"
               type="number"
               class="input mono"
               min="0"
+              :max="primarySize"
               style="width: 120px"
             />
           </SettingsRow>
           <SettingsRow :label="t('creatorStart.propHotspotY')">
             <input
-              v-model.number="hotspotY"
+              v-model.number="hotspotYPx"
               type="number"
               class="input mono"
               min="0"
+              :max="primarySize"
               style="width: 120px"
             />
           </SettingsRow>

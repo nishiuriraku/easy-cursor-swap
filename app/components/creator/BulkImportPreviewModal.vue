@@ -119,8 +119,7 @@ watch(
           pngBytes: parsed.primaryPngBytes,
           svgText: null,
           nativeSize: parsed.primarySize,
-          hotspotX: parsed.hotspotX,
-          hotspotY: parsed.hotspotY,
+          hotspot: parsed.hotspot,
           availableSizes: isAni
             ? [parsed.primarySize]
             : Object.keys(parsed.sizedPngBytes).map(Number),
@@ -224,11 +223,11 @@ function toRoleAsset(
   // .ani は自前の埋め込みホットスポットを使う (中央既定を適用しない)。
   const isAni = asset.kind === 'ani' && asset.ani !== null
   const noEmbeddedHotspot =
-    asset.kind === 'png' || asset.kind === 'svg' || (asset.hotspotX === 0 && asset.hotspotY === 0)
+    asset.kind === 'png' || asset.kind === 'svg' || (asset.hotspot.x === 0 && asset.hotspot.y === 0)
   const finalHotspot =
     isNewRole && noEmbeddedHotspot && !isAni
       ? initialHotspotFor(roleId, asset.nativeSize)
-      : { x: asset.hotspotX, y: asset.hotspotY }
+      : asset.hotspot
   const base: RoleAsset = {
     primary: new Uint8Array(asset.pngBytes),
     primarySize: asset.nativeSize,
@@ -254,14 +253,16 @@ function apply() {
     for (const m of matches.value) {
       if (m.decision !== 'apply') continue
       const parsed = props.cursorpack.roles[m.role]
-      const sized = new Map<number, Uint8Array>()
+      if (!parsed) continue
+      // SizedAsset 形式で構築 (per-size hotspot は cursorpack 内では未サポートなので undefined)
+      const sized = new Map<number, import('~/composables/useCreatorAssets').SizedAsset>()
       for (const [k, v] of Object.entries(parsed.sizedPngBytes)) {
-        sized.set(Number(k), new Uint8Array(v))
+        sized.set(Number(k), { png: new Uint8Array(v) })
       }
       const asset: RoleAsset = {
         primary: new Uint8Array(parsed.primaryPngBytes),
         primarySize: parsed.primarySize,
-        hotspot: { x: parsed.hotspotX, y: parsed.hotspotY },
+        hotspot: parsed.hotspot,
         sized: sized.size > 0 ? sized : undefined,
         source: 'cursorpack',
       }

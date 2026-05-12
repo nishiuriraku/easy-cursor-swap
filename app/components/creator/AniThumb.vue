@@ -41,10 +41,11 @@ const player = useAniPlayer({
 })
 
 const hotspotPercent = computed(() => {
-  if (!props.hotspot || props.width === 0 || props.height === 0) return null
+  if (!props.hotspot) return null
+  // hotspot は ratio (0.0-1.0) なので直接パーセント化する
   return {
-    left: `${(props.hotspot.x / props.width) * 100}%`,
-    top: `${(props.hotspot.y / props.height) * 100}%`,
+    left: `${props.hotspot.x * 100}%`,
+    top: `${props.hotspot.y * 100}%`,
   }
 })
 
@@ -52,11 +53,10 @@ let dragging = false
 
 function pointToCoord(e: MouseEvent, el: HTMLElement): { x: number; y: number } {
   const rect = el.getBoundingClientRect()
-  const ratioX = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width))
-  const ratioY = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height))
+  // ratio (0.0-1.0) で emit する
   return {
-    x: Math.round(ratioX * props.width),
-    y: Math.round(ratioY * props.height),
+    x: Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)),
+    y: Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height)),
   }
 }
 
