@@ -110,8 +110,7 @@ easy-cursor-swap/
 │   ├── Cargo.toml
 │   └── tauri.conf.json
 ├── docs/                       # アーキテクチャ / セキュリティ / 配布 / 署名ドキュメント
-├── scripts/marketplace/        # validate.mjs — インデックス提出の CI 検証スクリプト
-└── .github/workflows/          # ci.yml / performance.yml / marketplace-validate.yml
+└── .github/workflows/          # ci.yml / performance.yml / release.yml
 ```
 
 ## アーキテクチャ

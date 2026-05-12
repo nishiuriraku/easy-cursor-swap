@@ -146,8 +146,9 @@ One feature = one commit. Run `bash scripts/verify-gate.sh` and confirm it passe
 
 - `.github/workflows/ci.yml` — `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test --lib`, `vue-tsc --noEmit`, i18n parity.
 - `.github/workflows/performance.yml` — Criterion benches (`benches/cursor_build.rs`, `benches/startup.rs`); regression-detected on PRs.
-- `.github/workflows/marketplace-validate.yml` — runs `scripts/marketplace/validate.mjs` to verify `.cursorpack` SHA-256, Ed25519 signature, size limits, and malware-hash DB on incoming submissions.
 - `.github/workflows/release.yml` — signed installer builds.
+
+Marketplace 投稿の検証 (`.cursorpack` の SHA-256 / Ed25519 / サイズ / マルウェア DB) は別リポジトリ [`nishiuriraku/easy-cursor-swap-index`](https://github.com/nishiuriraku/easy-cursor-swap-index) 側の `scripts/marketplace/validate.mjs` と `marketplace-validate.yml` ワークフローで行う (Ajv 版が正準)。
 
 ## Pitfalls
 

@@ -137,10 +137,9 @@
 | ディレクトリ | 役割 |
 |---|---|
 | [easy-cursor-swap-crash-report-worker (private)](https://github.com/nishiuriraku/easy-cursor-swap-crash-report-worker) | Cloudflare Workers + KV（dedup / rate limit） / 別 private repo に切り出し済 (2026-05-09) |
+| [easy-cursor-swap-index](https://github.com/nishiuriraku/easy-cursor-swap-index) | Marketplace インデックス + `scripts/marketplace/validate.mjs` (Ajv 版: スキーマ / SHA-256 / Ed25519 / VirusTotal v3) + `malware-hashes.txt` / 別 repo に切り出し済 (2026-05-08) |
 | [scripts/check-i18n.mjs](../scripts/check-i18n.mjs) | ja/en parity CI |
-| [scripts/marketplace/validate.mjs](../scripts/marketplace/validate.mjs) | スキーマ + SHA-256 + Ed25519 + VirusTotal v3 |
-| [scripts/marketplace/malware-hashes.txt](../scripts/marketplace/malware-hashes.txt) | マルウェアハッシュ DB |
-| [.github/workflows/](../.github/workflows/) | `ci` / `performance` / `release` / `marketplace-validate` の 4 本 |
+| [.github/workflows/](../.github/workflows/) | `ci` / `performance` / `release` の 3 本 |
 
 ---
 

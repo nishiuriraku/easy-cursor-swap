@@ -114,8 +114,7 @@ easy-cursor-swap/
 │   ├── Cargo.toml
 │   └── tauri.conf.json
 ├── docs/                       # Architecture, security, distribution, signing docs
-├── scripts/marketplace/        # validate.mjs — CI validation for index submissions
-└── .github/workflows/          # ci.yml / performance.yml / marketplace-validate.yml
+└── .github/workflows/          # ci.yml / performance.yml / release.yml
 ```
 
 ## Architecture

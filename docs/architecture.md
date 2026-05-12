@@ -191,5 +191,6 @@ vitest run
 
 - `ci.yml` — 検証ゲート相当
 - `performance.yml` — `benches/cursor_build.rs`, `benches/startup.rs` (Criterion)
-- `marketplace-validate.yml` — `scripts/marketplace/validate.mjs` で PR 提出されたパックを検証
 - `release.yml` — 署名済みインストーラビルド
+
+Marketplace 投稿パックの検証ワークフロー (`marketplace-validate.yml` / `validate.mjs`) は別リポジトリ [`nishiuriraku/easy-cursor-swap-index`](https://github.com/nishiuriraku/easy-cursor-swap-index) 側に存在する。

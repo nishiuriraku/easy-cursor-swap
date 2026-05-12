@@ -122,7 +122,7 @@ EasyCursorSwap アプリで:
 
 ## CI 自動検証
 
-`scripts/marketplace/validate.mjs` の `verifySignature` ロジックは以下を行う:
+[index repo の `scripts/marketplace/validate.mjs`](https://github.com/nishiuriraku/easy-cursor-swap-index/blob/main/scripts/marketplace/validate.mjs) の `verifySignature` ロジックは以下を行う:
 
 1. `entry.author_pubkey_id` が現行 `public_key` の `key_id` と一致 → 現行鍵で検証
 2. 一致しない場合は `historical_keys[entry.author_pubkey_id]` を引いて検証
