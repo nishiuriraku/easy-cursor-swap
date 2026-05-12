@@ -409,8 +409,9 @@ export default {
     notFound: '該当するテーマが見つかりません',
     clear: '未指定にする',
     detailsEyebrow: 'テーマ詳細',
-    latestVersionNote: '最新版。詳細な変更履歴は将来のリリースで対応予定です。',
     roleMissing: '欠落',
+    openHomepage: 'ホームページを開く',
+    lastAppliedPrefix: '前回',
   },
   // 空ライブラリ画面のドロップ枠補足
   drop: {

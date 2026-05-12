@@ -1,20 +1,16 @@
 <script setup lang="ts">
 /**
- * テーマ詳細ドロワー (インライン展開)
+ * テーマ詳細ドロワー (モーダル本体)
  *
  * design/library-detail.jsx の `ThemeDetailDrawer` を Vue 化したもの。
- * ThemeCard 内のシェブロンを押すと、カードが 2 列分の幅にスパンして
- * このドロワーが展開する設計 (CSS: `.card.td-open`)。
+ * 3 段構成:
+ *   1. DESCRIPTION ペイン (説明文 + tags + signed pill) | ROLE COVERAGE ペイン
+ *   2. PACKAGE / USAGE / SOURCE の 3 セル strip
+ *   3. アクション群 (フッター)
  *
- * 5 ペイン構成:
- *   1. 説明 + チェンジログ (左)
- *   2. 17 ロールカバレッジ + ライブプレビュー (右)
- *   3. パッケージ / 署名 / 使用統計 / ペアリング (帯)
- *   4. アクション群 (フッター)
- *
- * 説明文・チェンジログ・ペアリング等のデータはまだ Rust 側に IPC 経路が
- * ないので、利用可能な ThemeCardData の値からフォールバック表示する。
- * (将来的に `get_theme_detail` IPC を追加する想定)
+ * 表示する全ての値は ThemeCardData (= Rust ThemeSummary) から導出する。
+ * description / license / homepage / lastAppliedAt 等が無いフィールドは
+ * 行ごと非表示にし、プレースホルダ文字列を出さない。
  *
  * Windows システムスキーム (`kind: 'system'`) は署名・統計・編集系操作を
  * 全て隠す。
@@ -23,6 +19,7 @@ import { computed, ref } from 'vue'
 import type { ThemeCardData } from '~/types/theme'
 import { CURSOR_ROLES } from '~/components/icons/CursorIcons'
 import { useI18n } from '~/composables/useI18n'
+import { invokeTauri } from '~/composables/useTauri'
 import type { RolePreviewDetail } from '~/composables/useThemePreviews'
 import type { CursorPreviewAsset } from '~/components/preview/CursorPreview.vue'
 
@@ -96,21 +93,42 @@ function selectRole(id: string) {
   activeRole.value = id
 }
 
-const description = computed(() => {
+const descriptionText = computed<string | null>(() => {
+  if (props.theme.description) return props.theme.description
   if (isSystem.value) {
     return 'Windows のマウスのプロパティに保存された配色スキームです。EasyCursorSwap では適用のみ可能で、編集・エクスポート・署名検証は行いません。'
   }
-  return `カバレッジ ${coverage.value}/17 役割。詳細な説明は将来のリリースで .cursorpack のメタデータから読み込む予定です。`
+  return null
 })
 
-const tags = computed<string[]>(() => {
-  const out: string[] = []
-  if (isSystem.value) out.push('system')
-  else out.push('cursor')
-  if (coverage.value === 17) out.push('complete')
-  if (props.theme.applyCount > 0) out.push('used')
-  return out
+const tagsToShow = computed<string[]>(() => props.theme.tags ?? [])
+
+const hasSigned = computed(() => props.theme.signed === true)
+
+// バイト → 表示文字列。null は呼び出し側で行ごと省略する。
+const displaySize = computed<string | null>(() => {
+  const b = props.theme.sizeBytes
+  if (b == null || b === 0) return null
+  if (b < 1024) return `${b} B`
+  if (b < 1024 * 1024) return `${(b / 1024).toFixed(0)} KB`
+  return `${(b / (1024 * 1024)).toFixed(1)} MB`
 })
+
+const lastAppliedDate = computed<string | null>(() => {
+  const d = props.theme.lastAppliedAt
+  if (!d) return null
+  return d.slice(0, 10)
+})
+
+async function openHomepage() {
+  const url = props.theme.homepage
+  if (!url) return
+  try {
+    await invokeTauri<void>('open_url', { url })
+  } catch {
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+}
 </script>
 
 <template>
@@ -121,25 +139,14 @@ const tags = computed<string[]>(() => {
         <header class="td-pane-h">
           <span class="td-pane-k">DESCRIPTION</span>
         </header>
-        <p class="td-desc">{{ description }}</p>
+        <p v-if="descriptionText" class="td-desc">{{ descriptionText }}</p>
 
-        <div class="td-tags">
-          <span v-for="tag in tags" :key="tag" class="td-tag">{{ tag }}</span>
-          <span v-if="!isSystem" class="td-tag td-tag-on">
+        <div v-if="tagsToShow.length > 0 || hasSigned" class="td-tags">
+          <span v-for="tag in tagsToShow" :key="tag" class="td-tag">{{ tag }}</span>
+          <span v-if="hasSigned" class="td-tag td-tag-on">
             <UiIcon name="Shield" :size="10" />signed
           </span>
         </div>
-
-        <header v-if="!isSystem" class="td-pane-h" style="margin-top: 18px">
-          <span class="td-pane-k">VERSION</span>
-        </header>
-        <ul v-if="!isSystem" class="td-changelog">
-          <li class="current">
-            <span class="td-cv">v{{ theme.version }}</span>
-            <span class="td-cd">{{ theme.date.slice(0, 10) }}</span>
-            <span class="td-cm">{{ t('themePicker.latestVersionNote') }}</span>
-          </li>
-        </ul>
       </section>
 
       <section class="td-pane">
@@ -201,31 +208,19 @@ const tags = computed<string[]>(() => {
       </section>
     </div>
 
-    <!-- 中段: パッケージ情報帯 (system では一部のみ) -->
+    <!-- 中段: パッケージ情報帯 (実データ駆動、3 セル構成) -->
     <div class="td-strip">
       <div class="td-cell">
         <div class="td-cell-k">PACKAGE</div>
         <div class="td-cell-v mono">
-          {{ isSystem ? '— (system scheme)' : `${theme.id.slice(0, 8)}.cursorpack` }}
+          {{ isSystem ? 'system scheme' : `schema v${theme.schemaVersion ?? '?'}` }}
         </div>
         <div class="td-cell-sub">
           <span>{{ coverage }} roles</span>
-          <span class="td-dot">·</span>
-          <span>{{ isSystem ? 'system' : 'schema v3.2' }}</span>
-        </div>
-      </div>
-
-      <div class="td-cell">
-        <div class="td-cell-k">
-          SIGNATURE
-          <span v-if="isSystem" class="td-pill">N/A</span>
-          <span v-else class="td-pill ok"> <UiIcon name="Shield" :size="9" />Ed25519 </span>
-        </div>
-        <div class="td-cell-v mono trunc">
-          {{ isSystem ? 'Windows OS スキーム' : 'key_id 検証中…' }}
-        </div>
-        <div class="td-cell-sub mono">
-          {{ isSystem ? 'EasyCursorSwap の署名対象外' : '適用時にハッシュ照合' }}
+          <template v-if="displaySize">
+            <span class="td-dot">·</span>
+            <span>{{ displaySize }}</span>
+          </template>
         </div>
       </div>
 
@@ -240,7 +235,13 @@ const tags = computed<string[]>(() => {
           </span>
         </div>
         <div class="td-cell-sub">
-          <span>{{ theme.isActive ? '現在適用中' : '未適用' }}</span>
+          <span>
+            {{ theme.isActive ? '現在適用中' : theme.applyCount > 0 ? '未適用' : '一度も適用なし' }}
+          </span>
+          <template v-if="lastAppliedDate">
+            <span class="td-dot">·</span>
+            <span>{{ t('themePicker.lastAppliedPrefix') }} {{ lastAppliedDate }}</span>
+          </template>
         </div>
       </div>
 
@@ -256,6 +257,21 @@ const tags = computed<string[]>(() => {
         </div>
         <div class="td-cell-sub">
           <span>{{ isSystem ? 'OS レジストリ' : `v${theme.version}` }}</span>
+          <template v-if="!isSystem && theme.license">
+            <span class="td-dot">·</span>
+            <span>{{ theme.license }}</span>
+          </template>
+          <template v-if="!isSystem && theme.homepage">
+            <span class="td-dot">·</span>
+            <button
+              type="button"
+              class="td-pane-link"
+              :aria-label="t('themePicker.openHomepage')"
+              @click="openHomepage"
+            >
+              {{ t('themePicker.openHomepage') }}
+            </button>
+          </template>
         </div>
       </div>
     </div>
@@ -390,36 +406,6 @@ const tags = computed<string[]>(() => {
   @apply border-accent-line bg-accent-dim text-accent;
 }
 
-.td-changelog {
-  @apply m-0 flex flex-col overflow-hidden rounded-lg border border-line p-0;
-  list-style: none;
-}
-.td-changelog li {
-  @apply grid items-baseline gap-3 border-b border-line px-3 py-2.5 text-[12px];
-  grid-template-columns: 60px 88px 1fr;
-}
-.td-changelog li:last-child {
-  @apply border-b-0;
-}
-.td-changelog li.current {
-  background: rgba(124, 242, 212, 0.04);
-}
-:where(html.light) .td-changelog li.current {
-  background: rgba(15, 168, 133, 0.05);
-}
-.td-cv {
-  @apply font-mono text-[11px] font-semibold text-fg;
-}
-.td-changelog li.current .td-cv {
-  @apply text-accent;
-}
-.td-cd {
-  @apply font-mono text-[10.5px] text-fg-mute;
-}
-.td-cm {
-  @apply leading-[1.5] text-fg-dim;
-}
-
 .td-cov {
   @apply grid items-start gap-[18px];
   grid-template-columns: 1fr 240px;
@@ -512,7 +498,7 @@ const tags = computed<string[]>(() => {
 
 .td-strip {
   @apply grid border-b border-line;
-  grid-template-columns: 1.2fr 1.4fr 1fr 1.2fr;
+  grid-template-columns: 1.2fr 1.2fr 1.6fr;
 }
 .td-cell {
   @apply flex min-w-0 flex-col gap-1 border-r border-line px-[18px] py-3.5;

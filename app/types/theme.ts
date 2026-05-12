@@ -45,4 +45,24 @@ export interface ThemeCardData {
    * 「最近使用」フィルタの判定に使う。Windows システムスキームは未追跡 (`null`)。
    */
   lastAppliedAt?: string | null
+  /**
+   * theme.json `description` を `"ja"` 解決した文字列。
+   * `null/undefined` のとき UI は説明段落を非表示にする。
+   * Windows システムスキームは `null`。
+   */
+  description?: string | null
+  /**
+   * theme.json `schema_version`。詳細モーダルの PACKAGE セルで `schema v{n}` 表記に使う。
+   * Windows システムスキームは `undefined` (UI 側で `system scheme` 表記にフォールバック)。
+   */
+  schemaVersion?: number
+  /**
+   * theme.json `license` (SPDX)。`null/undefined` のとき行ごと非表示。
+   */
+  license?: string | null
+  /**
+   * theme.json `homepage`。`null/undefined` のとき行ごと非表示。
+   * クリック時は `open_url` IPC 経由で外部ブラウザに渡す。
+   */
+  homepage?: string | null
 }

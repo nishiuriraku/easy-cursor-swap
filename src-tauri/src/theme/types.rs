@@ -286,6 +286,18 @@ pub struct ThemeSummary {
     /// 一覧の「署名」列で Ed25519 / 未署名 のピル色分けに使う。
     /// **検証結果ではない** — 検証は marketplace::verify_signature が別途行う。
     pub signed: bool,
+    /// theme.json `description` を表示用に解決した文字列。
+    /// 現状はロケール `"ja"` 固定 (`name` と同じ TODO)。`None` のとき UI は説明段落を非表示。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// theme.json `schema_version`。詳細モーダルの PACKAGE セルで表示する。
+    pub schema_version: u32,
+    /// theme.json `license` (SPDX)。`None` のとき行非表示。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub license: Option<String>,
+    /// theme.json `homepage`。`None` のとき行非表示。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub homepage: Option<String>,
 }
 
 /// `LocalizedString` の文字列値全てに同じサフィックスを付与した新しい LocalizedString を返す。
@@ -461,6 +473,54 @@ mod tests {
         m.insert("en".into(), "English Name".into());
         m.insert("de".into(), "Deutscher Name".into());
         LocalizedString::Localized(m)
+    }
+
+    fn sample_summary_full() -> ThemeSummary {
+        ThemeSummary {
+            id: Uuid::nil(),
+            name: "Test Theme".into(),
+            author: Some("Tester".into()),
+            version: "1.0.0".into(),
+            created_at: "2026-05-12T00:00:00Z".into(),
+            is_active: false,
+            is_favorite: false,
+            apply_count: 0,
+            last_applied_at: None,
+            included_roles: vec!["Arrow".into()],
+            path: "/tmp/test".into(),
+            tags: vec!["dark".into()],
+            size_bytes: 1024,
+            signed: true,
+            description: Some("テスト用説明".into()),
+            schema_version: 2,
+            license: Some("MIT".into()),
+            homepage: Some("https://example.test".into()),
+        }
+    }
+
+    #[test]
+    fn theme_summary_omits_none_optional_fields() {
+        let mut s = sample_summary_full();
+        s.description = None;
+        s.license = None;
+        s.homepage = None;
+        let v = serde_json::to_value(&s).unwrap();
+        // 必須フィールドは出る
+        assert_eq!(v["schema_version"], 2);
+        // Option::None はキーごと省略される
+        assert!(v.get("description").is_none(), "description present: {v}");
+        assert!(v.get("license").is_none(), "license present: {v}");
+        assert!(v.get("homepage").is_none(), "homepage present: {v}");
+    }
+
+    #[test]
+    fn theme_summary_includes_optional_fields_when_present() {
+        let s = sample_summary_full();
+        let v = serde_json::to_value(&s).unwrap();
+        assert_eq!(v["description"], "テスト用説明");
+        assert_eq!(v["schema_version"], 2);
+        assert_eq!(v["license"], "MIT");
+        assert_eq!(v["homepage"], "https://example.test");
     }
 
     #[test]

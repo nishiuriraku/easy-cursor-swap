@@ -755,6 +755,10 @@ impl ThemeManager {
             tags,
             size_bytes,
             signed,
+            description: metadata.description.as_ref().map(|d| d.get("ja")),
+            schema_version: metadata.schema_version,
+            license: metadata.license.clone(),
+            homepage: metadata.homepage.clone(),
         })
     }
 

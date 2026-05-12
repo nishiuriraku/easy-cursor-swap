@@ -643,6 +643,14 @@ interface IpcThemeSummary {
   signed: boolean
   /** 最終適用日時 (RFC3339)。一度も適用されていなければ null。 */
   last_applied_at: string | null
+  /** theme.json `description` を `"ja"` 解決した文字列。 未設定なら省略。 */
+  description?: string
+  /** theme.json `schema_version` (必須フィールド)。 */
+  schema_version: number
+  /** theme.json `license` (SPDX)。 未設定なら省略。 */
+  license?: string
+  /** theme.json `homepage`。 未設定なら省略。 */
+  homepage?: string
 }
 
 /** `list_windows_schemes` のレスポンス。Windows レジストリ HKCU\Cursors\Schemes 由来。 */
@@ -684,6 +692,10 @@ function mapWindowsSchemeToCard(s: IpcWindowsScheme): ThemeCardData {
     sizeBytes: undefined,
     signed: true,
     lastAppliedAt: null,
+    description: null,
+    schemaVersion: undefined,
+    license: null,
+    homepage: null,
   }
 }
 
@@ -718,6 +730,10 @@ async function loadThemes() {
       sizeBytes: tt.size_bytes,
       signed: tt.signed,
       lastAppliedAt: tt.last_applied_at,
+      description: tt.description ?? null,
+      schemaVersion: tt.schema_version,
+      license: tt.license ?? null,
+      homepage: tt.homepage ?? null,
     }))
 
     // EasyCursorSwap が register_scheme で書き込んだスキームはローカルテーマと

@@ -410,8 +410,9 @@ export default {
     notFound: 'No matching themes',
     clear: 'Clear selection',
     detailsEyebrow: 'Theme details',
-    latestVersionNote: 'Latest version. Detailed changelog coming in future releases.',
     roleMissing: 'Missing',
+    openHomepage: 'Open homepage',
+    lastAppliedPrefix: 'last',
   },
   // Empty-library drop area extras
   drop: {
