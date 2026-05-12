@@ -114,40 +114,60 @@ async function call(cmd: 'minimize' | 'toggleMaximize' | 'close') {
  *   - target がボタン (またはその子) なら何もしない → button の click 通常動作
  *   - 左クリック以外は無視
  *   - e.detail === 2 (ダブルクリックの 2 発目) → toggleMaximize()
- *   - それ以外 → startDragging() で OS にウィンドウ移動を委譲
+ *   - それ以外 → ドラッグ閾値 (4px) を超えてから startDragging()
  *
- * tauriWindow は onMounted で一度解決済みなので、本ハンドラは同期的に呼び出せて
- * mousedown → startDragging の往復にちらつき (Vue 再描画 + WebView 再 layout)
- * が挟まらない。Tauri API 未解決の場合のみ遅延 import にフォールバックする。
+ * **閾値方式の理由**: mousedown 直後に startDragging を呼ぶと、純粋なクリック
+ * (移動量 0) でも OS の WM_NCLBUTTONDOWN が発火して即時抜け、WebView2 が
+ * フォーカスを再取得 → Vue/CSS が re-layout してちらつき (= 「再レンダリング
+ * されたような挙動」) になる。pointermove を待って 4px 以上動いたときだけ
+ * startDragging することで、クリックでは何も起きないようにする。
  */
+const DRAG_THRESHOLD_PX = 4
+
 function onTitlebarMouseDown(e: MouseEvent) {
   if (e.button !== 0) return
   const target = e.target as HTMLElement | null
   if (target?.closest('button')) return
-  const w = tauriWindow
-  if (!w) {
-    // mount 完了前の極端なタイミング: 同期処理を諦めて遅延 import 経由で実行する。
+
+  // ダブルクリックは即時 toggleMaximize (Win11 と同じ挙動)
+  if (e.detail === 2) {
     void (async () => {
-      const lazy = await loadTauriWindow()
-      if (!lazy) return
-      if (e.detail === 2) {
-        await lazy.toggleMaximize()
-        isMaximized.value = await lazy.isMaximized()
-      } else {
-        await lazy.startDragging()
-      }
+      const w = tauriWindow ?? (await loadTauriWindow())
+      if (!w) return
+      await w.toggleMaximize()
+      isMaximized.value = await w.isMaximized()
     })()
     return
   }
-  if (e.detail === 2) {
-    void w.toggleMaximize().then(async () => {
-      isMaximized.value = await w.isMaximized()
-    })
-  } else {
-    // startDragging は OS の WM_NCLBUTTONDOWN 経由でドラッグループに入るので
-    // pointermove イベント等を自前で監視する必要はない。
-    void w.startDragging()
+
+  // 単発 mousedown は閾値ベース: 4px 以上動いてから startDragging を発火
+  const startX = e.clientX
+  const startY = e.clientY
+  let started = false
+
+  const onMove = (me: MouseEvent) => {
+    if (started) return
+    const dx = Math.abs(me.clientX - startX)
+    const dy = Math.abs(me.clientY - startY)
+    if (dx > DRAG_THRESHOLD_PX || dy > DRAG_THRESHOLD_PX) {
+      started = true
+      cleanup()
+      void (async () => {
+        const w = tauriWindow ?? (await loadTauriWindow())
+        if (!w) return
+        // startDragging は OS の WM_NCLBUTTONDOWN 経由でドラッグループに入るので
+        // pointermove を自前で追う必要はここから先にはない。
+        await w.startDragging()
+      })()
+    }
   }
+  const onUp = () => cleanup()
+  const cleanup = () => {
+    window.removeEventListener('mousemove', onMove)
+    window.removeEventListener('mouseup', onUp)
+  }
+  window.addEventListener('mousemove', onMove)
+  window.addEventListener('mouseup', onUp)
 }
 </script>
 
