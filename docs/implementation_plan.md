@@ -649,10 +649,9 @@
 > - 齟齬④ Creator UI: 17 ロール hotspot 一覧 / 一括編集が未実装
 >   - 現状: アクティブロール 1 つだけ大プレビュー、ホットスポット確認に各ロール切替が必要
 >   - 次手: 別 spec `docs/superpowers/specs/<date>-creator-hotspot-overview-design.md` で起票予定
-> - 齟齬⑤ 単一 PNG 取込時の `primarySize` ハードコード (= UI と Rust の hotspot 座標系不整合)
->   - 該当: `app/pages/creator.vue` 内 `applyImportedRaster(bytes, 256)` 2 箇所 (PNG 経路の `pickRasterFromPath` と HTML input fallback `onFileChange`)
->   - Rust 側 `build_cur_from_png` は実 PNG 寸法を基準とするため、64×64 などの非 256 PNG では hotspot が誤位置に
->   - 次手: GitHub Issue 化 → `docs/superpowers/notes/2026-05-12-issue-png-primarysize.md` ドラフト保存済み
+> - ~~齟齬⑤ 単一 PNG 取込時の `primarySize` ハードコード~~ ✅ **2026-05-12 解消** — Phase 1 (Hotspot Ratio Unification) で根本的に解決。
+>   ホットスポット内部表現を絶対 px → 比率 (0.0-1.0) に統一し、UI と Rust の座標系不整合を撤廃。
+>   参照: [docs/superpowers/2026-05-12-hotspot-ratio-unification-design.md](superpowers/2026-05-12-hotspot-ratio-unification-design.md)
 
 ---
 
@@ -665,6 +664,15 @@
 
 ### 変更履歴
 
+- 2026-05-12: **Phase 1 (Hotspot Ratio Unification) 完了**
+  ホットスポット内部表現を絶対 px → 比率 (0.0-1.0) に統一。
+  `Ratio01(f32)` + `Hotspot { x, y }` 型導入、`theme.json` schema_version 1→2、
+  IPC ペイロード全移行、`creator.vue` の `hotspotX/Y` ローカル ref と `scaleHotspot()` 撤廃、
+  `perSizeHotspot` トグルを per-size override 編集機能として実配線。
+  齟齬⑤ (PNG primarySize ハードコード) を根本的に解消。
+  - 設計書: [docs/superpowers/2026-05-12-hotspot-ratio-unification-design.md](superpowers/2026-05-12-hotspot-ratio-unification-design.md)
+  - 実装計画: [docs/superpowers/plans/2026-05-12-hotspot-ratio-unification.md](superpowers/plans/2026-05-12-hotspot-ratio-unification.md)
+  - 後続: Phase 2 ([preview unification](superpowers/issue/2026-05-12-phase2-preview-unification.md)) / Phase 3 ([IPC symmetry + Rust split](superpowers/issue/2026-05-12-phase3-ipc-symmetry-rust-split.md)) は別 issue
 - 2026-05-10: `.cursorpack` の Windows ファイル関連付けを v1.0 に追加
   (spec: `docs/superpowers/specs/2026-05-10-cursorpack-file-association-design.md`)。
   `tauri-plugin-single-instance` 導入に伴い、カスタム `single_instance.rs` を撤去。
