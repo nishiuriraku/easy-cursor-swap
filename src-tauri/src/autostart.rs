@@ -254,7 +254,7 @@ mod tests {
         use std::path::PathBuf;
         let cases = [
             r"C:\Program Files\EasyCursorSwap\easy-cursor-swap.exe",
-            r"<USER_HOME>\AppData\Local\Programs\EasyCursorSwap\app.exe",
+            r"C:\Users\me\AppData\Local\Programs\EasyCursorSwap\app.exe",
             r"D:\dev\target\release\easy-cursor-swap.exe",
         ];
         for c in cases {
