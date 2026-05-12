@@ -18,6 +18,10 @@ use image::RgbaImage;
 ///  - `png_bytes`: 元画像 (PNG)
 ///  - `hotspot_x` / `hotspot_y`: 元画像での座標 (px)
 ///  - `resample`: リサイズアルゴリズム
+///  - `sized_overrides`: サイズ別オーバーライド PNG (サイズ px → PNG バイト列)
+///  - `per_size_hotspot_px`: サイズ別ホットスポット px (`sized_overrides` の各エントリに
+///    独立した hotspot が指定されている場合のみ存在)。`None` / 該当サイズなしの場合は
+///    `hotspot_x` / `hotspot_y` を `scale_hotspot` でスケールした値を使用する。
 ///
 /// メタデータ (tEXt/iTXt/zTXt/eXIf) は内部の DynamicImage 経由で自動剥離されるため、
 /// 出力 .cur には元 PNG の補助チャンクは残らない。
@@ -27,6 +31,7 @@ pub fn build_cur_from_png(
     hotspot_y: u32,
     resample: ResizeMethod,
     sized_overrides: Option<&std::collections::HashMap<u32, Vec<u8>>>,
+    per_size_hotspot_px: Option<&std::collections::HashMap<u32, (u32, u32)>>,
 ) -> AppResult<Vec<u8>> {
     // PNG マジックバイト検証 (Magic Byte 第一防御線)
     const PNG_MAGIC: [u8; 8] = [0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a];
@@ -100,7 +105,12 @@ pub fn build_cur_from_png(
         };
         let resized =
             img_at_size.unwrap_or_else(|| resize_image_cached(&img, &src_hash, target, effective));
-        let (hx, hy) = scale_hotspot(hotspot_x, hotspot_y, original_size, target);
+        // サイズ別ホットスポット override が指定されていればそれを使用し、
+        // なければ primary hotspot をターゲットサイズへスケーリングする。
+        let (hx, hy) = per_size_hotspot_px
+            .and_then(|m| m.get(&target))
+            .copied()
+            .unwrap_or_else(|| scale_hotspot(hotspot_x, hotspot_y, original_size, target));
         entries.push((resized, hx, hy));
     }
 
@@ -219,9 +229,10 @@ mod tests {
         let mut overrides = std::collections::HashMap::new();
         overrides.insert(64u32, png64.clone());
 
-        // sized_overrides ありでビルド
+        // sized_overrides ありでビルド (per_size_hotspot_px は指定なし)
         let cur_bytes =
-            build_cur_from_png(&png256, 0, 0, ResizeMethod::Lanczos, Some(&overrides)).unwrap();
+            build_cur_from_png(&png256, 0, 0, ResizeMethod::Lanczos, Some(&overrides), None)
+                .unwrap();
 
         // 出力 .cur をパースして 64x64 のエントリの最初のピクセルが赤か確認
         let parsed = parse_ico_cur(&cur_bytes).unwrap();

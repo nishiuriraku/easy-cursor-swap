@@ -84,6 +84,7 @@ pub fn export_cursorpack(req: ExportCursorpackRequest) -> Result<ExportResult, A
             .get(role)
             .cloned()
             .unwrap_or(crate::theme::types::Hotspot::ZERO);
+        // .cur ファイル自体は既ビルド済み (cur_paths で受領)。theme.json に ratio を記録するのみ (変換不要)
         cursors_meta.insert(
             role.clone(),
             CursorDefinition {
@@ -333,14 +334,13 @@ pub fn export_cursorpack_streamed(
                     e
                 ))
             })?;
-            // ANI の primary_size は png_bytes から取得 (空の場合は 32px 既定)
-            let primary_size = if !entry.png_bytes.is_empty() {
-                image::load_from_memory(&entry.png_bytes)
-                    .map(|img| img.width())
-                    .unwrap_or(32)
-            } else {
-                32
-            };
+            // ANI の primary_size はファイル自体を parse_ani してフレーム幅から取得する。
+            // サムネイル PNG (png_bytes) は UI 表示用にリサイズされる場合があるため、
+            // それを使うと ratio→px 変換がズレる可能性がある。
+            let primary_size = crate::cursor::ani::parse_ani(&bytes)
+                .ok()
+                .and_then(|p| p.frames.first().map(|f| f.width))
+                .unwrap_or(32);
             let (hot_x_px, hot_y_px) = entry.hotspot.to_px(primary_size);
             let rewritten = crate::cursor::rewrite_ani_with_hotspot(
                 &bytes,
@@ -380,14 +380,27 @@ pub fn export_cursorpack_streamed(
             .unwrap_or(32);
         let (hot_x_px, hot_y_px) = entry.hotspot.to_px(primary_size);
 
-        // sized_overrides を sized_png_bytes 形式に変換 (build_cur_from_png への境界)
-        let sized_png_map: Option<std::collections::HashMap<u32, Vec<u8>>> =
-            entry.sized_overrides.as_ref().map(|overrides| {
-                overrides
-                    .iter()
-                    .map(|(size, payload)| (*size, payload.png_bytes.clone()))
-                    .collect()
-            });
+        // sized_overrides を PNG バイト列マップとサイズ別ホットスポット px マップに分解する。
+        // payload.hotspot が Some の場合はそのサイズ専用 hotspot px を計算して渡す。
+        // None のサイズは親の (hot_x_px, hot_y_px) を build_cur_from_png 側でスケール適用。
+        let (sized_png_map, sized_hotspot_map) = match entry.sized_overrides.as_ref() {
+            None => (None, None),
+            Some(overrides) => {
+                let mut png_map: std::collections::HashMap<u32, Vec<u8>> =
+                    std::collections::HashMap::new();
+                let mut hot_map: std::collections::HashMap<u32, (u32, u32)> =
+                    std::collections::HashMap::new();
+                for (size, payload) in overrides {
+                    png_map.insert(*size, payload.png_bytes.clone());
+                    // payload.hotspot が Some ならそのサイズ独自の hotspot を px 変換して記録
+                    if let Some(override_hot) = payload.hotspot {
+                        hot_map.insert(*size, override_hot.to_px(*size));
+                    }
+                }
+                let hot_map_opt = if hot_map.is_empty() { None } else { Some(hot_map) };
+                (Some(png_map), hot_map_opt)
+            }
+        };
 
         let bin = build_cur_from_png(
             &entry.png_bytes,
@@ -395,6 +408,7 @@ pub fn export_cursorpack_streamed(
             hot_y_px,
             resample,
             sized_png_map.as_ref(),
+            sized_hotspot_map.as_ref(),
         )?;
         cursor_bytes.insert(entry.role.clone(), bin);
         cursors_meta.insert(
@@ -720,5 +734,95 @@ mod tests {
         };
         let effective = payload.hotspot.unwrap_or(primary);
         assert_eq!(effective, override_h);
+    }
+
+    /// SizedOverridePayload.hotspot (比率) が build_cur_from_png の出力 .cur バイナリに
+    /// 正しいホットスポット px として記録されることを検証する。
+    ///
+    /// primary hotspot = (0.0, 0.0) → px=(0,0) で、
+    /// 64px オーバーライドの hotspot = (0.5, 0.5) → px=(32,32) を指定した場合、
+    /// 出力 .cur の 64px エントリは hotspot=(32,32) になるはず。
+    #[test]
+    fn sized_override_hotspot_reaches_cur_build_output() {
+        use crate::cursor::ico_cur::parse_ico_cur;
+        use crate::cursor::{build_cur_from_png, ResizeMethod};
+        use crate::theme::types::{Hotspot, Ratio01};
+
+        // 64x64 の赤 PNG (オーバーライド)
+        let img64: image::RgbaImage =
+            image::ImageBuffer::from_pixel(64, 64, image::Rgba([255, 0, 0, 255]));
+        let mut png64 = Vec::new();
+        image::ImageEncoder::write_image(
+            image::codecs::png::PngEncoder::new(&mut png64),
+            img64.as_raw(),
+            64,
+            64,
+            image::ExtendedColorType::Rgba8,
+        )
+        .unwrap();
+
+        // primary は 256x256 の青、hotspot = (0, 0)
+        let img256: image::RgbaImage =
+            image::ImageBuffer::from_pixel(256, 256, image::Rgba([0, 0, 255, 255]));
+        let mut png256 = Vec::new();
+        image::ImageEncoder::write_image(
+            image::codecs::png::PngEncoder::new(&mut png256),
+            img256.as_raw(),
+            256,
+            256,
+            image::ExtendedColorType::Rgba8,
+        )
+        .unwrap();
+
+        // 64px オーバーライドに hotspot (0.5, 0.5) → to_px(64) = (32, 32) を設定
+        let override_hotspot = Hotspot {
+            x: Ratio01::new(0.5),
+            y: Ratio01::new(0.5),
+        };
+        let (ov_hx, ov_hy) = override_hotspot.to_px(64);
+        assert_eq!((ov_hx, ov_hy), (32, 32));
+
+        let mut sized_png_map = std::collections::HashMap::new();
+        sized_png_map.insert(64u32, png64.clone());
+
+        let mut sized_hotspot_map = std::collections::HashMap::new();
+        sized_hotspot_map.insert(64u32, (ov_hx, ov_hy));
+
+        // primary hotspot = (0, 0) で build_cur_from_png に per_size_hotspot_px を渡す
+        let cur_bytes = build_cur_from_png(
+            &png256,
+            0,
+            0,
+            ResizeMethod::Lanczos,
+            Some(&sized_png_map),
+            Some(&sized_hotspot_map),
+        )
+        .unwrap();
+
+        let parsed = parse_ico_cur(&cur_bytes).unwrap();
+
+        // 64px エントリのホットスポットがオーバーライドの (32, 32) になっていることを確認
+        let entry_64 = parsed
+            .entries
+            .iter()
+            .find(|e| e.width == 64)
+            .expect("64px エントリがあるはず");
+        assert_eq!(
+            (entry_64.hotspot_x, entry_64.hotspot_y),
+            (32, 32),
+            "64px エントリのホットスポットはオーバーライドの (32,32) であるべき"
+        );
+
+        // 32px エントリ (オーバーライドなし) のホットスポットは primary (0,0) からスケールされた (0,0)
+        let entry_32 = parsed
+            .entries
+            .iter()
+            .find(|e| e.width == 32)
+            .expect("32px エントリがあるはず");
+        assert_eq!(
+            (entry_32.hotspot_x, entry_32.hotspot_y),
+            (0, 0),
+            "32px エントリのホットスポットは primary (0,0) のスケール値 (0,0) であるべき"
+        );
     }
 }

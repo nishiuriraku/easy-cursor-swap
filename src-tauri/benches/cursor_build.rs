@@ -37,16 +37,16 @@ fn bench_build_lanczos(c: &mut Criterion) {
     c.bench_function("build_cur_from_png/64x64/lanczos/cold", |b| {
         b.iter(|| {
             clear_resize_cache();
-            let _ = build_cur_from_png(black_box(&png_64), 0, 0, ResizeMethod::Lanczos, None)
+            let _ = build_cur_from_png(black_box(&png_64), 0, 0, ResizeMethod::Lanczos, None, None)
                 .expect("build");
         })
     });
 
     // キャッシュ温まった warm ベンチ (102 枚生成シナリオの 2 回目以降を模擬)
-    let _ = build_cur_from_png(&png_64, 0, 0, ResizeMethod::Lanczos, None);
+    let _ = build_cur_from_png(&png_64, 0, 0, ResizeMethod::Lanczos, None, None);
     c.bench_function("build_cur_from_png/64x64/lanczos/warm", |b| {
         b.iter(|| {
-            let _ = build_cur_from_png(black_box(&png_64), 0, 0, ResizeMethod::Lanczos, None)
+            let _ = build_cur_from_png(black_box(&png_64), 0, 0, ResizeMethod::Lanczos, None, None)
                 .expect("build");
         })
     });
@@ -54,8 +54,9 @@ fn bench_build_lanczos(c: &mut Criterion) {
     c.bench_function("build_cur_from_png/256x256/lanczos/cold", |b| {
         b.iter(|| {
             clear_resize_cache();
-            let _ = build_cur_from_png(black_box(&png_256), 0, 0, ResizeMethod::Lanczos, None)
-                .expect("build");
+            let _ =
+                build_cur_from_png(black_box(&png_256), 0, 0, ResizeMethod::Lanczos, None, None)
+                    .expect("build");
         })
     });
 }
@@ -65,7 +66,7 @@ fn bench_build_nearest(c: &mut Criterion) {
 
     c.bench_function("build_cur_from_png/32x32/nearest", |b| {
         b.iter(|| {
-            let _ = build_cur_from_png(black_box(&png_32), 0, 0, ResizeMethod::Nearest, None)
+            let _ = build_cur_from_png(black_box(&png_32), 0, 0, ResizeMethod::Nearest, None, None)
                 .expect("build");
         })
     });
