@@ -422,7 +422,9 @@ async function editInCreator(id: string) {
     // `editThemePath` クエリを拾って parse_cursorpack_for_creator を呼ぶ。
     await navigateTo({ path: '/creator', query: { editPath: tempPath } })
   } catch (err) {
-    applyError.value = `編集モードへの遷移に失敗: ${err instanceof Error ? err.message : String(err)}`
+    applyError.value = t('library.errEditModeTransition', {
+      detail: err instanceof Error ? err.message : String(err),
+    })
   }
 }
 
@@ -434,11 +436,15 @@ async function duplicateTheme(id: string) {
     await loadThemes()
     void notify({
       title: 'EasyCursorSwap',
-      body: `${themes.value.find((tt) => tt.id === id)?.name ?? 'テーマ'} を複製しました`,
+      body: t('library.notifyDuplicated', {
+        name: themes.value.find((tt) => tt.id === id)?.name ?? t('library.fallbackThemeName'),
+      }),
       level: 'success',
     })
   } catch (err) {
-    applyError.value = `複製に失敗: ${err instanceof Error ? err.message : String(err)}`
+    applyError.value = t('library.errDuplicate', {
+      detail: err instanceof Error ? err.message : String(err),
+    })
   }
 }
 
@@ -469,11 +475,16 @@ async function exportTheme(id: string) {
     }
     void notify({
       title: 'EasyCursorSwap',
-      body: `${target.name} をエクスポートしました (${bytes ?? '?'} bytes)`,
+      body: t('library.notifyExported', {
+        name: target.name,
+        bytes: bytes ?? t('library.bytesUnknown'),
+      }),
       level: 'success',
     })
   } catch (err) {
-    applyError.value = `エクスポートに失敗: ${err instanceof Error ? err.message : String(err)}`
+    applyError.value = t('library.errExport', {
+      detail: err instanceof Error ? err.message : String(err),
+    })
   }
 }
 
@@ -483,7 +494,7 @@ async function deleteTheme(id: string) {
   if (!target) return
   // ネイティブ confirm はテストしづらいが Tauri WebView では機能するので暫定使用。
   // 将来的には専用の確認モーダルに置き換える。
-  const ok = window.confirm(`「${target.name}」を完全に削除します。この操作は元に戻せません。`)
+  const ok = window.confirm(t('library.confirmDeleteMsg', { name: target.name }))
   if (!ok) return
   try {
     await invokeTauri<void>('delete_theme', { themeId: id })
@@ -491,11 +502,13 @@ async function deleteTheme(id: string) {
     await loadThemes()
     void notify({
       title: 'EasyCursorSwap',
-      body: `${target.name} を削除しました`,
+      body: t('library.notifyDeleted', { name: target.name }),
       level: 'info',
     })
   } catch (err) {
-    applyError.value = `削除に失敗: ${err instanceof Error ? err.message : String(err)}`
+    applyError.value = t('library.errDelete', {
+      detail: err instanceof Error ? err.message : String(err),
+    })
   }
 }
 
@@ -544,7 +557,7 @@ async function importByPath(path: string) {
     await actuallyImport(path)
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    applyError.value = `インポートに失敗: ${msg}`
+    applyError.value = t('library.errImport', { detail: msg })
     console.error('[Library] import failed:', err)
   }
 }
@@ -573,7 +586,7 @@ async function confirmConflictOverwrite() {
     await actuallyImport(pending.path)
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    applyError.value = `インポートに失敗: ${msg}`
+    applyError.value = t('library.errImport', { detail: msg })
   }
 }
 
@@ -1045,7 +1058,7 @@ onUnmounted(() => {
     <Transition name="fade">
       <div v-if="applyError" class="apply-error" role="alert">
         <UiIcon name="Alert" :size="14" />
-        適用に失敗しました: {{ applyError }}
+        {{ t('library.applyFailedBanner', { detail: applyError }) }}
         <button
           class="btn ghost"
           style="height: 24px; margin-left: auto"

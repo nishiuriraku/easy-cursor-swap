@@ -81,7 +81,10 @@ async function execute() {
       const role = CURSOR_ROLES[i]!
       logs.value.push({
         status: 'running',
-        text: `writing ${role.id} → ${stage.value === 1 ? '(Windows 既定)' : '(snapshot)'}`,
+        text: t('panic.writingProgress', {
+          role: role.id,
+          target: stage.value === 1 ? t('panic.targetWindowsDefault') : t('panic.targetSnapshot'),
+        }),
         t: String(Date.now() - startedAt.value),
       })
       await step(40)

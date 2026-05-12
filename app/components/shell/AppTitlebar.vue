@@ -183,7 +183,7 @@ function onTitlebarMouseDown(e: MouseEvent) {
       <button
         type="button"
         class="tb-btn"
-        :aria-label="`UI テーマ: ${themeLabel} (クリックで切替)`"
+        :aria-label="t('titlebar.themeAria', { label: themeLabel })"
         :title="`Theme: ${themeLabel}`"
         @click="cycle"
       >

@@ -38,7 +38,7 @@ const saving = ref(false)
 
 const fallbackTheme: ThemeCardData = {
   id: '',
-  name: '未指定',
+  name: t('appearance.unspecified'),
   author: null,
   version: '—',
   date: '',
@@ -50,7 +50,12 @@ const fallbackTheme: ThemeCardData = {
 
 function findTheme(id: string | null): ThemeCardData {
   if (!id) return fallbackTheme
-  return themes.value.find((t) => t.id === id) ?? { ...fallbackTheme, name: '(未インストール)' }
+  return (
+    themes.value.find((th) => th.id === id) ?? {
+      ...fallbackTheme,
+      name: t('appearance.uninstalled'),
+    }
+  )
 }
 
 const lightTheme = computed(() => findTheme(lightThemeId.value))
@@ -207,20 +212,20 @@ watch(
         <div class="prop-head">Detection</div>
         <div class="prop-body">
           <SettingsRow
-            label="OS ダークモード自動切替を有効化"
-            desc="WM_SETTINGCHANGE の ImmersiveColorSet を購読し、即時テーマを切替"
+            :label="t('appearance.toggleEnableLabel')"
+            :desc="t('appearance.toggleEnableDesc')"
           >
             <SettingsToggle v-model="detection.enabled" />
           </SettingsRow>
           <SettingsRow
-            label="切替時に通知トーストを表示"
-            desc="Windows トースト通知 (層 2) で適用結果を告知"
+            :label="t('appearance.toggleToastLabel')"
+            :desc="t('appearance.toggleToastDesc')"
           >
             <SettingsToggle v-model="detection.showToast" />
           </SettingsRow>
           <SettingsRow
-            label="切替時にペア毎の OS 標準ポインター影制御"
-            desc="requires_os_shadow に従い SPI_SETCURSORSHADOW を呼び出す"
+            :label="t('appearance.toggleShadowLabel')"
+            :desc="t('appearance.toggleShadowDesc')"
           >
             <SettingsToggle v-model="detection.perPairShadow" />
           </SettingsRow>
@@ -232,7 +237,7 @@ watch(
       :items="[
         { dot: true, text: `OS: ${isDark ? 'Dark Mode' : 'Light Mode'}` },
         { text: `Active pair: ${activePair}` },
-        { text: dirty ? '未保存の変更あり' : 'Panic ready · snapshot OK' },
+        { text: dirty ? t('appearance.statusUnsaved') : 'Panic ready · snapshot OK' },
       ]"
     />
 
@@ -242,8 +247,14 @@ watch(
         v-if="pickerOpen"
         :themes="themes"
         :model-value="pickerSelected"
-        :title="pickerOpen === 'light' ? 'Light Mode のテーマを選択' : 'Dark Mode のテーマを選択'"
-        :sub="pickerOpen === 'light' ? 'OS が Light の時に自動適用' : 'OS が Dark の時に自動適用'"
+        :title="
+          pickerOpen === 'light'
+            ? t('appearance.pickerLightTitle')
+            : t('appearance.pickerDarkTitle')
+        "
+        :sub="
+          pickerOpen === 'light' ? t('appearance.pickerLightSub') : t('appearance.pickerDarkSub')
+        "
         :accent="pickerOpen === 'light' ? '#f5c26b' : '#7cf2d4'"
         @update:model-value="onPickerUpdate"
         @cancel="pickerOpen = null"

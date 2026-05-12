@@ -74,7 +74,7 @@ function navigate(id: string) {
         <span
           v-if="it.count !== null && it.count !== undefined"
           class="nav-count"
-          :aria-label="`${it.count}件`"
+          :aria-label="t('nav.countAria', { count: it.count })"
           >{{ it.count }}</span
         >
       </button>
