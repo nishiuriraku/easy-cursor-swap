@@ -90,8 +90,10 @@ const imageStyle = computed(() => ({
       <div class="cp-crosshair-v" />
     </template>
 
+    <!-- ani↔ani 切替時に AniThumb を再マウントさせ、useAniPlayer 内の frameUrls を再初期化する -->
     <AniThumb
       v-if="asset.kind === 'ani'"
+      :key="asset.framePngs"
       :frame-pngs="asset.framePngs"
       :sequence="asset.sequence"
       :durations="asset.durations"
