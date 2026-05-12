@@ -397,6 +397,10 @@ export default {
     lastSyncJustNow: '取得済み',
     installedToast: '{name} をライブラリに取り込みました',
     installFailedToast: '{name} のインポートに失敗: {error}',
+    importBtn: 'インポート',
+    featuredNew: '新着',
+    featuredPopular: '人気',
+    installAria: '{name} をインストール',
   },
   conflict: {
     headerNewer: '新しいバージョンへの更新',

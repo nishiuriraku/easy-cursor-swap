@@ -3,7 +3,10 @@
  * Marketplace の Featured ストリップ用カード。
  * 横並びレイアウト + ハイライトラベル + ダウンロードボタン。
  */
+import { useI18n } from '~/composables/useI18n'
 import type { MarketplaceEntry } from '~/types/marketplace'
+
+const { t } = useI18n()
 
 defineProps<{
   entry: MarketplaceEntry
@@ -18,8 +21,8 @@ function fmtNumber(n: number): string {
 }
 
 function highlightLabel(h: MarketplaceEntry['highlight']): string {
-  if (h === 'new') return '新着'
-  if (h === 'popular') return '人気'
+  if (h === 'new') return t('marketplace.featuredNew')
+  if (h === 'popular') return t('marketplace.featuredPopular')
   return ''
 }
 </script>
@@ -46,7 +49,7 @@ function highlightLabel(h: MarketplaceEntry['highlight']): string {
     </div>
     <button
       class="btn"
-      :aria-label="`${entry.name} をインストール`"
+      :aria-label="t('marketplace.installAria', { name: entry.name })"
       @click="emit('install', entry.id)"
     >
       <UiIcon name="Import" :size="13" />

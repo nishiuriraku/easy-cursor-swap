@@ -398,6 +398,10 @@ export default {
     lastSyncJustNow: 'Just synced',
     installedToast: 'Imported {name} into your library',
     installFailedToast: 'Failed to import {name}: {error}',
+    importBtn: 'Import',
+    featuredNew: 'New',
+    featuredPopular: 'Popular',
+    installAria: 'Install {name}',
   },
   conflict: {
     headerNewer: 'Update to a newer version',

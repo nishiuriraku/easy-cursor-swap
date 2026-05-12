@@ -8,7 +8,10 @@
  * という差分がある。
  */
 import { computed } from 'vue'
+import { useI18n } from '~/composables/useI18n'
 import type { MarketplaceEntry } from '~/types/marketplace'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   entry: MarketplaceEntry
@@ -49,7 +52,7 @@ const fmtDownloads = computed(() => props.entry.downloadCount.toLocaleString('ja
       </div>
       <div class="card-actions">
         <button class="btn primary" @click="emit('install', entry.id)">
-          <UiIcon name="Import" :size="13" />インポート
+          <UiIcon name="Import" :size="13" />{{ t('marketplace.importBtn') }}
         </button>
       </div>
     </div>
