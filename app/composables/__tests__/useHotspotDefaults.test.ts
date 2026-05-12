@@ -43,6 +43,13 @@ describe('initialHotspotFor', () => {
     expect(initialHotspotFor('Arrow', 0)).toEqual({ x: 0, y: 0 })
   })
 
+  it('primarySize < 4 のとき 4/primarySize は 1.0 にクランプされる', () => {
+    expect(initialHotspotFor('Arrow', 1)).toEqual({ x: 1, y: 1 })
+    expect(initialHotspotFor('Arrow', 2)).toEqual({ x: 1, y: 1 })
+    expect(initialHotspotFor('Arrow', 3)).toEqual({ x: 1, y: 1 })
+    expect(initialHotspotFor('Arrow', 4)).toEqual({ x: 1, y: 1 })
+  })
+
   it('未知ロールは primarySize > 0 なら 4/primarySize の ratio を返す', () => {
     expect(initialHotspotFor('UnknownRoleXyz', 256)).toEqual({ x: 4 / 256, y: 4 / 256 })
   })
