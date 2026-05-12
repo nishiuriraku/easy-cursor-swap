@@ -210,11 +210,11 @@ function ensureRoleBlobUrl(roleId: string, bytes: Uint8Array): string {
   return url
 }
 
-/** 現在の役割に紐付いた表示用 PNG URL。優先順: そのロールの assigned → 直近インポート → null */
+/** 現在の役割に紐付いた表示用 PNG URL。assigned が無いロールは null (既定アイコン表示)。 */
 const activePreviewUrl = computed<string | null>(() => {
   const a = assigned.value[activeRoleId.value]
   if (a?.primary) return ensureRoleBlobUrl(activeRoleId.value, a.primary)
-  return importedPreviewUrl.value
+  return null
 })
 
 /**
@@ -390,8 +390,6 @@ const importBusy = ref(false)
 const importMessage = ref<string | null>(null)
 /** 直近インポートで除去された SVG 要素/属性 (デバッグ表示) */
 const sanitizedRemovals = ref<string[]>([])
-/** プレビュー用 URL (Object URL or data URL) */
-const importedPreviewUrl = ref<string | null>(null)
 
 /**
  * 通知系メッセージの自動消去 (~3.5s)。
@@ -457,12 +455,6 @@ async function pickRasterFromPath(path: string, ext: string) {
  * `pickRasterFromPath` と `onFileChange` (HTML input フォールバック) で共有。
  */
 function applyImportedRaster(png: Uint8Array, primarySize: number) {
-  if (importedPreviewUrl.value && importedPreviewUrl.value.startsWith('blob:')) {
-    URL.revokeObjectURL(importedPreviewUrl.value)
-  }
-  importedPreviewUrl.value = URL.createObjectURL(
-    new Blob([png.slice().buffer], { type: 'image/png' }),
-  )
   filledRoles.add(activeRoleId.value)
   const map = filledSizesByRole.value[activeRoleId.value] ?? []
   if (!map.includes(activeSize.value)) {
@@ -492,12 +484,6 @@ async function pickCursorFromPath(picked: string) {
   if (!result) throw new Error('IPC 結果が空でした')
 
   const png = new Uint8Array(result.pngBytes)
-  if (importedPreviewUrl.value && importedPreviewUrl.value.startsWith('blob:')) {
-    URL.revokeObjectURL(importedPreviewUrl.value)
-  }
-  importedPreviewUrl.value = URL.createObjectURL(
-    new Blob([png.slice().buffer], { type: 'image/png' }),
-  )
 
   filledRoles.add(activeRoleId.value)
   const map = filledSizesByRole.value[activeRoleId.value] ?? []
@@ -903,10 +889,6 @@ function resetCreator() {
   metaVersion.value = '1.0.0'
   metaDescription.value = ''
   shadowEnabled.value = false
-  if (importedPreviewUrl.value && importedPreviewUrl.value.startsWith('blob:')) {
-    URL.revokeObjectURL(importedPreviewUrl.value)
-  }
-  importedPreviewUrl.value = null
   importMessage.value = null
   exportMessage.value = null
   exportProgress.value = null
@@ -1014,8 +996,6 @@ async function onFileChange(e: Event) {
       const { sanitized, removed } = sanitizeSvg(text)
       if (!sanitized) throw new Error('SVG が解析できません: ' + removed.join(', '))
       sanitizedRemovals.value = removed
-      const blob = new Blob([sanitized], { type: 'image/svg+xml' })
-      importedPreviewUrl.value = URL.createObjectURL(blob)
       // SVG → 256px PNG にラスタライズして Rust 側ビルダー用に保持
       pngBytes = await rasterizeSvgToPng(sanitized, 256)
       importMessage.value =
@@ -1035,7 +1015,6 @@ async function onFileChange(e: Event) {
         throw new Error('PNG ヘッダーが不正です (Magic Byte 不一致)')
       }
       pngBytes = fullBytes
-      importedPreviewUrl.value = URL.createObjectURL(file)
       importMessage.value = 'PNG をインポートしました'
     } else {
       throw new Error(`未対応の拡張子: .${ext} (PNG / SVG のみ受付)`)

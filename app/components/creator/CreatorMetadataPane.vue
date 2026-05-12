@@ -289,6 +289,7 @@ defineEmits<{
     grid-template-columns: 1fr 1fr;
   }
 
+  .metadata-grid > .prop-section:nth-child(1),
   .metadata-grid > .prop-section:nth-child(2) {
     grid-column: span 2;
   }
