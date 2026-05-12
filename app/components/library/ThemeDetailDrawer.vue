@@ -24,6 +24,7 @@ import type { ThemeCardData } from '~/types/theme'
 import { CURSOR_ROLES } from '~/components/icons/CursorIcons'
 import { useI18n } from '~/composables/useI18n'
 import type { RolePreviewDetail } from '~/composables/useThemePreviews'
+import type { CursorPreviewAsset } from '~/components/preview/CursorPreview.vue'
 
 const { t } = useI18n()
 
@@ -72,29 +73,24 @@ const activePreviewDetail = computed<RolePreviewDetail | null>(
 )
 
 /**
- * ホットスポットドット位置スタイル。
- *
- * `<img>` は親 `.td-rp-stage` に対して 64x64 の固定サイズ + place-items: center
- * で中央配置されている。ステージ寸法は CSS で 110px (高) なので、画像は
- * stage 中央の 64x64 領域を占める。ドットは画像のホットスポット位置に
- * 表示したいので、stage 中心からのオフセットを「画像表示サイズ × 比率」で算出。
- *
- * width/height = 0 (PNG デコード失敗) や詳細未取得時は中央 (50%/50%) フォールバック。
+ * `<CursorPreview>` に渡す asset。preview URL があれば static、なければ empty。
+ * Drawer では ANI 描画は行わない (PNG プレビューのみ)。
  */
-const HOT_DOT_DISPLAY_SIZE = 64
-const hotspotStyle = computed(() => {
-  const detail = activePreviewDetail.value
-  if (!detail) {
-    return { left: '50%', top: '50%' }
-  }
-  // detail.hotspot は ratio (0.0-1.0)。画像中心からの px オフセットに変換。
-  const offsetX = (detail.hotspot.x - 0.5) * HOT_DOT_DISPLAY_SIZE
-  const offsetY = (detail.hotspot.y - 0.5) * HOT_DOT_DISPLAY_SIZE
-  return {
-    left: `calc(50% + ${offsetX}px)`,
-    top: `calc(50% + ${offsetY}px)`,
-  }
+const activePreviewAsset = computed<CursorPreviewAsset>(() => {
+  const url = activePreviewUrl.value
+  if (url) return { kind: 'static', url, alt: activeRoleDef.value.jp }
+  return { kind: 'empty' }
 })
+
+/**
+ * `<CursorPreview>` に渡すホットスポット。詳細が未取得時は中央 (0.5, 0.5) フォールバック。
+ */
+const previewHotspot = computed(() => activePreviewDetail.value?.hotspot ?? { x: 0.5, y: 0.5 })
+
+/**
+ * 詳細が未取得 (width/height = 0 等) のときは dot を隠す。
+ */
+const hideHotDot = computed(() => !activePreviewDetail.value)
 
 function selectRole(id: string) {
   activeRole.value = id
@@ -179,18 +175,14 @@ const tags = computed<string[]>(() => {
           <div class="td-rolepreview">
             <div class="td-rp-stage">
               <template v-if="activeIncluded">
-                <img
-                  v-if="activePreviewUrl"
-                  :src="activePreviewUrl"
-                  :alt="activeRoleDef.jp"
-                  draggable="false"
-                  style="width: 64px; height: 64px; image-rendering: pixelated"
-                />
-                <CursorIcon v-else :role="activeRoleDef.id" :size="64" style="color: var(--fg)" />
-                <span
-                  v-if="activePreviewUrl && activePreviewDetail"
-                  class="td-rp-hot"
-                  :style="hotspotStyle"
+                <CursorPreview
+                  :asset="activePreviewAsset"
+                  :hotspot="previewHotspot"
+                  :role-id="activeRoleDef.id"
+                  :display-pct="100"
+                  :fallback-icon-size="64"
+                  :hide-dot="hideHotDot"
+                  class="td-rp-preview"
                 />
               </template>
               <div v-else class="td-rp-missing">
@@ -501,11 +493,8 @@ const tags = computed<string[]>(() => {
     repeating-conic-gradient(rgba(15, 20, 35, 0.035) 0% 25%, transparent 0% 50%) 0 / 12px 12px,
     rgba(255, 255, 255, 0.5);
 }
-.td-rp-hot {
-  @apply pointer-events-none absolute size-[7px] -translate-x-1/2 -translate-y-1/2 rounded-full;
-  border: 1.5px solid var(--accent);
-  background: rgba(124, 242, 212, 0.3);
-  box-shadow: 0 0 10px var(--accent);
+.td-rp-preview {
+  @apply size-[64px];
 }
 .td-rp-missing {
   @apply flex flex-col items-center gap-1.5 font-mono text-[11px] tracking-[0.08em];

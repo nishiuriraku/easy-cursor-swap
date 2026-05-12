@@ -1,15 +1,13 @@
 <script setup lang="ts">
 /**
- * .ani をアニメーション再生するサムネ / プレビュー要素。
+ * .ani をアニメーション再生する素の `<img>` ラッパー。
  *
- * - `editable=false` (既定): 画像表示のみ。
- * - `editable=true`: 内部に十字線 + dot を描画し、クリック/ドラッグで `hotspot-pick` / `hotspot-drag` emit。
- *   creator.vue は `fit` モードで親側の overlay にホットスポット表示を委譲しているため
- *   editable は使用しない (一括インポートプレビュー等で将来再利用するために残置)。
- * - `fit=true`: 親要素の 90% に合わせて伸縮 (`image-rendering: pixelated` で粗くスケール)。
- *   `width/height` props はフレームの内在ピクセル幅として残し、CSS で表示サイズだけ揃える。
+ * - `fit=true` (`<CursorPreview>` から呼ばれる主用途): 親要素を 100% に占めて表示する。
+ *   `image-rendering: pixelated` で粗くスケール。`width/height` props はフレームの内在ピクセル幅。
+ * - `fit=false` (既定): props.width/height をそのまま CSS サイズに使う (ヘッダーアイコン等の用途)。
+ *
+ * ホットスポット表示・編集は `<CursorPreview>` 側で行うため、本コンポーネントは持たない。
  */
-import { computed } from 'vue'
 import { useAniPlayer } from '~/composables/useAniPlayer'
 
 interface Props {
@@ -18,82 +16,26 @@ interface Props {
   durations: readonly number[]
   width: number
   height: number
-  editable?: boolean
-  hotspot?: { x: number; y: number } | null
   fit?: boolean
 }
 const props = withDefaults(defineProps<Props>(), {
-  editable: false,
-  hotspot: null,
   fit: false,
 })
-
-const emit = defineEmits<{
-  (e: 'hotspot-pick', value: { x: number; y: number }): void
-  (e: 'hotspot-drag', value: { x: number; y: number }): void
-  (e: 'hotspot-drag-end'): void
-}>()
 
 const player = useAniPlayer({
   framePngs: props.framePngs,
   sequence: props.sequence,
   perStepDurationsMs: props.durations,
 })
-
-const hotspotPercent = computed(() => {
-  if (!props.hotspot) return null
-  // hotspot は ratio (0.0-1.0) なので直接パーセント化する
-  return {
-    left: `${props.hotspot.x * 100}%`,
-    top: `${props.hotspot.y * 100}%`,
-  }
-})
-
-let dragging = false
-
-function pointToCoord(e: MouseEvent, el: HTMLElement): { x: number; y: number } {
-  const rect = el.getBoundingClientRect()
-  // ratio (0.0-1.0) で emit する
-  return {
-    x: Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)),
-    y: Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height)),
-  }
-}
-
-function onMouseDown(e: MouseEvent) {
-  if (!props.editable) return
-  dragging = true
-  const coord = pointToCoord(e, e.currentTarget as HTMLElement)
-  emit('hotspot-pick', coord)
-}
-function onMouseMove(e: MouseEvent) {
-  if (!props.editable || !dragging) return
-  const coord = pointToCoord(e, e.currentTarget as HTMLElement)
-  emit('hotspot-drag', coord)
-}
-function onMouseUp() {
-  if (!props.editable || !dragging) return
-  dragging = false
-  emit('hotspot-drag-end')
-}
 </script>
 
 <template>
   <div
     class="ani-thumb"
-    :class="{ editable, fit }"
+    :class="{ fit }"
     :style="fit ? undefined : { width: width + 'px', height: height + 'px' }"
-    @mousedown="onMouseDown"
-    @mousemove="onMouseMove"
-    @mouseup="onMouseUp"
-    @mouseleave="onMouseUp"
   >
     <img :src="player.currentImageUrl.value" :width="width" :height="height" alt="ani" />
-    <template v-if="editable && hotspotPercent">
-      <div class="crosshair-v" :style="{ left: hotspotPercent.left }" />
-      <div class="crosshair-h" :style="{ top: hotspotPercent.top }" />
-      <div class="dot" :style="{ left: hotspotPercent.left, top: hotspotPercent.top }" />
-    </template>
   </div>
 </template>
 
@@ -103,12 +45,9 @@ function onMouseUp() {
 .ani-thumb {
   @apply relative overflow-hidden;
 }
-.ani-thumb.editable {
-  @apply cursor-crosshair;
-}
 .ani-thumb.fit {
-  width: 90%;
-  height: 90%;
+  width: 100%;
+  height: 100%;
   aspect-ratio: 1 / 1;
 }
 .ani-thumb img {
@@ -118,18 +57,5 @@ function onMouseUp() {
   width: 100%;
   height: 100%;
   image-rendering: pixelated;
-}
-.crosshair-v {
-  @apply pointer-events-none absolute top-0 bottom-0 w-px;
-  background: rgba(255, 80, 80, 0.85);
-}
-.crosshair-h {
-  @apply pointer-events-none absolute left-0 right-0 h-px;
-  background: rgba(255, 80, 80, 0.85);
-}
-.dot {
-  @apply pointer-events-none absolute size-2 -translate-x-1/2 -translate-y-1/2 rounded-full;
-  background: rgba(255, 80, 80, 0.95);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
 }
 </style>

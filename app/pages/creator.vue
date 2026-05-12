@@ -24,7 +24,7 @@ import {
   type ResolvedAsset,
   type ParsedCursorpack,
 } from '~/composables/useBulkImport'
-import AniThumb from '~/components/creator/AniThumb.vue'
+import type { CursorPreviewAsset } from '~/components/preview/CursorPreview.vue'
 import BulkImportButton from '~/components/creator/BulkImportButton.vue'
 import BulkImportPreviewModal, {
   type ApplyPayload,
@@ -218,6 +218,27 @@ const activePreviewUrl = computed<string | null>(() => {
 })
 
 /**
+ * `<CursorPreview>` に渡す現在の asset 形。
+ * ANI フレームがあれば 'ani'、静止 PNG があれば 'static'、どちらもなければ 'empty'。
+ */
+const activePreviewAsset = computed<CursorPreviewAsset>(() => {
+  const frames = activeAniFrames.value
+  if (frames) {
+    const a = assigned.value[activeRoleId.value]
+    return {
+      kind: 'ani',
+      framePngs: frames.framePngs,
+      sequence: frames.sequence,
+      durations: frames.perStepDurationsMs,
+      nativeSize: a?.primarySize ?? activeSize.value,
+    }
+  }
+  const url = activePreviewUrl.value
+  if (url) return { kind: 'static', url, alt: activeRole.value.jp }
+  return { kind: 'empty' }
+})
+
+/**
  * 現在のロール + サイズで「表示・操作対象」のホットスポット (ratio)。
  * perSizeHotspot=ON かつ sized.hotspot=Some のとき sized 側を返す。
  */
@@ -297,13 +318,6 @@ function enableSizedOverride() {
   setAsset(id, { ...a, sized: nextSizedMap })
 }
 
-/**
- * `.bigpreview` 内で `<img>` が占める最大寸法 (CSS の `max-width`/`max-height` と一致)。
- * ホットスポットドットの位置とドラッグ範囲をこの「画像領域」に揃えるために使う。
- * `global.css` の `.bigpreview img` スタイルを変えたら同期すること。
- */
-const IMAGE_DISPLAY_PCT = 90
-
 /** アクティブロールに .ani フレームデータが存在する場合にそれを返す。 */
 const activeAniFrames = computed(() => {
   const id = activeRoleId.value
@@ -322,106 +336,6 @@ onBeforeUnmount(() => {
   for (const { url } of roleBlobCache.values()) URL.revokeObjectURL(url)
   roleBlobCache.clear()
 })
-
-// --- ホットスポットのドラッグ操作 ---
-const bigpreviewEl = ref<HTMLElement | null>(null)
-const hotspotDragging = ref(false)
-
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value))
-}
-
-function updateHotspotFromEvent(e: PointerEvent) {
-  const el = bigpreviewEl.value
-  if (!el) return
-  const rect = el.getBoundingClientRect()
-  // 画像は中央配置で 90% サイズなので、コンテナ左右に各 5% の余白がある。
-  // その内側 90% を ratio 0..1 にマッピングする。
-  const margin = (100 - IMAGE_DISPLAY_PCT) / 2 / 100 // 0.05
-  const innerLeft = rect.left + rect.width * margin
-  const innerTop = rect.top + rect.height * margin
-  const innerWidth = rect.width * (IMAGE_DISPLAY_PCT / 100)
-  const innerHeight = rect.height * (IMAGE_DISPLAY_PCT / 100)
-  const x = clamp((e.clientX - innerLeft) / innerWidth, 0, 1)
-  const y = clamp((e.clientY - innerTop) / innerHeight, 0, 1)
-  writeActiveHotspot({ x, y })
-}
-
-function onHotspotPointerDown(e: PointerEvent) {
-  if (e.button !== 0) return
-  hotspotDragging.value = true
-  const el = e.currentTarget as HTMLElement
-  el.setPointerCapture?.(e.pointerId)
-  el.focus({ preventScroll: true })
-  updateHotspotFromEvent(e)
-}
-
-function onHotspotPointerMove(e: PointerEvent) {
-  if (!hotspotDragging.value) return
-  updateHotspotFromEvent(e)
-}
-
-function onHotspotPointerUp(e: PointerEvent) {
-  if (!hotspotDragging.value) return
-  hotspotDragging.value = false
-  ;(e.currentTarget as Element).releasePointerCapture?.(e.pointerId)
-}
-
-/**
- * ビッグプレビューに focus がある状態で矢印キー / Home / End / PgUp / PgDn を
- * ハンドリングしてホットスポットを 1 px 単位で移動する。Shift 同時押しで 10 px。
- *
- * テキスト入力中の矢印操作と衝突しないよう、event.target が input/textarea のときは
- * 何もしない。bigpreviewEl 自身が tabindex=0 でフォーカス可能なので、
- * クリックやドラッグ後にこのハンドラが優先される。
- */
-function onHotspotKeydown(e: KeyboardEvent) {
-  const tag = (e.target as HTMLElement).tagName
-  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
-
-  const id = activeRoleId.value
-  const a = assigned.value[id]
-  if (!a) return
-
-  const px = e.shiftKey ? 10 : 1
-  const refSize = a.primarySize > 0 ? a.primarySize : activeSize.value
-  const step = refSize > 0 ? px / refSize : 0
-  // 読み取り元は activeHotspot (per-size 分岐済み)
-  let { x, y } = activeHotspot.value
-
-  switch (e.key) {
-    case 'ArrowLeft':
-      x -= step
-      break
-    case 'ArrowRight':
-      x += step
-      break
-    case 'ArrowUp':
-      y -= step
-      break
-    case 'ArrowDown':
-      y += step
-      break
-    case 'Home':
-      x = 0
-      break
-    case 'End':
-      x = 1
-      break
-    case 'PageUp':
-      y = 0
-      break
-    case 'PageDown':
-      y = 1
-      break
-    default:
-      return
-  }
-  e.preventDefault()
-  x = clamp(x, 0, 1)
-  y = clamp(y, 0, 1)
-  writeActiveHotspot({ x, y })
-}
 
 /**
  * 現在ロールのホットスポットを画像中央 (0.5, 0.5) に移動する。
@@ -478,6 +392,32 @@ const importMessage = ref<string | null>(null)
 const sanitizedRemovals = ref<string[]>([])
 /** プレビュー用 URL (Object URL or data URL) */
 const importedPreviewUrl = ref<string | null>(null)
+
+/**
+ * 通知系メッセージの自動消去 (~3.5s)。
+ *
+ * importMessage / exportMessage は成功・失敗を問わず Banner に出る短命トーストなので
+ * 一定時間で自動的に消えるようにする。ただし `failedApplyThemeId` が立っている間は
+ * 「再試行」ボタン経路を残すため exportMessage は消さない。
+ *
+ * セッターを直接ラップする代わりに watch で副作用として timer を仕掛けることで
+ * 既存の `importMessage.value = ...` 呼出を 1 行も書き換えずに済ませる。
+ */
+const TOAST_AUTO_DISMISS_MS = 3500
+let importMessageTimer: ReturnType<typeof setTimeout> | null = null
+let exportMessageTimer: ReturnType<typeof setTimeout> | null = null
+watch(importMessage, (msg) => {
+  if (importMessageTimer) {
+    clearTimeout(importMessageTimer)
+    importMessageTimer = null
+  }
+  if (msg !== null) {
+    importMessageTimer = setTimeout(() => {
+      importMessage.value = null
+      importMessageTimer = null
+    }, TOAST_AUTO_DISMISS_MS)
+  }
+})
 
 const fileInput = ref<HTMLInputElement | null>(null)
 
@@ -587,6 +527,23 @@ const exportBusy = ref(false)
 const exportMessage = ref<string | null>(null)
 /** Library 保存成功 + apply 失敗時の theme_id。retry ボタンの活性化と invokeTauri('apply_theme', { themeId }) 呼出に使う。 */
 const failedApplyThemeId = ref<string | null>(null)
+
+/**
+ * exportMessage も同様に自動消去する。
+ * failedApplyThemeId が残っている場合 (apply 失敗) は retry の UI 動線が必要なので残す。
+ */
+watch(exportMessage, (msg) => {
+  if (exportMessageTimer) {
+    clearTimeout(exportMessageTimer)
+    exportMessageTimer = null
+  }
+  if (msg !== null && failedApplyThemeId.value === null) {
+    exportMessageTimer = setTimeout(() => {
+      exportMessage.value = null
+      exportMessageTimer = null
+    }, TOAST_AUTO_DISMISS_MS)
+  }
+})
 
 interface ExportResult {
   theme_id: string
@@ -1229,57 +1186,18 @@ async function onFileChange(e: Event) {
 
           <div class="canvas-area">
             <div class="canvas-stage">
-              <!-- ビッグプレビュー (ホットスポット ドラッグ対応) -->
-              <div
-                ref="bigpreviewEl"
-                :class="['bigpreview', { dragging: hotspotDragging }]"
-                :title="t('creator.hotspotHint')"
-                tabindex="0"
-                @pointerdown="onHotspotPointerDown"
-                @pointermove="onHotspotPointerMove"
-                @pointerup="onHotspotPointerUp"
-                @pointercancel="onHotspotPointerUp"
-                @keydown="onHotspotKeydown"
-              >
-                <div class="crosshair-h" />
-                <div class="crosshair-v" />
-                <!--
-                  ホットスポット表示・操作は親 .bigpreview 側に一本化している
-                  (pointerdown/move/up + keydown + `.hot` ドット)。AniThumb は
-                  fit モードでアニメ表示だけを担当し、内部 overlay は使わない。
-                -->
-                <AniThumb
-                  v-if="activeAniFrames"
-                  :frame-pngs="activeAniFrames.framePngs"
-                  :sequence="activeAniFrames.sequence"
-                  :durations="activeAniFrames.perStepDurationsMs"
-                  :width="assigned[activeRoleId]?.primarySize ?? activeSize"
-                  :height="assigned[activeRoleId]?.primarySize ?? activeSize"
-                  fit
-                />
-                <img
-                  v-else-if="activePreviewUrl"
-                  :src="activePreviewUrl"
-                  :alt="activeRole.jp"
-                  draggable="false"
-                  style="width: 90%; height: 90%; image-rendering: pixelated; pointer-events: none"
-                />
-                <CursorIcon
-                  v-else
-                  :role="activeRole.id"
-                  :size="90"
-                  style="color: var(--fg); pointer-events: none"
-                />
-                <!--
-                  画像は中央配置で 90% サイズ。activeHotspot は ratio (0..1) なので
-                  コンテナ中央 ± (ratio - 0.5) × IMAGE_DISPLAY_PCT% でドットを配置。
-                -->
-                <div
-                  class="hot"
-                  :style="{
-                    left: `calc(50% + ${(activeHotspot.x - 0.5) * IMAGE_DISPLAY_PCT}%)`,
-                    top: `calc(50% + ${(activeHotspot.y - 0.5) * IMAGE_DISPLAY_PCT}%)`,
-                  }"
+              <!-- ビッグプレビュー (CursorPreview に委譲、メタコーナーは外側でオーバーレイ) -->
+              <div class="bigpreview-wrapper" :title="t('creator.hotspotHint')">
+                <CursorPreview
+                  :asset="activePreviewAsset"
+                  :hotspot="activeHotspot"
+                  :role-id="activeRole.id"
+                  :display-pct="90"
+                  editable
+                  :reference-px="assigned[activeRoleId]?.primarySize || activeSize"
+                  :fallback-icon-size="90"
+                  class="bigpreview"
+                  @update:hotspot="(h) => writeActiveHotspot(h)"
                 />
                 <div class="preview-meta tl">{{ activeSize }} × {{ activeSize }}</div>
                 <button
@@ -1466,9 +1384,16 @@ async function onFileChange(e: Event) {
     background 120ms ease,
     transform 120ms ease;
 }
+:where(html.light) .hotspot-center-btn {
+  /* ライトテーマでは黒地が浮くため、accent (#0fa885) の極淡背景に切替える。 */
+  background: rgba(15, 168, 133, 0.08);
+}
 .hotspot-center-btn:hover {
   background: rgba(124, 242, 212, 0.15);
   transform: scale(1.08);
+}
+:where(html.light) .hotspot-center-btn:hover {
+  background: rgba(15, 168, 133, 0.18);
 }
 
 .next-step-row {
@@ -1601,49 +1526,14 @@ async function onFileChange(e: Event) {
   }
 }
 
-.bigpreview {
-  @apply relative grid size-[220px] min-h-0 cursor-crosshair place-items-center rounded-2xl border border-line-hi;
+.bigpreview-wrapper {
+  @apply relative grid size-[220px] min-h-0 place-items-center rounded-2xl border border-line-hi;
   background:
     repeating-conic-gradient(rgba(255, 255, 255, 0.025) 0% 25%, transparent 0% 50%) 0 / 18px 18px,
     var(--bg-1);
   box-shadow: var(--shadow-2);
-  touch-action: none;
-  user-select: none;
 }
-.bigpreview.dragging .hot {
-  border-color: var(--accent-hi);
-  background: rgba(124, 242, 212, 0.4);
-  box-shadow:
-    0 0 16px var(--accent),
-    0 0 0 6px rgba(124, 242, 212, 0.18);
-}
-.bigpreview .hot {
-  @apply absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full;
-  border: 1.5px solid var(--accent);
-  background: rgba(124, 242, 212, 0.2);
-  box-shadow: 0 0 12px var(--accent);
-  transition:
-    box-shadow 120ms ease,
-    background 120ms ease;
-}
-.bigpreview .crosshair-h,
-.bigpreview .crosshair-v {
-  @apply absolute;
-  background: var(--accent-line);
-}
-.bigpreview .crosshair-h {
-  @apply inset-x-0 h-px;
-  top: 50%;
-}
-.bigpreview .crosshair-v {
-  @apply inset-y-0 w-px;
-  left: 50%;
-}
-.bigpreview:focus {
-  outline: 2px solid var(--accent-line);
-  outline-offset: -2px;
-}
-.bigpreview:focus:not(:focus-visible) {
-  outline: none;
+.bigpreview {
+  @apply size-full;
 }
 </style>
