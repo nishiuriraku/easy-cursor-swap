@@ -10,29 +10,25 @@
  * NOTE: 実際の画像アップロード / .cur ビルド / 署名生成は今回はスタブ。
  *       UI 構造とインタラクションのみ実装し、IPC 配線は後続タスクに委ねる。
  */
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref } from 'vue'
 import { CURSOR_ROLES, type CursorRoleDef } from '~/components/icons/CursorIcons'
-import { sanitizeSvg } from '~/composables/sanitizeSvg'
 import { invokeTauri } from '~/composables/useTauri'
+import { sanitizeSvg } from '~/composables/sanitizeSvg'
 import { useKeystore } from '~/composables/useKeystore'
 import { useI18n } from '~/composables/useI18n'
 import { useCreatorAssets } from '~/composables/useCreatorAssets'
 import type { Hotspot } from '~/composables/useCreatorAssets'
 import { initialHotspotFor } from '~/composables/useHotspotDefaults'
-import {
-  useBulkImport,
-  type ResolvedAsset,
-  type ParsedCursorpack,
-} from '~/composables/useBulkImport'
+import { useBulkImport } from '~/composables/useBulkImport'
+import { useCreatorImport } from '~/composables/useCreatorImport'
+import { useCreatorExport } from '~/composables/useCreatorExport'
+import { useCreatorBulkImportFlow } from '~/composables/useCreatorBulkImportFlow'
+import { useCreatorPickers } from '~/composables/useCreatorPickers'
 import type { CursorPreviewAsset } from '~/components/preview/CursorPreview.vue'
 import BulkImportButton from '~/components/creator/BulkImportButton.vue'
-import BulkImportPreviewModal, {
-  type ApplyPayload,
-} from '~/components/creator/BulkImportPreviewModal.vue'
+import BulkImportPreviewModal from '~/components/creator/BulkImportPreviewModal.vue'
 import NewThemeStartModal from '~/components/creator/NewThemeStartModal.vue'
-import SaveDestinationModal, {
-  type SaveSubmitPayload,
-} from '~/components/creator/SaveDestinationModal.vue'
+import SaveDestinationModal from '~/components/creator/SaveDestinationModal.vue'
 import ThemePickerModal from '~/components/library/ThemePickerModal.vue'
 import { useThemes } from '~/composables/useThemes'
 
@@ -145,12 +141,7 @@ const metaDescription = ref<string>('')
 
 // --- 一括インポート ---
 const bulkImport = useBulkImport()
-
-// プレビューモーダル制御
-const bulkModalOpen = ref(false)
-const bulkResolved = ref<ResolvedAsset[] | null>(null)
-const bulkCursorpack = ref<ParsedCursorpack | null>(null)
-const bulkSourceLabel = ref('')
+const pickers = useCreatorPickers()
 
 // 既存テーマ複製ピッカー
 const themePickerOpen = ref(false)
@@ -385,285 +376,12 @@ onMounted(async () => {
   }
 })
 
-// --- 画像インポート ---
-const importBusy = ref(false)
-const importMessage = ref<string | null>(null)
-/** 直近インポートで除去された SVG 要素/属性 (デバッグ表示) */
-const sanitizedRemovals = ref<string[]>([])
-
-/**
- * 通知系メッセージの自動消去 (~3.5s)。
- *
- * importMessage / exportMessage は成功・失敗を問わず Banner に出る短命トーストなので
- * 一定時間で自動的に消えるようにする。ただし `failedApplyThemeId` が立っている間は
- * 「再試行」ボタン経路を残すため exportMessage は消さない。
- *
- * セッターを直接ラップする代わりに watch で副作用として timer を仕掛けることで
- * 既存の `importMessage.value = ...` 呼出を 1 行も書き換えずに済ませる。
- */
-const TOAST_AUTO_DISMISS_MS = 3500
-let importMessageTimer: ReturnType<typeof setTimeout> | null = null
-let exportMessageTimer: ReturnType<typeof setTimeout> | null = null
-watch(importMessage, (msg) => {
-  if (importMessageTimer) {
-    clearTimeout(importMessageTimer)
-    importMessageTimer = null
-  }
-  if (msg !== null) {
-    importMessageTimer = setTimeout(() => {
-      importMessage.value = null
-      importMessageTimer = null
-    }, TOAST_AUTO_DISMISS_MS)
-  }
-})
+// --- 画像インポート / エクスポート / 一括インポートのフロー制御 ---
+// 詳細は composable に分離 (Phase 3c)。creator.vue は組み立てだけを担当する。
 
 const fileInput = ref<HTMLInputElement | null>(null)
 
-/** Tauri plugin-fs でファイルを読み込み、PNG / SVG として現在のロールに反映する。 */
-async function pickRasterFromPath(path: string, ext: string) {
-  const { readFile } = await import('@tauri-apps/plugin-fs')
-  const data = await readFile(path)
-  const bytes = data instanceof Uint8Array ? data : new Uint8Array(data)
-  if (ext === 'svg') {
-    const text = new TextDecoder().decode(bytes)
-    const { sanitized, removed } = sanitizeSvg(text)
-    if (!sanitized) throw new Error('SVG が解析できません: ' + removed.join(', '))
-    sanitizedRemovals.value = removed
-    const png = await rasterizeSvgToPng(sanitized, 256)
-    applyImportedRaster(png, 256)
-    importMessage.value =
-      removed.length > 0
-        ? `SVG を sanitize しました (除去: ${removed.length} 件)`
-        : `SVG をインポートしました`
-  } else {
-    if (
-      bytes.length < 8 ||
-      bytes[0] !== 0x89 ||
-      bytes[1] !== 0x50 ||
-      bytes[2] !== 0x4e ||
-      bytes[3] !== 0x47
-    ) {
-      throw new Error('PNG ヘッダーが不正です')
-    }
-    applyImportedRaster(bytes, 256)
-    importMessage.value = 'PNG をインポートしました'
-  }
-}
-
-/**
- * 取り込んだ raster バイト列を「現在の activeRole」に反映する共通ロジック。
- * `pickRasterFromPath` と `onFileChange` (HTML input フォールバック) で共有。
- */
-function applyImportedRaster(png: Uint8Array, primarySize: number) {
-  filledRoles.add(activeRoleId.value)
-  const map = filledSizesByRole.value[activeRoleId.value] ?? []
-  if (!map.includes(activeSize.value)) {
-    filledSizesByRole.value[activeRoleId.value] = [...map, activeSize.value]
-  }
-  // 新規ロールならデフォルト hotspot を当てる。既存ロールは現在の hotspot を維持。
-  const existing = assigned.value[activeRoleId.value]
-  const hotspot = existing?.hotspot ?? initialHotspotFor(activeRoleId.value, primarySize)
-  setAsset(activeRoleId.value, {
-    primary: png,
-    primarySize,
-    hotspot,
-    source: 'manual',
-  })
-}
-
-/** `.cur` / `.ico` ファイルをパスから直接 Rust 側でパースする (ダイアログを開かない版)。 */
-async function pickCursorFromPath(picked: string) {
-  const result = await invokeTauri<{
-    isCur: boolean
-    width: number
-    height: number
-    hotspot: { x: number; y: number }
-    pngBytes: number[]
-    availableSizes: number[]
-  }>('import_cursor_file', { path: picked })
-  if (!result) throw new Error('IPC 結果が空でした')
-
-  const png = new Uint8Array(result.pngBytes)
-
-  filledRoles.add(activeRoleId.value)
-  const map = filledSizesByRole.value[activeRoleId.value] ?? []
-  if (!map.includes(activeSize.value)) {
-    filledSizesByRole.value[activeRoleId.value] = [...map, activeSize.value]
-  }
-  // .cur/.ico に hotspot ratio が (0, 0) かつ新規ロールなら、初期値を当てる。
-  const isNewRole = !creatorAssets.hasAsset(activeRoleId.value)
-  const noEmbeddedHotspot = result.hotspot.x === 0 && result.hotspot.y === 0
-  const hotspot =
-    isNewRole && noEmbeddedHotspot
-      ? initialHotspotFor(activeRoleId.value, result.width)
-      : result.hotspot
-  setAsset(activeRoleId.value, {
-    primary: png,
-    primarySize: result.width,
-    hotspot,
-    source: 'manual',
-  })
-  const sizeList = result.availableSizes.length > 0 ? result.availableSizes.join('/') : '?'
-  const kind = result.isCur ? '.cur' : '.ico'
-  importMessage.value = `${kind} を取り込みました (${result.width}x${result.height}, 含解像度: ${sizeList})`
-}
-
-// --- パッケージエクスポート ---
-const exportBusy = ref(false)
-const exportMessage = ref<string | null>(null)
-/** Library 保存成功 + apply 失敗時の theme_id。retry ボタンの活性化と invokeTauri('apply_theme', { themeId }) 呼出に使う。 */
-const failedApplyThemeId = ref<string | null>(null)
-
-/**
- * exportMessage も同様に自動消去する。
- * failedApplyThemeId が残っている場合 (apply 失敗) は retry の UI 動線が必要なので残す。
- */
-watch(exportMessage, (msg) => {
-  if (exportMessageTimer) {
-    clearTimeout(exportMessageTimer)
-    exportMessageTimer = null
-  }
-  if (msg !== null && failedApplyThemeId.value === null) {
-    exportMessageTimer = setTimeout(() => {
-      exportMessage.value = null
-      exportMessageTimer = null
-    }, TOAST_AUTO_DISMISS_MS)
-  }
-})
-
-interface ExportResult {
-  theme_id: string
-  size_bytes: number
-  signed: boolean
-  key_id: string | null
-  applied: boolean
-  apply_error: string | null
-}
-
-/** ストリームエクスポート時の進捗状態 */
-interface BuildProgress {
-  buildId: string
-  stage: 'role' | 'package' | 'sign' | 'done' | 'cancelled' | 'error'
-  current: number
-  total: number
-  message: string | null
-}
-const exportProgress = ref<BuildProgress | null>(null)
-const currentBuildId = ref<string | null>(null)
-
-/** 進行中のエクスポートを中止する。Rust 側は次のチェックポイントで終了する。 */
-async function cancelExport() {
-  if (!currentBuildId.value) return
-  try {
-    await invokeTauri('cancel_build', { buildId: currentBuildId.value })
-  } catch {
-    // ignore
-  }
-}
-
-/**
- * SaveDestinationModal の submit を受けて Rust 側 export_cursorpack_streamed を呼ぶ。
- * destination ごとにトーストメッセージを切り替え、apply 失敗時は warning + retry。
- */
-async function executeSave(payload: SaveSubmitPayload) {
-  if (assignedRoleCount.value === 0) {
-    exportMessage.value = '少なくとも 1 役割に画像を割り当ててください'
-    return
-  }
-  if (!arrowAssigned.value) {
-    exportMessage.value = 'Arrow ロールは必須です'
-    return
-  }
-  exportBusy.value = true
-  exportMessage.value = null
-  exportProgress.value = null
-
-  let unlisten: (() => void) | null = null
-  try {
-    const buildId = `build-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    currentBuildId.value = buildId
-
-    try {
-      const { listen } = await import('@tauri-apps/api/event')
-      unlisten = await listen<BuildProgress>('build-progress', (e) => {
-        if (e.payload.buildId === buildId) exportProgress.value = e.payload
-      })
-    } catch {
-      // Web 開発時は購読をスキップ
-    }
-
-    const roles = toExportPayload(resample.value)
-
-    const destination =
-      payload.destination === 'file'
-        ? { kind: 'file', path: payload.filePath! }
-        : { kind: 'library', applyAfter: payload.destination === 'libraryAndApply' }
-
-    const result = await invokeTauri<ExportResult>('export_cursorpack_streamed', {
-      req: {
-        buildId,
-        nameJa: payload.effectiveName,
-        nameEn: metaNameEn.value || null,
-        author: metaAuthor.value || null,
-        version: metaVersion.value,
-        requiresOsShadow: shadowEnabled.value,
-        roles,
-        destination,
-        existingThemeId:
-          payload.overwriteExisting && sourceThemeId.value ? sourceThemeId.value : null,
-        sign: payload.sign,
-      },
-    })
-
-    if (!result) throw new Error('エクスポート結果が空でした')
-
-    if (result.apply_error) {
-      exportMessage.value = t('saveModal.toastAppliedFailed').replace('{error}', result.apply_error)
-      failedApplyThemeId.value = result.theme_id
-    } else if (result.applied) {
-      exportMessage.value = t('saveModal.toastSavedAndApplied')
-      failedApplyThemeId.value = null
-    } else if (payload.destination === 'file') {
-      exportMessage.value = t('saveModal.toastSavedFile').replace('{path}', payload.filePath!)
-      failedApplyThemeId.value = null
-    } else {
-      exportMessage.value = t('saveModal.toastSavedLibrary')
-      failedApplyThemeId.value = null
-    }
-  } catch (err) {
-    exportMessage.value = `エクスポート失敗: ${err instanceof Error ? err.message : String(err)}`
-  } finally {
-    if (unlisten) unlisten()
-    currentBuildId.value = null
-    exportBusy.value = false
-    setTimeout(() => {
-      if (!exportBusy.value) exportProgress.value = null
-    }, 3000)
-  }
-}
-
-/**
- * apply 失敗後の再試行 CTA。バナーから呼ばれる。
- * 失敗 ID をクリアして apply_theme を再度叩く。
- */
-async function retryApply() {
-  if (!failedApplyThemeId.value) return
-  const themeId = failedApplyThemeId.value
-  failedApplyThemeId.value = null
-  try {
-    await invokeTauri<void>('apply_theme', { themeId })
-    exportMessage.value = t('saveModal.toastSavedAndApplied')
-  } catch (err) {
-    exportMessage.value = `再試行失敗: ${err instanceof Error ? err.message : String(err)}`
-    failedApplyThemeId.value = themeId // 再再試行のため復元
-  }
-}
-
-function onToolbarSave() {
-  saveModalOpen.value = true
-}
-
-/** sanitized SVG 文字列 → 指定サイズの PNG バイト列 (Canvas 経由) */
+/** sanitized SVG 文字列 → 指定サイズの PNG バイト列 (Canvas 経由)。Canvas API 依存なのでここに残す。 */
 async function rasterizeSvgToPng(svgString: string, size: number): Promise<Uint8Array> {
   const blob = new Blob([svgString], { type: 'image/svg+xml' })
   const url = URL.createObjectURL(blob)
@@ -692,177 +410,87 @@ async function rasterizeSvgToPng(svgString: string, size: number): Promise<Uint8
   }
 }
 
-// --- 一括インポート ハンドラ ---
+const {
+  importBusy,
+  importMessage,
+  sanitizedRemovals,
+  applyImportedRaster,
+  pickRasterFromPath,
+  pickCursorFromPath,
+} = useCreatorImport({
+  creatorAssets,
+  activeRoleId,
+  activeSize,
+  filledRoles,
+  filledSizesByRole,
+  rasterizeSvgToPng,
+})
 
-/**
- * 統合エントリ。png/svg/cur/ico/ani/.cursorpack をまとめて選べるダイアログを開き、
- * 拡張子で内部分岐:
- *   - 単独 `.cursorpack`     → cursorpack 解析経路 (parseCursorpack)
- *   - 通常ファイル (複数可)   → bulk_resolve_assets 経路
- *   - 混在 / 複数 cursorpack  → 警告メッセージを表示し非サポート部分を除外
- *
- * フォルダ取込はネイティブダイアログ仕様で別経路 (`pickBulkFolder`) になる。
- */
+const {
+  exportBusy,
+  exportMessage,
+  failedApplyThemeId,
+  exportProgress,
+  currentBuildId,
+  cancelExport,
+  executeSave,
+  retryApply,
+} = useCreatorExport({
+  creatorAssets,
+  metaNameEn,
+  metaAuthor,
+  metaVersion,
+  sourceThemeId,
+  shadowEnabled,
+  resample,
+  t,
+})
+
+function onToolbarSave() {
+  saveModalOpen.value = true
+}
+
+const {
+  bulkModalOpen,
+  bulkResolved,
+  bulkCursorpack,
+  bulkSourceLabel,
+  dispatchBulkPaths,
+  runBulkResolve,
+  applyBulkImport,
+  cancelBulkImport,
+} = useCreatorBulkImportFlow({
+  bulkImport,
+  creatorAssets,
+  filledRoles,
+  filledSizesByRole,
+  sourceThemeId,
+  metaName,
+  metaNameEn,
+  metaAuthor,
+  metaVersion,
+  metaDescription,
+  saveModalOpen,
+  saveModalDefault,
+  importBusy,
+  importMessage,
+  sanitizedRemovals,
+  pickRasterFromPath,
+  pickCursorFromPath,
+})
+
+/** メイン取込ダイアログ → 拡張子 dispatch */
 async function pickBulkAuto() {
-  const { open } = await import('@tauri-apps/plugin-dialog')
-  const picked = await open({
-    multiple: true,
-    filters: [
-      {
-        name: 'Cursor assets / pack',
-        extensions: ['png', 'svg', 'cur', 'ico', 'ani', 'cursorpack'],
-      },
-    ],
-  })
-  if (!picked) return
-  const paths = Array.isArray(picked) ? picked : [picked]
+  const paths = await pickers.pickAssetFiles()
+  if (!paths) return
   await dispatchBulkPaths(paths)
 }
 
 /** フォルダから取込 (chevron サブメニュー / 新規作成モーダル経由)。 */
 async function pickBulkFolder() {
-  const { open } = await import('@tauri-apps/plugin-dialog')
-  const picked = await open({ directory: true })
-  if (!picked || typeof picked !== 'string') return
+  const picked = await pickers.pickFolder()
+  if (!picked) return
   await runBulkResolve([picked], false, `📁 ${picked}`)
-}
-
-/**
- * 拡張子分岐の本体。`pickBulkAuto` から、または将来のドラッグ&ドロップから呼ばれる想定。
- *
- * 設計判断:
- *  - 単一ファイル (1 件) で `.cursorpack` 以外 (= png/svg/cur/ico) の場合は、
- *    bulk preview を経由せず **現在編集中のロールに直接代入** する fast-path に流す。
- *    これは旧「画像 / カーソルを取込」ボタンの挙動を維持するためで、エディタ内で
- *    特定ロールを選んで素早く差し替えるワークフローを壊さない
- *  - 単一 `.ani` は static fast-path には乗せず、bulk preview 経路に通す
- *    (アニメ再生 + ホットスポット調整 UI が必要なため)
- *  - `.cursorpack` は他のファイルと一緒に取り込む意味的整合性が無い (パッケージ単位の取込なので)
- *    ため、混在時は通常ファイルのみ取り込み、cursorpack 部分は無視する
- *  - 複数 `.cursorpack` の同時取込もサポートしない (ロール衝突解決が複雑になるため)
- */
-async function dispatchBulkPaths(paths: string[]) {
-  // Fast-path: 1 件かつ非 cursorpack なら現在ロールに直接代入
-  if (paths.length === 1) {
-    const p = paths[0]!
-    const ext = p.split('.').pop()?.toLowerCase() ?? ''
-    if (ext === 'cur' || ext === 'ico') {
-      importBusy.value = true
-      importMessage.value = null
-      try {
-        await pickCursorFromPath(p)
-      } catch (err) {
-        importMessage.value = `失敗: ${err instanceof Error ? err.message : String(err)}`
-      } finally {
-        importBusy.value = false
-      }
-      return
-    }
-    if (ext === 'png' || ext === 'svg') {
-      importBusy.value = true
-      importMessage.value = null
-      sanitizedRemovals.value = []
-      try {
-        await pickRasterFromPath(p, ext)
-      } catch (err) {
-        importMessage.value = `失敗: ${err instanceof Error ? err.message : String(err)}`
-      } finally {
-        importBusy.value = false
-      }
-      return
-    }
-    // .cursorpack は下の bulk preview ロジックに fallthrough
-  }
-
-  const packs = paths.filter((p) => p.toLowerCase().endsWith('.cursorpack'))
-  const others = paths.filter((p) => !p.toLowerCase().endsWith('.cursorpack'))
-
-  if (packs.length === 1 && others.length === 0) {
-    try {
-      const parsed = await bulkImport.parseCursorpack(packs[0]!)
-      bulkCursorpack.value = parsed
-      bulkResolved.value = null
-      bulkSourceLabel.value = `📦 ${packs[0]!.split(/[\\/]/).pop()}`
-      bulkModalOpen.value = true
-      // `.cursorpack` を取り込んだ瞬間、編集対象のソースが入れ替わる。
-      // `?editPath` で引き継いだ UUID は無効になるのでクリア (SaveDestinationModal の
-      // 誤 overwrite 提案を防ぐ)。
-      sourceThemeId.value = null
-    } catch (err) {
-      importMessage.value = `cursorpack 取り込み失敗: ${err instanceof Error ? err.message : String(err)}`
-    }
-    return
-  }
-
-  if (packs.length >= 2) {
-    importMessage.value = '.cursorpack は 1 つだけ選択してください'
-    return
-  }
-
-  if (packs.length === 1 && others.length > 0) {
-    importMessage.value =
-      '.cursorpack は他のファイルと同時に取り込めません (.cursorpack 以外を取り込みました)'
-  }
-
-  if (others.length === 0) return
-  await runBulkResolve(others, false, `${others.length} 個のファイル`)
-}
-
-async function runBulkResolve(paths: string[], recursive: boolean, label: string) {
-  try {
-    const r = await bulkImport.resolveAssets(paths, recursive)
-    if (r.assets.length === 0) {
-      importMessage.value = '対応ファイルが見つかりません'
-      return
-    }
-    bulkResolved.value = r.assets
-    bulkCursorpack.value = null
-    bulkSourceLabel.value = label
-    bulkModalOpen.value = true
-    if (r.failures.length > 0) {
-      // 後で本格的な警告 UI に置換可能。現状はトースト風メッセージ。
-      importMessage.value = `${r.failures.length} 件のファイルをスキップしました`
-    }
-  } catch (err) {
-    importMessage.value = `一括インポート失敗: ${err instanceof Error ? err.message : String(err)}`
-  }
-}
-
-function applyBulkImport(payload: ApplyPayload) {
-  for (const { roleId, asset } of payload.roleAssets) {
-    setAsset(roleId, asset)
-    // filledSizesByRole も更新 (UI バッジ用)
-    const sizes = asset.sized ? Array.from(asset.sized.keys()) : [asset.primarySize]
-    filledSizesByRole.value = { ...filledSizesByRole.value, [roleId]: sizes }
-    filledRoles.add(roleId)
-  }
-
-  // メタデータ反映 (.cursorpack のみ)
-  if (payload.metadata && payload.metadataChoice !== 'keep') {
-    metaName.value = payload.metadata.nameJa ?? metaName.value
-    if (payload.metadataChoice === 'overwrite') {
-      metaNameEn.value = payload.metadata.nameEn ?? metaNameEn.value
-      metaAuthor.value = payload.metadata.author ?? metaAuthor.value
-      metaVersion.value = payload.metadata.version ?? metaVersion.value
-      metaDescription.value = payload.metadata.description ?? metaDescription.value
-    }
-  }
-
-  bulkModalOpen.value = false
-  importMessage.value = `${payload.roleAssets.length} 件のロールを適用しました`
-
-  // ✓ 「すぐシステムに反映」がチェックされていれば SaveDestinationModal を
-  // Library+Apply 既定で開く。ユーザーは [保存] を押すだけで適用まで進める。
-  if (payload.applyImmediately) {
-    saveModalDefault.value = 'libraryAndApply'
-    saveModalOpen.value = true
-  }
-}
-
-function cancelBulkImport() {
-  bulkModalOpen.value = false
-  bulkResolved.value = null
-  bulkCursorpack.value = null
 }
 
 /**
