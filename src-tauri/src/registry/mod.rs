@@ -225,6 +225,83 @@ impl RegistryManager {
         Ok(())
     }
 
+    /// 指定テーマディレクトリを指す `HKCU\Control Panel\Cursors\Schemes` 値を削除する。
+    ///
+    /// テーマ削除時に呼ばれ、Windows のマウスのプロパティ → ポインター → "デザイン"
+    /// ドロップダウンに削除済みテーマのスキーム名が残り続ける問題を解消する。
+    ///
+    /// 「テーマを指す」の判定は [`scheme_is_app_managed`] を再利用する: スキームの
+    /// 非空パスが **すべて** `<theme_dir>` 配下を指す場合に、EasyCursorSwap が
+    /// `register_scheme` で書いたエントリとみなして削除する。1 つでも別ディレクトリ
+    /// (Windows 既定 / 他テーマ) を含むスキームはユーザー手動編集の可能性があるため
+    /// 触らない (= 巻き添え削除を防ぐ)。
+    ///
+    /// パス比較は ASCII 小文字化済みの prefix に対する `starts_with` で行うため、
+    /// 末尾にパス区切り `\` を必ず付けて兄弟ディレクトリの誤検出を防ぐ。
+    ///
+    /// 戻り値: 削除に成功した Schemes 値の数。Schemes キー自体が存在しない場合は
+    /// `Ok(0)` (= 成功扱い: そもそも掃除する対象がない)。
+    pub fn unregister_schemes_for_theme(theme_dir: &std::path::Path) -> AppResult<usize> {
+        use winreg::enums::*;
+        use winreg::RegKey;
+
+        let raw = theme_dir.to_string_lossy().to_lowercase();
+        if raw.is_empty() {
+            return Ok(0);
+        }
+        let mut prefix_lower = raw;
+        if !prefix_lower.ends_with('\\') && !prefix_lower.ends_with('/') {
+            prefix_lower.push('\\');
+        }
+
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let schemes_key = match hkcu
+            .open_subkey_with_flags("Control Panel\\Cursors\\Schemes", KEY_READ | KEY_WRITE)
+        {
+            Ok(k) => k,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(0),
+            Err(e) => {
+                return Err(AppError::Registry(format!(
+                    "Schemes キーを開けません: {}",
+                    e
+                )))
+            }
+        };
+
+        // 列挙中に削除すると挙動が崩れる winreg もあるので、一旦 (name, value) を
+        // 集めてから走査する。
+        let entries: Vec<(String, String)> = schemes_key
+            .enum_values()
+            .filter_map(|r| r.ok())
+            .filter_map(|(name, _)| {
+                schemes_key
+                    .get_value::<String, _>(&name)
+                    .ok()
+                    .map(|v| (name, v))
+            })
+            .collect();
+
+        let mut removed = 0usize;
+        for (name, value) in entries {
+            let scheme = parse_scheme_value(&name, &value);
+            if scheme_is_app_managed(&scheme, &prefix_lower) {
+                match schemes_key.delete_value(&name) {
+                    Ok(()) => {
+                        removed += 1;
+                        tracing::info!(
+                            "Schemes から '{}' を削除 (テーマディレクトリ削除に伴うクリーンアップ)",
+                            name
+                        );
+                    }
+                    Err(e) => {
+                        tracing::warn!("Schemes 値 '{}' の削除に失敗: {}", name, e);
+                    }
+                }
+            }
+        }
+        Ok(removed)
+    }
+
     /// Windows 既定カーソルにリセットする（パニックボタン）
     pub fn reset_to_windows_default() -> AppResult<()> {
         use winreg::enums::*;

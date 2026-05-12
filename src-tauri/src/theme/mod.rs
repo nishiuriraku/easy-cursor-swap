@@ -1184,18 +1184,43 @@ impl ThemeManager {
 
     /// 指定 ID のテーマディレクトリ (`~/.custom_cursors/<UUID>/`) を完全削除する。
     ///
-    /// アクティブテーマを削除した場合、レジストリ側は EasyCursorSwap が書いたパスが
-    /// ファイル不在になるが Windows は読めない値で既定にフォールバックするので追加
-    /// cleanup は不要。呼び出し側は config.active_theme_id を None に戻す責任を持つ。
+    /// アクティブテーマを削除した場合、`HKCU\Control Panel\Cursors` (現在値) 側は
+    /// パスがファイル不在になっても Windows が既定にフォールバックするので触らない。
+    /// 一方、`HKCU\Control Panel\Cursors\Schemes` (= マウスのプロパティ → ポインター →
+    /// "デザイン" ドロップダウンの保存済みスキーム一覧) には `apply_theme` 時に
+    /// `RegistryManager::register_scheme` で書き込んだエントリが残るため、ここで
+    /// 明示的にクリーンアップする (best-effort: 失敗しても削除自体は成功扱い)。
+    ///
+    /// 呼び出し側は config.active_theme_id を None に戻す責任を持つ。
     pub fn delete_theme(id: Uuid) -> AppResult<()> {
         use crate::config::ConfigManager;
         use crate::errors::AppError;
+        use crate::registry::RegistryManager;
         let cursors_dir = ConfigManager::cursors_dir()?;
         let theme_dir = cursors_dir.join(id.to_string());
         if !theme_dir.exists() {
             return Err(AppError::Theme(format!("テーマ {} が見つかりません", id)));
         }
         std::fs::remove_dir_all(&theme_dir)?;
+
+        // Windows のマウスのプロパティの "デザイン" に削除済みテーマが残らないよう、
+        // このテーマディレクトリを指す Schemes 値を掃除する。ベストエフォート扱い:
+        // 失敗してもファイル削除自体は成功しているのでエラーは伝播させない。
+        match RegistryManager::unregister_schemes_for_theme(&theme_dir) {
+            Ok(n) if n > 0 => {
+                tracing::info!(
+                    "Schemes から {} 件のテーマ参照を削除しました (theme={})",
+                    n,
+                    id
+                )
+            }
+            Ok(_) => {}
+            Err(e) => tracing::warn!(
+                "Schemes クリーンアップに失敗 (ファイル削除自体は成功): {}",
+                e
+            ),
+        }
+
         tracing::info!("テーマ {} を削除しました", id);
         Ok(())
     }

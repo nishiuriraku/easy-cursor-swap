@@ -291,6 +291,33 @@ mod tests {
         assert!(!scheme_is_app_managed(&scheme, prefix));
     }
 
+    /// テーマ削除時のスキームクリーンアップでは、アプリ全体ではなく **個別テーマ
+    /// ディレクトリ** を prefix にして「そのテーマを指すスキーム」だけを抽出する。
+    /// 同じ pure 関数を異なる粒度の prefix で使い回せることを保証する。
+    #[test]
+    fn scheme_is_app_managed_matches_per_theme_subdir() {
+        let theme_prefix = "c:\\users\\me\\.custom_cursors\\11111111-1111-1111-1111-111111111111\\";
+        let scheme = parse_scheme_value(
+            "EasyCursorSwap - ThemeOne",
+            "C:\\Users\\me\\.custom_cursors\\11111111-1111-1111-1111-111111111111\\arrow.cur,\
+             C:\\Users\\me\\.custom_cursors\\11111111-1111-1111-1111-111111111111\\ibeam.cur",
+        );
+        assert!(scheme_is_app_managed(&scheme, theme_prefix));
+    }
+
+    /// 別テーマ UUID 配下を指すスキームは、対象テーマの prefix では一致しない
+    /// (= 削除対象から除外される) ことを保証する。テーマ A 削除でテーマ B の
+    /// スキームを巻き添えで消さないための回帰テスト。
+    #[test]
+    fn scheme_is_app_managed_excludes_other_theme_subdirs() {
+        let theme_prefix = "c:\\users\\me\\.custom_cursors\\11111111-1111-1111-1111-111111111111\\";
+        let scheme = parse_scheme_value(
+            "Other",
+            "C:\\Users\\me\\.custom_cursors\\22222222-2222-2222-2222-222222222222\\arrow.cur",
+        );
+        assert!(!scheme_is_app_managed(&scheme, theme_prefix));
+    }
+
     #[test]
     fn parse_scheme_value_trims_whitespace_and_counts_correctly() {
         let scheme = parse_scheme_value("Spaced", " C:\\a.cur ,  ,C:\\c.cur,,,,,,,,,,,,,,");
