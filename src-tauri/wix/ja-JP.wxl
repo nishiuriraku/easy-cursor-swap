@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WixLocalization Culture="ja-jp" xmlns="http://schemas.microsoft.com/wix/2006/localization">
+  <String Id="TauriLanguage">1041</String>
+  <String Id="TauriCodepage">932</String>
+  <String Id="LaunchApp">EasyCursorSwap を起動</String>
+  <String Id="DowngradeErrorMessage">既に新しいバージョンの EasyCursorSwap がインストールされています。</String>
+  <String Id="PathEnvVarFeature">EasyCursorSwap の実行ファイルのインストール先を PATH 環境変数に追加します。これにより、任意の場所から EasyCursorSwap を起動できるようになります。</String>
+  <String Id="InstallAppFeature">EasyCursorSwap をインストールします。</String>
+</WixLocalization>

@@ -42,7 +42,7 @@
       {
         "ext": ["cursorpack"],
         "name": "EasyCursorSwap Theme Pack",
-        "description": "EasyCursorSwap カーソルテーマパッケージ",
+        "description": "EasyCursorSwap Theme Pack",
         "role": "Editor",
         "mimeType": "application/x-cursorpack"
       }
@@ -59,7 +59,12 @@
         "type": "embedBootstrapper"
       },
       "wix": {
-        "language": ["ja-JP", "en-US"],
+        "language": {
+          "en-US": {},
+          "ja-JP": {
+            "localePath": "wix/ja-JP.wxl"
+          }
+        },
         "fragmentPaths": [],
         "componentRefs": [],
         "featureRefs": [],
