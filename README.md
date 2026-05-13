@@ -176,15 +176,22 @@ See [docs/key_rotation.md](docs/key_rotation.md) if you need to rotate your sign
 
 ## Contributing
 
-Pull requests are welcome. Before submitting:
+Pull requests are welcome. See **[CONTRIBUTING.md](CONTRIBUTING.md)** for the full workflow, but in short:
 
-1. Run the verification gate: `cargo check` + `cargo test` + `npx tauri build`
+1. Run the verification gate: `bash scripts/verify-gate.sh`
 2. Keep i18n keys in parity: run `node scripts/check-i18n.mjs` (must exit 0)
 3. Follow the coding conventions in [CLAUDE.md](CLAUDE.md):
    - Rust comments in Japanese
    - Vue: Composition API + `<script setup>`
    - CSS: Tailwind v4 utility classes (see `app/assets/css/tailwind.css`)
    - No `v-html` (XSS prevention)
+
+## Community
+
+- [Support and questions](SUPPORT.md) — where to ask
+- [Code of Conduct](CODE_OF_CONDUCT.md) — Contributor Covenant 2.1
+- [Security policy](SECURITY.md) — vulnerability reporting via GitHub Private Vulnerability Reporting
+- [Changelog](CHANGELOG.md) — release notes (Keep a Changelog format)
 
 ## License
 
