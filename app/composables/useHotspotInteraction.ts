@@ -16,14 +16,14 @@ function clamp01(value: number): number {
  * pointer の clientX/clientY を、コンテナ内に displayPct% で中央配置された画像領域の
  * ratio (0..1) に変換する。画像領域の外側はクランプ。
  *
- * - コンテナ幅 200px / displayPct=90 → 内側 180px (左右各 10px の余白) を ratio 0..1 にマップ。
+ * - コンテナ幅 200px / displayPct=80 → 内側 160px (左右各 20px の余白) を ratio 0..1 にマップ。
  */
 export function pointerToHotspotRatio(
   e: { clientX: number; clientY: number },
   rect: DOMRect,
   displayPct: number,
 ): Hotspot {
-  const margin = (100 - displayPct) / 200 // 90 → 0.05
+  const margin = (100 - displayPct) / 200 // 80 → 0.10
   const innerLeft = rect.left + rect.width * margin
   const innerTop = rect.top + rect.height * margin
   const innerWidth = rect.width * (displayPct / 100)

@@ -2,10 +2,10 @@ import { describe, it, expect } from 'vitest'
 import { pointerToHotspotRatio, applyKeyboardNudge } from '../useHotspotInteraction'
 
 describe('pointerToHotspotRatio', () => {
-  // 200×200 のコンテナ、displayPct=90 → 内側 180×180 が画像領域
-  // 左上の余白は各 10px (5% × 200)
+  // 200×200 のコンテナ、displayPct=80 → 内側 160×160 が画像領域
+  // 左上の余白は各 20px (10% × 200)
   const rect = { left: 0, top: 0, width: 200, height: 200 } as DOMRect
-  const displayPct = 90
+  const displayPct = 80
 
   it('画像領域の中心は (0.5, 0.5)', () => {
     const r = pointerToHotspotRatio({ clientX: 100, clientY: 100 }, rect, displayPct)
@@ -13,14 +13,14 @@ describe('pointerToHotspotRatio', () => {
     expect(r.y).toBeCloseTo(0.5, 5)
   })
 
-  it('画像領域の左上端 (10px,10px) は (0, 0)', () => {
-    const r = pointerToHotspotRatio({ clientX: 10, clientY: 10 }, rect, displayPct)
+  it('画像領域の左上端 (20px,20px) は (0, 0)', () => {
+    const r = pointerToHotspotRatio({ clientX: 20, clientY: 20 }, rect, displayPct)
     expect(r.x).toBeCloseTo(0, 5)
     expect(r.y).toBeCloseTo(0, 5)
   })
 
-  it('画像領域の右下端 (190px,190px) は (1, 1)', () => {
-    const r = pointerToHotspotRatio({ clientX: 190, clientY: 190 }, rect, displayPct)
+  it('画像領域の右下端 (180px,180px) は (1, 1)', () => {
+    const r = pointerToHotspotRatio({ clientX: 180, clientY: 180 }, rect, displayPct)
     expect(r.x).toBeCloseTo(1, 5)
     expect(r.y).toBeCloseTo(1, 5)
   })

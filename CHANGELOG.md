@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- _Nothing yet._
+- Creator のビッグプレビュー描画倍率を 90% → 80% に変更し、ホットスポット編集領域の周囲余白を広げた。
 
 ### Deprecated
 

@@ -790,7 +790,7 @@ async function onFileChange(e: Event) {
                   :asset="activePreviewAsset"
                   :hotspot="activeHotspot"
                   :role-id="activeRole.id"
-                  :display-pct="90"
+                  :display-pct="80"
                   editable
                   :reference-px="assigned[activeRoleId]?.primarySize || activeSize"
                   :fallback-icon-size="90"
