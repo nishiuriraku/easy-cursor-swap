@@ -52,10 +52,10 @@ const player = useAniPlayer({
 }
 .ani-thumb img {
   @apply pointer-events-none select-none;
+  image-rendering: pixelated;
 }
 .ani-thumb.fit img {
   width: 100%;
   height: 100%;
-  image-rendering: pixelated;
 }
 </style>

@@ -67,8 +67,8 @@ const conflictTitle = computed(() => {
         :frame-pngs="aniFramesU8"
         :sequence="aniData.sequence"
         :durations="aniData.perStepDurationsMs"
-        :width="32"
-        :height="32"
+        :width="48"
+        :height="48"
       />
       <img v-else-if="previewUrl" :src="previewUrl" :alt="roleId" />
       <span v-else class="dim">{{ t('bulkImport.emptyRole') }}</span>
