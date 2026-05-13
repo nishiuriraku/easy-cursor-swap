@@ -26,6 +26,13 @@ interface Props {
   /** 既に割り当て済みのロール (上書き判定用)。 */
   existingRoles: Set<string>
   sourceLabel: string
+  /**
+   * Creator ページで現在フォーカスされているロール ID。
+   * 単発ファイルインポート時のフォールバック先として使う
+   * (例: `1.cur` 等のロール名にマッチしないファイル名でも、
+   * ユーザーが選んでいるロールへ直接割り当てる)。
+   */
+  activeRoleId: string
 }
 const props = defineProps<Props>()
 const emit = defineEmits<{
@@ -132,6 +139,23 @@ watch(
           aniFramesU8: toAniFramesU8(fakeAsset),
         })
       }
+      return
+    }
+
+    // 単発ファイル fast-path: ファイル名が `1.cur` 等 alias 辞書にマッチしない場合でも、
+    // ユーザーが Creator で選んでいる activeRoleId に直接割り当てる。
+    // 複数ファイル時は従来通り fuzzy match を走らせる (alias による役割推定が活きるため)。
+    //
+    // TODO(USER): props.resolved の長さが 1 のときの分岐を実装してください。
+    //   - props.resolved[0] を props.activeRoleId に割り当てる PendingMatch を 1 件 push
+    //   - confidence は 1.0 を採用 (ユーザー本人がロールを選んだ状態でドロップしているため)
+    //   - 既存ロールへの上書きは props.existingRoles と protectExisting.value を見て
+    //     conflict = 'overwrite-existing' / decision = 'skip' or 'apply' を決める
+    //     (cursorpack 経路 L124-130 と同じパターン)
+    //   - previewUrl / aniFramesU8 は makePreview / toAniFramesU8 を再利用
+    //   - 完了後は早期 return で通常マッチ経路をスキップする
+    if (props.resolved && props.resolved.length === 1) {
+      // ↓ ここに 8〜12 行で実装してください
       return
     }
 

@@ -101,6 +101,7 @@ const imageStyle = computed(() => ({
       :height="asset.nativeSize"
       fit
       class="cp-image"
+      :style="imageStyle"
     />
     <img
       v-else-if="asset.kind === 'static'"

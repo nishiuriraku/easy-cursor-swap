@@ -875,6 +875,7 @@ async function onFileChange(e: Event) {
         :cursorpack="bulkCursorpack"
         :existing-roles="existingRolesSet"
         :source-label="bulkSourceLabel"
+        :active-role-id="activeRoleId"
         @apply="applyBulkImport"
         @cancel="cancelBulkImport"
       />
