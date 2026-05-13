@@ -10,7 +10,9 @@
 //!   cargo run --manifest-path src-tauri/Cargo.toml --bin build_sample_packs
 
 use app_lib::cursor::{build_cur_from_png, ResizeMethod};
-use app_lib::theme::types::{CursorDefinition, Hotspot, LocalizedString, Ratio01, ThemeMetadata};
+use app_lib::theme::types::{
+    CursorDefinition, Hotspot, LocalizedString, Ratio01, ThemeMetadata, ThemeSource,
+};
 use app_lib::theme::ThemeManager;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -124,6 +126,7 @@ fn build_one(
         min_app_version: None,
         signature: None,
         tags: Vec::new(),
+        source: ThemeSource::Local,
     };
 
     let output_path = output_dir.join(format!("{}.cursorpack", folder));

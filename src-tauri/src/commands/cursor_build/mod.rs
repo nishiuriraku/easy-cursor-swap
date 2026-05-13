@@ -86,6 +86,7 @@ pub fn export_cursorpack(req: ExportCursorpackRequest) -> Result<ExportResult, A
         min_app_version: None,
         signature: None,
         tags: Vec::new(),
+        source: crate::theme::types::ThemeSource::Local,
     };
 
     // 3) 署名 (sign=true の場合)。sign.rs に共通化済み。
@@ -280,6 +281,7 @@ mod tests {
             min_app_version: None,
             signature: None,
             tags: Vec::new(),
+            source: crate::theme::types::ThemeSource::Local,
         };
         let target_id = metadata.id;
         let cursors: HashMap<String, Vec<u8>> = HashMap::new();

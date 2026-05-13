@@ -120,6 +120,28 @@ pub struct AniFrameData {
     pub is_legacy_raw_dib: bool,
 }
 
+/// テーマソース種別。
+///
+/// - `Local`: ユーザーが作成した、または `.cursorpack` を手動で取り込んだテーマ (default)
+/// - `Marketplace`: 公式インデックス (`marketplace_install`) 経由で取得したテーマ。
+///   UI と `repackage_theme` IPC が編集 / エクスポートをガードする。
+///
+/// `Deserialize` で未知の値は `Local` にフォールバックする (forward-compat)。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ThemeSource {
+    Marketplace,
+    /// `#[serde(other)]` で未知の値 (将来追加されるソース種別など) を Local にフォールバック。
+    /// この属性は必ず enum の最後のバリアントに付ける必要がある (serde 仕様)。
+    #[default]
+    #[serde(other)]
+    Local,
+}
+
+fn is_local_source(s: &ThemeSource) -> bool {
+    matches!(s, ThemeSource::Local)
+}
+
 /// テーマメタデータ (theme.json のスキーマ)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ThemeMetadata {
@@ -161,6 +183,11 @@ pub struct ThemeMetadata {
     /// 旧スキーマとの互換のため `serde(default)` で空配列にフォールバック。
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
+    /// テーマソース種別。`marketplace` の場合 UI と repackage_theme が編集/エクスポートをガード。
+    /// 旧スキーマとの互換のため `serde(default)` で `Local` にフォールバック。Local の場合は
+    /// JSON に書き出さない (`skip_serializing_if`) ことで旧形式の theme.json と完全互換。
+    #[serde(default, skip_serializing_if = "is_local_source")]
+    pub source: ThemeSource,
 }
 
 /// 多言語対応文字列
@@ -611,5 +638,85 @@ mod tests {
         let copied = clone_with_suffix(&original, "");
         assert_eq!(copied.get("ja"), "日本語名");
         assert_eq!(copied.get("en"), "English Name");
+    }
+
+    #[test]
+    fn theme_source_defaults_to_local() {
+        let s = ThemeSource::default();
+        assert!(matches!(s, ThemeSource::Local));
+    }
+
+    #[test]
+    fn theme_source_serializes_lowercase() {
+        assert_eq!(
+            serde_json::to_string(&ThemeSource::Local).unwrap(),
+            r#""local""#
+        );
+        assert_eq!(
+            serde_json::to_string(&ThemeSource::Marketplace).unwrap(),
+            r#""marketplace""#
+        );
+    }
+
+    #[test]
+    fn theme_source_unknown_value_falls_back_to_local() {
+        let s: ThemeSource = serde_json::from_str(r#""future_value""#).unwrap();
+        assert!(matches!(s, ThemeSource::Local));
+    }
+
+    #[test]
+    fn theme_metadata_source_defaults_when_missing() {
+        let json = r#"{
+            "schema_version": 1,
+            "id": "00000000-0000-0000-0000-000000000000",
+            "name": "Test",
+            "version": "1.0.0",
+            "created_at": "2026-05-14T00:00:00Z",
+            "requires_os_shadow": false,
+            "cursors": {}
+        }"#;
+        let m: ThemeMetadata = serde_json::from_str(json).unwrap();
+        assert!(matches!(m.source, ThemeSource::Local));
+    }
+
+    #[test]
+    fn theme_metadata_source_marketplace_round_trips() {
+        let json = r#"{
+            "schema_version": 1,
+            "id": "00000000-0000-0000-0000-000000000000",
+            "name": "Test",
+            "version": "1.0.0",
+            "created_at": "2026-05-14T00:00:00Z",
+            "requires_os_shadow": false,
+            "cursors": {},
+            "source": "marketplace"
+        }"#;
+        let m: ThemeMetadata = serde_json::from_str(json).unwrap();
+        assert!(matches!(m.source, ThemeSource::Marketplace));
+        let back = serde_json::to_string(&m).unwrap();
+        assert!(back.contains(r#""source":"marketplace""#));
+    }
+
+    #[test]
+    fn theme_metadata_source_local_is_omitted_in_serialization() {
+        let m = ThemeMetadata {
+            schema_version: 1,
+            id: Uuid::nil(),
+            name: LocalizedString::Simple("T".into()),
+            version: "1.0.0".into(),
+            created_at: "2026-05-14T00:00:00Z".into(),
+            requires_os_shadow: false,
+            cursors: HashMap::new(),
+            author: None,
+            license: None,
+            homepage: None,
+            description: None,
+            min_app_version: None,
+            signature: None,
+            tags: Vec::new(),
+            source: ThemeSource::Local,
+        };
+        let json = serde_json::to_string(&m).unwrap();
+        assert!(!json.contains("source"), "Local は省略されるべき: {json}");
     }
 }

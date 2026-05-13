@@ -641,6 +641,7 @@ impl ThemeManager {
             min_app_version: None,
             signature: None,
             tags: Vec::new(),
+            source: crate::theme::types::ThemeSource::Local,
         };
 
         if let Some(parent) = output_path.parent() {
@@ -1293,6 +1294,7 @@ mod tests {
             min_app_version: None,
             signature: None,
             tags: Vec::new(),
+            source: crate::theme::types::ThemeSource::Local,
         };
         let cursors: HashMap<String, Vec<u8>> = HashMap::new();
 
@@ -1347,6 +1349,7 @@ mod tests {
             min_app_version: None,
             signature: None,
             tags: Vec::new(),
+            source: crate::theme::types::ThemeSource::Local,
         };
         // ani は "RIFF" マジックで始まるダミー、cur は "CUR1" ダミー
         let mut cursors: HashMap<String, Vec<u8>> = HashMap::new();
