@@ -100,14 +100,15 @@ easy-cursor-swap/
 ├── src-tauri/                  # Tauri + Rust backend
 │   ├── src/
 │   │   ├── main.rs             # Entry point: tray, dark-mode watcher, health check
-│   │   ├── lib.rs              # Module declarations
-│   │   ├── commands.rs         # Tauri IPC command handlers (~25 endpoints)
+│   │   ├── lib.rs              # Module declarations (21 modules)
+│   │   ├── commands/           # Tauri IPC command handlers (53 endpoints across 9 sub-modules)
 │   │   ├── config.rs           # Config manager (RwLock, schema migration, backups)
-│   │   ├── cursor.rs           # PNG → .cur binary generation (6 sizes, hotspot)
-│   │   ├── registry.rs         # HKCU registry read/write, SPI_SETCURSORS
-│   │   ├── theme.rs            # Theme manager (.cursorpack import/export)
+│   │   ├── cursor/             # PNG → .cur / .ani pipeline (6 sizes, hotspot, ANI read/write)
+│   │   ├── registry/           # HKCU registry read/write, Schemes, SPI_SETCURSORS
+│   │   ├── theme/              # Theme manager (.cursorpack import/export, sanitisation)
+│   │   ├── bulk_import/        # Folder/file bulk resolve + cursorpack-for-creator parser
 │   │   ├── marketplace.rs      # HTTP index fetch, SHA-256 + Ed25519 verification
-│   │   ├── keystore.rs         # Ed25519 key generation, DPAPI encryption
+│   │   ├── keystore.rs         # Ed25519 key generation, DPAPI encryption, .cfkey
 │   │   ├── health.rs           # Startup failure counter, rollback detection
 │   │   └── …                   # darkmode, tray, logging, backup, accessibility, …
 │   ├── benches/                # Criterion micro-benchmarks
@@ -182,7 +183,7 @@ Pull requests are welcome. Before submitting:
 3. Follow the coding conventions in [CLAUDE.md](CLAUDE.md):
    - Rust comments in Japanese
    - Vue: Composition API + `<script setup>`
-   - CSS: Vanilla CSS (no Tailwind)
+   - CSS: Tailwind v4 utility classes (see `app/assets/css/tailwind.css`)
    - No `v-html` (XSS prevention)
 
 ## License

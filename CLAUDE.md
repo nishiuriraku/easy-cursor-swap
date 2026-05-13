@@ -77,7 +77,7 @@ bash scripts/verify-gate.sh
 ## Architecture
 
 ```
-Vue (UI) ──invoke()──▶ Tauri command (commands.rs) ──▶ Rust module ──▶ Windows registry / FS
+Vue (UI) ──invoke()──▶ Tauri command (commands/) ──▶ Rust module ──▶ Windows registry / FS
 ```
 
 **Rust is the single source of truth.** Frontend state must be synced via IPC; never persist app state only on the Vue side.
@@ -85,8 +85,8 @@ Vue (UI) ──invoke()──▶ Tauri command (commands.rs) ──▶ Rust modu
 ### Frontend layout (`app/`)
 
 - `pages/` — `index.vue` (Library), `creator.vue`, `marketplace.vue`, `settings.vue`, `appearance.vue`
-- `components/{shell,library,creator,marketplace,settings,panic,icons}/` — domain-grouped SFCs. `nuxt.config.ts` sets `pathPrefix: false`, so reference components by file name (`<ThemeCard>`, not `<LibraryThemeCard>`).
-- `composables/` — `useThemes`, `useAppSettings`, `useI18n`, `useTauri` (IPC wrapper), `useKeystore`, `useUiTheme`, `useRoleMatcher`, `useThemePreviews`, `useBulkImport`, `useUpdater`, `useNotify`, `sanitizeSvg`. Vitest specs in `app/composables/__tests__/`.
+- `components/{shell,library,creator,marketplace,settings,preview,panic,icons,ui}/` — domain-grouped SFCs. `nuxt.config.ts` sets `pathPrefix: false`, so reference components by file name (`<ThemeCard>`, not `<LibraryThemeCard>`).
+- `composables/` — 21 個。IPC ラッパ (`useTauri`)、ドメイン状態 (`useThemes`, `useAppSettings`, `useKeystore`, `useUpdater`, `useNotify`, `useUiTheme`)、Creator 系 (`useCreatorAssets`, `useCreatorPickers`, `useCreatorImport`, `useCreatorBulkImportFlow`, `useCreatorExport`, `useHotspotDefaults`, `useHotspotInteraction`, `useAniPlayer`, `useBulkImport`, `useRoleMatcher`, `useThemePreviews`)、UI 補助 (`useCursorpackOpener`, `useI18n`, `sanitizeSvg`)。Vitest specs は `app/composables/__tests__/` に 10 本。詳細は `docs/file_inventory.md` の 2-3 セクション。
 - `locales/{ja,en}.ts` — keys typed `as const`; **must stay in parity** (CI gate via `scripts/check-i18n.mjs`).
 - `types/` — IPC payload types (`config.ts`, `theme.ts`, `marketplace.ts`).
 - `assets/css/tailwind.css` — Tailwind v4 entry + `@theme` ブロック (design tokens を utility に露出) + 横断 shared utility (`.btn` / `.card` / `.chip` / `.input` / `.tag` / `.toolbar` / `.tabs` / `.prop-section` / `.lib-table` / `.lib-row` / `.lt-*` / `.modal*` / `.content` / `.page-head` / `.grid` ほか)。
@@ -94,24 +94,24 @@ Vue (UI) ──invoke()──▶ Tauri command (commands.rs) ──▶ Rust modu
 
 ### Backend layout (`src-tauri/src/`)
 
-22 modules registered in `lib.rs`. Grouped by responsibility:
+21 modules registered in `lib.rs`. Grouped by responsibility:
 
 | Concern | Modules |
 |---|---|
-| IPC surface | `commands.rs` (≈25 commands; the contract between Vue and Rust) |
+| IPC surface | `commands/` (53 `#[tauri::command]` across 9 sub-modules: `theme` / `cursor_build/` (5 files) / `cursor_io` / `ani_export` / `keystore` / `marketplace` / `profile` / `system` / `windows_scheme`) |
 | Config / state | `config.rs` (RwLock + schema migration + backups, Source of Truth), `errors.rs` |
-| Cursor pipeline | `cursor.rs` (PNG/SVG → `.cur`, 6 sizes, Lanczos, hotspot), `cursor_watcher.rs` |
-| Registry | `registry.rs` (`HKCU\Control Panel\Cursors`, `Schemes`, `SPI_SETCURSORS`) |
-| Theme packages | `theme.rs` (`.cursorpack` import/export), `bulk_import.rs`, `backup.rs` (`.cursorprofile`) |
-| Marketplace | `marketplace.rs` (HTTP index fetch, SHA-256 + Ed25519 verify), `keystore.rs` (Ed25519 + DPAPI) |
+| Cursor pipeline | `cursor/` (5 files: `image` / `cur_build` / `ico_cur` / `ani` / `ani_write`), `cursor_watcher.rs` |
+| Registry | `registry/` (4 files: `mod` / `scheme` / `roles` / `env`) |
+| Theme packages | `theme/` (3 files: `mod` / `types` / `sanitize`), `bulk_import/` (3 files: `mod` / `assets` / `cursorpack`), `backup.rs` (`.cursorprofile`) |
+| Marketplace | `marketplace.rs` (HTTP index fetch, SHA-256 + Ed25519 verify), `keystore.rs` (Ed25519 + DPAPI + `.cfkey` XChaCha20-Poly1305 + Argon2id) |
 | Reliability | `health.rs` (startup-failure counter + rollback), `crash.rs` |
-| OS integration | `tray.rs`, `darkmode.rs`, `hotkey.rs`, `autostart.rs`, `single_instance.rs` (Named Mutex), `appusermodel.rs`, `accessibility.rs`, `environment.rs` (RDP/Citrix detection) |
+| OS integration | `tray.rs`, `darkmode.rs`, `hotkey.rs`, `autostart.rs`, `appusermodel.rs`, `accessibility.rs`, `environment.rs` (RDP/Citrix detection). Multi-instance lock is `tauri_plugin_single_instance` (no custom module). |
 | Observability | `logging.rs` (with `redact_path` / `short_hash` PII helpers) |
 
 ### Critical invariants
 
 - **HKCU only.** Never touch HKLM or anything that triggers UAC.
-- **Apply is transactional.** `registry.rs` writes a snapshot to `~/.custom_cursors/_pending_apply.snapshot` before mutating, deletes it on success. On startup, a leftover snapshot triggers auto-rollback. There is also `_initial_snapshot.json` saved on first run; the panic button (`Ctrl+Alt+Shift+R`) restores either Windows defaults or this initial snapshot.
+- **Apply is transactional.** `registry/mod.rs` writes a snapshot to `~/.custom_cursors/_pending_apply.snapshot` before mutating, deletes it on success. On startup, a leftover snapshot triggers auto-rollback. There is also `_initial_snapshot.json` saved on first run; the panic button (`Ctrl+Alt+Shift+R`) restores either Windows defaults or this initial snapshot.
 - **Cursor files live in `~/.custom_cursors/`** so they survive uninstall.
 - **PII redaction in logs.** When using `tracing!`, route raw paths through `logging::redact_path` and hashes through `logging::short_hash` (12 chars). No raw registry values, no full SHA-256 in logs.
 - **Archive sanitisation.** Any code unzipping `.cursorpack` / `.cursorprofile` must go through `theme::sanitize_archive_path` and the size limits (50 MB compressed / 200 MB expanded / 10 MB per image / 1 GB total user storage).
@@ -127,7 +127,7 @@ Vue (UI) ──invoke()──▶ Tauri command (commands.rs) ──▶ Rust modu
   - **横断 shared utility** (`.btn`, `.card`, `.chip`, `.input`, `.tag`, `.toolbar`, `.tabs`, `.prop-section`, `.lib-row`, `.lt-*`, `.modal*`, `.content`, `.page-head`, `.grid` ほか) は `app/assets/css/tailwind.css` の top-level (unlayered) に定義。`@layer components` には**入れない** — Tailwind preflight (`button { color: inherit }` 等) が unlayered で出力されるため、`@layer` 内のルールは cascade で負ける。
   - **コンポーネント固有のスタイル**は各 `.vue` ファイルの `<style scoped>` に置き、`@reference '~/assets/css/tailwind.css';` を冒頭で宣言してから `@apply` を使う。
   - `app/assets/css/global.css` は `:root` トークン、CSS リセット、スクロールバーカスタマイズ、`:focus-visible`、`prefers-reduced-motion`、共有 `@keyframes`、`html.light` トークン上書きの**みに限定**。コンポーネント固有スタイルをここへ追加しない (Phase 10-12 で 3327 行 → 223 行に収束済み)。
-- IPC payload types live in `app/types/` and must mirror `serde`-derived Rust structs in `commands.rs` / module files.
+- IPC payload types live in `app/types/` and must mirror `serde`-derived Rust structs in `commands/` sub-modules / domain module files.
 - Filenames in `components/` are referenced without directory prefix — keep names globally unique.
 
 ## Implementation policy
@@ -135,7 +135,7 @@ Vue (UI) ──invoke()──▶ Tauri command (commands.rs) ──▶ Rust modu
 新規機能・リファクタ・バグ修正に着手するときは、以下を**必ず**この順で実施する。
 
 1. **必要な skill を使用する。** タスクに該当しそうな skill が 1% でもあれば `Skill` ツールで起動する (例: ブレストは `superpowers:brainstorming`、TDD は `superpowers:test-driven-development`、デバッグは `superpowers:systematic-debugging`、Rust の所有権/並行性エラーは `rust-skills:m01-ownership` 等、Cloudflare/Tauri/Nuxt 固有作業は対応 skill)。判断に迷ったら起動して、合わなければ捨てる。
-2. **既存の実装を確認してから書く。** 触る領域の `app/` / `src-tauri/src/` / `composables/` / `commands.rs` を先に読み、命名・型・IPC の前例に揃える。`scripts/check-i18n.mjs` が落ちないよう `locales/{ja,en}.ts` 双方を更新。重複コードを新設せず、既存の composable / module を拡張する方を優先。
+2. **既存の実装を確認してから書く。** 触る領域の `app/` / `src-tauri/src/` / `composables/` / `commands/` を先に読み、命名・型・IPC の前例に揃える。`scripts/check-i18n.mjs` が落ちないよう `locales/{ja,en}.ts` 双方を更新。重複コードを新設せず、既存の composable / module を拡張する方を優先。
 3. **検証ゲートは `scripts/verify-gate.sh` を使う。** コミット直前に `bash scripts/verify-gate.sh` を実行し、緑になることを確認する。インライン版 (`cargo fmt` 〜 `npm run tauri:build`) は使わない — スクリプトが正準。
 
 ## Workflow rule (auto-memory)
