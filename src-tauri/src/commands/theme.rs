@@ -238,6 +238,91 @@ pub fn duplicate_theme(theme_id: String) -> Result<String, AppError> {
 pub fn repackage_theme(theme_id: String, output_path: String) -> Result<u64, AppError> {
     let id = uuid::Uuid::parse_str(&theme_id)
         .map_err(|e| AppError::Theme(format!("無効なテーマ ID: {}", e)))?;
+    // marketplace 由来テーマは編集 / エクスポート不可。複製してから操作するよう促す。
+    let metadata = ThemeManager::load_metadata(id)?;
+    if metadata.source.is_marketplace() {
+        return Err(AppError::Theme(
+            "公式インデックスから取得したテーマはエクスポート・編集できません。複製してから操作してください。".to_string(),
+        ));
+    }
     let path = std::path::PathBuf::from(&output_path);
     ThemeManager::repackage_theme(id, &path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::cursors_dir_override_lock;
+    use crate::theme::types::{LocalizedString, ThemeMetadata, ThemeSource};
+    use std::collections::HashMap;
+    use tempfile::TempDir;
+
+    fn write_theme_with_source(dir: &std::path::Path, id: uuid::Uuid, source: ThemeSource) {
+        let metadata = ThemeMetadata {
+            schema_version: 1,
+            id,
+            name: LocalizedString::Simple("T".into()),
+            version: "1.0.0".into(),
+            created_at: "2026-05-14T00:00:00Z".into(),
+            requires_os_shadow: false,
+            cursors: HashMap::new(),
+            author: None,
+            license: None,
+            homepage: None,
+            description: None,
+            min_app_version: None,
+            signature: None,
+            tags: Vec::new(),
+            source,
+        };
+        std::fs::create_dir_all(dir).unwrap();
+        std::fs::write(
+            dir.join("theme.json"),
+            serde_json::to_string_pretty(&metadata).unwrap(),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn marketplace_theme_cannot_be_repackaged() {
+        let _guard = cursors_dir_override_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let temp = TempDir::new().unwrap();
+        std::env::set_var("CUSTOM_CURSORS_DIR_OVERRIDE", temp.path());
+        let id = uuid::Uuid::new_v4();
+        let theme_dir = temp.path().join(id.to_string());
+        write_theme_with_source(&theme_dir, id, ThemeSource::Marketplace);
+
+        let out = temp.path().join("out.cursorpack");
+        let result = repackage_theme(id.to_string(), out.to_string_lossy().to_string());
+        std::env::remove_var("CUSTOM_CURSORS_DIR_OVERRIDE");
+        assert!(
+            result.is_err(),
+            "marketplace テーマは repackage 不可: {result:?}"
+        );
+        let err_str = result.unwrap_err().to_string();
+        assert!(
+            err_str.contains("公式インデックス"),
+            "エラーメッセージに公式インデックスが含まれるはず: {err_str}"
+        );
+    }
+
+    #[test]
+    fn local_theme_passes_marketplace_guard() {
+        // local テーマは guard をパスする (cursors 空でも write_cursorpack_to_buffer は成功)
+        let _guard = cursors_dir_override_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let temp = TempDir::new().unwrap();
+        std::env::set_var("CUSTOM_CURSORS_DIR_OVERRIDE", temp.path());
+        let id = uuid::Uuid::new_v4();
+        let theme_dir = temp.path().join(id.to_string());
+        write_theme_with_source(&theme_dir, id, ThemeSource::Local);
+
+        let out = temp.path().join("out.cursorpack");
+        let result = repackage_theme(id.to_string(), out.to_string_lossy().to_string());
+        std::env::remove_var("CUSTOM_CURSORS_DIR_OVERRIDE");
+        assert!(result.is_ok(), "local テーマは guard をパス: {result:?}");
+    }
 }

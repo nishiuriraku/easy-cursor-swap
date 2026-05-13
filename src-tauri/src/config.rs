@@ -153,10 +153,26 @@ pub struct ConfigManager {
     config_path: PathBuf,
 }
 
+/// `CUSTOM_CURSORS_DIR_OVERRIDE` を読む `ConfigManager::cursors_dir()` は
+/// プロセス全体で env var を共有するため、override を使うテストはこの共有ロックで直列化する。
+/// クレート横断 (`config::tests` / `commands::theme::tests` / `marketplace::tests` 等) の
+/// 並走でも 1 つのミューテックスを共有することで env var の競合を防ぐ。
+#[cfg(test)]
+pub(crate) fn cursors_dir_override_lock() -> &'static std::sync::Mutex<()> {
+    static LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
+    LOCK.get_or_init(|| std::sync::Mutex::new(()))
+}
+
 impl ConfigManager {
     /// カーソル保存ディレクトリのパスを返す
     /// ~/.custom_cursors/
+    ///
+    /// テスト時は `CUSTOM_CURSORS_DIR_OVERRIDE` 環境変数で上書きできる。
     pub fn cursors_dir() -> AppResult<PathBuf> {
+        #[cfg(test)]
+        if let Ok(override_path) = std::env::var("CUSTOM_CURSORS_DIR_OVERRIDE") {
+            return Ok(PathBuf::from(override_path));
+        }
         let home = dirs::home_dir()
             .ok_or_else(|| AppError::Config("ホームディレクトリが見つかりません".to_string()))?;
         Ok(home.join(".custom_cursors"))
@@ -549,7 +565,17 @@ mod tests {
     #[test]
     fn cursors_dir_is_under_home() {
         // ~/.custom_cursors/ をホーム配下に解決できる。
+        // 同プロセスで `CUSTOM_CURSORS_DIR_OVERRIDE` を設定する別テスト
+        // (`commands::theme::tests`) と直列化するため、共有ロックを取得する。
+        let _g = super::cursors_dir_override_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let saved = std::env::var("CUSTOM_CURSORS_DIR_OVERRIDE").ok();
+        std::env::remove_var("CUSTOM_CURSORS_DIR_OVERRIDE");
         let dir = ConfigManager::cursors_dir().unwrap();
+        if let Some(v) = saved {
+            std::env::set_var("CUSTOM_CURSORS_DIR_OVERRIDE", v);
+        }
         assert!(dir.ends_with(".custom_cursors"));
         if let Some(home) = dirs::home_dir() {
             assert!(dir.starts_with(&home));

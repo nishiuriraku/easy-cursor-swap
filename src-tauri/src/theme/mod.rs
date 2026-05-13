@@ -60,6 +60,21 @@ pub struct RolePreview {
 pub struct ThemeManager;
 
 impl ThemeManager {
+    /// 指定 ID の theme.json をパースして返す。
+    /// `source` フィールドのチェックなど、テーマ単体のメタデータが欲しい場面で使う。
+    pub fn load_metadata(id: Uuid) -> AppResult<ThemeMetadata> {
+        use crate::config::ConfigManager;
+        use crate::errors::AppError;
+        let cursors_dir = ConfigManager::cursors_dir()?;
+        let path = cursors_dir.join(id.to_string()).join("theme.json");
+        if !path.is_file() {
+            return Err(AppError::Theme(format!("テーマ {} が見つかりません", id)));
+        }
+        let content = std::fs::read_to_string(&path)?;
+        let metadata: ThemeMetadata = serde_json::from_str(&content)?;
+        Ok(metadata)
+    }
+
     /// 指定 ID のテーマがディスク上に存在するかを確認する。
     /// `~/.custom_cursors/<UUID>/theme.json` の存在のみで判定する (中身は検証しない)。
     pub fn theme_exists(id: Uuid) -> bool {
