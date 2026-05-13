@@ -510,11 +510,12 @@
   animation: spin 0.6s linear infinite;
 }
 
-/* --- Library list view shared (Phase 11-E / 13-A) ---
+/* --- Library list view shared (Phase 11-E / 13-A / 2026-05-13) ---
  * .lib-table (index.vue) + .lib-row.lib-head (index.vue) +
  * .lib-row (ThemeRow.vue) で同じグリッドレイアウトを共有するため shared utility に置く。
- * 7 列構成: fav | preview (Arrow 1) | name | ver | date | size | signed
- * (Phase 13-A で coverage バー列を撤去、preview は Arrow 1 個に縮小) */
+ * 6 列構成: fav | preview (Arrow 1) | name | ver | date | size
+ * (Phase 13-A で coverage バー列を撤去、preview は Arrow 1 個に縮小。
+ *  2026-05-13 で末尾の signed 列を撤去) */
 .lib-table {
   @apply overflow-hidden rounded-lg border border-line bg-bg-glass backdrop-blur-2xl;
 }
@@ -526,8 +527,7 @@
     minmax(220px, 1.4fr)
     78px
     104px
-    72px
-    104px;
+    72px;
   transition: background 0.12s;
 }
 .lib-row:not(.lib-head) {
@@ -673,19 +673,6 @@
 
 .lt-mono {
   @apply font-mono text-[11px] tracking-[0.02em] text-fg-dim;
-}
-
-.lt-sig-ok,
-.lt-sig-warn {
-  @apply inline-flex items-center gap-[5px] rounded border px-2 py-[3px] font-mono text-[9.5px] tracking-[0.06em];
-}
-.lt-sig-ok {
-  @apply border-accent-line bg-accent-dim text-accent;
-}
-.lt-sig-warn {
-  color: var(--amber);
-  background: rgba(245, 194, 107, 0.08);
-  border-color: rgba(245, 194, 107, 0.3);
 }
 
 .lt-act {
@@ -914,7 +901,8 @@
 }
 
 /* Narrow viewport (Phase 13-A 後): coverage 列廃止済み、preview は単一 Arrow セル。
- * 7 列 → 6 列で .lt-size を hide してパス情報優先。 */
+ * 6 列 → 5 列で .lt-size を hide してパス情報優先。
+ * (旧 7 列構成では末尾に署名列があったが、2026-05-13 で撤去済み) */
 @media (max-width: 1080px) {
   .lib-row {
     grid-template-columns:

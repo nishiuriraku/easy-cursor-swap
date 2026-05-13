@@ -6,8 +6,9 @@
  * グリッド表示の `ThemeCard.vue` と同じ emit を共有し、Library ページで
  * 表示モード切替 (`viewMode === 'list'`) に応じて差し替えられる。
  *
- * 7 列構成 (Phase 13-A で coverage バーを撤去、preview を Arrow 1 個に):
- *  fav | preview (Arrow 1 個) | name+tags | ver | date | size | sig
+ * 6 列構成 (Phase 13-A で coverage バーを撤去、preview を Arrow 1 個に。
+ *  2026-05-13 で署名列 sig を撤去):
+ *  fav | preview (Arrow 1 個) | name+tags | ver | date | size
  */
 import { computed } from 'vue'
 import type { ThemeCardData } from '~/types/theme'
@@ -47,8 +48,6 @@ const displaySize = computed(() => {
   if (b < 1024 * 1024) return `${(b / 1024).toFixed(0)} KB`
   return `${(b / (1024 * 1024)).toFixed(1)} MB`
 })
-
-const isSigned = computed(() => props.theme.signed === true)
 
 function onFav(e: Event) {
   e.stopPropagation()
@@ -131,16 +130,6 @@ function onRowKeydown(e: KeyboardEvent) {
     </div>
     <div class="lt-col lt-size" role="cell">
       <span class="lt-mono">{{ displaySize }}</span>
-    </div>
-
-    <!-- 署名 -->
-    <div class="lt-col lt-sig" role="cell">
-      <span v-if="isSigned" class="lt-sig-ok">
-        <UiIcon name="Shield" :size="11" aria-hidden="true" />{{ t('library.sigSigned') }}
-      </span>
-      <span v-else class="lt-sig-warn">
-        <UiIcon name="Alert" :size="11" aria-hidden="true" />{{ t('library.sigUnsigned') }}
-      </span>
     </div>
   </div>
 </template>

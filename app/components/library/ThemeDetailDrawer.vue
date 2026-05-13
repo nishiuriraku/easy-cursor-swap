@@ -144,7 +144,7 @@ async function openHomepage() {
         <div v-if="tagsToShow.length > 0 || hasSigned" class="td-tags">
           <span v-for="tag in tagsToShow" :key="tag" class="td-tag">{{ tag }}</span>
           <span v-if="hasSigned" class="td-tag td-tag-on">
-            <UiIcon name="Shield" :size="10" />signed
+            <UiIcon name="Shield" :size="10" />{{ t('themeDetail.officialBadge') }}
           </span>
         </div>
       </section>

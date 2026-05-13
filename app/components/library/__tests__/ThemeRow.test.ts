@@ -1,17 +1,15 @@
 /**
- * ThemeRow の署名バッジは signed === true のときだけ表示する。
- * 過去に `signed !== false` 判定だったため、signed が undefined のときも
- * 全テーマ "署名済" 扱いになる不具合があった。
+ * ThemeRow から署名列を撤去したことを固定化する。
  *
- * 注: Stage 3 で Library の署名列を撤去するため、このファイルは
- * 同 Stage で「.lt-sig セルが描画されない」仕様のテストに差し替える予定。
- * Stage 1 完了時点ではバッジ条件分岐そのものの厳密化を固定化する。
+ * 2026-05-13 の UI 簡略化で「Ed25519 で署名された」というジャーゴンを
+ * 一般ユーザー向け画面から除去する一環として、Library 行の `.lt-sig`
+ * セルを撤去した (signed バッジは ThemeDetailDrawer 内の「公式」ピルに
+ * 集約)。Stage 1 で追加した signed バッジ表示テストのリプレースメント。
  */
 import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import ThemeRow from '../ThemeRow.vue'
 import type { ThemeCardData } from '~/types/theme'
-import jaLib from '~/locales/ja'
 
 vi.mock('~/composables/useI18n', async () => {
   const ja = (await import('~/locales/ja')).default
@@ -26,8 +24,6 @@ vi.mock('~/composables/useI18n', async () => {
   }
   return { useI18n: () => ({ t: (k: string) => resolveJa(k) }) }
 })
-
-const SIGNED_LABEL = (jaLib as unknown as { library: { sigSigned: string } }).library.sigSigned
 
 function makeTheme(over: Partial<ThemeCardData>): ThemeCardData {
   return {
@@ -44,19 +40,11 @@ function makeTheme(over: Partial<ThemeCardData>): ThemeCardData {
   }
 }
 
-describe('ThemeRow signed badge', () => {
-  it('signed === true なら 署名バッジが出る', () => {
-    const w = mount(ThemeRow, { props: { theme: makeTheme({ signed: true }) } })
-    expect(w.text()).toContain(SIGNED_LABEL)
-  })
-
-  it('signed === false なら 署名バッジは出ない', () => {
-    const w = mount(ThemeRow, { props: { theme: makeTheme({ signed: false }) } })
-    expect(w.text()).not.toContain(SIGNED_LABEL)
-  })
-
-  it('signed が undefined でも 署名バッジは出ない (取りこぼし耐性)', () => {
-    const w = mount(ThemeRow, { props: { theme: makeTheme({ signed: undefined }) } })
-    expect(w.text()).not.toContain(SIGNED_LABEL)
+describe('ThemeRow', () => {
+  it('signed の値によらず .lt-sig セルを描画しない', () => {
+    for (const signed of [true, false, undefined] as const) {
+      const w = mount(ThemeRow, { props: { theme: makeTheme({ signed }) } })
+      expect(w.find('.lt-sig').exists()).toBe(false)
+    }
   })
 })

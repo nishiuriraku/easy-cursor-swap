@@ -21,7 +21,7 @@ import { useCursorpackOpener } from '~/composables/useCursorpackOpener'
 const { t } = useI18n()
 // UiIcon / ThemeCard / ApplyModal は Nuxt の自動インポートで解決される。
 
-type FilterChip = 'all' | 'favorites' | 'recent' | 'unsigned'
+type FilterChip = 'all' | 'favorites' | 'recent'
 /** 並び替えキー。
  *  - `updated` / `name` / `applied`: グリッド・一覧表示の両方で使う既存キー
  *  - `coverage` / `size`: 一覧表示のヘッダクリック用に追加
@@ -234,7 +234,6 @@ const filteredThemes = computed(() => {
   if (filter.value === 'favorites') result = result.filter((tt) => tt.isFavorite)
   else if (filter.value === 'recent')
     result = result.filter((tt) => Boolean(tt.lastAppliedAt) || tt.applyCount > 0)
-  else if (filter.value === 'unsigned') result = result.filter((tt) => tt.signed === false)
 
   // Q2: sortKey/sortDir はグリッドと一覧で共有。sortDir で昇降を切替。
   const dirSign = sortDir.value === 'asc' ? 1 : -1
@@ -267,7 +266,6 @@ const counts = computed(() => ({
   all: themes.value.length,
   favorites: themes.value.filter((tt) => tt.isFavorite).length,
   recent: themes.value.filter((tt) => Boolean(tt.lastAppliedAt) || tt.applyCount > 0).length,
-  unsigned: themes.value.filter((tt) => tt.signed === false).length,
 }))
 
 // `useAppSettings` はグローバルシングルトン。Settings 画面で更新されると自動追従する。
@@ -977,7 +975,6 @@ onUnmounted(() => {
               sortDir === 'asc' ? '↑' : '↓'
             }}</span>
           </div>
-          <div class="lt-col lt-sig" role="columnheader">{{ t('library.colSignature') }}</div>
         </div>
 
         <ThemeRow

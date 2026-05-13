@@ -2,20 +2,22 @@
 /**
  * Library 画面のフィルタチップ + ソートボタン。
  *
- * 4 つのフィルタ (all / favorites / recent / unsigned) と件数バッジ、
+ * 3 つのフィルタ (all / favorites / recent) と件数バッジ、
  * 右端の ソート切替ボタン (cycleSort で 3 状態を循環) で構成される。
  * カウントは親が computed で渡し、ソートラベルは sortLabel ですでに整形済みのものを props で受け取る。
+ *
+ * 2026-05-13: 非技術者向け簡略化のため "unsigned" チップを撤去。
  */
 import { useI18n } from '~/composables/useI18n'
 
-type FilterId = 'all' | 'favorites' | 'recent' | 'unsigned'
+type FilterId = 'all' | 'favorites' | 'recent'
 
 const { t } = useI18n()
 
 const filter = defineModel<FilterId>('filter', { required: true })
 
 defineProps<{
-  counts: { all: number; favorites: number; recent: number; unsigned: number }
+  counts: { all: number; favorites: number; recent: number }
   sortLabel: string
 }>()
 
@@ -49,14 +51,6 @@ defineEmits<{
       >
         {{ t('library.filterRecent')
         }}<span class="num" aria-hidden="true">{{ counts.recent }}</span>
-      </button>
-      <button
-        :class="['chip', { active: filter === 'unsigned' }]"
-        :aria-pressed="filter === 'unsigned'"
-        @click="filter = 'unsigned'"
-      >
-        {{ t('library.filterUnsigned')
-        }}<span class="num" aria-hidden="true">{{ counts.unsigned }}</span>
       </button>
     </div>
     <div class="spacer-x" />

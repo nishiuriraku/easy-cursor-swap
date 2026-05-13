@@ -46,14 +46,8 @@ defineEmits<{
           <UiIcon name="Import" :size="20" style="color: var(--accent)" />
           <div>
             <div class="es-drop-t">{{ t('library.emptyDropText') }}</div>
-            <div class="es-drop-s">{{ t('drop.autoVerify') }}</div>
           </div>
         </div>
-      </div>
-
-      <div class="es-foot-tip">
-        <UiIcon name="Shield" :size="11" style="color: var(--accent)" />
-        <span>{{ t('drop.footTip') }}</span>
       </div>
     </div>
   </div>
@@ -120,15 +114,5 @@ defineEmits<{
 }
 .es-drop-s {
   @apply mt-0.5 text-[11.5px] text-fg-dim;
-}
-.es-foot-tip {
-  @apply mt-[18px] flex items-center gap-2 font-mono text-[10.5px] tracking-[0.02em] text-fg-mute;
-}
-.es-foot-tip code {
-  @apply rounded-[3px] px-[5px] py-px text-fg-dim;
-  background: rgba(255, 255, 255, 0.04);
-}
-:where(html.light) .es-foot-tip code {
-  background: rgba(15, 20, 35, 0.04);
 }
 </style>
