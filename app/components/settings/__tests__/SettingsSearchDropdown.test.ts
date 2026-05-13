@@ -18,9 +18,9 @@ describe('SettingsSearchDropdown', () => {
     })
     // ロケールに依存せず、ja/en のいずれかの no-result 文言が出ていること
     const txt = w.text()
-    expect(
-      txt.includes('該当する設定がありません') || txt.includes('No matching settings'),
-    ).toBe(true)
+    expect(txt.includes('該当する設定がありません') || txt.includes('No matching settings')).toBe(
+      true,
+    )
   })
 
   it('renders one row per result', () => {

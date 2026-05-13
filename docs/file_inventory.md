@@ -100,7 +100,7 @@
 | [library/](../app/components/library/) | `ThemeCard` / `ThemeRow` / `ThemeDetailModal` / `ThemeDetailDrawer` / `ApplyModal` / `ImportConflictDialog` / `ThemePickerModal` / `CursorMatrix` / `LibraryToolbar` / `LibraryFilterBar` / `LibraryEmptyState` / `LibraryDropOverlay` |
 | [creator/](../app/components/creator/) | `CreatorStartScreen` / `CreatorToolbar` / `CreatorRoleList` / `CreatorMetadataPane` (Hotspot 節を内包) / `NewThemeStartModal` / `SaveDestinationModal` / `BulkImportButton` / `BulkImportPreviewModal` / `BulkImportRoleRow` / `RoleListItem` / `SizeStrip` / `AniThumb` |
 | [marketplace/](../app/components/marketplace/) | `FeaturedCard` / `MarketplaceCard` / `SubmitThemeDialog` |
-| [settings/](../app/components/settings/) | `GeneralSection` / `StartupSection` / `LibrarySection` / `SecuritySection` / `KeysSection` / `LoggingSection` / `UpdatesSection` / `AboutSection` / `SettingsRow` / `SettingsToggle` / `PassphrasePrompt` / `ConfigRecoveryPanel` / `PairingSlot` / `ModeIndicator` |
+| [settings/](../app/components/settings/) | `GeneralSection` / `StartupSection` / `LibrarySection` / `SecuritySection` / `KeysSection` / `LoggingSection` / `UpdatesSection` / `AboutSection` / `SettingsRow` (anchor prop で検索ジャンプ対応) / `SettingsToggle` / `PassphrasePrompt` / `ConfigRecoveryPanel` / `PairingSlot` / `ModeIndicator` / `SettingsSearchDropdown` (ja/en 両言語の横断検索ドロップダウン) |
 | [preview/](../app/components/preview/) | `CursorPreview` (theme detail で使うプレビュー) |
 | [panic/](../app/components/panic/) | `PanicFlow` (ステージ選択 + ライブログ + 17 ロールグリッド) |
 | [icons/](../app/components/icons/) | `UiIcon` + `UI_ICONS`、`CursorIcon` + `CURSOR_ICONS` — render 関数で v-html 回避 |
@@ -131,6 +131,8 @@
 | [useUpdater.ts](../app/composables/useUpdater.ts) | check / downloadAndInstall / relaunch |
 | [useNotify.ts](../app/composables/useNotify.ts) | Toast 通知 (permission キャッシュ) |
 | [sanitizeSvg.ts](../app/composables/sanitizeSvg.ts) | SVG サニタイズ (`<script>`/`href`/`on*`/`javascript:` 除去) |
+| [useAppInfo.ts](../app/composables/useAppInfo.ts) | `get_app_info` IPC で取得したアプリ情報 (version, cursors_dir 等) の共有 |
+| [useSettingsSearch.ts](../app/composables/useSettingsSearch.ts) | 設定検索カタログ + ja/en 横断 substring 検索 + アンカージャンプ |
 
 ### 2-4. その他
 

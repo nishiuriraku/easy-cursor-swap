@@ -157,7 +157,8 @@ app/
 │                    useRoleMatcher, useThemePreviews, useBulkImport, useUpdater, useNotify,
 │                    sanitizeSvg, useCreatorAssets, useCreatorPickers, useCreatorImport,
 │                    useCreatorBulkImportFlow, useCreatorExport, useHotspotDefaults,
-│                    useHotspotInteraction, useAniPlayer, useCursorpackOpener (合計 21)
+│                    useHotspotInteraction, useAniPlayer, useCursorpackOpener,
+│                    useAppInfo, useSettingsSearch (合計 23)
 ├─ types/          ← config.ts, theme.ts, marketplace.ts (Rust struct と 1:1)
 ├─ locales/        ← ja.ts, en.ts (CI で parity チェック)
 ├─ assets/css/     ← tailwind.css (Tailwind v4 entry + @theme + 横断 shared utility) +
@@ -172,7 +173,7 @@ app/
 | `index.vue` (Library) | useThemes, useCursorpackOpener, ThemeCard / ThemeRow, ApplyModal, ImportConflictDialog, ThemePickerModal | `get_themes`, `apply_theme`, `import_cursorpack`, `inspect_cursorpack`, `delete_theme`, `duplicate_theme`, `repackage_theme`, `list_windows_schemes`, `apply_windows_scheme`, `get_windows_scheme_previews`, `set_theme_favorite`, `take_pending_cursorpack` |
 | `creator.vue` | useCreatorAssets, useCreatorPickers, useCreatorImport, useCreatorBulkImportFlow, useCreatorExport, useRoleMatcher, useBulkImport, useKeystore, useHotspotDefaults, useHotspotInteraction, useAniPlayer, sanitizeSvg, NewThemeStartModal, BulkImportPreviewModal | `import_cursor_file`, `inspect_ani_file`, `parse_cursorpack_for_creator`, `bulk_resolve_assets`, `cancel_bulk_import`, `export_cursorpack_streamed`, `cancel_build`, `export_ani_with_hotspot`, `keystore_info` |
 | `marketplace.vue` | useThemes, MarketplaceCard, FeaturedCard, SubmitThemeDialog | `marketplace_fetch_index`, `marketplace_install`, `keystore_info` |
-| `settings.vue` | useAppSettings, useKeystore, useUpdater, ConfigRecoveryPanel, PassphrasePrompt, GeneralSection 〜 AboutSection の 8 セクション | `get_config`, `update_config`, `keystore_*`, `list_config_backups`, `restore_config_backup`, `export_profile`, `import_profile`, `list_crash_reports`, `clear_crash_reports`, `submit_crash_reports`, `check_update_is_major_jump` |
+| `settings.vue` | useAppSettings, useKeystore, useUpdater, useSettingsSearch, ConfigRecoveryPanel, PassphrasePrompt, SettingsSearchDropdown, GeneralSection 〜 AboutSection の 8 セクション | `get_config`, `update_config`, `keystore_*`, `list_config_backups`, `restore_config_backup`, `export_profile`, `import_profile`, `list_crash_reports`, `clear_crash_reports`, `submit_crash_reports`, `check_update_is_major_jump` |
 | `appearance.vue` | useAppSettings, ModeIndicator, PairingSlot, ThemePickerModal | `get_dark_mode_status`, `update_config` |
 | `PanicFlow.vue` (modal) | useNotify | `reset_to_default`, `reset_to_initial` |
 
