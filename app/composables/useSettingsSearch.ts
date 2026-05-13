@@ -262,11 +262,7 @@ function entryHaystacks(e: SettingsSearchEntry): string[] {
 }
 
 /** 純関数の検索本体。Vitest からも直接呼べる */
-export function searchSettings(
-  query: string,
-  locale: Locale,
-  ctx: SearchContext,
-): SearchResult[] {
+export function searchSettings(query: string, locale: Locale, ctx: SearchContext): SearchResult[] {
   const trimmed = query.trim()
   if (!trimmed) return []
   const nq = normalize(trimmed)

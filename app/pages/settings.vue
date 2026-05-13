@@ -15,8 +15,9 @@ import { useKeystore } from '~/composables/useKeystore'
 import { invokeTauri } from '~/composables/useTauri'
 import { useI18n } from '~/composables/useI18n'
 import { useUpdater } from '~/composables/useUpdater'
+import { useSettingsSearch, type SettingsSearchEntry } from '~/composables/useSettingsSearch'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 type SectionId =
   | 'general'
@@ -355,6 +356,75 @@ async function onConfigRestored() {
   applyConfigToLocal()
 }
 
+// 設定検索 composable (横断検索 → ジャンプ)
+const searchContext = computed(() => ({
+  hasKeystore: keystoreInfo.value?.has_keypair ?? false,
+}))
+const {
+  open: searchOpen,
+  activeIndex: searchActiveIndex,
+  visibleResults: searchResults,
+  overflowCount: searchOverflow,
+  focus: openSearchDropdown,
+  close: closeSearchDropdown,
+  moveActive: moveSearchActive,
+  resetActive: resetSearchActive,
+  jumpTo: jumpToSearchResult,
+} = useSettingsSearch({
+  query: searchQuery,
+  locale,
+  context: searchContext,
+  sectionRef: section,
+})
+
+function onSearchInput() {
+  resetSearchActive()
+  searchOpen.value = searchQuery.value.trim().length > 0
+}
+
+function onSearchKeydown(ev: KeyboardEvent) {
+  if (!searchOpen.value) return
+  switch (ev.key) {
+    case 'ArrowDown':
+      ev.preventDefault()
+      moveSearchActive(1)
+      break
+    case 'ArrowUp':
+      ev.preventDefault()
+      moveSearchActive(-1)
+      break
+    case 'Enter': {
+      ev.preventDefault()
+      const r = searchResults.value[searchActiveIndex.value]
+      if (r) {
+        searchQuery.value = ''
+        closeSearchDropdown()
+        void jumpToSearchResult(r.entry)
+      }
+      break
+    }
+    case 'Escape':
+      ev.preventDefault()
+      closeSearchDropdown()
+      break
+  }
+}
+
+function onSearchSelect(entry: SettingsSearchEntry) {
+  searchQuery.value = ''
+  closeSearchDropdown()
+  void jumpToSearchResult(entry)
+}
+
+function onSearchHover(i: number) {
+  searchActiveIndex.value = i
+}
+
+function onSearchBlur() {
+  // mousedown 経由の select 後でも安全に閉じる (mousedown 内で .prevent 済)
+  setTimeout(() => closeSearchDropdown(), 0)
+}
+
 onMounted(async () => {
   await loadConfig()
   applyConfigToLocal()
@@ -388,12 +458,34 @@ function selectSection(id: SectionId) {
         <span class="sep">/</span>
         <span class="crumb active">{{ t(currentSection.labelKey) }}</span>
       </div>
-      <div class="search" style="max-width: 280px">
+      <div class="search" style="max-width: 280px; position: relative">
         <UiIcon name="Search" :size="14" style="color: var(--fg-mute)" />
         <input
           v-model="searchQuery"
           :placeholder="t('settings.searchPlaceholder')"
           :aria-label="t('common.search')"
+          role="combobox"
+          :aria-expanded="searchOpen"
+          aria-controls="settings-search-listbox"
+          :aria-activedescendant="
+            searchOpen && searchResults.length > 0
+              ? `settings-search-opt-${searchActiveIndex}`
+              : undefined
+          "
+          @input="onSearchInput"
+          @focus="openSearchDropdown"
+          @keydown="onSearchKeydown"
+          @blur="onSearchBlur"
+        />
+        <SettingsSearchDropdown
+          v-if="searchOpen"
+          id="settings-search-listbox"
+          :results="searchResults"
+          :overflow-count="searchOverflow"
+          :active-index="searchActiveIndex"
+          :query="searchQuery"
+          @select="onSearchSelect"
+          @hover="onSearchHover"
         />
       </div>
       <div class="tb-actions">
