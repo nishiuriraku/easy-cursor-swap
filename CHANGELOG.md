@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- _Nothing yet._
+- ライブラリのテーマ詳細モーダルがコンテンツ高さに追従せず、常にビューポート最大サイズで開いていた不具合を修正。`.td-standalone` から `height: 100%` (`h-full`) を外し、レイアウトを `.td-modal-shell` の `h-auto` + `max-h` に一本化。あわせて `.td-modal-body` に `min-h-0` を付与し、コンテンツ超過時のみ body 内でスクロールするようにした。
 
 ### Security
 

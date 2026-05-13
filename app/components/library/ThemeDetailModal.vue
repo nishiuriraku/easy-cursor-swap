@@ -131,11 +131,18 @@ onBeforeUnmount(() => {
 .td-modal-backdrop {
   @apply fixed inset-0 z-[100] grid place-items-center bg-[rgba(8,9,14,0.6)] p-8 backdrop-blur-[8px];
 }
+/*
+ * シェルは `grid place-items-center` の中で中央寄せされる。
+ * 高さはコンテンツに追従し、`max-h` だけで上限を抑える。
+ * `td-standalone` 由来の `height: 100%` が乗ると、グリッドトラック全体
+ * (viewport - 64px) まで張ってしまい常に最大サイズになるので、レイアウト
+ * 系プロパティはこちらに寄せて `td-standalone` は枠線・角丸・影だけに絞る。
+ */
 .td-modal-shell {
   @apply flex h-auto max-h-[calc(100vh-64px)] w-[min(960px,100%)] flex-col overflow-hidden;
 }
 .td-modal-body {
-  @apply flex-1 overflow-y-auto;
+  @apply min-h-0 flex-1 overflow-y-auto;
 }
 /* モーダル内の drawer は通常のカード文脈ではないので、外側の境界線を消して二重枠を避ける */
 .td-modal-body :deep(.td-drawer) {
@@ -143,7 +150,7 @@ onBeforeUnmount(() => {
 }
 
 .td-standalone {
-  @apply flex h-full flex-col overflow-hidden rounded-[14px] border border-line-hi bg-bg-1;
+  @apply rounded-[14px] border border-line-hi bg-bg-1;
   box-shadow: var(--shadow-2);
 }
 .td-standalone-h {
