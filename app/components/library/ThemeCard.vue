@@ -40,6 +40,9 @@ function onCardKeydown(e: KeyboardEvent) {
   }
 }
 
+/* 2026-05-14: ライブラリカードはプレビューを 3x2 (6 セル) に縮小したため、
+ * .card-preview の min-height (default 132px) を抑えて全体高さを詰める。
+ * Marketplace カード (6x3 = 17 セル) は default のまま維持される。 */
 const coveragePct = computed(() => Math.round((props.theme.includedRoles.length / 17) * 100))
 
 const displayDate = computed(() => {
@@ -84,6 +87,8 @@ watch(() => props.theme.id, fetchPreview)
       <CursorMatrix
         :included="theme.includedRoles"
         :preview-map="previewMap"
+        :limit="6"
+        :cols="3"
         :aria-label="t('library.coverage', { filled: theme.includedRoles.length })"
       />
     </div>
@@ -118,3 +123,13 @@ watch(() => props.theme.id, fetchPreview)
     </div>
   </article>
 </template>
+
+<style scoped>
+@reference '~/assets/css/tailwind.css';
+
+/* ライブラリカード固有: matrix が 3x2 に縮んだぶん preview を詰めて全体高さを軽く。
+ * Marketplace は別ファイル (.card-preview グローバル既定 132px) のまま。 */
+.card-preview {
+  @apply min-h-[112px] p-3;
+}
+</style>

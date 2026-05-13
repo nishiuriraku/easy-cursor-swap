@@ -632,6 +632,14 @@
     transparent 4px
   );
 }
+/* 行ビュー Arrow セル内の実 PNG プレビュー。SVG アイコン (14px) と同程度の見栄えになるよう
+ * 20px に拡大。image-rendering スタックは CursorMatrix .cell-img と揃える。 */
+.lt-cell-img {
+  @apply size-5 object-contain;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
 
 .lt-name-wrap {
   @apply flex min-w-0 flex-col gap-[3px];

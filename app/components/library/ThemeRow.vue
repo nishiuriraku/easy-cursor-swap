@@ -7,12 +7,14 @@
  * 表示モード切替 (`viewMode === 'list'`) に応じて差し替えられる。
  *
  * 6 列構成 (Phase 13-A で coverage バーを撤去、preview を Arrow 1 個に。
- *  2026-05-13 で署名列 sig を撤去):
+ *  2026-05-13 で署名列 sig を撤去。
+ *  2026-05-14 で Arrow セルを実 PNG プレビュー表示へ昇格):
  *  fav | preview (Arrow 1 個) | name+tags | ver | date | size
  */
-import { computed } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import type { ThemeCardData } from '~/types/theme'
 import { useI18n } from '~/composables/useI18n'
+import { useThemePreviews } from '~/composables/useThemePreviews'
 
 const { t } = useI18n()
 
@@ -27,6 +29,21 @@ const emit = defineEmits<{
 
 /** 行ビューでは Arrow 1 個だけアイコン表示する。included かどうかで描画切替。 */
 const hasArrow = computed(() => props.theme.includedRoles.includes('Arrow'))
+
+/** 実カーソル画像のプレビュー (キャッシュ越しに取得)。Arrow PNG が取れた場合だけ img を出す。 */
+const previewMap = ref<Record<string, string> | null>(null)
+const { getMap } = useThemePreviews()
+
+async function fetchPreview() {
+  if (!props.theme.id) return
+  const map = await getMap(props.theme.id)
+  previewMap.value = map
+}
+
+onMounted(fetchPreview)
+watch(() => props.theme.id, fetchPreview)
+
+const arrowPreviewUrl = computed(() => previewMap.value?.['Arrow'] ?? null)
 
 const isSystem = computed(() => props.theme.kind === 'system')
 
@@ -102,7 +119,13 @@ function onRowKeydown(e: KeyboardEvent) {
         :aria-label="t('library.coverage', { filled: theme.includedRoles.length })"
       >
         <div :class="['lt-cell', { empty: !hasArrow }]">
-          <CursorIcon v-if="hasArrow" role="Arrow" :size="14" />
+          <img
+            v-if="hasArrow && arrowPreviewUrl"
+            :src="arrowPreviewUrl"
+            alt=""
+            class="lt-cell-img"
+          />
+          <CursorIcon v-else-if="hasArrow" role="Arrow" :size="14" />
         </div>
       </div>
     </div>
