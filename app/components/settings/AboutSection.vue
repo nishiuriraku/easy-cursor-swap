@@ -9,10 +9,19 @@
  * Rust 側 `open_url` IPC (内部で Win32 ShellExecuteW) を経由してホスト OS の
  * ブラウザを起動する。SubmitThemeDialog / marketplace.vue と同じパターン。
  */
+import { onMounted } from 'vue'
 import { useI18n } from '~/composables/useI18n'
 import { invokeTauri } from '~/composables/useTauri'
+import { useAppInfo } from '~/composables/useAppInfo'
 
 const { t } = useI18n()
+
+// 実バージョンは Rust 側 get_app_info (= env!("CARGO_PKG_VERSION")) から取得する。
+// Tauri 未接続時は info.value が null のままなので '—' で fallback。
+const { info: appInfo, load: loadAppInfo } = useAppInfo()
+onMounted(() => {
+  void loadAppInfo()
+})
 
 async function openExternal(url: string) {
   try {
@@ -36,7 +45,9 @@ async function openExternal(url: string) {
     <div class="prop-section">
       <div class="prop-head">
         {{ t('app.name') }}
-        <span class="head-hint">{{ t('settings.aboutAppHint', { version: '1.0.0' }) }}</span>
+        <span class="head-hint">{{
+          t('settings.aboutAppHint', { version: appInfo?.version ?? '—' })
+        }}</span>
       </div>
       <div class="prop-body">
         <SettingsRow :label="t('settings.homepageLabel')" mono>

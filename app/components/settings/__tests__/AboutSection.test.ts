@@ -7,11 +7,23 @@
  * を確認する。
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import AboutSection from '../AboutSection.vue'
 
 // invokeTauri を spy できるよう mock。
-const invokeMock = vi.fn().mockResolvedValue(undefined)
+// `get_app_info` だけは AboutSection の onMounted がバージョン取得に使うので
+// 固定値を返し、それ以外 (open_url 等) は undefined を返す。
+const invokeMock = vi.fn().mockImplementation((cmd: string) => {
+  if (cmd === 'get_app_info') {
+    return Promise.resolve({
+      version: '0.1.0',
+      cursors_dir: '',
+      config_dir: '',
+      os_version: 'Windows 10.0',
+    })
+  }
+  return Promise.resolve(undefined)
+})
 vi.mock('~/composables/useTauri', () => ({
   invokeTauri: (...args: unknown[]) => invokeMock(...args),
 }))
@@ -44,9 +56,10 @@ describe('AboutSection', () => {
     for (let i = 0; i < 2; i++) {
       await buttons[i]!.trigger('click')
     }
-    expect(invokeMock).toHaveBeenCalledTimes(2)
-    for (const call of invokeMock.mock.calls) {
-      expect(call[0]).toBe('open_url')
+    // get_app_info も onMounted で呼ばれるので open_url 呼び出しのみ抽出して検証する。
+    const openUrlCalls = invokeMock.mock.calls.filter((c) => c[0] === 'open_url')
+    expect(openUrlCalls).toHaveLength(2)
+    for (const call of openUrlCalls) {
       const url = (call[1] as { url: string }).url
       expect(url).toMatch(/^https:\/\/github\.com\//)
     }
@@ -59,8 +72,10 @@ describe('AboutSection', () => {
     expect(buttons.length).toBe(3)
   })
 
-  it('shows version hint with v{version} pattern', () => {
+  it('shows version hint with v{version} pattern from get_app_info', async () => {
     const wrapper = mount(AboutSection, { global: { stubs } })
+    // useAppInfo の load() が解決するのを待ってから DOM を見る。
+    await flushPromises()
     const hint = wrapper.find('.head-hint')
     expect(hint.exists()).toBe(true)
     expect(hint.text()).toMatch(/v\d/)

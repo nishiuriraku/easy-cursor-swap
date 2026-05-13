@@ -1,25 +1,38 @@
 <script setup lang="ts">
 /**
  * Win11 風タイトルバー。
- * Tauri ウィンドウコントロール (最小化/最大化/閉じる) を将来的に IPC で接続する。
- * 現状はクリックハンドラーのみ用意し、IPC 未接続時はコンソール警告のみ。
+ * Tauri ウィンドウコントロール (最小化/最大化/閉じる) は @tauri-apps/api/window 経由で接続済み。
+ * Web 開発時は API が存在しないので onMounted で動的 import + 失敗時はコンソール警告。
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useUiTheme } from '~/composables/useUiTheme'
 import { useI18n } from '~/composables/useI18n'
+import { useAppInfo } from '~/composables/useAppInfo'
 
 const { t } = useI18n()
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     title?: string
+    /** 明示指定時は IPC を上書きする。通常は省略して get_app_info の結果を使う。 */
     version?: string
   }>(),
   {
     title: 'EasyCursorSwap',
-    version: 'v1.0.0',
+    version: '',
   },
 )
+
+// バージョン表示は Rust 側 get_app_info (= env!("CARGO_PKG_VERSION")) から取得して
+// `v{version}` 形式で出す。Tauri 未接続時は '—' で fallback。
+const { info: appInfo, load: loadAppInfo } = useAppInfo()
+onMounted(() => {
+  void loadAppInfo()
+})
+const versionLabel = computed(() => {
+  if (props.version) return props.version
+  return appInfo.value?.version ? `v${appInfo.value.version}` : 'v—'
+})
 
 const { mode, cycle } = useUiTheme()
 const themeIcon = computed(() =>
@@ -177,7 +190,7 @@ function onTitlebarMouseDown(e: MouseEvent) {
       <span class="tb-mark"><UiIcon name="Logo" :size="12" /></span>
       <span>{{ title }}</span>
       <span class="tb-dash">—</span>
-      <span class="tb-meta">{{ version }} · Win 11</span>
+      <span class="tb-meta">{{ versionLabel }} · Win 11</span>
     </div>
     <div class="tb-controls">
       <button

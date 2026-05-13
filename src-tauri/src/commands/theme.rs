@@ -6,7 +6,7 @@
 //! - `.cursorpack` の inspect / import
 //! - 17 ロール定義の取得 (`get_cursor_roles`)
 //!
-//! .cur ビルドや署名フローは [`super::cursor_build`] (TODO: 切り出し予定)、
+//! .cur ビルドや署名フローは [`super::cursor_build`] (build / cancel / dto / sign / stream に分割済み)、
 //! Windows スキーム連携は [`super::windows_scheme`] にある。
 
 use crate::config::ConfigManager;

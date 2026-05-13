@@ -1,14 +1,16 @@
 <script setup lang="ts">
 /**
- * クリエイターモード (Phase 5-5)
+ * クリエイターモード。
  *
- * design/creator.jsx を Vue 化したもの。2 カラム構成 (Assign タブ):
- *  - 左:  17 役割リスト (filled/partial/empty ドット付き)
+ * 2 カラム構成 (Assign タブ):
+ *  - 左:  17 役割リスト (filled / empty ドット付き)
  *  - 中央: ビッグプレビュー + 6 サイズストリップ + リサンプル切替
- *  ※ ホットスポット / 影フラグはメタデータタブに集約し、右ペインは廃止。
+ *  ホットスポット / 影フラグはメタデータタブに集約。
  *
- * NOTE: 実際の画像アップロード / .cur ビルド / 署名生成は今回はスタブ。
- *       UI 構造とインタラクションのみ実装し、IPC 配線は後続タスクに委ねる。
+ * 画像アップロード / .cur ビルド / 署名生成は全て IPC 配線済み:
+ *  - useCreatorImport (PNG/SVG/.cur/.ico 単一ファイル取込)
+ *  - useCreatorBulkImportFlow (複数ファイル / .cursorpack の bulk 取込)
+ *  - useCreatorExport (Rust 側 export_cursorpack_streamed への引き渡し)
  */
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { CURSOR_ROLES, type CursorRoleDef } from '~/components/icons/CursorIcons'
@@ -90,7 +92,10 @@ const activeTab = ref<TabId>('assign')
 const activeRoleId = ref<string>('Arrow')
 const activeSize = ref<number>(64)
 const resample = ref<ResampleMode>('lanczos')
-const perSizeHotspot = ref(false) // Task 5 で配線、当面デフォルト OFF
+// 解像度別のホットスポット上書きを有効化するトグル。デフォルト OFF。
+// ON のときは writeActiveHotspot が assigned[role].sized 側に書き込み、
+// activeHotspotModel / sizedOverrideActive / enableSizedOverride で制御される。
+const perSizeHotspot = ref(false)
 /**
  * `?editPath` で既存テーマを Creator に取り込んでいる場合、その元テーマの UUID。
  * SaveDestinationModal の「上書き保存 / 複製」選択肢の表示と、
