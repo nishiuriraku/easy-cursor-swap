@@ -841,11 +841,10 @@ async function onFileChange(e: Event) {
                 <CursorPreview
                   :asset="activePreviewAsset"
                   :hotspot="activeHotspot"
-                  :role-id="activeRole.id"
                   :display-pct="70"
                   editable
                   :reference-px="assigned[activeRoleId]?.primarySize || activeSize"
-                  :fallback-icon-size="90"
+                  :hide-dot="activePreviewAsset.kind === 'empty'"
                   class="bigpreview"
                   @update:hotspot="(h) => writeActiveHotspot(h)"
                 />
