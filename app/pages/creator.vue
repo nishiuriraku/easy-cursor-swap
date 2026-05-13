@@ -12,7 +12,7 @@
  *  - useCreatorBulkImportFlow (複数ファイル / .cursorpack の bulk 取込)
  *  - useCreatorExport (Rust 側 export_cursorpack_streamed への引き渡し)
  */
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, onUnmounted, ref } from 'vue'
 import { CURSOR_ROLES, type CursorRoleDef } from '~/components/icons/CursorIcons'
 import { invokeTauri } from '~/composables/useTauri'
 import { sanitizeSvg } from '~/composables/sanitizeSvg'
@@ -27,7 +27,6 @@ import { useCreatorExport } from '~/composables/useCreatorExport'
 import { useCreatorBulkImportFlow } from '~/composables/useCreatorBulkImportFlow'
 import { useCreatorPickers } from '~/composables/useCreatorPickers'
 import type { CursorPreviewAsset } from '~/components/preview/CursorPreview.vue'
-import BulkImportButton from '~/components/creator/BulkImportButton.vue'
 import BulkImportPreviewModal from '~/components/creator/BulkImportPreviewModal.vue'
 import NewThemeStartModal from '~/components/creator/NewThemeStartModal.vue'
 import SaveDestinationModal from '~/components/creator/SaveDestinationModal.vue'
@@ -327,6 +326,13 @@ onBeforeUnmount(() => {
   roleBlobCache.clear()
 })
 
+onUnmounted(() => {
+  if (unlistenDrop) {
+    unlistenDrop()
+    unlistenDrop = null
+  }
+})
+
 /**
  * 現在ロールのホットスポットを画像中央 (0.5, 0.5) に移動する。
  */
@@ -350,6 +356,7 @@ function isRequired(id: string): boolean {
 import { onMounted } from 'vue'
 onMounted(async () => {
   void refreshKeystore()
+  void setupTauriDrop()
   // ライブラリの「Creator で編集」から `?editPath=...` で .cursorpack を渡された場合は
   // 自動ロードして editing ステージを開く。一時ファイルなので読み込み後に放置しても
   // OS が TEMP を整理してくれるので明示削除はしない。
@@ -480,6 +487,58 @@ async function pickBulkFolder() {
   const picked = await pickers.pickFolder()
   if (!picked) return
   await runBulkResolve([picked], false, `📁 ${picked}`)
+}
+
+// ----------------------------------------------------------------------------
+// Tauri ウィンドウ Drag & Drop
+//
+// ブラウザの DragEvent は dataTransfer.files に絶対パスを含めないため、Library
+// 画面と同じく Tauri v2 の onDragDropEvent で実パスを受け取って dispatchBulkPaths
+// に流す。start ステージで受けた場合は NewThemeStartModal をスキップして editing
+// へ直接遷移する (ユーザー選択: 両方で受け付ける)。
+//
+// dispatchBulkPaths は拡張子別に「.cursorpack 単独」と「bulk_resolve」に分岐する
+// ので、ここでは拡張子ごとの分岐を再実装しない。サポート外の拡張子は
+// dispatchBulkPaths 側で「マッチ 0 件」の空 preview として扱われる。
+// ----------------------------------------------------------------------------
+const showDrop = ref(false)
+let unlistenDrop: (() => void) | null = null
+
+const SUPPORTED_DROP_EXTS = ['png', 'svg', 'cur', 'ico', 'ani', 'cursorpack']
+
+async function setupTauriDrop() {
+  try {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window')
+    const win = getCurrentWindow()
+    unlistenDrop = await win.onDragDropEvent((event) => {
+      const p = event.payload
+      if (p.type === 'enter' || p.type === 'over') {
+        showDrop.value = true
+      } else if (p.type === 'leave') {
+        showDrop.value = false
+      } else if (p.type === 'drop') {
+        showDrop.value = false
+        const paths = (p.paths ?? []).filter((path: string) => {
+          const ext = path.toLowerCase().split('.').pop() ?? ''
+          return SUPPORTED_DROP_EXTS.includes(ext)
+        })
+        if (paths.length === 0) {
+          importMessage.value = t('creator.errDropUnsupported')
+          return
+        }
+        // start 画面で受けたときは NewThemeStartModal を閉じて editing に遷移。
+        // dispatchBulkPaths 内で `.cursorpack` の場合は bulkModalOpen が立ち、
+        // bulk_resolve 経路でも同様に preview が開くため stage 遷移は先んじて行う。
+        if (stage.value === 'start') {
+          newThemeModalOpen.value = false
+          stage.value = 'editing'
+        }
+        void dispatchBulkPaths(paths)
+      }
+    })
+  } catch (err) {
+    console.warn('[Creator] Tauri drop API unavailable:', err)
+  }
 }
 
 /**
@@ -681,6 +740,8 @@ async function onFileChange(e: Event) {
         :arrow-assigned="arrowAssigned"
         @reset="resetCreator"
         @save="onToolbarSave"
+        @bulk-auto="pickBulkAuto"
+        @bulk-folder="pickBulkFolder"
       />
 
       <!-- タブバー -->
@@ -745,7 +806,6 @@ async function onFileChange(e: Event) {
               </div>
             </div>
             <div style="display: flex; gap: 6px">
-              <BulkImportButton @bulk-auto="pickBulkAuto" @bulk-folder="pickBulkFolder" />
               <input
                 ref="fileInput"
                 type="file"
@@ -923,6 +983,21 @@ async function onFileChange(e: Event) {
       @update:model-value="onThemePickerSelect"
       @cancel="onThemePickerCancel"
     />
+
+    <!--
+      Tauri ウィンドウ DnD のフィードバック。Library 画面の LibraryDropOverlay と
+      ほぼ同じだが、Creator では PNG/SVG/CUR/ICO/ANI/.cursorpack 全般を受け付ける
+      ので文言を専用化している。
+    -->
+    <Transition name="fade">
+      <div v-if="showDrop" class="creator-drop">
+        <div class="creator-drop-inner">
+          <UiIcon name="Import" :size="56" class="creator-drop-icon" />
+          <h3>{{ t('creator.dropTitle') }}</h3>
+          <p>{{ t('creator.dropSub') }}</p>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -1118,5 +1193,38 @@ async function onFileChange(e: Event) {
 }
 .bigpreview {
   @apply size-full;
+}
+
+/* Tauri DnD オーバーレイ。LibraryDropOverlay と同じ表現を Creator 用に inline 化。
+ * Creator 配下のすべてのステージ (start / editing) を覆うので creator-host
+ * (relative) の中で z-50 に積む。 */
+.creator-drop {
+  @apply absolute inset-0 z-50 grid place-items-center;
+  background: rgba(10, 11, 15, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.creator-drop-inner {
+  @apply w-[480px] rounded-2xl p-10 text-center;
+  border: 1.5px dashed var(--accent-line);
+  background: rgba(124, 242, 212, 0.04);
+}
+.creator-drop-inner h3 {
+  @apply m-0 font-display text-[18px] font-semibold tracking-[-0.01em];
+  margin: 12px 0 6px;
+}
+.creator-drop-inner p {
+  @apply m-0 text-[13px] text-fg-dim;
+}
+.creator-drop-icon {
+  @apply text-accent;
+}
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 200ms ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>

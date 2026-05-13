@@ -1,11 +1,16 @@
 <script setup lang="ts">
 /**
- * Creator のツールバー (パンくず + クリアボタン + 署名状態タグ + Save ボタン)。
+ * Creator のツールバー (パンくず + 一括インポート + クリアボタン + 署名状態タグ + Save ボタン)。
  *
  * メタデータ表示 (テーマ名 / バージョン) と export 状態を props で受け取り、
- * アクション 2 種 (reset / save) を emit で親に通知する。
+ * アクション 4 種 (bulk-auto / bulk-folder / reset / save) を emit で親に通知する。
  * Save ボタンを押すと親が SaveDestinationModal を開き、保存先 / 署名を選ばせる。
+ *
+ * Bulk import の主アクション / フォルダ取込はもともと editor-head 内にあった
+ * BulkImportButton を移植したもの。creator.vue 側で pickBulkAuto / pickBulkFolder
+ * にそのまま接続する。
  */
+import BulkImportButton from '~/components/creator/BulkImportButton.vue'
 import { useI18n } from '~/composables/useI18n'
 
 const { t } = useI18n()
@@ -21,6 +26,8 @@ defineProps<{
 defineEmits<{
   (e: 'reset'): void
   (e: 'save'): void
+  (e: 'bulk-auto'): void
+  (e: 'bulk-folder'): void
 }>()
 </script>
 
@@ -36,6 +43,7 @@ defineEmits<{
     </div>
     <div />
     <div class="tb-actions">
+      <BulkImportButton @bulk-auto="$emit('bulk-auto')" @bulk-folder="$emit('bulk-folder')" />
       <button
         class="btn ghost"
         :aria-label="t('creator.clearAria')"
