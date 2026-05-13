@@ -625,7 +625,7 @@ impl ThemeManager {
         }
 
         let metadata = ThemeMetadata {
-            schema_version: 2,
+            schema_version: 1,
             id: Uuid::new_v4(),
             name: LocalizedString::Localized(name_map),
             version: "1.0.0".to_string(),
@@ -686,15 +686,15 @@ impl ThemeManager {
         let content = std::fs::read_to_string(theme_json_path)?;
         let metadata: ThemeMetadata = serde_json::from_str(&content)?;
 
-        // schema_version 検証: v2 以外はスキップ (v1 → v2 マイグレーションなし)
-        if metadata.schema_version != 2 {
+        // schema_version 検証: v1 のみ対応 (リリース前のため将来のマイグレーション窓口だけ用意)
+        if metadata.schema_version != 1 {
             tracing::warn!(
-                "テーマ {} スキップ: 非対応 schema_version {} (expected 2)",
+                "テーマ {} スキップ: 非対応 schema_version {} (expected 1)",
                 crate::logging::short_hash(metadata.id.to_string().as_bytes()),
                 metadata.schema_version
             );
             return Err(crate::errors::AppError::Theme(format!(
-                "schema_version {} は非対応 (expected 2)",
+                "schema_version {} は非対応 (expected 1)",
                 metadata.schema_version
             )));
         }
@@ -1279,7 +1279,7 @@ mod tests {
     #[test]
     fn write_cursorpack_to_buffer_produces_valid_zip() {
         let mut metadata = crate::theme::types::ThemeMetadata {
-            schema_version: 2,
+            schema_version: 1,
             id: uuid::Uuid::new_v4(),
             name: crate::theme::types::LocalizedString::Simple("Buf Test".to_string()),
             version: "1.0.0".to_string(),
@@ -1333,7 +1333,7 @@ mod tests {
             },
         );
         let mut metadata = crate::theme::types::ThemeMetadata {
-            schema_version: 2,
+            schema_version: 1,
             id: uuid::Uuid::new_v4(),
             name: LocalizedString::Simple("Ani Mix".to_string()),
             version: "1.0.0".to_string(),

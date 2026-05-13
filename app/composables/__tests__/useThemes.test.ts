@@ -29,7 +29,7 @@ const SUMMARY = {
   size_bytes: 1234,
   signed: false,
   description: 'Sample description.',
-  schema_version: 2,
+  schema_version: 1,
   license: 'MIT',
   homepage: 'https://example.com',
   last_applied_at: '2026-05-10T00:00:00Z',
@@ -56,7 +56,7 @@ describe('useThemes mapSummary', () => {
     const t = themes.value[0]!
     expect(t.tags).toEqual(['cute'])
     expect(t.sizeBytes).toBe(1234)
-    expect(t.schemaVersion).toBe(2)
+    expect(t.schemaVersion).toBe(1)
     expect(t.license).toBe('MIT')
     expect(t.homepage).toBe('https://example.com')
     expect(t.lastAppliedAt).toBe('2026-05-10T00:00:00Z')

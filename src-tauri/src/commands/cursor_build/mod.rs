@@ -65,7 +65,7 @@ pub fn export_cursorpack(req: ExportCursorpackRequest) -> Result<ExportResult, A
     }
 
     let mut metadata = ThemeMetadata {
-        schema_version: 2,
+        schema_version: 1,
         id: uuid::Uuid::new_v4(),
         name: LocalizedString::Localized(name_map),
         version: req.version.clone(),
@@ -266,7 +266,7 @@ mod tests {
         // (フル展開は手動 E2E に委ねる)。
         use std::collections::HashMap;
         let mut metadata = crate::theme::types::ThemeMetadata {
-            schema_version: 2,
+            schema_version: 1,
             id: uuid::Uuid::new_v4(),
             name: crate::theme::types::LocalizedString::Simple("Lib Test".to_string()),
             version: "1.2.3".to_string(),

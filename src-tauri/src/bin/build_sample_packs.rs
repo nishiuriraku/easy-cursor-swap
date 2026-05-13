@@ -110,7 +110,7 @@ fn build_one(
 
     let id = Uuid::new_v4();
     let mut metadata = ThemeMetadata {
-        schema_version: 2,
+        schema_version: 1,
         id,
         name: localized_name(title),
         version: "1.0.0".to_string(),

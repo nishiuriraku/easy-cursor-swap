@@ -61,7 +61,7 @@ function makeTheme(overrides: Partial<ThemeCardData> = {}): ThemeCardData {
     signed: false,
     lastAppliedAt: null,
     description: null,
-    schemaVersion: 2,
+    schemaVersion: 1,
     license: null,
     homepage: null,
     ...overrides,
@@ -118,9 +118,9 @@ describe('ThemeDetailDrawer — 静的要素の整理', () => {
   })
 
   it('PACKAGE セルに schema v{n} とサイズを表示', () => {
-    const w = mountDrawer(makeTheme({ schemaVersion: 2, sizeBytes: 2 * 1024 * 1024 }))
+    const w = mountDrawer(makeTheme({ schemaVersion: 1, sizeBytes: 2 * 1024 * 1024 }))
     const pkg = w.findAll('.td-cell')[0]!
-    expect(pkg.find('.td-cell-v').text()).toContain('schema v2')
+    expect(pkg.find('.td-cell-v').text()).toContain('schema v1')
     expect(pkg.find('.td-cell-sub').text()).toContain('2.0 MB')
   })
 

@@ -492,7 +492,7 @@ mod tests {
             size_bytes: 1024,
             signed: true,
             description: Some("テスト用説明".into()),
-            schema_version: 2,
+            schema_version: 1,
             license: Some("MIT".into()),
             homepage: Some("https://example.test".into()),
         }
@@ -506,7 +506,7 @@ mod tests {
         s.homepage = None;
         let v = serde_json::to_value(&s).unwrap();
         // 必須フィールドは出る
-        assert_eq!(v["schema_version"], 2);
+        assert_eq!(v["schema_version"], 1);
         // Option::None はキーごと省略される
         assert!(v.get("description").is_none(), "description present: {v}");
         assert!(v.get("license").is_none(), "license present: {v}");
@@ -518,7 +518,7 @@ mod tests {
         let s = sample_summary_full();
         let v = serde_json::to_value(&s).unwrap();
         assert_eq!(v["description"], "テスト用説明");
-        assert_eq!(v["schema_version"], 2);
+        assert_eq!(v["schema_version"], 1);
         assert_eq!(v["license"], "MIT");
         assert_eq!(v["homepage"], "https://example.test");
     }

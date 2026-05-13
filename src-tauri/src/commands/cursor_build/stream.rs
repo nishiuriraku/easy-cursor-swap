@@ -94,7 +94,7 @@ pub fn export_cursorpack_streamed(
         name_map.insert("en".to_string(), en);
     }
     let mut metadata = ThemeMetadata {
-        schema_version: 2,
+        schema_version: 1,
         id: resolve_metadata_id(req.existing_theme_id),
         name: LocalizedString::Localized(name_map),
         version: req.version.clone(),
