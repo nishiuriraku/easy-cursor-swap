@@ -108,7 +108,6 @@ defineEmits<{
           </SettingsRow>
         </div>
       </div>
-
     </div>
 
     <Transition name="fade">
@@ -317,5 +316,4 @@ defineEmits<{
 .fade-leave-to {
   opacity: 0;
 }
-
 </style>
