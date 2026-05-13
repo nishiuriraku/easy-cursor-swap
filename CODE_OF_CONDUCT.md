@@ -14,7 +14,7 @@ This Code of Conduct applies within all project spaces — issues, pull requests
 
 Instances of abusive, harassing, or otherwise unacceptable behaviour may be reported confidentially to the maintainer:
 
-- **Email:** <EMAIL_ADDRESS>
+- **Email:** nishiuriraku@gmail.com
 
 All complaints will be reviewed and investigated promptly and fairly. The maintainer is obligated to respect the privacy and security of the reporter.
 
