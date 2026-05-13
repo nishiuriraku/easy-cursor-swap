@@ -96,7 +96,7 @@ const displayCells = computed<Array<{ role: CursorRoleDef; included: boolean }>>
  * matrix 自体を中央寄せ + 幅制限し、その分アイコン/画像を大きく見せる。 */
 .cursors.cols-3 {
   @apply mx-auto;
-  max-width: 168px;
+  max-width: 216px;
 }
 .cursors.cols-3 .cell svg {
   @apply size-[22px];

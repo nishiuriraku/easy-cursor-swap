@@ -82,7 +82,7 @@ watch(() => props.theme.id, fetchPreview)
         <span class="pulse" aria-hidden="true" />{{ t('library.activeTag') }}
       </div>
       <div v-if="isSystem" class="card-source-tag" :aria-label="t('library.sourceTagSchemeAria')">
-        WINDOWS
+        SYSTEM
       </div>
       <CursorMatrix
         :included="theme.includedRoles"
@@ -108,7 +108,14 @@ watch(() => props.theme.id, fetchPreview)
           <UiIcon :name="theme.isFavorite ? 'Star' : 'StarO'" :size="13" aria-hidden="true" />
         </button>
       </div>
-      <div class="meta-row" aria-label="`${theme.name} v${theme.version}, ${displayDate}`">
+      <div
+        v-if="!isSystem"
+        class="meta-row"
+        aria-label="`${theme.name} v${theme.version}, ${displayDate}`"
+      >
+        <span v-if="theme.signed" class="tag ok featured-tag">
+          <UiIcon name="Shield" :size="9" />
+        </span>
         <span class="m" aria-hidden="true"><b>v</b>{{ theme.version }}</span>
         <span class="m" aria-hidden="true">{{ displayDate }}</span>
         <span class="m" aria-hidden="true">×{{ theme.applyCount }}</span>

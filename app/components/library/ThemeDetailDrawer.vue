@@ -224,14 +224,14 @@ async function openHomepage() {
       <div class="td-cell">
         <div class="td-cell-k">PACKAGE</div>
         <div class="td-cell-v mono">
-          {{ isSystem ? 'system scheme' : `schema v${theme.schemaVersion ?? '?'}` }}
-        </div>
-        <div class="td-cell-sub">
           <span>{{ coverage }} roles</span>
           <template v-if="displaySize">
             <span class="td-dot">·</span>
             <span>{{ displaySize }}</span>
           </template>
+        </div>
+        <div class="td-cell-sub">
+          {{ isSystem ? 'system scheme' : `schema v${theme.schemaVersion ?? '?'}` }}
         </div>
       </div>
 

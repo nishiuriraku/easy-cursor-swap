@@ -810,7 +810,7 @@
 }
 .grid {
   @apply grid gap-4;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
 }
 
 /* --- Modal shell (Phase 12-F) ---
