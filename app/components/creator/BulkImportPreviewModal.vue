@@ -13,7 +13,6 @@ import { initialHotspotFor } from '~/composables/useHotspotDefaults'
 import { useI18n } from '~/composables/useI18n'
 import BulkImportRoleRow from './BulkImportRoleRow.vue'
 import AniThumb from './AniThumb.vue'
-import SettingsToggle from '~/components/settings/SettingsToggle.vue'
 
 const { t } = useI18n()
 
@@ -26,13 +25,6 @@ interface Props {
   /** 既に割り当て済みのロール (上書き判定用)。 */
   existingRoles: Set<string>
   sourceLabel: string
-  /**
-   * Creator ページで現在フォーカスされているロール ID。
-   * 単発ファイルインポート時のフォールバック先として使う
-   * (例: `1.cur` 等のロール名にマッチしないファイル名でも、
-   * ユーザーが選んでいるロールへ直接割り当てる)。
-   */
-  activeRoleId: string
 }
 const props = defineProps<Props>()
 const emit = defineEmits<{
@@ -47,12 +39,16 @@ export interface ApplyPayload {
   metadata: ParsedCursorpack['metadata'] | null
 }
 
+/**
+ * 1 ロールに割当て済みのアセット。
+ *
+ * 確信度パーセントと採用/スキップトグルは廃止。`matches` に入っているもの = apply 対象。
+ * 「適用したくない」場合は ✕ ボタンで未マッチプールへ戻すと、apply 時に無視される。
+ */
 interface PendingMatch {
   role: string
   asset: ResolvedAsset
-  confidence: number
   conflict: 'none' | 'overwrite-existing' | 'collision-with-other-pending'
-  decision: 'apply' | 'skip'
   previewUrl: string
   /**
    * `.ani` 用の Uint8Array 化済みフレーム列。Vue 3 のテンプレートは Uint8Array を
@@ -63,9 +59,15 @@ interface PendingMatch {
   aniFramesU8: readonly Uint8Array[] | null
 }
 
+/**
+ * まだロールに割当てられていないファイル (未マッチプール)。
+ *
+ * ドロップダウンでロール選択された瞬間に `matches` へ移動する eager モデルなので、
+ * 「選択された未マッチ」という中間状態は持たない。誤マッチで未マッチに戻された
+ * ファイルも同じ構造で再利用する。
+ */
 interface UnmatchedFile {
   asset: ResolvedAsset
-  manuallyAssignedRole: string | null
   previewUrl: string
   aniFramesU8: readonly Uint8Array[] | null
 }
@@ -74,10 +76,8 @@ function toAniFramesU8(asset: ResolvedAsset): readonly Uint8Array[] | null {
   return asset.ani ? asset.ani.framePngs.map((b) => new Uint8Array(b)) : null
 }
 
-const protectExisting = ref(true)
 const matches = ref<PendingMatch[]>([])
 const unmatched = ref<UnmatchedFile[]>([])
-const skippedCount = ref(0)
 const metadataChoice = ref<'keep' | 'overwrite' | 'name-only'>('overwrite')
 
 const previewUrls: string[] = []
@@ -98,7 +98,6 @@ function resetState() {
   previewUrls.length = 0
   matches.value = []
   unmatched.value = []
-  skippedCount.value = 0
 }
 
 watch(
@@ -132,30 +131,11 @@ watch(
         matches.value.push({
           role,
           asset: fakeAsset,
-          confidence: 1.0,
           conflict,
-          decision: conflict === 'overwrite-existing' && protectExisting.value ? 'skip' : 'apply',
           previewUrl: makePreview(fakeAsset),
           aniFramesU8: toAniFramesU8(fakeAsset),
         })
       }
-      return
-    }
-
-    // 単発ファイル fast-path: ファイル名が `1.cur` 等 alias 辞書にマッチしない場合でも、
-    // ユーザーが Creator で選んでいる activeRoleId に直接割り当てる。
-    // 複数ファイル時は従来通り fuzzy match を走らせる (alias による役割推定が活きるため)。
-    //
-    // TODO(USER): props.resolved の長さが 1 のときの分岐を実装してください。
-    //   - props.resolved[0] を props.activeRoleId に割り当てる PendingMatch を 1 件 push
-    //   - confidence は 1.0 を採用 (ユーザー本人がロールを選んだ状態でドロップしているため)
-    //   - 既存ロールへの上書きは props.existingRoles と protectExisting.value を見て
-    //     conflict = 'overwrite-existing' / decision = 'skip' or 'apply' を決める
-    //     (cursorpack 経路 L124-130 と同じパターン)
-    //   - previewUrl / aniFramesU8 は makePreview / toAniFramesU8 を再利用
-    //   - 完了後は早期 return で通常マッチ経路をスキップする
-    if (props.resolved && props.resolved.length === 1) {
-      // ↓ ここに 8〜12 行で実装してください
       return
     }
 
@@ -170,7 +150,6 @@ watch(
       } else {
         unmatched.value.push({
           asset: a,
-          manuallyAssignedRole: null,
           previewUrl: makePreview(a),
           aniFramesU8: toAniFramesU8(a),
         })
@@ -180,7 +159,6 @@ watch(
     for (const c of demoted as Array<(typeof candidates)[0]>) {
       unmatched.value.push({
         asset: c.asset,
-        manuallyAssignedRole: null,
         previewUrl: makePreview(c.asset),
         aniFramesU8: toAniFramesU8(c.asset),
       })
@@ -190,9 +168,7 @@ watch(
       matches.value.push({
         role: w.match.role,
         asset: w.asset,
-        confidence: w.match.score,
         conflict,
-        decision: conflict === 'overwrite-existing' && protectExisting.value ? 'skip' : 'apply',
         previewUrl: makePreview(w.asset),
         aniFramesU8: toAniFramesU8(w.asset),
       })
@@ -201,16 +177,78 @@ watch(
   { immediate: true },
 )
 
-watch(protectExisting, (v) => {
-  for (const m of matches.value) {
-    if (m.conflict === 'overwrite-existing') {
-      m.decision = v ? 'skip' : 'apply'
-    }
+/**
+ * 割当解除: matches から該当ロールのファイルを未マッチプールへ戻す。
+ *
+ * ファジーマッチが誤った場合や、ユーザーが別ロールに付け直したい場合に呼ばれる。
+ * previewUrl / aniFramesU8 はそのまま再利用する (revoke しない)。
+ */
+function unassignRole(roleId: string): void {
+  const idx = matches.value.findIndex((m) => m.role === roleId)
+  if (idx < 0) return
+  const m = matches.value[idx]!
+  matches.value.splice(idx, 1)
+  unmatched.value.push({
+    asset: m.asset,
+    previewUrl: m.previewUrl,
+    aniFramesU8: m.aniFramesU8,
+  })
+}
+
+/**
+ * 未マッチプールからロールへ割当: 既存の割当があれば未マッチプールへ追い出してから入替。
+ *
+ * UiSelect の v-model 変更ハンドラから呼ぶ。これにより未マッチドロップダウンで
+ * 「すでに別ファイルが入っているロール」を選ぶと、その既存ファイルが未マッチに
+ * 戻って入替わる (誤マッチの修正がワンアクションで完了する)。
+ */
+function pickRoleFromUnmatched(item: UnmatchedFile, roleId: string): void {
+  const itemIdx = unmatched.value.indexOf(item)
+  if (itemIdx < 0) return
+
+  // 既存割当があれば先に未マッチへ戻す (順序: 自分を抜く → 既存を戻す → 新規割当)
+  unmatched.value.splice(itemIdx, 1)
+  const existingIdx = matches.value.findIndex((m) => m.role === roleId)
+  if (existingIdx >= 0) {
+    const existing = matches.value[existingIdx]!
+    matches.value.splice(existingIdx, 1)
+    unmatched.value.push({
+      asset: existing.asset,
+      previewUrl: existing.previewUrl,
+      aniFramesU8: existing.aniFramesU8,
+    })
   }
-})
+
+  const conflict = props.existingRoles.has(roleId) ? 'overwrite-existing' : 'none'
+  matches.value.push({
+    role: roleId,
+    asset: item.asset,
+    conflict,
+    previewUrl: item.previewUrl,
+    aniFramesU8: item.aniFramesU8,
+  })
+}
+
+/**
+ * 全解除: 現在割当済の全ファイルを未マッチプールへ戻す。
+ *
+ * 「ファジーマッチの結果をまるごとリセットして最初から手動で割り直したい」用途。
+ * `.cursorpack` 経路 (全ロールが自動で matches に埋まる) でも、ユーザーが
+ * 1 つずつロールを選び直す体験へ切り替えるためのエスケープハッチ。
+ */
+function unassignAll(): void {
+  for (const m of matches.value) {
+    unmatched.value.push({
+      asset: m.asset,
+      previewUrl: m.previewUrl,
+      aniFramesU8: m.aniFramesU8,
+    })
+  }
+  matches.value = []
+}
 
 const summaryLine = computed(() => {
-  const auto = matches.value.filter((m) => m.decision === 'apply').length
+  const auto = matches.value.length
   const conflicts = matches.value.filter((m) => m.conflict !== 'none').length
   return t('bulkImport.previewSummary', { auto, unmatched: unmatched.value.length, conflicts })
 })
@@ -227,6 +265,39 @@ const allRoleRows = computed(() => {
       match: m,
     }
   })
+})
+
+/**
+ * 未マッチプールの表示順。ファイル名で自然数順 (`1.cur < 2.cur < 10.cur`) に固定。
+ * `Intl.Collator({ numeric: true })` で日本語ファイル名も含めて自然な辞書順に並ぶ。
+ */
+const naturalCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
+const sortedUnmatched = computed(() =>
+  [...unmatched.value].sort((a, b) =>
+    naturalCollator.compare(a.asset.sourceFile, b.asset.sourceFile),
+  ),
+)
+
+/**
+ * 未マッチ行ドロップダウンの選択肢。
+ * 空きロールを先頭、割当済ロールを末尾に並べ替え、割当済には「上書き」サフィックスを付ける。
+ * 割当済を選ぶと `pickRoleFromUnmatched` 内で既存ファイルが未マッチに戻る (swap)。
+ */
+const unmatchedRoleOptions = computed(() => {
+  const assigned = new Set(matches.value.map((m) => m.role))
+  const placeholder = { value: null, label: t('bulkImport.selectRolePlaceholder') }
+  const empty: Array<{ value: string; label: string }> = []
+  const taken: Array<{ value: string; label: string }> = []
+  for (const r of CURSOR_ROLE_IDS) {
+    const def = CURSOR_ROLES.find((d) => d.id === r)
+    const base = def ? `${def.jp}（${r}）` : r
+    if (assigned.has(r)) {
+      taken.push({ value: r, label: `${base} — ${t('bulkImport.alreadyAssignedSuffix')}` })
+    } else {
+      empty.push({ value: r, label: base })
+    }
+  }
+  return [placeholder, ...empty, ...taken]
 })
 
 function toRoleAsset(
@@ -271,7 +342,6 @@ function apply() {
 
   if (props.cursorpack) {
     for (const m of matches.value) {
-      if (m.decision !== 'apply') continue
       const parsed = props.cursorpack.roles[m.role]
       if (!parsed) continue
       // SizedAsset 形式で構築 (per-size hotspot は cursorpack 内では未サポートなので undefined)
@@ -298,25 +368,15 @@ function apply() {
       roleAssets.push({ roleId: m.role, asset })
     }
   } else {
+    // unmatched は eager に matches へ移動するモデルなので、apply 時点では
+    // ロール確定済みの matches だけを走査すればよい。未マッチに残ったまま
+    // apply された場合はそのファイルは破棄される (UI 側でも未マッチ件数として可視化)。
     const sourceTag: RoleAsset['source'] =
       (props.resolved?.length ?? 0) > 1 ? 'bulk-folder' : 'bulk-file'
     for (const m of matches.value) {
-      if (m.decision !== 'apply') continue
       roleAssets.push({
         roleId: m.role,
         asset: toRoleAsset(m.role, m.asset, sourceTag, !props.existingRoles.has(m.role)),
-      })
-    }
-    for (const u of unmatched.value) {
-      if (!u.manuallyAssignedRole) continue
-      roleAssets.push({
-        roleId: u.manuallyAssignedRole,
-        asset: toRoleAsset(
-          u.manuallyAssignedRole,
-          u.asset,
-          sourceTag,
-          !props.existingRoles.has(u.manuallyAssignedRole),
-        ),
       })
     }
   }
@@ -329,6 +389,12 @@ function apply() {
 }
 
 onUnmounted(resetState)
+
+/**
+ * テスト用に内部状態と操作を露出する。本番 UI は emit / v-model 経由でしか触らないので
+ * 副作用は無いが、Vue Test Utils から swap / unassign の単体検証を簡素化できる。
+ */
+defineExpose({ matches, unmatched, unassignRole, pickRoleFromUnmatched, unassignAll })
 </script>
 
 <template>
@@ -342,54 +408,67 @@ onUnmounted(resetState)
         <div class="bi-source">{{ sourceLabel }} — {{ summaryLine }}</div>
 
         <div class="bi-protect">
-          <span class="bi-protect-label">{{ t('bulkImport.protectExisting') }}</span>
-          <SettingsToggle v-model="protectExisting" />
+          <button
+            type="button"
+            class="btn ghost"
+            :disabled="matches.length === 0"
+            :title="t('bulkImport.unassignAllHint')"
+            @click="unassignAll"
+          >
+            {{ t('bulkImport.unassignAll', { count: matches.length }) }}
+          </button>
         </div>
 
-        <h4>{{ t('bulkImport.seventeenRoles') }}</h4>
-        <BulkImportRoleRow
-          v-for="row in allRoleRows"
-          :key="row.roleId"
-          :role-id="row.roleId"
-          :role-label="row.roleLabel"
-          :required="row.required"
-          :preview-url="row.match?.previewUrl ?? null"
-          :source-file="row.match?.asset.sourceFile ?? null"
-          :native-size="row.match?.asset.width ?? null"
-          :confidence="row.match?.confidence ?? null"
-          :conflict="row.match?.conflict ?? 'none'"
-          :decision="row.match?.decision ?? 'skip'"
-          :ani-data="row.match?.asset.ani ?? null"
-          :ani-frames-u8="row.match?.aniFramesU8 ?? null"
-          @toggle="(v) => row.match && (row.match.decision = v)"
-        />
+        <div class="bi-columns">
+          <section class="bi-col bi-col-unmatched">
+            <h4>
+              {{
+                unmatched.length
+                  ? t('bulkImport.unmatchedHeader', { count: unmatched.length })
+                  : t('bulkImport.unmatchedEmpty')
+              }}
+            </h4>
+            <div v-for="u in sortedUnmatched" :key="u.asset.sourcePath" class="bi-unmatched">
+              <AniThumb
+                v-if="u.asset.ani && u.aniFramesU8"
+                :frame-pngs="u.aniFramesU8"
+                :sequence="u.asset.ani.sequence"
+                :durations="u.asset.ani.perStepDurationsMs"
+                :width="64"
+                :height="64"
+              />
+              <img v-else :src="u.previewUrl" :alt="u.asset.sourceFile" />
+              <span class="unmatched-meta">{{ u.asset.sourceFile }} ({{ u.asset.width }}px)</span>
+              <UiSelect
+                :model-value="null"
+                width="180px"
+                :placeholder="t('bulkImport.selectRolePlaceholder')"
+                :options="unmatchedRoleOptions"
+                @change="(v) => v && pickRoleFromUnmatched(u, v as string)"
+              />
+            </div>
+            <p v-if="!unmatched.length" class="bi-col-empty">
+              {{ t('bulkImport.unmatchedEmptyHint') }}
+            </p>
+          </section>
 
-        <h4 v-if="unmatched.length">
-          {{ t('bulkImport.unmatchedHeader', { count: unmatched.length }) }}
-        </h4>
-        <div v-for="u in unmatched" :key="u.asset.sourcePath" class="bi-unmatched">
-          <AniThumb
-            v-if="u.asset.ani && u.aniFramesU8"
-            :frame-pngs="u.aniFramesU8"
-            :sequence="u.asset.ani.sequence"
-            :durations="u.asset.ani.perStepDurationsMs"
-            :width="32"
-            :height="32"
-          />
-          <img v-else :src="u.previewUrl" :alt="u.asset.sourceFile" />
-          <span>{{ u.asset.sourceFile }} ({{ u.asset.width }}px)</span>
-          <UiSelect
-            v-model="u.manuallyAssignedRole"
-            width="180px"
-            :placeholder="t('bulkImport.selectRolePlaceholder')"
-            :options="[
-              { value: null, label: t('bulkImport.selectRolePlaceholder') },
-              ...CURSOR_ROLE_IDS.map((r) => {
-                const def = CURSOR_ROLES.find((d) => d.id === r)
-                return { value: r, label: def ? `${def.jp}（${r}）` : r }
-              }),
-            ]"
-          />
+          <section class="bi-col bi-col-roles">
+            <h4>{{ t('bulkImport.seventeenRoles') }}</h4>
+            <BulkImportRoleRow
+              v-for="row in allRoleRows"
+              :key="row.roleId"
+              :role-id="row.roleId"
+              :role-label="row.roleLabel"
+              :required="row.required"
+              :preview-url="row.match?.previewUrl ?? null"
+              :source-file="row.match?.asset.sourceFile ?? null"
+              :native-size="row.match?.asset.width ?? null"
+              :conflict="row.match?.conflict ?? 'none'"
+              :ani-data="row.match?.asset.ani ?? null"
+              :ani-frames-u8="row.match?.aniFramesU8 ?? null"
+              @unassign="unassignRole(row.roleId)"
+            />
+          </section>
         </div>
 
         <template v-if="cursorpack">
@@ -431,13 +510,7 @@ onUnmounted(resetState)
         <button class="btn ghost ml-auto" @click="emit('cancel')">{{ t('common.cancel') }}</button>
         <button class="btn primary" @click="apply">
           ✓
-          {{
-            t('bulkImport.applyCount', {
-              count:
-                matches.filter((m) => m.decision === 'apply').length +
-                unmatched.filter((u) => u.manuallyAssignedRole !== null).length,
-            })
-          }}
+          {{ t('bulkImport.applyCount', { count: matches.length }) }}
         </button>
       </footer>
     </div>
@@ -451,8 +524,22 @@ onUnmounted(resetState)
   @apply fixed inset-0 z-[100] flex items-center justify-center bg-[rgba(10,11,15,0.7)];
 }
 .bi-modal {
-  @apply flex max-h-[90vh] w-[min(900px,96vw)] flex-col rounded-[12px] border border-line;
+  @apply flex max-h-[90vh] w-[min(1200px,96vw)] flex-col rounded-[12px] border border-line;
   background: var(--bg-1, #14161c);
+}
+/* 2 カラム本体: 狭幅では縦積みにフォールバック (md=768px) */
+.bi-columns {
+  @apply mt-2 flex flex-col items-start gap-4 md:flex-row;
+}
+.bi-col {
+  @apply min-w-0 flex-1;
+}
+/* 未マッチカラムは横並び時に sticky 化 — 右カラムをスクロールしても上部に常駐 */
+.bi-col-unmatched {
+  @apply md:sticky md:top-0 md:max-h-[70vh] md:self-start md:overflow-y-auto;
+}
+.bi-col-empty {
+  @apply mt-2 rounded border border-dashed border-line/60 px-3 py-4 text-center text-[11px] text-fg-dim;
 }
 .bi-head,
 .bi-foot {
@@ -474,10 +561,14 @@ onUnmounted(resetState)
   @apply text-[12.5px] font-medium text-fg;
 }
 .bi-unmatched {
-  @apply flex items-center gap-2 py-1 text-[12px];
+  @apply flex items-center gap-3 py-1.5 text-[12px];
 }
 .bi-unmatched img {
-  @apply size-8 object-contain;
+  @apply size-16 object-contain;
+  image-rendering: pixelated;
+}
+.unmatched-meta {
+  @apply flex-1 truncate font-mono text-[11px] text-fg-dim;
 }
 .bi-meta-info {
   @apply mb-1.5 text-[12px] text-fg-mute;

@@ -1,12 +1,16 @@
 <script setup lang="ts">
 /**
  * 一括インポートプレビューモーダル内の 1 ロール行。
- * - 画像サムネ + 信頼度バッジ + 衝突アイコン + 採用/スキップトグル
+ *
+ * - 割当済: サムネ + 衝突アイコン + 解除ボタン
+ * - 空き:   点線枠 + 「未割当」ラベル (未マッチプールからドロップダウンで割当)
+ *
+ * 確信度パーセント表示と採用/スキップトグルは廃止。「適用しないファイル」は
+ * 解除ボタンで未マッチプールへ戻す UX に統一した (情報を失わず、操作が 1 種類で済む)。
  */
 import { computed } from 'vue'
 import { useI18n } from '~/composables/useI18n'
 import AniThumb from './AniThumb.vue'
-import SettingsToggle from '~/components/settings/SettingsToggle.vue'
 
 const { t } = useI18n()
 
@@ -18,10 +22,7 @@ interface Props {
   previewUrl: string | null
   sourceFile: string | null
   nativeSize: number | null
-  /** 信頼度 0-1。null なら未マッチ。 */
-  confidence: number | null
   conflict: 'none' | 'overwrite-existing' | 'collision-with-other-pending'
-  decision: 'apply' | 'skip'
   aniData?: {
     framePngs: number[][]
     sequence: number[]
@@ -30,25 +31,19 @@ interface Props {
   } | null
   /**
    * 親側で 1 度だけ Uint8Array 化した frames 配列。テンプレートに
-   * `new Uint8Array(...)` を書くと Vue 3 のグローバル白リスト
-   * (Math/Date/Array 等しか入っていない) に Uint8Array は含まれないため、
-   * `[Vue warn]: Property "Uint8Array" was accessed during render but is
-   * not defined on instance.` が出る。変換は script setup 内で済ませて渡す。
+   * `new Uint8Array(...)` を書くと Vue 3 のグローバル白リストに
+   * Uint8Array が含まれないため warn が出るので script setup 内で済ませて渡す。
    */
   aniFramesU8?: readonly Uint8Array[] | null
 }
 const props = withDefaults(defineProps<Props>(), { aniData: null, aniFramesU8: null })
-const emit = defineEmits<{ (e: 'toggle', value: 'apply' | 'skip'): void }>()
+const emit = defineEmits<{
+  /** 解除ボタンクリック: 割当済アセットを未マッチプールに戻す */
+  (e: 'unassign'): void
+}>()
 
-const confidenceLabel = computed(() => {
-  if (props.confidence === null) return ''
-  return `${Math.round(props.confidence * 100)}%`
-})
+const isEmpty = computed(() => props.previewUrl === null && props.aniData === null)
 
-const decisionOn = computed({
-  get: () => props.decision === 'apply',
-  set: (v: boolean) => emit('toggle', v ? 'apply' : 'skip'),
-})
 const conflictTitle = computed(() => {
   if (props.conflict === 'overwrite-existing') return t('bulkImport.conflictOverwrite')
   if (props.conflict === 'collision-with-other-pending') return t('bulkImport.conflictCollision')
@@ -57,11 +52,14 @@ const conflictTitle = computed(() => {
 </script>
 
 <template>
-  <div class="bi-row" :class="{ skip: decision === 'skip', conflict: conflict !== 'none' }">
+  <div class="bi-row" :class="{ conflict: conflict !== 'none', empty: isEmpty }">
     <div class="role-cell">
+      <div class="role-line">
+        <CursorIcon :role="roleId" :size="14" />
+        <span class="role-label">{{ roleLabel }}</span>
+        <span v-if="required" class="req">★</span>
+      </div>
       <span class="role-id">{{ roleId }}</span>
-      <span v-if="required" class="req">★</span>
-      <span class="role-label">{{ roleLabel }}</span>
     </div>
     <div class="thumb-cell">
       <AniThumb
@@ -73,7 +71,7 @@ const conflictTitle = computed(() => {
         :height="32"
       />
       <img v-else-if="previewUrl" :src="previewUrl" :alt="roleId" />
-      <span v-else class="dim">{{ t('bulkImport.notProvided') }}</span>
+      <span v-else class="dim">{{ t('bulkImport.emptyRole') }}</span>
       <span v-if="aniData?.isLegacyRawDib" class="legacy-chip">{{
         t('bulkImport.legacyAniChip')
       }}</span>
@@ -83,11 +81,18 @@ const conflictTitle = computed(() => {
       <span v-if="nativeSize" class="size">{{ nativeSize }}px</span>
     </div>
     <div class="badge-cell">
-      <span v-if="confidence !== null" class="confidence">{{ confidenceLabel }}</span>
       <span v-if="conflict !== 'none'" class="warn" :title="conflictTitle">⚠</span>
     </div>
     <div class="action-cell">
-      <SettingsToggle v-model="decisionOn" :disabled="!previewUrl" />
+      <button
+        v-if="!isEmpty"
+        type="button"
+        class="btn ghost unassign-btn"
+        :title="t('bulkImport.unassign')"
+        @click="emit('unassign')"
+      >
+        ✕
+      </button>
     </div>
   </div>
 </template>
@@ -96,23 +101,32 @@ const conflictTitle = computed(() => {
 @reference '~/assets/css/tailwind.css';
 
 .bi-row {
-  @apply grid grid-cols-[140px_56px_1fr_80px_32px] items-center gap-2 border-b border-line px-2 py-1.5 text-[12px];
-}
-.bi-row.skip {
-  @apply opacity-50;
+  @apply grid grid-cols-[160px_56px_1fr_24px_32px] items-center gap-2 border-b border-line px-2 py-1.5 text-[12px];
 }
 .bi-row.conflict {
   background: rgba(255, 191, 0, 0.04);
 }
-
-.role-id {
-  @apply font-mono font-medium;
+.bi-row.empty .thumb-cell {
+  @apply rounded border border-dashed border-line/70;
 }
-.req {
-  @apply mx-1 my-0 text-accent;
+
+.role-cell {
+  @apply flex min-w-0 flex-col gap-0.5;
+}
+.role-line {
+  @apply flex items-center gap-1;
 }
 .role-label {
-  @apply ml-1.5 text-fg-mute;
+  @apply truncate text-[12px] font-medium text-fg;
+}
+.req {
+  @apply text-accent;
+}
+.role-id {
+  @apply font-mono text-[10px] text-fg-mute;
+}
+.thumb-cell {
+  @apply flex h-12 items-center justify-center;
 }
 .thumb-cell img {
   @apply size-12 object-contain;
@@ -127,13 +141,16 @@ const conflictTitle = computed(() => {
 .size {
   @apply ml-1.5 font-mono text-[10px] text-fg-mute;
 }
-.confidence {
-  @apply font-mono text-[10px] text-accent;
-}
 .warn {
   @apply ml-1 text-amber;
 }
 .legacy-chip {
   @apply ml-1 rounded-sm bg-[rgba(240,180,40,0.2)] px-1 text-[10px] uppercase text-[#f0b428];
+}
+.action-cell {
+  @apply flex items-center justify-end;
+}
+.unassign-btn {
+  @apply px-1.5 py-0 text-[12px] leading-none;
 }
 </style>
