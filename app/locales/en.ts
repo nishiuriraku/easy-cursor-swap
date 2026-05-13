@@ -50,6 +50,7 @@ export default {
     sortApplied: 'By usage',
     emptyTitle: 'No themes yet',
     emptySearch: 'No themes match your filters',
+    emptyFavorites: 'No favorites yet',
     coverage: '{filled}/17',
     searchPlaceholder: 'Search by theme or author...',
     breadcrumbWorkspace: 'Workspace',

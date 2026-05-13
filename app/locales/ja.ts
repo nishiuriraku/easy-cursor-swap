@@ -49,6 +49,7 @@ export default {
     sortApplied: '適用回数順',
     emptyTitle: 'テーマがありません',
     emptySearch: '該当するテーマが見つかりません',
+    emptyFavorites: 'お気に入りがありません',
     coverage: '{filled}/17',
     searchPlaceholder: 'テーマ名・作者名で検索...',
     breadcrumbWorkspace: 'Workspace',

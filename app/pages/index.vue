@@ -751,9 +751,18 @@ onUnmounted(() => {
       </div>
 
       <LibraryEmptyState
-        v-else-if="filteredThemes.length === 0 && !searchQuery"
+        v-else-if="themes.length === 0 && !searchQuery"
         @open-import="openImportDialog"
       />
+
+      <!-- お気に入り 0 件 (ライブラリ自体は空ではない): 検索 0 件と同じ簡易表示 -->
+      <div
+        v-else-if="filter === 'favorites' && filteredThemes.length === 0 && !searchQuery"
+        class="empty-state"
+      >
+        <UiIcon name="Star" :size="40" />
+        <h3>{{ t('library.emptyFavorites') }}</h3>
+      </div>
 
       <!-- 検索一致なし (空ライブラリではなく、検索 0 件) -->
       <div v-else-if="filteredThemes.length === 0" class="empty-state">
