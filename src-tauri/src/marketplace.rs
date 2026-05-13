@@ -210,6 +210,15 @@ impl MarketplaceClient {
         // 6. ThemeManager に展開を委譲 (Path traversal / Zip 爆弾 / Symlink 防御を共有)
         let theme_id = crate::theme::ThemeManager::import_cursorpack_bytes(&bytes)?;
 
+        // マーケットプレース由来であることを theme.json に記録する。
+        // repackage_theme IPC と UI が編集 / エクスポートをガードするための土台。
+        let cursors_dir = crate::config::ConfigManager::cursors_dir()?;
+        let theme_dir = cursors_dir.join(theme_id.to_string());
+        crate::theme::set_metadata_source(
+            &theme_dir,
+            crate::theme::types::ThemeSource::Marketplace,
+        )?;
+
         tracing::info!("marketplace install completed: theme_id={}", theme_id);
         Ok(theme_id)
     }
@@ -361,6 +370,35 @@ mod tests {
         let short_sig = base64::engine::general_purpose::STANDARD.encode([0u8; 32]);
         let err = decode_signature(&short_sig).unwrap_err();
         assert!(matches!(err, AppError::Theme(_)));
+    }
+
+    #[test]
+    fn install_writes_marketplace_source_via_helper() {
+        // marketplace::install の "set_metadata_source 呼出" 部分を契約として固定するテスト。
+        // 実 install は HTTP / Ed25519 が要るので、ヘルパだけ単体で動くことを確認する。
+        use crate::theme::types::ThemeSource;
+        let temp = tempfile::TempDir::new().unwrap();
+        let theme_dir = temp.path();
+        std::fs::write(
+            theme_dir.join("theme.json"),
+            r#"{
+                "schema_version":1,
+                "id":"00000000-0000-0000-0000-000000000000",
+                "name":"Imported",
+                "version":"1.0.0",
+                "created_at":"2026-05-14T00:00:00Z",
+                "requires_os_shadow":false,
+                "cursors":{}
+            }"#,
+        )
+        .unwrap();
+
+        // install() が最後にやる呼び出しと同じパラメータ
+        crate::theme::set_metadata_source(theme_dir, ThemeSource::Marketplace).unwrap();
+
+        let content = std::fs::read_to_string(theme_dir.join("theme.json")).unwrap();
+        assert!(content.contains(r#""source""#));
+        assert!(content.contains(r#""marketplace""#));
     }
 
     #[test]
