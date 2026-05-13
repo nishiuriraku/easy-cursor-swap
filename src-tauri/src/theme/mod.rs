@@ -727,6 +727,7 @@ impl ThemeManager {
             schema_version: metadata.schema_version,
             license: metadata.license.clone(),
             homepage: metadata.homepage.clone(),
+            source: metadata.source,
         })
     }
 

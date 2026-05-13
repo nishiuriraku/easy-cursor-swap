@@ -325,6 +325,10 @@ pub struct ThemeSummary {
     /// theme.json `homepage`。`None` のとき行非表示。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub homepage: Option<String>,
+    /// テーマソース種別。フロント側で `kind` (local / system / marketplace) に変換し、
+    /// MARKETPLACE タグ表示と編集/エクスポートボタンの非表示判定に使う。
+    #[serde(default)]
+    pub source: ThemeSource,
 }
 
 /// `LocalizedString` の文字列値全てに同じサフィックスを付与した新しい LocalizedString を返す。
@@ -522,6 +526,7 @@ mod tests {
             schema_version: 1,
             license: Some("MIT".into()),
             homepage: Some("https://example.test".into()),
+            source: ThemeSource::Local,
         }
     }
 
@@ -548,6 +553,57 @@ mod tests {
         assert_eq!(v["schema_version"], 1);
         assert_eq!(v["license"], "MIT");
         assert_eq!(v["homepage"], "https://example.test");
+    }
+
+    #[test]
+    fn theme_summary_includes_source() {
+        let s = ThemeSummary {
+            id: Uuid::nil(),
+            name: "Test".into(),
+            author: None,
+            version: "1.0.0".into(),
+            created_at: "2026-05-14T00:00:00Z".into(),
+            is_active: false,
+            is_favorite: false,
+            apply_count: 0,
+            last_applied_at: None,
+            included_roles: vec![],
+            path: "/tmp/x".into(),
+            tags: vec![],
+            size_bytes: 0,
+            signed: false,
+            description: None,
+            schema_version: 1,
+            license: None,
+            homepage: None,
+            source: ThemeSource::Marketplace,
+        };
+        let v = serde_json::to_value(&s).unwrap();
+        assert_eq!(v["source"], "marketplace");
+    }
+
+    #[test]
+    fn theme_summary_source_defaults_to_local_when_missing() {
+        // 旧 IPC レスポンスとの互換: source フィールドが無い JSON でも Local として読める
+        let json = r#"{
+            "id": "00000000-0000-0000-0000-000000000000",
+            "name": "T",
+            "author": null,
+            "version": "1.0.0",
+            "created_at": "2026-05-14T00:00:00Z",
+            "is_active": false,
+            "is_favorite": false,
+            "apply_count": 0,
+            "last_applied_at": null,
+            "included_roles": [],
+            "path": "/tmp/x",
+            "tags": [],
+            "size_bytes": 0,
+            "signed": false,
+            "schema_version": 1
+        }"#;
+        let s: ThemeSummary = serde_json::from_str(json).unwrap();
+        assert!(matches!(s.source, ThemeSource::Local));
     }
 
     #[test]
