@@ -23,10 +23,15 @@ const startMinimized = defineModel<boolean>('startMinimized', { required: true }
         <span class="head-hint">{{ t('settings.autoStartHint') }}</span>
       </div>
       <div class="prop-body">
-        <SettingsRow :label="t('settings.autoStartLabel')" :desc="t('settings.autoStartDesc')">
+        <SettingsRow
+          anchor="autoStart"
+          :label="t('settings.autoStartLabel')"
+          :desc="t('settings.autoStartDesc')"
+        >
           <SettingsToggle v-model="autoStart" />
         </SettingsRow>
         <SettingsRow
+          anchor="startMinimized"
           :label="t('settings.startMinimizedLabel')"
           :desc="t('settings.startMinimizedDesc')"
         >

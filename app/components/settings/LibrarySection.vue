@@ -34,6 +34,7 @@ defineEmits<{
       <div class="prop-head">{{ t('settings.groupStorageWarning') }}</div>
       <div class="prop-body">
         <SettingsRow
+          anchor="storageThreshold"
           :label="t('settings.storageThresholdLabel')"
           :desc="t('settings.storageThresholdDesc')"
         >
@@ -49,6 +50,7 @@ defineEmits<{
           />
         </SettingsRow>
         <SettingsRow
+          anchor="storageWarnEnabled"
           :label="t('settings.storageWarnEnabledLabel')"
           :desc="t('settings.storageWarnEnabledDesc')"
         >
@@ -64,6 +66,7 @@ defineEmits<{
       </div>
       <div class="prop-body">
         <SettingsRow
+          anchor="profileExport"
           :label="t('settings.profileExportLabel')"
           :desc="t('settings.profileExportDesc')"
         >
@@ -73,6 +76,7 @@ defineEmits<{
           </button>
         </SettingsRow>
         <SettingsRow
+          anchor="profileImport"
           :label="t('settings.profileImportLabel')"
           :desc="t('settings.profileImportDesc')"
         >

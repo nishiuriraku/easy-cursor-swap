@@ -29,7 +29,11 @@ defineEmits<{
         {{ t('settings.groupDisplayLanguage') }}
       </div>
       <div class="prop-body">
-        <SettingsRow :label="t('settings.languageLabel')" :desc="t('settings.languageDesc')">
+        <SettingsRow
+          anchor="language"
+          :label="t('settings.languageLabel')"
+          :desc="t('settings.languageDesc')"
+        >
           <UiSelect
             v-model="language"
             width="140px"
@@ -46,12 +50,14 @@ defineEmits<{
       <div class="prop-head">{{ t('settings.groupNotifications') }}</div>
       <div class="prop-body">
         <SettingsRow
+          anchor="showApplyToast"
           :label="t('settings.showApplyToastLabel')"
           :desc="t('settings.showApplyToastDesc')"
         >
           <SettingsToggle v-model="showApplyToast" />
         </SettingsRow>
         <SettingsRow
+          anchor="applyShadowControl"
           :label="t('settings.applyShadowControlLabel')"
           :desc="t('settings.applyShadowControlDesc')"
         >

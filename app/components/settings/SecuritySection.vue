@@ -21,12 +21,14 @@ const warnUnsignedImport = defineModel<boolean>('warnUnsignedImport', { required
       <div class="prop-head">{{ t('settings.groupThemeVerify') }}</div>
       <div class="prop-body">
         <SettingsRow
+          anchor="requireSigned"
           :label="t('settings.requireSignedLabel')"
           :desc="t('settings.requireSignedDesc')"
         >
           <SettingsToggle v-model="requireSignedThemes" />
         </SettingsRow>
         <SettingsRow
+          anchor="warnUnsigned"
           :label="t('settings.warnUnsignedLabel')"
           :desc="t('settings.warnUnsignedDesc')"
         >

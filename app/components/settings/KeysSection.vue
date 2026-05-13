@@ -45,11 +45,12 @@ defineEmits<{
       </div>
       <div class="prop-body">
         <template v-if="keystoreInfo.has_keypair">
-          <SettingsRow :label="t('settings.keyIdLabel')" mono>
+          <SettingsRow anchor="keyId" :label="t('settings.keyIdLabel')" mono>
             <span class="tag ok">{{ keystoreInfo.key_id ?? '—' }}</span>
           </SettingsRow>
           <SettingsRow
             v-if="keystoreInfo.public_key_b64"
+            anchor="publicKey"
             :label="t('settings.publicKeyLabel')"
             :desc="t('settings.publicKeyDesc')"
             mono
@@ -68,6 +69,7 @@ defineEmits<{
             </span>
           </SettingsRow>
           <SettingsRow
+            anchor="exportPrivate"
             :label="t('settings.exportPrivateLabel')"
             :desc="t('settings.exportPrivateDesc')"
           >
@@ -75,26 +77,39 @@ defineEmits<{
               <UiIcon name="Export" :size="13" />{{ t('common.export') }}
             </button>
           </SettingsRow>
-          <SettingsRow :label="t('settings.regenerateLabel')" :desc="t('settings.regenerateDesc')">
+          <SettingsRow
+            anchor="regenerate"
+            :label="t('settings.regenerateLabel')"
+            :desc="t('settings.regenerateDesc')"
+          >
             <button class="btn danger" :disabled="keystoreBusy" @click="$emit('regenerate')">
               <span v-if="keystoreBusy" class="spinner" style="width: 13px; height: 13px" />
               <UiIcon v-else name="Alert" :size="13" />{{ t('settings.btnRegenerate') }}
             </button>
           </SettingsRow>
-          <SettingsRow :label="t('settings.deleteKeyLabel')" :desc="t('settings.deleteKeyDesc')">
+          <SettingsRow
+            anchor="deleteKey"
+            :label="t('settings.deleteKeyLabel')"
+            :desc="t('settings.deleteKeyDesc')"
+          >
             <button class="btn danger" :disabled="keystoreBusy" @click="$emit('delete')">
               <UiIcon name="X" :size="13" />{{ t('common.delete') }}
             </button>
           </SettingsRow>
         </template>
         <template v-else>
-          <SettingsRow :label="t('settings.generateLabel')" :desc="t('settings.generateDesc')">
+          <SettingsRow
+            anchor="generate"
+            :label="t('settings.generateLabel')"
+            :desc="t('settings.generateDesc')"
+          >
             <button class="btn primary" :disabled="keystoreBusy" @click="$emit('generate')">
               <span v-if="keystoreBusy" class="spinner" style="width: 13px; height: 13px" />
               <UiIcon v-else name="Plus" :size="13" />{{ t('settings.btnGenerate') }}
             </button>
           </SettingsRow>
           <SettingsRow
+            anchor="importExisting"
             :label="t('settings.importExistingLabel')"
             :desc="t('settings.importExistingDesc')"
           >

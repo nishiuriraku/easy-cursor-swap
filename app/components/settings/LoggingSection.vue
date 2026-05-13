@@ -34,7 +34,11 @@ async function openLogFolder() {
     <div class="prop-section">
       <div class="prop-head">{{ t('settings.groupLogOutput') }}</div>
       <div class="prop-body">
-        <SettingsRow :label="t('settings.logLevelLabel')" :desc="t('settings.logLevelDesc')">
+        <SettingsRow
+          anchor="logLevel"
+          :label="t('settings.logLevelLabel')"
+          :desc="t('settings.logLevelDesc')"
+        >
           <UiSelect
             v-model="logLevel"
             width="140px"
@@ -47,7 +51,11 @@ async function openLogFolder() {
             ]"
           />
         </SettingsRow>
-        <SettingsRow :label="t('settings.retentionLabel')" :desc="t('settings.retentionDesc')">
+        <SettingsRow
+          anchor="retention"
+          :label="t('settings.retentionLabel')"
+          :desc="t('settings.retentionDesc')"
+        >
           <input
             v-model.number="retentionDays"
             type="number"
@@ -57,7 +65,11 @@ async function openLogFolder() {
             style="width: 80px"
           />
         </SettingsRow>
-        <SettingsRow :label="t('settings.maxSizeLabel')" :desc="t('settings.maxSizeDesc')">
+        <SettingsRow
+          anchor="maxSize"
+          :label="t('settings.maxSizeLabel')"
+          :desc="t('settings.maxSizeDesc')"
+        >
           <input
             v-model.number="maxSizeMb"
             type="number"
@@ -68,6 +80,7 @@ async function openLogFolder() {
           />
         </SettingsRow>
         <SettingsRow
+          anchor="openLogFolder"
           :label="t('settings.openLogFolderLabel')"
           :desc="t('settings.openLogFolderDesc')"
         >

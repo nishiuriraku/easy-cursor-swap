@@ -43,10 +43,18 @@ defineEmits<{
     <div class="prop-section">
       <div class="prop-head">{{ t('settings.groupAutoUpdate') }}</div>
       <div class="prop-body">
-        <SettingsRow :label="t('settings.autoUpdateLabel')" :desc="t('settings.autoUpdateDesc')">
+        <SettingsRow
+          anchor="autoUpdate"
+          :label="t('settings.autoUpdateLabel')"
+          :desc="t('settings.autoUpdateDesc')"
+        >
           <SettingsToggle v-model="autoUpdate" />
         </SettingsRow>
-        <SettingsRow :label="t('settings.channelLabel')" :desc="t('settings.channelDesc')">
+        <SettingsRow
+          anchor="channel"
+          :label="t('settings.channelLabel')"
+          :desc="t('settings.channelDesc')"
+        >
           <UiSelect
             v-model="channel"
             width="140px"
@@ -56,7 +64,7 @@ defineEmits<{
             ]"
           />
         </SettingsRow>
-        <SettingsRow :label="t('settings.checkNowLabel')">
+        <SettingsRow anchor="checkNow" :label="t('settings.checkNowLabel')">
           <button
             class="btn"
             :disabled="updaterChecking || updaterDownloading"

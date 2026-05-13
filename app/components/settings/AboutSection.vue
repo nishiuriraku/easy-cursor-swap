@@ -50,7 +50,7 @@ async function openExternal(url: string) {
         }}</span>
       </div>
       <div class="prop-body">
-        <SettingsRow :label="t('settings.homepageLabel')" mono>
+        <SettingsRow anchor="homepage" :label="t('settings.homepageLabel')" mono>
           <button
             class="btn ghost"
             type="button"
@@ -59,7 +59,7 @@ async function openExternal(url: string) {
             <UiIcon name="Globe" :size="13" />github.com/nishiuriraku/easy-cursor-swap
           </button>
         </SettingsRow>
-        <SettingsRow :label="t('settings.issuesLabel')" mono>
+        <SettingsRow anchor="issues" :label="t('settings.issuesLabel')" mono>
           <button
             class="btn ghost"
             type="button"
@@ -68,7 +68,7 @@ async function openExternal(url: string) {
             <UiIcon name="Alert" :size="13" />Issues
           </button>
         </SettingsRow>
-        <SettingsRow :label="t('settings.ossLicenseLabel')">
+        <SettingsRow anchor="ossLicense" :label="t('settings.ossLicenseLabel')">
           <button class="btn">{{ t('settings.btnView') }}</button>
         </SettingsRow>
       </div>
