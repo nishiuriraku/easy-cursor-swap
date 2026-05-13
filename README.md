@@ -50,7 +50,7 @@ Download the latest installer from the
 | `EasyCursorSwap_x64_en-US.msi` | MSI installer                                |
 
 Both are signed with a minisign key (verified by the built-in updater).
-See [docs/signing.md](docs/signing.md) for signature verification instructions.
+See [docs/updater_signing.md](docs/updater_signing.md) for signature verification instructions.
 
 > **SmartScreen notice:** Until the installer accumulates enough download reputation,
 > Windows SmartScreen may show an "Unknown publisher" warning.
@@ -131,7 +131,7 @@ Vue (UI) ──IPC──▶ Tauri commands ──▶ Rust modules ──▶ Wind
   automatically rolled back on crash (detected on next startup via a pending-snapshot file).
 - Cursor files live in `%USERPROFILE%\.custom_cursors\` and survive uninstallation.
 
-See [docs/02_architecture_and_core.md](docs/02_architecture_and_core.md) for details.
+See [docs/architecture.md](docs/architecture.md) for details.
 
 ## Security Model
 
@@ -145,7 +145,7 @@ See [docs/02_architecture_and_core.md](docs/02_architecture_and_core.md) for det
 | Image safety        | PNG metadata stripping (eXIf, iTXt, zTXt), SVG sanitisation             |
 | Transport           | rustls-tls (no OS TLS stack dependency)                                 |
 
-See [docs/03_security_and_ecosystem.md](docs/03_security_and_ecosystem.md) for the full model.
+See [docs/architecture.md#security](docs/architecture.md#security) for the full model.
 
 ## Submitting Themes to the Official Index
 
@@ -184,8 +184,6 @@ Pull requests are welcome. Before submitting:
    - Vue: Composition API + `<script setup>`
    - CSS: Vanilla CSS (no Tailwind)
    - No `v-html` (XSS prevention)
-
-See [docs/04_implementation_guide.md](docs/04_implementation_guide.md) for the full development workflow.
 
 ## License
 

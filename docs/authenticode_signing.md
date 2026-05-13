@@ -5,7 +5,7 @@ EasyCursorSwap の `.msi` / `.exe` インストーラーに付与する Authenti
 
 > [!IMPORTANT]
 > Tauri Updater の **minisign 署名** とは別物。
-> minisign 署名はアップデート差分の検証用 ([signing.md](signing.md))、
+> minisign 署名はアップデート差分の検証用 ([updater_signing.md](updater_signing.md))、
 > Authenticode 署名は Windows SmartScreen / UAC の警告軽減用。
 > 両方が必要。
 

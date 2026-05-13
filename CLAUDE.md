@@ -15,17 +15,17 @@ See `README.md` and the documentation map below for full context.
 
 ## Documentation map
 
-`docs/` holds three different kinds of documents. Don't confuse their roles or update policies.
+`docs/` は役割の違う 3 系統からなる。**現状ドキュメント (生きた現コード説明)** が真値で、コードと食い違ったらこちらを直す。`docs/legacy/` は初期プランの保管庫で、参照も書き換えもしない。
 
 | File | Role | Update policy |
 |---|---|---|
-| `docs/first_plan.md` | **Frozen requirements (planning-phase source)** — the original brain-dump that fixed everything: licensing model, supported OS matrix, the 17 cursor roles, required `theme.json` fields, security thresholds, performance targets, v1.0 MVP scope. Captures the *original intent* in full. | **Do not rewrite.** When the spec changes, log the change in `implementation_plan.md` instead. Treat `first_plan.md` as the source-of-truth for "what was originally decided." |
-| `docs/implementation_plan.md` | **Living implementation plan** — Phase 1–9 task tables + progress checklists derived from `first_plan.md`, updated commit by commit. The "次回セッションでの優先タスク" and "ユーザー手動が必要な残作業" sections are the de-facto roadmap. | **Updated every commit** under the one-feature = one-commit rule. Tick boxes when a phase finishes; append new findings to "既知の問題" or "次回セッションでの優先タスク". |
-| `docs/01_specification.md` – `04_implementation_guide.md` | **Tidied chapter version** — `first_plan.md` re-organised into 4 chapters (spec / architecture / security / implementation guide) for easier reading. | Sync only on large spec changes. Day-to-day, `implementation_plan.md` is enough. |
-| `docs/code_signing.md` / `signing.md` / `distribution.md` / `key_rotation.md` / `author_registration.md` | **Operational runbooks** — code-signing procurement, Updater key issuance, MSIX distribution, key-rotation PR procedure, new-author registration. | Update only when the procedure itself changes. |
-| `docs/superpowers/` | **Per-feature work log** — design docs, plans, and follow-up issues for individual features, accumulated chronologically (e.g. `2026-05-07-creator-bulk-import-design.md`). | Add a new dated file per feature; keep old ones as history. |
+| `docs/architecture.md` | **生きた見取り図** — Rust/Vue モジュール責務マップ、IPC 一覧、起動シーケンス、Page → IPC 経路、Security 不変条件 + コード参照。リファクタや初見オンボードはここから読む。 | コードベース構造が変わったら更新 (モジュール分割/IPC 追加/Security 不変条件の追加など)。 |
+| `docs/file_inventory.md` | **生きたファイル索引** — `src-tauri/src/` と `app/` の全ファイル機能表 + ソースへの直リンク。`architecture.md` の俯瞰では足りない「どのファイルに何があるか」を網羅。 | ファイル新設/削除/責務移動が起きたら更新。 |
+| `docs/updater_signing.md` / `docs/authenticode_signing.md` / `docs/distribution.md` / `docs/key_rotation.md` / `docs/author_registration.md` | **運用 runbook** — Tauri Updater minisign 鍵管理 / Authenticode 証明書調達 / MSIX 配布 / 鍵ローテ PR / 新規著者登録。 | 手順自体が変わったら更新。 |
+| `docs/superpowers/` | **per-feature 作業ログ** — 個別機能の設計書・プラン・follow-up issue を時系列で蓄積 (例: `2026-05-07-creator-bulk-import-design.md`)。 | 機能ごとに新しい日付付きファイルを追加。古いファイルはそのまま履歴として残す。 |
+| `docs/legacy/` | **初期プラン (凍結)** — `first_plan.md` / `implementation_plan.md` / `01_specification.md` 〜 `04_implementation_guide.md`。リポジトリ立ち上げ期の要件・章立て版・Phase 1–9 進捗の歴史的スナップショット。 | **参照も修正もしない。** 現状の説明には `architecture.md` / `file_inventory.md` を使うこと。コードと矛盾していても無視。 |
 
-When documents disagree, **treat `implementation_plan.md` as authoritative** — it travels with the code. Where it diverges from `first_plan.md`, the divergence is intentional (a deliberate change from the original plan); don't silently roll it back to match `first_plan.md`.
+When documents disagree, **`docs/architecture.md` + `docs/file_inventory.md` を真値とする** — どちらもコード本体と一緒に更新されるため。`docs/legacy/` 配下と矛盾していてもそれは想定内 (legacy は凍結された歴史的記録)。
 
 ## Commands
 
