@@ -142,6 +142,14 @@ fn is_local_source(s: &ThemeSource) -> bool {
     matches!(s, ThemeSource::Local)
 }
 
+impl ThemeSource {
+    /// `Marketplace` か判定する。
+    /// `repackage_theme` IPC ガードや UI の編集ボタン非表示判定に使う。
+    pub fn is_marketplace(&self) -> bool {
+        matches!(self, Self::Marketplace)
+    }
+}
+
 /// テーマメタデータ (theme.json のスキーマ)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ThemeMetadata {
@@ -718,6 +726,12 @@ mod tests {
     fn theme_source_unknown_value_falls_back_to_local() {
         let s: ThemeSource = serde_json::from_str(r#""future_value""#).unwrap();
         assert!(matches!(s, ThemeSource::Local));
+    }
+
+    #[test]
+    fn theme_source_is_marketplace_predicate() {
+        assert!(ThemeSource::Marketplace.is_marketplace());
+        assert!(!ThemeSource::Local.is_marketplace());
     }
 
     #[test]

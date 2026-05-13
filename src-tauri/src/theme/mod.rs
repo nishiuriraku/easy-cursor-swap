@@ -29,6 +29,21 @@ use std::collections::HashMap;
 use types::{clone_with_suffix, copy_dir_recursive, zip_dir_recursive};
 use uuid::Uuid;
 
+/// 指定テーマディレクトリの `theme.json` を読んで `source` フィールドのみ書き換える。
+/// `duplicate_theme` での Local リセットと `marketplace::install` での Marketplace 書込で共有する。
+pub(crate) fn set_metadata_source(
+    theme_dir: &std::path::Path,
+    source: types::ThemeSource,
+) -> AppResult<()> {
+    let path = theme_dir.join("theme.json");
+    let content = std::fs::read_to_string(&path)?;
+    let mut metadata: ThemeMetadata = serde_json::from_str(&content)?;
+    metadata.source = source;
+    let new_content = serde_json::to_string_pretty(&metadata)?;
+    std::fs::write(&path, new_content)?;
+    Ok(())
+}
+
 /// 1 ロールあたりのプレビュー詳細。
 ///
 /// `CursorAssetDescriptor` を `#[serde(flatten)]` で埋め込み、JSON 上は
@@ -1226,6 +1241,9 @@ impl ThemeManager {
             serde_json::to_vec_pretty(&metadata)?,
         )?;
 
+        // 複製先は常に Local にリセット (Marketplace 由来テーマを複製したコピーは編集可能にする)
+        set_metadata_source(&target_dir, types::ThemeSource::Local)?;
+
         tracing::info!("テーマ {} を {} として複製しました", source_id, new_id);
         Ok(new_id)
     }
@@ -1387,6 +1405,58 @@ mod tests {
             archive.by_name("cursors/Arrow.cur").is_err(),
             "Arrow.ani が誤って Arrow.cur に書かれていない"
         );
+    }
+
+    #[test]
+    fn set_metadata_source_writes_marketplace() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let theme_dir = temp.path();
+        let theme_json = theme_dir.join("theme.json");
+        std::fs::write(
+            &theme_json,
+            r#"{
+                "schema_version":1,
+                "id":"00000000-0000-0000-0000-000000000000",
+                "name":"T",
+                "version":"1.0.0",
+                "created_at":"2026-05-14T00:00:00Z",
+                "requires_os_shadow":false,
+                "cursors":{}
+            }"#,
+        )
+        .unwrap();
+        super::set_metadata_source(theme_dir, super::types::ThemeSource::Marketplace).unwrap();
+        let back: super::ThemeMetadata =
+            serde_json::from_str(&std::fs::read_to_string(&theme_json).unwrap()).unwrap();
+        assert!(matches!(
+            back.source,
+            super::types::ThemeSource::Marketplace
+        ));
+    }
+
+    #[test]
+    fn set_metadata_source_resets_to_local() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let theme_dir = temp.path();
+        std::fs::write(
+            theme_dir.join("theme.json"),
+            r#"{
+                "schema_version":1,
+                "id":"00000000-0000-0000-0000-000000000000",
+                "name":"T",
+                "version":"1.0.0",
+                "created_at":"2026-05-14T00:00:00Z",
+                "requires_os_shadow":false,
+                "cursors":{},
+                "source":"marketplace"
+            }"#,
+        )
+        .unwrap();
+        super::set_metadata_source(theme_dir, super::types::ThemeSource::Local).unwrap();
+        let back: super::ThemeMetadata =
+            serde_json::from_str(&std::fs::read_to_string(theme_dir.join("theme.json")).unwrap())
+                .unwrap();
+        assert!(matches!(back.source, super::types::ThemeSource::Local));
     }
 }
 
