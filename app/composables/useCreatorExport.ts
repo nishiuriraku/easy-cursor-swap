@@ -52,6 +52,11 @@ export interface CreatorExportDeps {
   metaNameEn: Ref<string>
   metaAuthor: Ref<string>
   metaVersion: Ref<string>
+  /**
+   * Creator UI の説明欄。空文字のときは IPC で null を送り、
+   * Rust 側で theme.json から description フィールドごと省略する。
+   */
+  metaDescription: Ref<string>
   sourceThemeId: Ref<string | null>
   shadowEnabled: Ref<boolean>
   resample: Ref<ResampleMode>
@@ -66,6 +71,7 @@ export function useCreatorExport(deps: CreatorExportDeps) {
     metaNameEn,
     metaAuthor,
     metaVersion,
+    metaDescription,
     sourceThemeId,
     shadowEnabled,
     resample,
@@ -149,6 +155,9 @@ export function useCreatorExport(deps: CreatorExportDeps) {
           nameEn: metaNameEn.value || null,
           author: metaAuthor.value || null,
           version: metaVersion.value,
+          // Rust 側で trim + 空文字 None 化されるが、明示的に "" → null にしておくと
+          // IPC ペイロードの意図が明確 (ja.ts の placeholder と区別がつく)。
+          description: metaDescription.value.trim() || null,
           requiresOsShadow: shadowEnabled.value,
           roles,
           destination,

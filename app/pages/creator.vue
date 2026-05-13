@@ -437,6 +437,7 @@ const {
   metaNameEn,
   metaAuthor,
   metaVersion,
+  metaDescription,
   sourceThemeId,
   shadowEnabled,
   resample,

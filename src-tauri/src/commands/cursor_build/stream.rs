@@ -104,7 +104,14 @@ pub fn export_cursorpack_streamed(
         author: req.author.clone(),
         license: None,
         homepage: None,
-        description: None,
+        // Creator UI の説明欄 (`metaDescription`) 由来。空文字 / 空白のみは
+        // None と同じ扱い (= theme.json から description フィールドごと省略)。
+        description: req
+            .description
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(|s| LocalizedString::Simple(s.to_string())),
         min_app_version: None,
         signature: None,
         tags: Vec::new(),

@@ -15,6 +15,10 @@ pub struct ExportCursorpackRequest {
     pub name_en: Option<String>,
     pub author: Option<String>,
     pub version: String,
+    /// `theme.json` の `description` フィールド。`None` または空文字なら省略。
+    /// 現状 UI は単一テキスト欄しか持たないので `LocalizedString::Simple` 相当の単一文字列で渡す。
+    #[serde(default)]
+    pub description: Option<String>,
     pub requires_os_shadow: bool,
     /// 役割名 → 元画像ホットスポット比率 (`{ "Arrow": { x: 0.125, y: 0.125 } }`)
     pub hotspots: HashMap<String, crate::theme::types::Hotspot>,
@@ -92,6 +96,10 @@ pub struct StreamedExportRequest {
     pub name_en: Option<String>,
     pub author: Option<String>,
     pub version: String,
+    /// `theme.json` の `description` フィールド。`None` または空文字なら省略。
+    /// 現状 UI は単一テキスト欄しか持たないので `LocalizedString::Simple` 相当の単一文字列で渡す。
+    #[serde(default)]
+    pub description: Option<String>,
     pub requires_os_shadow: bool,
     pub roles: Vec<RoleBuildEntry>,
     /// File / Library{apply_after} で出力先を切替える。

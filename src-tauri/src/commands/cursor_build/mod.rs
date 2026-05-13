@@ -75,7 +75,14 @@ pub fn export_cursorpack(req: ExportCursorpackRequest) -> Result<ExportResult, A
         author: req.author.clone(),
         license: None,
         homepage: None,
-        description: None,
+        // Creator UI の説明欄 (`metaDescription`) 由来。空文字 / 空白のみは
+        // None と同じ扱い (= theme.json から description フィールドごと省略)。
+        description: req
+            .description
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(|s| LocalizedString::Simple(s.to_string())),
         min_app_version: None,
         signature: None,
         tags: Vec::new(),
@@ -156,6 +163,61 @@ mod tests {
             super::ExportDestination::Library { apply_after } => assert!(apply_after),
             _ => panic!("expected Library variant"),
         }
+    }
+
+    /// `description` フィールドは Some(String) でも欠落でも受け取れる必要がある。
+    /// (古いフロントとの後方互換 + 説明欄が空のときの省略)
+    #[test]
+    fn streamed_request_accepts_description_present_and_missing() {
+        // (1) description フィールドが存在 + 非空
+        let with_desc = serde_json::json!({
+            "buildId": "id1",
+            "nameJa": "T",
+            "nameEn": null,
+            "author": null,
+            "version": "1.0.0",
+            "description": "今回のテーマは……",
+            "requiresOsShadow": false,
+            "roles": [],
+            "destination": { "kind": "file", "path": "/tmp/x" },
+            "existingThemeId": null,
+            "sign": false
+        });
+        let req: super::StreamedExportRequest = serde_json::from_value(with_desc).unwrap();
+        assert_eq!(req.description.as_deref(), Some("今回のテーマは……"));
+
+        // (2) description フィールド欠落 → None
+        let no_desc = serde_json::json!({
+            "buildId": "id2",
+            "nameJa": "T",
+            "nameEn": null,
+            "author": null,
+            "version": "1.0.0",
+            "requiresOsShadow": false,
+            "roles": [],
+            "destination": { "kind": "file", "path": "/tmp/x" },
+            "existingThemeId": null,
+            "sign": false
+        });
+        let req: super::StreamedExportRequest = serde_json::from_value(no_desc).unwrap();
+        assert!(req.description.is_none());
+
+        // (3) description フィールド null → None
+        let null_desc = serde_json::json!({
+            "buildId": "id3",
+            "nameJa": "T",
+            "nameEn": null,
+            "author": null,
+            "version": "1.0.0",
+            "description": null,
+            "requiresOsShadow": false,
+            "roles": [],
+            "destination": { "kind": "file", "path": "/tmp/x" },
+            "existingThemeId": null,
+            "sign": false
+        });
+        let req: super::StreamedExportRequest = serde_json::from_value(null_desc).unwrap();
+        assert!(req.description.is_none());
     }
 
     #[test]
