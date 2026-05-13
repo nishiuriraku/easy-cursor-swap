@@ -73,153 +73,6 @@ interface ConflictPending {
 }
 const conflictDialog = ref<ConflictPending | null>(null)
 
-// --- デモデータ (将来は invoke('get_themes')) ---
-// design/library-list.jsx の demo データに合わせて tags / size / signed を追加。
-// 実機では Rust の get_themes が ThemeSummary 経由でこれらを返すので、ここはあくまで
-// Tauri 未起動時 (web preview) のフォールバック表示。
-const demoThemes: ThemeCardData[] = [
-  {
-    id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-    name: 'Neon Glow',
-    author: 'PixelMaster',
-    version: '1.2.0',
-    date: '2026-04-15',
-    applyCount: 42,
-    isFavorite: true,
-    isActive: true,
-    includedRoles: [
-      'Arrow',
-      'Help',
-      'AppStarting',
-      'Wait',
-      'IBeam',
-      'Hand',
-      'No',
-      'SizeNS',
-      'SizeWE',
-      'SizeNWSE',
-      'SizeNESW',
-      'SizeAll',
-    ],
-    tags: ['animated', 'dark'],
-    sizeBytes: 2_202_009,
-    signed: true,
-  },
-  {
-    id: 'b2c3d4e5-f6a7-8901-bcde-f23456789012',
-    name: 'Minimal White',
-    author: 'CleanDesign',
-    version: '2.0.1',
-    date: '2026-03-20',
-    applyCount: 18,
-    isFavorite: false,
-    isActive: false,
-    includedRoles: ['Arrow', 'Wait', 'IBeam', 'Hand', 'No'],
-    tags: ['minimal', 'light'],
-    sizeBytes: 419_430,
-    signed: true,
-  },
-  {
-    id: 'c3d4e5f6-a7b8-9012-cdef-345678901234',
-    name: 'ドット絵レトロ',
-    author: 'RetroPixel',
-    version: '1.0.0',
-    date: '2026-05-01',
-    applyCount: 7,
-    isFavorite: true,
-    isActive: false,
-    includedRoles: [
-      'Arrow',
-      'Help',
-      'AppStarting',
-      'Wait',
-      'Crosshair',
-      'IBeam',
-      'NWPen',
-      'No',
-      'SizeNS',
-      'SizeWE',
-      'SizeNWSE',
-      'SizeNESW',
-      'SizeAll',
-      'UpArrow',
-      'Hand',
-      'Pin',
-      'Person',
-    ],
-    tags: ['pixel', 'retro'],
-    sizeBytes: 943_718,
-    signed: true,
-  },
-  {
-    id: 'd4e5f6a7-b8c9-0123-defa-456789012345',
-    name: 'Sakura Breeze',
-    author: 'はむち',
-    version: '1.1.0',
-    date: '2026-04-28',
-    applyCount: 31,
-    isFavorite: false,
-    isActive: false,
-    includedRoles: ['Arrow', 'Help', 'Wait', 'IBeam', 'Hand', 'No', 'SizeNS', 'SizeWE'],
-    tags: ['seasonal', 'soft'],
-    sizeBytes: 1_363_148,
-    signed: true,
-  },
-  {
-    id: 'e5f6a7b8-c9d0-1234-efab-567890123456',
-    name: 'Cyber Punk 2077',
-    author: 'NightCity',
-    version: '3.0.0',
-    date: '2026-02-14',
-    applyCount: 56,
-    isFavorite: true,
-    isActive: false,
-    includedRoles: [
-      'Arrow',
-      'Help',
-      'AppStarting',
-      'Wait',
-      'Crosshair',
-      'IBeam',
-      'No',
-      'SizeNS',
-      'SizeWE',
-      'SizeNWSE',
-      'SizeNESW',
-      'SizeAll',
-      'Hand',
-    ],
-    tags: ['animated', 'neon'],
-    sizeBytes: 4_928_307,
-    signed: true,
-  },
-  {
-    id: 'f6a7b8c9-d0e1-2345-fabc-678901234567',
-    name: 'Monolith',
-    author: 'studio.kane',
-    version: '0.4.2',
-    date: '2026-04-02',
-    applyCount: 12,
-    isFavorite: false,
-    isActive: false,
-    includedRoles: [
-      'Arrow',
-      'Wait',
-      'IBeam',
-      'Hand',
-      'No',
-      'SizeAll',
-      'SizeNS',
-      'SizeWE',
-      'Crosshair',
-      'Help',
-    ],
-    tags: ['draft'],
-    sizeBytes: 209_715,
-    signed: false,
-  },
-]
-
 // --- フィルタ・ソート ---
 const filteredThemes = computed(() => {
   let result = [...themes.value]
@@ -737,15 +590,10 @@ async function loadThemes() {
       .filter((s) => !localNames.has(s.name))
       .map(mapWindowsSchemeToCard)
 
-    if (local.length > 0 || system.length > 0) {
-      themes.value = [...local, ...system]
-    } else if (themes.value.length === 0) {
-      // Tauri 未接続 or 空ライブラリ → デモ表示
-      themes.value = demoThemes
-    }
+    themes.value = [...local, ...system]
   } catch (err) {
-    console.warn('[Library] loadThemes failed entirely, using demo:', err)
-    if (themes.value.length === 0) themes.value = demoThemes
+    console.warn('[Library] loadThemes failed:', err)
+    themes.value = []
   } finally {
     isLoading.value = false
   }

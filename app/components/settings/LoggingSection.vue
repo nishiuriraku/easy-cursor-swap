@@ -3,15 +3,26 @@
  * 設定 → ログ・診断 セクション。
  *
  * ログレベル / 保持期間 / 合計上限 / フォルダを開く ボタン。
- * フォルダオープンは将来的に IPC 経由で実装予定 (現在はダミーボタン)。
+ * Open ボタンは `open_log_folder` IPC 経由で `logging::log_dir()` を
+ * Windows Explorer で開く。
  */
 import { useI18n } from '~/composables/useI18n'
+import { invokeTauri } from '~/composables/useTauri'
 
 const { t } = useI18n()
 
 const logLevel = defineModel<string>('logLevel', { required: true })
 const retentionDays = defineModel<number>('retentionDays', { required: true })
 const maxSizeMb = defineModel<number>('maxSizeMb', { required: true })
+
+async function openLogFolder() {
+  try {
+    await invokeTauri<void>('open_log_folder')
+  } catch (err) {
+    // Tauri 未接続 (web preview) では何もできない。コンソールに warning を出して握る。
+    console.error('open_log_folder failed:', err)
+  }
+}
 </script>
 
 <template>
@@ -60,7 +71,9 @@ const maxSizeMb = defineModel<number>('maxSizeMb', { required: true })
           :label="t('settings.openLogFolderLabel')"
           :desc="t('settings.openLogFolderDesc')"
         >
-          <button class="btn"><UiIcon name="Globe" :size="13" />{{ t('settings.btnOpen') }}</button>
+          <button class="btn" @click="openLogFolder">
+            <UiIcon name="Globe" :size="13" />{{ t('settings.btnOpen') }}
+          </button>
         </SettingsRow>
       </div>
     </div>

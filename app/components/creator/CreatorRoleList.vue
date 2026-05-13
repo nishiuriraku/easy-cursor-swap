@@ -9,7 +9,7 @@
 import { useI18n } from '~/composables/useI18n'
 import { CURSOR_ROLES, type CursorRoleDef } from '~/components/icons/CursorIcons'
 
-type RoleStatus = 'filled' | 'partial' | 'empty'
+type RoleStatus = 'filled' | 'empty'
 
 const { t } = useI18n()
 

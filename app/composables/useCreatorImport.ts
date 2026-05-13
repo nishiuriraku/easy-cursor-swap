@@ -8,7 +8,7 @@
  *
  * 依存:
  *  - `creatorAssets` (useCreatorAssets の戻値)
- *  - active ロール/サイズ ref と filledRoles/filledSizesByRole 状態
+ *  - active ロール/サイズ ref
  *  - `rasterizeSvgToPng` (Canvas 経由の SVG → PNG ヘルパ)
  *
  * これらは creator.vue が所有しているため、依存注入 (factory deps) でやり取りする。
@@ -22,10 +22,6 @@ import type { useCreatorAssets } from './useCreatorAssets'
 export interface CreatorImportDeps {
   creatorAssets: ReturnType<typeof useCreatorAssets>
   activeRoleId: Ref<string>
-  activeSize: Ref<number>
-  /** `reactive(Set<string>)`。creator.vue 側で確保。 */
-  filledRoles: Set<string>
-  filledSizesByRole: Ref<Record<string, number[]>>
   /** SVG → PNG ラスタライズ。Canvas API 依存なので creator.vue が提供。 */
   rasterizeSvgToPng: (svgString: string, size: number) => Promise<Uint8Array>
 }
@@ -33,14 +29,7 @@ export interface CreatorImportDeps {
 const TOAST_AUTO_DISMISS_MS = 3500
 
 export function useCreatorImport(deps: CreatorImportDeps) {
-  const {
-    creatorAssets,
-    activeRoleId,
-    activeSize,
-    filledRoles,
-    filledSizesByRole,
-    rasterizeSvgToPng,
-  } = deps
+  const { creatorAssets, activeRoleId, rasterizeSvgToPng } = deps
   const { assigned, setAsset } = creatorAssets
 
   const importBusy = ref(false)
@@ -65,13 +54,11 @@ export function useCreatorImport(deps: CreatorImportDeps) {
   /**
    * 取り込んだ raster バイト列を「現在の activeRole」に反映する共通ロジック。
    * 新規ロールならデフォルト hotspot を当て、既存ロールは現在の hotspot を維持。
+   *
+   * assigned へ setAsset するだけでよい (filled* 状態は creator.vue 側で
+   * assigned 由来の computed が拾うので二重管理しない)。
    */
   function applyImportedRaster(png: Uint8Array, primarySize: number) {
-    filledRoles.add(activeRoleId.value)
-    const map = filledSizesByRole.value[activeRoleId.value] ?? []
-    if (!map.includes(activeSize.value)) {
-      filledSizesByRole.value[activeRoleId.value] = [...map, activeSize.value]
-    }
     const existing = assigned.value[activeRoleId.value]
     const hotspot = existing?.hotspot ?? initialHotspotFor(activeRoleId.value, primarySize)
     setAsset(activeRoleId.value, {
@@ -126,11 +113,6 @@ export function useCreatorImport(deps: CreatorImportDeps) {
     if (!result) throw new Error('IPC 結果が空でした')
 
     const png = new Uint8Array(result.pngBytes)
-    filledRoles.add(activeRoleId.value)
-    const map = filledSizesByRole.value[activeRoleId.value] ?? []
-    if (!map.includes(activeSize.value)) {
-      filledSizesByRole.value[activeRoleId.value] = [...map, activeSize.value]
-    }
     // .cur/.ico に hotspot ratio が (0, 0) かつ新規ロールなら、初期値を当てる。
     const isNewRole = !creatorAssets.hasAsset(activeRoleId.value)
     const noEmbeddedHotspot = result.hotspot.x === 0 && result.hotspot.y === 0

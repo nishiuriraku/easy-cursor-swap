@@ -258,3 +258,52 @@ pub async fn submit_crash_reports(
     };
     crate::crash::submit_pending_reports(endpoint, token).await
 }
+
+/// 現在のログ出力ディレクトリを Windows Explorer で開く。
+///
+/// `logging::log_dir()` が返すパス (= `%LOCALAPPDATA%\EasyCursorSwap\logs\`) を
+/// ShellExecuteW で Explorer に渡す。`open_url` と異なり verb を NULL にすると
+/// 「ディレクトリの既定動作 = Explorer で開く」となる (Win32 仕様)。
+///
+/// ログ出力が一度も走っていない起動直後でもボタンを押して開けるよう、
+/// 存在しない場合は `create_dir_all` で先に作る。
+#[tauri::command]
+pub fn open_log_folder() -> Result<(), AppError> {
+    let dir = crate::logging::log_dir()?;
+    if !dir.exists() {
+        std::fs::create_dir_all(&dir).map_err(|e| {
+            AppError::Other(format!("ログディレクトリ作成失敗 {}: {}", dir.display(), e))
+        })?;
+    }
+    #[cfg(windows)]
+    {
+        use windows::core::{HSTRING, PCWSTR};
+        use windows::Win32::UI::Shell::ShellExecuteW;
+        use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+
+        let path_h = HSTRING::from(dir.as_os_str());
+        let result = unsafe {
+            ShellExecuteW(
+                None,
+                PCWSTR::null(),
+                PCWSTR(path_h.as_ptr()),
+                PCWSTR::null(),
+                PCWSTR::null(),
+                SW_SHOWNORMAL,
+            )
+        };
+        // ShellExecuteW は HINSTANCE を返す; ポインタ値が 32 より大きければ成功
+        if (result.0 as usize) <= 32 {
+            return Err(AppError::Other(
+                "ShellExecuteW (ログフォルダ) が失敗しました".to_string(),
+            ));
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        return Err(AppError::Other(
+            "open_log_folder は Windows 専用です".to_string(),
+        ));
+    }
+    Ok(())
+}

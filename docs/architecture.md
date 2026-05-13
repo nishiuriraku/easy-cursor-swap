@@ -16,7 +16,7 @@
                         │ IPC (Tauri 2 / serde)
 ┌───────────────────────▼─────────────────────────────────────────┐
 │ Rust バックエンド  (src-tauri/src/)                              │
-│   commands/ (53 IPC 受け口を 9 サブモジュールに分割)              │
+│   commands/ (54 IPC 受け口を 9 サブモジュールに分割)              │
 │   ├─ config / theme / cursor / registry  ← Source of Truth      │
 │   ├─ marketplace / keystore / bulk_import                       │
 │   └─ tray / darkmode / hotkey / health / crash                  │
@@ -51,7 +51,7 @@
 
 | カテゴリ | モジュール | 主な役割 |
 |---|---|---|
-| **IPC 表玄関** | `commands/` | 53 個の `#[tauri::command]` を 9 サブモジュールに分割。`mod.rs::get_command_handlers()` が `tauri::generate_handler!` にまとめて渡す。サブモジュール: `theme` / `cursor_build/` (build / cancel / dto / sign / stream の 5 ファイル分割) / `cursor_io` / `ani_export` / `keystore` / `marketplace` / `profile` / `system` / `windows_scheme` |
+| **IPC 表玄関** | `commands/` | 54 個の `#[tauri::command]` を 9 サブモジュールに分割。`mod.rs::get_command_handlers()` が `tauri::generate_handler!` にまとめて渡す。サブモジュール: `theme` / `cursor_build/` (build / cancel / dto / sign / stream の 5 ファイル分割) / `cursor_io` / `ani_export` / `keystore` / `marketplace` / `profile` / `system` / `windows_scheme` |
 | **設定 / 状態** | `config.rs` | `AppConfig` / `ConfigManager` (RwLock + 自動 schema migration + バックアップ) |
 | | `errors.rs` | `AppError` / `AppResult` 共通型 |
 | **カーソル生成パイプライン** | `cursor/` | 5 サブモジュール: `image` (リサイズ / hotspot / メタデータ剥離) / `cur_build` (PNG → 6 解像度 .cur) / `ico_cur` (ICO/CUR 解析) / `ani` (RIFF/ACON 解析) / `ani_write` (ANI 書き出し)。`mod.rs` で全シンボルを `pub use` 再エクスポート |
@@ -75,9 +75,9 @@
 
 > 多重起動防止は `tauri_plugin_single_instance::init` プラグインに集約 (argv ハンドオーバ含む)。旧 `single_instance.rs` モジュールは削除済。
 
-### IPC 一覧 (53 commands)
+### IPC 一覧 (54 commands)
 
-`commands::get_command_handlers()` が `tauri::generate_handler!` に登録する 53 個。フロントは `app/composables/useTauri.ts::invokeTauri<T>(name, args)` で呼ぶ。
+`commands::get_command_handlers()` が `tauri::generate_handler!` に登録する 54 個。フロントは `app/composables/useTauri.ts::invokeTauri<T>(name, args)` で呼ぶ。
 
 | カテゴリ | コマンド名 |
 |---|---|
@@ -89,7 +89,7 @@
 | マーケットプレース (2) | `marketplace_fetch_index`, `marketplace_install` |
 | プロファイル (2) | `export_profile`, `import_profile` |
 | Windows スキーム (5) | `list_windows_schemes`, `apply_windows_scheme`, `get_windows_scheme_previews`, `get_windows_scheme_role_previews`, `export_windows_scheme_as_cursorpack` |
-| システム / 設定 / 診断 (16) | `reset_to_default`, `reset_to_initial`, `get_dark_mode_status`, `get_environment_report`, `get_config`, `update_config`, `get_app_info`, `list_config_backups`, `restore_config_backup`, `check_update_is_major_jump`, `open_url`, `get_accessibility_conflicts`, `get_autostart_status`, `list_crash_reports`, `clear_crash_reports`, `submit_crash_reports` |
+| システム / 設定 / 診断 (17) | `reset_to_default`, `reset_to_initial`, `get_dark_mode_status`, `get_environment_report`, `get_config`, `update_config`, `get_app_info`, `list_config_backups`, `restore_config_backup`, `check_update_is_major_jump`, `open_url`, `open_log_folder`, `get_accessibility_conflicts`, `get_autostart_status`, `list_crash_reports`, `clear_crash_reports`, `submit_crash_reports` |
 | 一括取込 (3) | `bulk_resolve_assets`, `cancel_bulk_import`, `parse_cursorpack_for_creator` |
 
 ### 起動シーケンス (`main.rs`)

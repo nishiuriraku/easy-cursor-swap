@@ -90,6 +90,7 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         system::restore_config_backup,
         system::check_update_is_major_jump,
         system::open_url,
+        system::open_log_folder,
         system::get_accessibility_conflicts,
         system::get_autostart_status,
         system::list_crash_reports,

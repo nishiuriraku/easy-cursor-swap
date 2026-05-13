@@ -17,8 +17,6 @@ import type { ApplyPayload } from '~/components/creator/BulkImportPreviewModal.v
 export interface CreatorBulkImportFlowDeps {
   bulkImport: ReturnType<typeof useBulkImport>
   creatorAssets: ReturnType<typeof useCreatorAssets>
-  filledRoles: Set<string>
-  filledSizesByRole: Ref<Record<string, number[]>>
   sourceThemeId: Ref<string | null>
   /** メタデータ refs (cursorpack 取込時に上書き) */
   metaName: Ref<string>
@@ -36,8 +34,6 @@ export function useCreatorBulkImportFlow(deps: CreatorBulkImportFlowDeps) {
   const {
     bulkImport,
     creatorAssets,
-    filledRoles,
-    filledSizesByRole,
     sourceThemeId,
     metaName,
     metaNameEn,
@@ -130,10 +126,6 @@ export function useCreatorBulkImportFlow(deps: CreatorBulkImportFlowDeps) {
   function applyBulkImport(payload: ApplyPayload) {
     for (const { roleId, asset } of payload.roleAssets) {
       setAsset(roleId, asset)
-      // filledSizesByRole も更新 (UI バッジ用)
-      const sizes = asset.sized ? Array.from(asset.sized.keys()) : [asset.primarySize]
-      filledSizesByRole.value = { ...filledSizesByRole.value, [roleId]: sizes }
-      filledRoles.add(roleId)
     }
 
     // メタデータ反映 (.cursorpack のみ)

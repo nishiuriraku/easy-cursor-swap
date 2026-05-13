@@ -1,14 +1,14 @@
 <script setup lang="ts">
 /**
  * クリエイターモード左ペインの 17 役割リスト項目。
- * filled (全6サイズ) / partial (一部) / empty の状態ドット付き。
+ * filled (アセット有り) / empty (未割当) の状態ドット付き。
  */
 import type { CursorRoleDef } from '~/components/icons/CursorIcons'
 
 defineProps<{
   role: CursorRoleDef
   index: number
-  status: 'filled' | 'partial' | 'empty'
+  status: 'filled' | 'empty'
   active: boolean
 }>()
 
@@ -57,8 +57,5 @@ defineEmits<{
 .rstatus.filled {
   @apply bg-accent;
   box-shadow: 0 0 6px var(--accent);
-}
-.rstatus.partial {
-  background: var(--amber);
 }
 </style>

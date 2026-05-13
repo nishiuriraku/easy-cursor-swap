@@ -55,8 +55,6 @@ function makeDeps(overrides: { resolveAssets?: ReturnType<typeof vi.fn> } = {}) 
     deps: {
       bulkImport,
       creatorAssets,
-      filledRoles: new Set<string>(),
-      filledSizesByRole: ref<Record<string, number[]>>({}),
       sourceThemeId: ref<string | null>(null),
       metaName: ref(''),
       metaNameEn: ref(''),

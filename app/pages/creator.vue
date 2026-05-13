@@ -10,7 +10,7 @@
  * NOTE: 実際の画像アップロード / .cur ビルド / 署名生成は今回はスタブ。
  *       UI 構造とインタラクションのみ実装し、IPC 配線は後続タスクに委ねる。
  */
-import { computed, onBeforeUnmount, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import { CURSOR_ROLES, type CursorRoleDef } from '~/components/icons/CursorIcons'
 import { invokeTauri } from '~/composables/useTauri'
 import { sanitizeSvg } from '~/composables/sanitizeSvg'
@@ -37,7 +37,7 @@ const { t } = useI18n()
 const { info: keystoreInfo, refresh: refreshKeystore } = useKeystore()
 const hasKeystoreSigning = computed(() => keystoreInfo.value.has_keypair)
 
-type RoleStatus = 'filled' | 'partial' | 'empty'
+type RoleStatus = 'filled' | 'empty'
 type ResampleMode = 'lanczos' | 'nearest' | 'auto'
 
 const SIZES = [32, 48, 64, 96, 128, 256] as const
@@ -82,30 +82,13 @@ useSeoMeta({
  * CreatorStartScreen と編集 UI を切替える。useSeoMeta 設定はファイル冒頭で完結している。
  * ====================================================================================== */
 
-// --- ダミーステート (実装は将来の IPC 連携で置換) ---
-const filledRoles = reactive(
-  new Set<string>([
-    'Arrow',
-    'Help',
-    'Wait',
-    'IBeam',
-    'Hand',
-    'No',
-    'Crosshair',
-    'SizeNS',
-    'SizeWE',
-    'SizeAll',
-    'NWPen',
-  ]),
-)
-const partialRoles = new Set<string>(['AppStarting', 'SizeNWSE'])
+// --- ロール状態は useCreatorAssets.assigned を Single Source of Truth として導出する ---
+// (以前は filledRoles / partialRoles / filledSizesByRole をハードコードで初期化していたが、
+// 画像未インポート時に虚偽の "filled" 表示が出る原因になっていたため computed に変更)
 
 const activeTab = ref<TabId>('assign')
 const activeRoleId = ref<string>('Arrow')
 const activeSize = ref<number>(64)
-const filledSizesByRole = ref<Record<string, number[]>>({
-  Arrow: [32, 48, 64, 128],
-})
 const resample = ref<ResampleMode>('lanczos')
 const perSizeHotspot = ref(false) // Task 5 で配線、当面デフォルト OFF
 /**
@@ -155,18 +138,30 @@ const activeRole = computed<CursorRoleDef>(
   () => CURSOR_ROLES.find((r) => r.id === activeRoleId.value) ?? CURSOR_ROLES[0]!,
 )
 
+/** assigned に存在するロール ID のセット (filled/empty 判定の唯一の根拠)。 */
+const filledRoleSet = computed(() => new Set(Object.keys(assigned.value)))
+
 function statusOf(id: string): RoleStatus {
-  if (filledRoles.has(id)) return 'filled'
-  if (partialRoles.has(id)) return 'partial'
-  return 'empty'
+  return filledRoleSet.value.has(id) ? 'filled' : 'empty'
 }
 
-const filledCount = computed(() => filledRoles.size)
+const filledCount = computed(() => filledRoleSet.value.size)
 const tabs = computed<Array<{ id: TabId; label: string; count?: string }>>(() => [
   { id: 'assign', label: t('creator.tabAssign'), count: `${filledCount.value}/17` },
   { id: 'metadata', label: t('creator.tabMetadata') },
 ])
-const filledSizes = computed(() => filledSizesByRole.value[activeRoleId.value] ?? [])
+
+/**
+ * 現在ロールに「埋まっているサイズ」を assigned から導出。
+ * primary は必ず含まれ、sized オーバーライドのキーを和集合で足す。
+ */
+const filledSizes = computed<number[]>(() => {
+  const a = assigned.value[activeRoleId.value]
+  if (!a) return []
+  const set = new Set<number>([a.primarySize])
+  if (a.sized) for (const k of a.sized.keys()) set.add(k)
+  return Array.from(set).sort((x, y) => x - y)
+})
 
 function selectRole(id: string) {
   activeRoleId.value = id
@@ -417,9 +412,6 @@ async function rasterizeSvgToPng(svgString: string, size: number): Promise<Uint8
 const { importBusy, importMessage, sanitizedRemovals, applyImportedRaster } = useCreatorImport({
   creatorAssets,
   activeRoleId,
-  activeSize,
-  filledRoles,
-  filledSizesByRole,
   rasterizeSvgToPng,
 })
 
@@ -460,8 +452,6 @@ const {
 } = useCreatorBulkImportFlow({
   bulkImport,
   creatorAssets,
-  filledRoles,
-  filledSizesByRole,
   sourceThemeId,
   metaName,
   metaNameEn,
@@ -492,14 +482,13 @@ async function pickBulkFolder() {
  *
  * アセット・メタデータ・インポートメッセージ・進捗バナーを全てクリアして
  * 「Clear」ボタンを押した瞬間に Cmd+N と同等の状態に戻す。プレビュー Blob URL も
- * 解放してメモリリークを防ぐ。
+ * 解放してメモリリークを防ぐ。assigned をクリアすれば filledRoleSet / filledSizes の
+ * computed が自動的に空に戻るので、別途 filled* state をクリアする必要はない。
  */
 function resetCreator() {
   for (const role of Object.keys(assigned.value)) {
     creatorAssets.removeAsset(role)
   }
-  filledRoles.clear()
-  filledSizesByRole.value = {}
   activeRoleId.value = 'Arrow'
   sourceThemeId.value = null
   saveModalDefault.value = 'file'
@@ -645,14 +634,9 @@ async function onFileChange(e: Event) {
       throw new Error(t('creator.errUnsupportedExt', { ext }))
     }
 
-    // 該当役割を partial → filled に
-    filledRoles.add(activeRoleId.value)
-    const map = filledSizesByRole.value[activeRoleId.value] ?? []
-    if (!map.includes(activeSize.value)) {
-      filledSizesByRole.value[activeRoleId.value] = [...map, activeSize.value]
-    }
-
-    // 役割マップに登録 (エクスポート時に使用)
+    // 役割マップに登録 (assigned が真のソース。setAsset 経由で filledRoleSet
+    // computed が追従するので filledRoles/filledSizesByRole の手動更新は不要。)
+    // エクスポート時にも assigned 経由で使用。
     // PNG/SVG はホットスポット情報を持たないので、既存 hotspot を維持するか、
     // 新規ロールならロールに応じた初期値を適用する。ratio は size 非依存。
     if (pngBytes) {
