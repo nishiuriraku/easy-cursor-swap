@@ -323,7 +323,21 @@ export function useSettingsSearch(opts: {
       `[data-search-anchor="${entry.anchor}"]`,
     ) as HTMLElement | null
     if (!el) return
-    el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    // scrollIntoView は ancestor 全てを巻き込む (overflow:hidden の .main / .body
+    // でも scrollTop が動いてしまい、ユーザーから見えるスクロールバーで戻せなくなる)。
+    // 設定コンテンツ内だけ手動でスクロールする。
+    const container = el.closest('[data-settings-scroll]') as HTMLElement | null
+    if (container) {
+      const cRect = container.getBoundingClientRect()
+      const eRect = el.getBoundingClientRect()
+      const targetTop =
+        container.scrollTop + (eRect.top - cRect.top) - (cRect.height - eRect.height) / 2
+      const maxTop = Math.max(0, container.scrollHeight - container.clientHeight)
+      container.scrollTo({
+        top: Math.max(0, Math.min(maxTop, targetTop)),
+        behavior: 'smooth',
+      })
+    }
     el.classList.add('is-search-hit')
     setTimeout(() => el.classList.remove('is-search-hit'), 1500)
   }

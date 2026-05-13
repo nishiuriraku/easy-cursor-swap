@@ -61,6 +61,8 @@ defineEmits<{
 <style scoped>
 @reference '~/assets/css/tailwind.css';
 
+/* 背景・ボーダー・影はトークン経由でライト/ダーク両対応。
+   UiSelect.vue のリストボックスと同じ pattern (--bg-2 → html.light で --bg-1)。 */
 .search-dd {
   position: absolute;
   top: calc(100% + 4px);
@@ -69,10 +71,19 @@ defineEmits<{
   z-index: 50;
   max-height: 360px;
   overflow-y: auto;
-  background: var(--bg-elev1, #1c1d22);
-  border: 1px solid var(--line, rgba(255, 255, 255, 0.08));
+  background: var(--bg-2);
+  border: 1px solid var(--line-hi);
   border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  box-shadow:
+    0 12px 32px -12px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(0, 0, 0, 0.25);
+  color: var(--fg);
+}
+:where(html.light) .search-dd {
+  background: var(--bg-1);
+  box-shadow:
+    0 12px 32px -12px rgba(15, 20, 35, 0.18),
+    0 0 0 1px rgba(15, 20, 35, 0.08);
 }
 .dd-empty {
   @apply px-3 py-2.5 text-[12px] text-fg-mute;
@@ -85,7 +96,8 @@ defineEmits<{
 }
 .dd-item.active,
 .dd-item:hover {
-  background: rgba(124, 242, 212, 0.1);
+  background: var(--accent-dim);
+  color: var(--accent);
 }
 .dd-bcrumb {
   @apply flex items-baseline gap-1.5;

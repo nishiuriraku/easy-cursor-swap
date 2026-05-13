@@ -518,7 +518,7 @@ function selectSection(id: SectionId) {
         </button>
       </nav>
 
-      <div class="settings-content">
+      <div class="settings-content" data-settings-scroll>
         <!-- 一般 -->
         <GeneralSection
           v-if="section === 'general'"
