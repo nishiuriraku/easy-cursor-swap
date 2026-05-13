@@ -678,10 +678,13 @@ function mapWindowsSchemeToCard(s: IpcWindowsScheme): ThemeCardData {
     includedRoles,
     kind: 'system',
     // Windows システムスキームに付随しない情報。一覧表示では tags = []、
-    // sizeBytes = undefined ('—' 表示)、signed = true (システム提供なので信頼) として扱う。
+    // sizeBytes = undefined ('—' 表示)、signed = false として扱う。
+    // signed=false の理由: Marketplace の Ed25519 検証済テーマ (= "公式" バッジ) と
+    // OS 提供スキームは別概念。Windows のものは「信頼できる」が「公式インデックス由来」では
+    // ないため、ThemeDetailDrawer の「公式」ピルを点灯させない。
     tags: [],
     sizeBytes: undefined,
-    signed: true,
+    signed: false,
     lastAppliedAt: null,
     description: null,
     schemaVersion: undefined,

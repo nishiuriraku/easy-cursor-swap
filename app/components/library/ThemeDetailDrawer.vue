@@ -105,6 +105,17 @@ const tagsToShow = computed<string[]>(() => props.theme.tags ?? [])
 
 const hasSigned = computed(() => props.theme.signed === true)
 
+/**
+ * 左ペイン (DESCRIPTION) に出すものが何かあるかどうか。
+ * description / tags / signed バッジが全て無い場合は左ペインごと
+ * 隠して、ROLE COVERAGE を 1 列で広げる (CSS 側 .td-grid-single)。
+ * これがないと「見出しだけ出るが中身が無い」見た目になる (空ライブラリ
+ * テーマで頻発: theme.json に description フィールドが無いケース)。
+ */
+const hasLeftPaneContent = computed(
+  () => descriptionText.value !== null || tagsToShow.value.length > 0 || hasSigned.value,
+)
+
 // バイト → 表示文字列。null は呼び出し側で行ごと省略する。
 const displaySize = computed<string | null>(() => {
   const b = props.theme.sizeBytes
@@ -134,9 +145,9 @@ async function openHomepage() {
 <template>
   <div class="td-drawer">
     <!-- 上段: 説明 / チェンジログ | 17 ロールカバレッジ -->
-    <div class="td-grid">
-      <section class="td-pane">
-        <header class="td-pane-h">
+    <div :class="['td-grid', { 'td-grid-single': !hasLeftPaneContent }]">
+      <section v-if="hasLeftPaneContent" class="td-pane">
+        <header v-if="descriptionText" class="td-pane-h">
           <span class="td-pane-k">DESCRIPTION</span>
         </header>
         <p v-if="descriptionText" class="td-desc">{{ descriptionText }}</p>
@@ -367,6 +378,11 @@ async function openHomepage() {
 .td-grid {
   @apply grid border-b border-line;
   grid-template-columns: 1fr 1.15fr;
+}
+/* description / tags / signed が無いテーマでは左ペインを丸ごと隠し、
+ * ROLE COVERAGE を 1 列で広げる。see hasLeftPaneContent. */
+.td-grid.td-grid-single {
+  grid-template-columns: 1fr;
 }
 .td-pane {
   @apply min-w-0 px-[22px] pb-5 pt-[18px];
