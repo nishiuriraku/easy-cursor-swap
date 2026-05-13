@@ -456,8 +456,6 @@ export default {
     btnDuplicate: '既存テーマを複製して編集',
     duplicatePickerTitle: '複製するテーマを選択',
     duplicatePickerSub: '選択したテーマを複製して Creator で編集します',
-    kbdNew: '新規',
-    kbdOpen: '開く',
     exportStageSign: '署名中…',
     exportStagePackage: 'パッケージ書き込み中…',
     exportStageCancelled: 'キャンセル済み',

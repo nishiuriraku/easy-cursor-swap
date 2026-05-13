@@ -53,17 +53,6 @@ const emit = defineEmits<{
           <UiIcon name="Brush" :size="13" />{{ t('creatorStart.btnDuplicate') }}
         </button>
       </div>
-
-      <div class="es-shortcuts">
-        <span class="es-kb">
-          <span class="kbd">Ctrl</span><span class="kbd">N</span
-          ><span>{{ t('creatorStart.kbdNew') }}</span>
-        </span>
-        <span class="es-kb">
-          <span class="kbd">Ctrl</span><span class="kbd">O</span
-          ><span>{{ t('creatorStart.kbdOpen') }}</span>
-        </span>
-      </div>
     </div>
 
     <div v-if="recentDrafts && recentDrafts.length > 0" class="es-recent">
@@ -179,20 +168,6 @@ const emit = defineEmits<{
 }
 .es-creator-hero p code {
   @apply rounded border border-accent-line bg-accent-dim px-[5px] py-px font-mono text-[12.5px] text-accent;
-}
-
-.es-shortcuts {
-  @apply mt-[22px] flex flex-wrap justify-center gap-[18px];
-}
-.es-kb {
-  @apply inline-flex items-center gap-1.5 text-[11.5px] text-fg-mute;
-}
-.es-kb .kbd {
-  @apply min-w-4 rounded-[3px] border border-line-hi px-[5px] py-px text-center font-mono text-[10px] text-fg-dim;
-  background: rgba(255, 255, 255, 0.05);
-}
-:where(html.light) .es-kb .kbd {
-  background: rgba(15, 20, 35, 0.04);
 }
 
 .es-recent {

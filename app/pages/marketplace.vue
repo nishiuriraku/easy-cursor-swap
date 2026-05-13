@@ -214,7 +214,6 @@ onMounted(loadIndex)
           :placeholder="t('marketplace.searchPlaceholder', { count: entries.length })"
           :aria-label="t('common.search')"
         />
-        <span class="kbd">⌘K</span>
       </div>
       <div class="tb-actions">
         <button class="btn ghost" @click="openGithub">

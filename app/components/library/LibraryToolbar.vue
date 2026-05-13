@@ -30,7 +30,6 @@ defineEmits<{
         :placeholder="t('library.searchPlaceholder')"
         :aria-label="t('common.search')"
       />
-      <span class="kbd">⌘K</span>
     </div>
     <div class="tb-actions">
       <button class="btn ghost" @click="$emit('open-import')">

@@ -457,8 +457,6 @@ export default {
     btnDuplicate: 'Duplicate an existing theme',
     duplicatePickerTitle: 'Pick a theme to duplicate',
     duplicatePickerSub: 'The selected theme will be duplicated and opened in Creator',
-    kbdNew: 'New',
-    kbdOpen: 'Open',
     exportStageSign: 'Signing...',
     exportStagePackage: 'Packaging...',
     exportStageCancelled: 'Cancelled',

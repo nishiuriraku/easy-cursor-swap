@@ -66,11 +66,11 @@ describe('LibraryToolbar', () => {
     expect(link.attributes('href')).toBe('/creator')
   })
 
-  it('shows ⌘K keyboard hint badge', () => {
+  it('does not render a keyboard shortcut hint (Ctrl+K is not wired up)', () => {
     const wrapper = mount(LibraryToolbar, {
       props: { searchQuery: '' },
       global: { stubs },
     })
-    expect(wrapper.find('.kbd').text()).toBe('⌘K')
+    expect(wrapper.find('.kbd').exists()).toBe(false)
   })
 })
