@@ -735,9 +735,9 @@ async function onFileChange(e: Event) {
               </h2>
               <div class="desc">
                 <template v-if="isRequired(activeRole.id)">
-                  {{ t('creator.requiredRoleNote', { required: '' }).split('{required}')[0]
+                  {{ t('creator.requiredRoleNote').split('{required}')[0]
                   }}<b style="color: var(--accent)">{{ t('creator.requiredMark') }}</b
-                  >{{ t('creator.requiredRoleNote', { required: '' }).split('{required}')[1] }}
+                  >{{ t('creator.requiredRoleNote').split('{required}')[1] }}
                 </template>
                 <template v-else>
                   {{ t('creator.optionalRoleNote', { en: activeRole.en }) }}
