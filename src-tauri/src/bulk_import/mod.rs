@@ -125,6 +125,10 @@ pub struct ParseCursorpackRequest {
 #[derive(Debug, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct CursorpackMetadata {
+    /// `theme.json` の id (UUID)。`?editPath` 経由で Creator に流したとき、
+    /// SaveDestinationModal の「上書き保存 / 複製」セクションを出し分けるトリガに使う。
+    /// 文字列で返してフロント側の `sourceThemeId` ref にそのまま渡せる形に揃える。
+    pub id: Option<String>,
     pub name_ja: Option<String>,
     pub name_en: Option<String>,
     pub author: Option<String>,

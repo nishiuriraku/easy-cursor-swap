@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - ライブラリのテーマ詳細モーダルがコンテンツ高さに追従せず、常にビューポート最大サイズで開いていた不具合を修正。`.td-standalone` から `height: 100%` (`h-full`) を外し、レイアウトを `.td-modal-shell` の `h-auto` + `max-h` に一本化。あわせて `.td-modal-body` に `min-h-0` を付与し、コンテンツ超過時のみ body 内でスクロールするようにした。
 - Creator のビッグプレビューがロール未取り込み (`empty`) 状態でも既定のカーソルアイコンとホットスポット dot を描画してしまい、取り込み済みロールとの判別がつかなかった問題を修正。`creator.vue` の `<CursorPreview>` 呼び出しから `role-id` / `fallback-icon-size` を外し、`:hide-dot="activePreviewAsset.kind === 'empty'"` を付与して未取り込み時は完全に空表示にした (共有コンポーネント側の semantics は維持し、Library のテーマ詳細ドロワーのプレースホルダ表示には影響しない)。
+- ライブラリ詳細モーダル「Creator で編集」経由で Creator に取り込んだテーマを保存するときに、SaveDestinationModal の「既存テーマを上書き保存 / 複製として保存」セクションが表示されず常に新規 UUID で複製されてしまっていた問題を修正。原因は `parse_cursorpack_for_creator` IPC の返却型 `CursorpackMetadata` (Rust 側) と `ParsedCursorpack.metadata` (TS 側) の双方で `id` フィールドが定義から漏れており、`creator.vue` の `sourceThemeId.value = parsed.metadata.id ?? null` が常に `null` を読んでいたため。両側に `id: Option<String>` / `id: string | null` を追加し、Rust 側 `metadata_from_theme` で `meta.id.to_string()` を返すよう修正。回帰防止のため `parse_cursorpack_basic_returns_roles` テストに `metadata.id` の UUID 検証を追加。あわせて Creator から上書き保存した直後に Library 側のプレビューキャッシュ (`useThemePreviews`) が無効化されず古い PNG が表示され続けていた問題も修正 (`useCreatorExport` の Library 保存成功時に `invalidate(theme_id)` を呼び、`cursor-changed` リスナー側でも旧アクティブ id を invalidate する 2 経路防御)。
 
 ### Security
 

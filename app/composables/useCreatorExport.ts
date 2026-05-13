@@ -11,6 +11,7 @@
  */
 import { ref, watch, type Ref } from 'vue'
 import { invokeTauri } from './useTauri'
+import { useThemePreviews } from './useThemePreviews'
 
 /** ストリームエクスポート時の進捗状態 */
 export interface BuildProgress {
@@ -84,6 +85,11 @@ export function useCreatorExport(deps: CreatorExportDeps) {
   const failedApplyThemeId = ref<string | null>(null)
   const exportProgress = ref<BuildProgress | null>(null)
   const currentBuildId = ref<string | null>(null)
+
+  // 上書き保存後にライブラリ側で古い Blob URL が表示され続ける問題への対策。
+  // useThemePreviews の cache はモジュール singleton なので、ここから invalidate すると
+  // Library / 詳細モーダル側の `getMap` / `getDetails` が次回呼出で再フェッチする。
+  const themePreviewCache = useThemePreviews()
 
   // exportMessage 自動消去。failedApplyThemeId が残っている場合は retry の動線を残すため消さない。
   let exportMessageTimer: ReturnType<typeof setTimeout> | null = null
@@ -168,6 +174,13 @@ export function useCreatorExport(deps: CreatorExportDeps) {
       })
 
       if (!result) throw new Error('エクスポート結果が空でした')
+
+      // Library 系の保存が完了した場合、同一 UUID で上書きされた可能性があるので
+      // プレビューキャッシュを破棄する (Library カード / 詳細モーダルの古い PNG 防止)。
+      // File 保存は ~/.custom_cursors/ を触らないので対象外。
+      if (payload.destination !== 'file') {
+        themePreviewCache.invalidate(result.theme_id)
+      }
 
       if (result.apply_error) {
         exportMessage.value = t('saveModal.toastAppliedFailed').replace(

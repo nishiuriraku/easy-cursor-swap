@@ -606,6 +606,11 @@ async function setupCursorChangeListener() {
     const { listen } = await import('@tauri-apps/api/event')
     unlistenCursorChange = await listen('cursor-changed', () => {
       console.info('[Library] cursor-changed event received → reload')
+      // 元アクティブテーマは Creator overwrite + apply 経路で再生成された可能性が高い。
+      // useCreatorExport 側の invalidate を A 経路としつつ、外部 apply / panic restore
+      // など Creator を経由しない経路の取りこぼし対策として B 経路でも invalidate を打つ。
+      const previouslyActiveId = themes.value.find((t) => t.isActive)?.id
+      if (previouslyActiveId) themePreviewCache.invalidate(previouslyActiveId)
       void loadThemes()
     })
   } catch (err) {

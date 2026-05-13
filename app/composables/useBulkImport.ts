@@ -60,6 +60,11 @@ export interface ParsedRole {
 
 export interface ParsedCursorpack {
   metadata: {
+    /** theme.json の UUID。`?editPath` 経由でロードしたとき creator.vue が
+     *  `sourceThemeId` にそのまま代入し、SaveDestinationModal の「上書き / 複製」
+     *  セクションを表示するトリガにする。Rust 側で必ず Some を返すが、古い
+     *  cursorpack で省略されている可能性を考慮して nullable のままにしておく。 */
+    id: string | null
     nameJa: string | null
     nameEn: string | null
     author: string | null

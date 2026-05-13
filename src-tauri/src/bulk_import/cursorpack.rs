@@ -35,6 +35,7 @@ fn metadata_from_theme(meta: &crate::theme::ThemeMetadata) -> CursorpackMetadata
             .cloned(),
     });
     CursorpackMetadata {
+        id: Some(meta.id.to_string()),
         name_ja,
         name_en,
         author: meta.author.clone(),
@@ -370,6 +371,19 @@ mod tests {
         assert!(
             parsed.roles.contains_key("Arrow"),
             "Arrow role should be present"
+        );
+        // creator.vue ?editPath 経路で sourceThemeId にそのまま代入されるため、
+        // metadata.id が必ず UUID 文字列で返ることを契約として固定する。
+        // 過去にここが欠落していた結果、SaveDestinationModal の「上書き / 複製」
+        // セクションが永久に出ないバグになっていた。
+        let id = parsed
+            .metadata
+            .id
+            .as_deref()
+            .expect("metadata.id must be Some");
+        assert!(
+            uuid::Uuid::parse_str(id).is_ok(),
+            "metadata.id should be a parseable UUID, got {id:?}"
         );
     }
 }
