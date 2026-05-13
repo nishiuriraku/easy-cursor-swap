@@ -9,7 +9,7 @@
  *       重い状態を持たないため SFC 分割するメリットが薄い)。
  *       将来セクションが肥大化したら個別 SFC に切り出す。
  */
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useAppSettings } from '~/composables/useAppSettings'
 import { useKeystore } from '~/composables/useKeystore'
 import { invokeTauri } from '~/composables/useTauri'
@@ -169,10 +169,14 @@ const dirty = ref(false)
 const saving = ref(false)
 const saveError = ref<string | null>(null)
 
+// applyConfigToLocal 実行中は dirty watch の発火を抑制する
+let suppressDirty = false
+
 /** appConfig (Rust 側) → UI ローカル ref へ反映 */
 function applyConfigToLocal() {
   const c = appConfig.value
   if (!c) return
+  suppressDirty = true
   general.value.language = (c.general.language as 'ja' | 'en' | 'auto') ?? 'auto'
   startup.value.autoStart = c.general.auto_start
   updates.value.autoUpdate = c.general.auto_update
@@ -184,6 +188,10 @@ function applyConfigToLocal() {
   logging.value.maxSizeMb = c.logging.max_total_size / BYTES_PER_MB
 
   dirty.value = false
+  // watch のマイクロタスク実行後にフラグを解除する
+  nextTick(() => {
+    suppressDirty = false
+  })
 }
 
 /** UI ローカル ref → appConfig 形状にコピー */
@@ -355,11 +363,11 @@ onMounted(async () => {
   watch(appConfig, applyConfigToLocal)
 })
 
-// 任意のローカル変更を dirty フラグ化
+// 任意のローカル変更を dirty フラグ化 (applyConfigToLocal 実行中は除外)
 watch(
   [general, startup, library, security, logging, updates],
   () => {
-    if (appConfig.value) dirty.value = true
+    if (appConfig.value && !suppressDirty) dirty.value = true
   },
   { deep: true },
 )
