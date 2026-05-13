@@ -61,8 +61,6 @@ function findTheme(id: string | null): ThemeCardData {
 const lightTheme = computed(() => findTheme(lightThemeId.value))
 const darkTheme = computed(() => findTheme(darkThemeId.value))
 
-const activePair = computed(() => `${lightTheme.value.name} ⇄ ${darkTheme.value.name}`)
-
 function applyConfigToLocal() {
   const c = appConfig.value
   if (!c) return
@@ -232,14 +230,6 @@ watch(
         </div>
       </div>
     </div>
-
-    <AppStatusbar
-      :items="[
-        { dot: true, text: `OS: ${isDark ? 'Dark Mode' : 'Light Mode'}` },
-        { text: `Active pair: ${activePair}` },
-        { text: dirty ? t('appearance.statusUnsaved') : 'Panic ready · snapshot OK' },
-      ]"
-    />
 
     <!-- テーマ選択モーダル -->
     <Transition name="fade">

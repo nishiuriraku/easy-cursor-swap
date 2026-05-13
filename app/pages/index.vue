@@ -19,7 +19,7 @@ import { useAppSettings } from '~/composables/useAppSettings'
 import { useCursorpackOpener } from '~/composables/useCursorpackOpener'
 
 const { t } = useI18n()
-// UiIcon / ThemeCard / ApplyModal / AppStatusbar は Nuxt の自動インポートで解決される。
+// UiIcon / ThemeCard / ApplyModal は Nuxt の自動インポートで解決される。
 
 type FilterChip = 'all' | 'favorites' | 'recent' | 'unsigned'
 /** 並び替えキー。
@@ -270,28 +270,8 @@ const counts = computed(() => ({
   unsigned: themes.value.filter((tt) => tt.signed === false).length,
 }))
 
-const activeTheme = computed(() => themes.value.find((tt) => tt.isActive))
-
-/** ライブラリ全体のストレージ使用量を MB 表示。
- *  Source of Truth は Rust 側 `ThemeSummary.size_bytes` の合計。
- *  Windows システムスキームは `sizeBytes` が undefined なので除外される。 */
-const totalStorageMb = computed(() => {
-  const totalBytes = themes.value.reduce((sum, tt) => sum + (tt.sizeBytes ?? 0), 0)
-  return (totalBytes / (1024 * 1024)).toFixed(1)
-})
-
-// --- ステータスバー用の動的情報 ---
 // `useAppSettings` はグローバルシングルトン。Settings 画面で更新されると自動追従する。
 const appSettings = useAppSettings()
-const signatureVerifyLabel = computed(
-  () => `${t('library.statusSignature')}: ${t('library.statusOn')}`,
-)
-const activeStatusLabel = computed(() =>
-  activeTheme.value
-    ? `${t('library.statusActive')}: ${activeTheme.value.name}`
-    : `${t('library.statusActive')}: ${t('library.statusActiveDefault')}`,
-)
-const storageStatusLabel = computed(() => `~/.custom_cursors/ — ${totalStorageMb.value} MB`)
 
 // --- ハンドラ ---
 /** カードの「適用」クリック → 確認モーダルを開く */
@@ -1009,15 +989,6 @@ onUnmounted(() => {
         />
       </div>
     </div>
-
-    <!-- ステータスバー: 各項目は config / themes 由来で動的に算出。 -->
-    <AppStatusbar
-      :items="[
-        { dot: true, text: activeStatusLabel },
-        { text: signatureVerifyLabel },
-        { text: storageStatusLabel },
-      ]"
-    />
 
     <!-- 詳細モーダル (テーマカードのシェブロンで開く) -->
     <ThemeDetailModal

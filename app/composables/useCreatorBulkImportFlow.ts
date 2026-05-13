@@ -14,8 +14,6 @@ import type { useBulkImport, ResolvedAsset, ParsedCursorpack } from './useBulkIm
 import type { useCreatorAssets } from './useCreatorAssets'
 import type { ApplyPayload } from '~/components/creator/BulkImportPreviewModal.vue'
 
-type SaveModalMode = 'file' | 'library' | 'libraryAndApply'
-
 export interface CreatorBulkImportFlowDeps {
   bulkImport: ReturnType<typeof useBulkImport>
   creatorAssets: ReturnType<typeof useCreatorAssets>
@@ -28,9 +26,6 @@ export interface CreatorBulkImportFlowDeps {
   metaAuthor: Ref<string>
   metaVersion: Ref<string>
   metaDescription: Ref<string>
-  /** SaveDestinationModal の open/default 制御 (Apply Immediately フロー用) */
-  saveModalOpen: Ref<boolean>
-  saveModalDefault: Ref<SaveModalMode>
   /** インポート系の進捗・通知 (useCreatorImport が所有) */
   importBusy: Ref<boolean>
   importMessage: Ref<string | null>
@@ -49,8 +44,6 @@ export function useCreatorBulkImportFlow(deps: CreatorBulkImportFlowDeps) {
     metaAuthor,
     metaVersion,
     metaDescription,
-    saveModalOpen,
-    saveModalDefault,
     importMessage,
     sanitizedRemovals,
   } = deps
@@ -156,13 +149,6 @@ export function useCreatorBulkImportFlow(deps: CreatorBulkImportFlowDeps) {
 
     bulkModalOpen.value = false
     importMessage.value = `${payload.roleAssets.length} 件のロールを適用しました`
-
-    // ✓ 「すぐシステムに反映」がチェックされていれば SaveDestinationModal を
-    // Library+Apply 既定で開く。ユーザーは [保存] を押すだけで適用まで進める。
-    if (payload.applyImmediately) {
-      saveModalDefault.value = 'libraryAndApply'
-      saveModalOpen.value = true
-    }
   }
 
   function cancelBulkImport() {

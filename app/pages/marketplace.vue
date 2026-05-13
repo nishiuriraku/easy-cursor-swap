@@ -25,7 +25,6 @@ const isLoading = ref(true)
 const filter = ref<MarketplaceTag>('all')
 const searchQuery = ref('')
 const installingId = ref<string | null>(null)
-const lastSync = computed(() => t('marketplace.lastSyncJustNow'))
 
 /**
  * インストール結果バナー。
@@ -138,11 +137,6 @@ const filteredGrid = computed(() => {
   }
 
   return result
-})
-
-const totalAuthors = computed(() => {
-  const set = new Set(entries.value.map((e) => e.authorGithub))
-  return set.size
 })
 
 // --- ハンドラ ---
@@ -330,15 +324,6 @@ onMounted(loadIndex)
         </div>
       </template>
     </div>
-
-    <!-- ステータスバー -->
-    <AppStatusbar
-      :items="[
-        { dot: true, text: `Index synced · ${lastSync}` },
-        { text: `${entries.length} themes · ${totalAuthors} authors` },
-        { text: 'schema v3.2' },
-      ]"
-    />
 
     <!-- テーマ提出ダイアログ -->
     <SubmitThemeDialog v-model:open="submitOpen" />

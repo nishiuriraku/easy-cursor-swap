@@ -63,8 +63,6 @@ function makeDeps(overrides: { resolveAssets?: ReturnType<typeof vi.fn> } = {}) 
       metaAuthor: ref(''),
       metaVersion: ref(''),
       metaDescription: ref(''),
-      saveModalOpen: ref(false),
-      saveModalDefault: ref<'file' | 'library' | 'libraryAndApply'>('file'),
       importBusy: ref(false),
       importMessage: ref<string | null>(null),
       sanitizedRemovals: ref<string[]>([]),

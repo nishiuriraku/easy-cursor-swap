@@ -167,7 +167,6 @@ const tabs = computed<Array<{ id: TabId; label: string; count?: string }>>(() =>
   { id: 'metadata', label: t('creator.tabMetadata') },
 ])
 const filledSizes = computed(() => filledSizesByRole.value[activeRoleId.value] ?? [])
-const sizesCovered = computed(() => filledSizes.value.length)
 
 function selectRole(id: string) {
   activeRoleId.value = id
@@ -468,8 +467,6 @@ const {
   metaAuthor,
   metaVersion,
   metaDescription,
-  saveModalOpen,
-  saveModalDefault,
   importBusy,
   importMessage,
   sanitizedRemovals,
@@ -899,18 +896,6 @@ async function onFileChange(e: Event) {
         @apply="applyBulkImport"
         @cancel="cancelBulkImport"
       />
-
-      <AppStatusbar
-        :items="[
-          {
-            dot: true,
-            text: t('creator.statusEditing', { name: metaName || t('creator.statusUntitled') }),
-          },
-          { text: t('creator.statusCoverage', { filled: filledCount, sizes: sizesCovered }) },
-          { text: t('creator.statusUnsaved', { count: 3 }) },
-          { text: 'WebView2 132.0.2957' },
-        ]"
-      />
     </template>
 
     <!--
@@ -951,6 +936,8 @@ async function onFileChange(e: Event) {
       :themes="pickerThemes"
       :title="t('creatorStart.duplicatePickerTitle')"
       :sub="t('creatorStart.duplicatePickerSub')"
+      :show-clear="false"
+      :show-footer-cancel="false"
       @update:model-value="onThemePickerSelect"
       @cancel="onThemePickerCancel"
     />

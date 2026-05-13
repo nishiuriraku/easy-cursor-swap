@@ -38,8 +38,6 @@ export interface ApplyPayload {
   roleAssets: Array<{ roleId: string; asset: RoleAsset }>
   metadataChoice: 'keep' | 'overwrite' | 'name-only'
   metadata: ParsedCursorpack['metadata'] | null
-  /** ✓ なら親側で SaveDestinationModal を libraryAndApply で自動オープン */
-  applyImmediately: boolean
 }
 
 interface PendingMatch {
@@ -70,7 +68,6 @@ function toAniFramesU8(asset: ResolvedAsset): readonly Uint8Array[] | null {
 }
 
 const protectExisting = ref(true)
-const applyImmediately = ref(false)
 const matches = ref<PendingMatch[]>([])
 const unmatched = ref<UnmatchedFile[]>([])
 const skippedCount = ref(0)
@@ -304,7 +301,6 @@ function apply() {
     roleAssets,
     metadataChoice: metadataChoice.value,
     metadata: props.cursorpack?.metadata ?? null,
-    applyImmediately: applyImmediately.value,
   })
 }
 
@@ -408,10 +404,6 @@ onUnmounted(resetState)
       </div>
 
       <footer class="bi-foot">
-        <div class="bi-apply-immediately">
-          <span class="bi-apply-immediately-label">{{ t('bulkImport.applyImmediately') }}</span>
-          <SettingsToggle v-model="applyImmediately" data-test="apply-immediately" />
-        </div>
         <button class="btn ghost ml-auto" @click="emit('cancel')">{{ t('common.cancel') }}</button>
         <button class="btn primary" @click="apply">
           ✓
@@ -456,12 +448,6 @@ onUnmounted(resetState)
 }
 .bi-protect-label {
   @apply text-[12.5px] font-medium text-fg;
-}
-.bi-apply-immediately {
-  @apply inline-flex items-center gap-2 text-[12px];
-}
-.bi-apply-immediately-label {
-  @apply text-[12.5px] text-fg-dim;
 }
 .bi-unmatched {
   @apply flex items-center gap-2 py-1 text-[12px];

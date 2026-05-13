@@ -24,6 +24,16 @@ const props = defineProps<{
   sub?: string
   /** モーダルアクセント色 (CSS) — Light=amber, Dark=mint 等 */
   accent?: string
+  /**
+   * フッターに「未指定にする」ボタンを表示するか。既定 true。
+   * Creator 複製モーダルでは「未指定」が意味を成さないので false で渡す。
+   */
+  showClear?: boolean
+  /**
+   * フッターに「キャンセル」ボタンを表示するか。既定 true。
+   * ヘッダ右上の ✕ ボタンと重複するため、不要な画面 (Creator 複製) では false。
+   */
+  showFooterCancel?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -129,10 +139,14 @@ function onBackdrop(e: MouseEvent) {
         </ul>
       </div>
 
-      <div class="modal-foot">
-        <button class="btn ghost" @click="clear">{{ t('themePicker.clear') }}</button>
+      <div v-if="(props.showClear ?? true) || (props.showFooterCancel ?? true)" class="modal-foot">
+        <button v-if="props.showClear ?? true" class="btn ghost" @click="clear">
+          {{ t('themePicker.clear') }}
+        </button>
         <div class="actions">
-          <button class="btn ghost" @click="emit('cancel')">{{ t('common.cancel') }}</button>
+          <button v-if="props.showFooterCancel ?? true" class="btn ghost" @click="emit('cancel')">
+            {{ t('common.cancel') }}
+          </button>
         </div>
       </div>
     </div>

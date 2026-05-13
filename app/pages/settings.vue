@@ -491,15 +491,6 @@ function selectSection(id: SectionId) {
       </div>
     </div>
 
-    <AppStatusbar
-      :items="[
-        { dot: true, text: `Settings · ${t(currentSection.labelKey)}` },
-        { text: t('settings.schemaInfo') },
-        { text: dirty ? t('settings.unsavedChanges') : t('settings.saved') },
-        ...(saveError ? [{ text: t('settings.statusError', { message: saveError }) }] : []),
-      ]"
-    />
-
     <PassphrasePrompt
       :open="passphrasePrompt.open"
       :mode="passphrasePrompt.mode"

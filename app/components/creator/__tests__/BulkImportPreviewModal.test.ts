@@ -1,6 +1,10 @@
 /**
- * BulkImportPreviewModal の applyImmediately フラグ追加分のテスト。
- * モーダル全体ではなく「apply 時に payload に applyImmediately が含まれるか」のみ確認。
+ * BulkImportPreviewModal の ApplyPayload コントラクトを固定化する。
+ *
+ * 2026-05-13 の UI 簡略化で「すぐシステムに反映」トグル
+ * (旧 `applyImmediately` フィールド) を削除した。本テストは
+ * 「apply で emit される payload に applyImmediately キーが含まれない」
+ * ことを契約として固定する — 将来の差し戻し防止用。
  */
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
@@ -20,8 +24,8 @@ const baseProps = {
   sourceLabel: 'test',
 }
 
-describe('BulkImportPreviewModal applyImmediately', () => {
-  it('emits apply payload with applyImmediately=false by default', async () => {
+describe('BulkImportPreviewModal apply payload', () => {
+  it('apply emit の payload に applyImmediately キーは含まない', async () => {
     const wrapper = mount(BulkImportPreviewModal, {
       props: baseProps,
       global: { stubs },
@@ -29,21 +33,18 @@ describe('BulkImportPreviewModal applyImmediately', () => {
     await wrapper.find('button.primary').trigger('click')
     const events = wrapper.emitted('apply')
     expect(events).toHaveLength(1)
-    const payload = events![0][0] as { applyImmediately: boolean }
-    expect(payload.applyImmediately).toBe(false)
+    const payload = events![0]![0] as Record<string, unknown>
+    expect('applyImmediately' in payload).toBe(false)
+    expect(payload).toHaveProperty('roleAssets')
+    expect(payload).toHaveProperty('metadataChoice')
+    expect(payload).toHaveProperty('metadata')
   })
 
-  it('emits apply payload with applyImmediately=true after checkbox toggle', async () => {
+  it('フッターに data-test="apply-immediately" を持つ要素は描画されない', () => {
     const wrapper = mount(BulkImportPreviewModal, {
       props: baseProps,
       global: { stubs },
     })
-    // SettingsToggle に置き換わっているのでボタンを click して ON にする
-    const cb = wrapper.find('button[data-test="apply-immediately"]')
-    await cb.trigger('click')
-    await wrapper.find('button.primary').trigger('click')
-    const events = wrapper.emitted('apply')
-    const payload = events![0][0] as { applyImmediately: boolean }
-    expect(payload.applyImmediately).toBe(true)
+    expect(wrapper.find('[data-test="apply-immediately"]').exists()).toBe(false)
   })
 })
