@@ -42,7 +42,7 @@ function onCardKeydown(e: KeyboardEvent) {
 
 /* 2026-05-14: ライブラリカードはプレビューを 3x2 (6 セル) に縮小したため、
  * .card-preview の min-height (default 132px) を抑えて全体高さを詰める。
- * Marketplace カード (6x3 = 17 セル) は default のまま維持される。 */
+ * MarketplaceCard も同日に同じ 3x2 + 112px へ揃えたため、両者で同じ調整が入る。 */
 const coveragePct = computed(() => Math.round((props.theme.includedRoles.length / 17) * 100))
 
 const displayDate = computed(() => {
