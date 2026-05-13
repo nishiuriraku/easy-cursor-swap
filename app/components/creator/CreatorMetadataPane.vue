@@ -8,9 +8,7 @@
  * 純粋なフォーム + 進捗表示なので 6 つの v-model + 数件の read-only props +
  * 2 つの emit (dismiss-export-message, cancel-export) で creator.vue から切り出している。
  */
-import { computed } from 'vue'
 import { useI18n } from '~/composables/useI18n'
-import type { Hotspot } from '~/composables/useCreatorAssets'
 
 const { t } = useI18n()
 
@@ -20,8 +18,6 @@ const metaAuthor = defineModel<string>('metaAuthor', { required: true })
 const metaVersion = defineModel<string>('metaVersion', { required: true })
 const metaDescription = defineModel<string>('metaDescription', { required: true })
 const shadowEnabled = defineModel<boolean>('shadowEnabled', { required: true })
-const hotspot = defineModel<Hotspot>('hotspot', { required: true })
-const perSizeHotspot = defineModel<boolean>('perSizeHotspot', { required: true })
 
 interface ExportProgress {
   buildId: string
@@ -37,41 +33,13 @@ const props = defineProps<{
   exportMessage: string | null
   exportProgress: ExportProgress | null
   exportBusy: boolean
-  activeRoleJp: string
-  showAdvancedResolutions: boolean
   failedApplyThemeId: string | null
-  /** px ⇔ ratio 変換の基準サイズ */
-  primarySize: number
-  /** 現在のサイズに sized.hotspot override が有効かどうか */
-  sizedOverrideActive: boolean
-  /** enableSizedOverride ボタンを押せる条件 (アセット割当済み + perSizeHotspot=ON) */
-  canEditSizedOverride: boolean
 }>()
-
-/** px 入力 ⇔ ratio model の双方向ブリッジ */
-const hotspotXPx = computed<number>({
-  get: () => Math.round(hotspot.value.x * (props.primarySize || 1)),
-  set: (px: number) => {
-    const size = props.primarySize || 1
-    const x = Math.max(0, Math.min(1, px / size))
-    hotspot.value = { ...hotspot.value, x }
-  },
-})
-
-const hotspotYPx = computed<number>({
-  get: () => Math.round(hotspot.value.y * (props.primarySize || 1)),
-  set: (px: number) => {
-    const size = props.primarySize || 1
-    const y = Math.max(0, Math.min(1, px / size))
-    hotspot.value = { ...hotspot.value, y }
-  },
-})
 
 defineEmits<{
   (e: 'dismiss-export-message'): void
   (e: 'cancel-export'): void
   (e: 'retry-apply'): void
-  (e: 'enable-sized-override'): void
 }>()
 </script>
 
@@ -137,50 +105,6 @@ defineEmits<{
             <span class="tag" :class="arrowAssigned ? 'ok' : ''">
               {{ arrowAssigned ? t('creator.metaAssigned') : t('creator.metaUnassigned') }}
             </span>
-          </SettingsRow>
-        </div>
-      </div>
-
-      <div class="prop-section">
-        <div class="prop-head">
-          {{ t('creator.metaHotspotTitle') }}
-          <span class="role-tag">{{ activeRoleJp }}</span>
-        </div>
-        <div class="prop-body" style="padding: 4px 16px">
-          <SettingsRow :label="t('creatorStart.propHotspotX')">
-            <input
-              v-model.number="hotspotXPx"
-              type="number"
-              class="input mono"
-              min="0"
-              :max="primarySize"
-              style="width: 120px"
-            />
-          </SettingsRow>
-          <SettingsRow :label="t('creatorStart.propHotspotY')">
-            <input
-              v-model.number="hotspotYPx"
-              type="number"
-              class="input mono"
-              min="0"
-              :max="primarySize"
-              style="width: 120px"
-            />
-          </SettingsRow>
-          <SettingsRow v-if="showAdvancedResolutions" :label="t('creatorStart.propPerSize')">
-            <SettingsToggle v-model="perSizeHotspot" />
-          </SettingsRow>
-          <SettingsRow
-            v-if="showAdvancedResolutions && perSizeHotspot"
-            :label="t('creator.perSizeOverride')"
-          >
-            <button
-              class="btn"
-              :disabled="!canEditSizedOverride || sizedOverrideActive"
-              @click="$emit('enable-sized-override')"
-            >
-              {{ sizedOverrideActive ? t('creator.perSizeActive') : t('creator.perSizeEnable') }}
-            </button>
           </SettingsRow>
         </div>
       </div>
@@ -391,14 +315,5 @@ defineEmits<{
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
-}
-
-.role-tag {
-  margin-left: 8px;
-  font-size: 11px;
-  color: var(--text-mute);
-  font-family: var(--font-mono);
-  font-weight: 400;
-  text-transform: none;
 }
 </style>
