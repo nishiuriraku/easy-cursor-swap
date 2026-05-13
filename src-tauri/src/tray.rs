@@ -28,14 +28,6 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         None::<&str>,
     )?;
     let separator2 = MenuItem::with_id(app, "sep2", "────────────", false, None::<&str>)?;
-    let dark_mode_status = MenuItem::with_id(
-        app,
-        "dark_mode_status",
-        "🌙 ダークモード連動: 無効",
-        false,
-        None::<&str>,
-    )?;
-    let separator3 = MenuItem::with_id(app, "sep3", "────────────", false, None::<&str>)?;
     let quit_item = MenuItem::with_id(app, "quit", "終了", true, None::<&str>)?;
 
     // メニューの構築
@@ -47,8 +39,6 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
             &panic_default,
             &panic_initial,
             &separator2,
-            &dark_mode_status,
-            &separator3,
             &quit_item,
         ],
     )?;

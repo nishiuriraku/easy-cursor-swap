@@ -16,10 +16,10 @@
                         │ IPC (Tauri 2 / serde)
 ┌───────────────────────▼─────────────────────────────────────────┐
 │ Rust バックエンド  (src-tauri/src/)                              │
-│   commands/ (54 IPC 受け口を 9 サブモジュールに分割)              │
+│   commands/ (53 IPC 受け口を 9 サブモジュールに分割)              │
 │   ├─ config / theme / cursor / registry  ← Source of Truth      │
 │   ├─ marketplace / keystore / bulk_import                       │
-│   └─ tray / darkmode / hotkey / health / crash                  │
+│   └─ tray / hotkey / health / crash                             │
 └─────────────────────────────────────────────────────────────────┘
                         │
                 ┌───────┴───────┐
@@ -44,14 +44,14 @@
 
 ## Rust 側モジュール (`src-tauri/src/`)
 
-`lib.rs` は 21 個のモジュールを `pub mod` で公開し、`main.rs` から `tauri::Builder` に組み込む。
+`lib.rs` は 20 個のモジュールを `pub mod` で公開し、`main.rs` から `tauri::Builder` に組み込む。
 直近のリファクタで `commands` / `cursor` / `theme` / `bulk_import` / `registry` を **ディレクトリ + サブモジュール構成** に分割済み。多重起動防止は自前 `single_instance.rs` を廃止し `tauri_plugin_single_instance` プラグインに移行。
 
 ### 責務マップ
 
 | カテゴリ | モジュール | 主な役割 |
 |---|---|---|
-| **IPC 表玄関** | `commands/` | 54 個の `#[tauri::command]` を 9 サブモジュールに分割。`mod.rs::get_command_handlers()` が `tauri::generate_handler!` にまとめて渡す。サブモジュール: `theme` / `cursor_build/` (build / cancel / dto / sign / stream の 5 ファイル分割) / `cursor_io` / `ani_export` / `keystore` / `marketplace` / `profile` / `system` / `windows_scheme` |
+| **IPC 表玄関** | `commands/` | 53 個の `#[tauri::command]` を 9 サブモジュールに分割。`mod.rs::get_command_handlers()` が `tauri::generate_handler!` にまとめて渡す。サブモジュール: `theme` / `cursor_build/` (build / cancel / dto / sign / stream の 5 ファイル分割) / `cursor_io` / `ani_export` / `keystore` / `marketplace` / `profile` / `system` / `windows_scheme` |
 | **設定 / 状態** | `config.rs` | `AppConfig` / `ConfigManager` (RwLock + 自動 schema migration + バックアップ) |
 | | `errors.rs` | `AppError` / `AppResult` 共通型 |
 | **カーソル生成パイプライン** | `cursor/` | 5 サブモジュール: `image` (リサイズ / hotspot / メタデータ剥離) / `cur_build` (PNG → 6 解像度 .cur) / `ico_cur` (ICO/CUR 解析) / `ani` (RIFF/ACON 解析) / `ani_write` (ANI 書き出し)。`mod.rs` で全シンボルを `pub use` 再エクスポート |
@@ -65,7 +65,6 @@
 | **信頼性 / 復旧** | `health.rs` | 起動連続失敗カウンタ + ロールバック対象バージョン算出 |
 | | `crash.rs` | panic フック + `crash-reports/` ディレクトリの retention + 投稿ペイロード生成 |
 | **OS 統合** | `tray.rs` | システムトレイ常駐 / メインウィンドウ再生成 |
-| | `darkmode.rs` | OS テーマ変更監視 → light/dark テーマ自動切替 |
 | | `hotkey.rs` | グローバルホットキー (Ctrl+Alt+Shift+R 等) |
 | | `autostart.rs` | `HKCU\...\Run` 自動起動レジストリ管理 (config が Source of Truth) |
 | | `appusermodel.rs` | AppUserModelID 登録 (Win トースト発信元) |
@@ -75,9 +74,9 @@
 
 > 多重起動防止は `tauri_plugin_single_instance::init` プラグインに集約 (argv ハンドオーバ含む)。旧 `single_instance.rs` モジュールは削除済。
 
-### IPC 一覧 (54 commands)
+### IPC 一覧 (53 commands)
 
-`commands::get_command_handlers()` が `tauri::generate_handler!` に登録する 54 個。フロントは `app/composables/useTauri.ts::invokeTauri<T>(name, args)` で呼ぶ。
+`commands::get_command_handlers()` が `tauri::generate_handler!` に登録する 53 個。フロントは `app/composables/useTauri.ts::invokeTauri<T>(name, args)` で呼ぶ。
 
 | カテゴリ | コマンド名 |
 |---|---|
@@ -89,7 +88,7 @@
 | マーケットプレース (2) | `marketplace_fetch_index`, `marketplace_install` |
 | プロファイル (2) | `export_profile`, `import_profile` |
 | Windows スキーム (5) | `list_windows_schemes`, `apply_windows_scheme`, `get_windows_scheme_previews`, `get_windows_scheme_role_previews`, `export_windows_scheme_as_cursorpack` |
-| システム / 設定 / 診断 (17) | `reset_to_default`, `reset_to_initial`, `get_dark_mode_status`, `get_environment_report`, `get_config`, `update_config`, `get_app_info`, `list_config_backups`, `restore_config_backup`, `check_update_is_major_jump`, `open_url`, `open_log_folder`, `get_accessibility_conflicts`, `get_autostart_status`, `list_crash_reports`, `clear_crash_reports`, `submit_crash_reports` |
+| システム / 設定 / 診断 (16) | `reset_to_default`, `reset_to_initial`, `get_environment_report`, `get_config`, `update_config`, `get_app_info`, `list_config_backups`, `restore_config_backup`, `check_update_is_major_jump`, `open_url`, `open_log_folder`, `get_accessibility_conflicts`, `get_autostart_status`, `list_crash_reports`, `clear_crash_reports`, `submit_crash_reports` |
 | 一括取込 (3) | `bulk_resolve_assets`, `cancel_bulk_import`, `parse_cursorpack_for_creator` |
 
 ### 起動シーケンス (`main.rs`)
@@ -103,7 +102,7 @@
 7. 孤児カーソル参照のクリーンアップ (`ThemeManager::cleanup_orphan_references`)
 8. **クラッシュリカバリ**: `RegistryManager::check_pending_snapshot` — 残っていれば前回の適用処理が中断 → Windows 既定へ復元
 9. `tauri::Builder` を組み立て、`tauri_plugin_single_instance::init` で多重起動防止 + argv ハンドオーバ
-10. `setup` 内でトレイ起動 (`tray::setup_tray`)、パニックホットキー登録、ダークモード監視、カーソルウォッチャ起動
+10. `setup` 内でトレイ起動 (`tray::setup_tray`)、パニックホットキー登録、カーソルウォッチャ起動
 11. 全部成功 → `mark_healthy` (失敗カウンタをリセット)
 
 ## Security
@@ -174,7 +173,6 @@ app/
 | `creator.vue` | useCreatorAssets, useCreatorPickers, useCreatorImport, useCreatorBulkImportFlow, useCreatorExport, useRoleMatcher, useBulkImport, useKeystore, useHotspotDefaults, useHotspotInteraction, useAniPlayer, sanitizeSvg, NewThemeStartModal, BulkImportPreviewModal | `import_cursor_file`, `inspect_ani_file`, `parse_cursorpack_for_creator`, `bulk_resolve_assets`, `cancel_bulk_import`, `export_cursorpack_streamed`, `cancel_build`, `export_ani_with_hotspot`, `keystore_info` |
 | `marketplace.vue` | useThemes, MarketplaceCard, FeaturedCard, SubmitThemeDialog | `marketplace_fetch_index`, `marketplace_install`, `keystore_info` |
 | `settings.vue` | useAppSettings, useKeystore, useUpdater, useSettingsSearch, ConfigRecoveryPanel, PassphrasePrompt, SettingsSearchDropdown, GeneralSection 〜 AboutSection の 8 セクション | `get_config`, `update_config`, `keystore_*`, `list_config_backups`, `restore_config_backup`, `export_profile`, `import_profile`, `list_crash_reports`, `clear_crash_reports`, `submit_crash_reports`, `check_update_is_major_jump` |
-| `appearance.vue` | useAppSettings, ModeIndicator, PairingSlot, ThemePickerModal | `get_dark_mode_status`, `update_config` |
 | `PanicFlow.vue` (modal) | useNotify | `reset_to_default`, `reset_to_initial` |
 
 ### 巨大ファイルの状態 (リファクタ追跡用)

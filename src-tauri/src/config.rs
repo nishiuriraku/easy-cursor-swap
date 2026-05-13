@@ -36,9 +36,6 @@ pub struct AppConfig {
     /// 一般設定
     pub general: GeneralConfig,
 
-    /// ダークモード設定
-    pub dark_mode: DarkModeConfig,
-
     /// セキュリティ設定
     pub security: SecurityConfig,
 
@@ -90,17 +87,6 @@ pub struct ThemeUsage {
     pub last_applied_at: Option<String>,
 }
 
-/// ダークモード連動設定
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DarkModeConfig {
-    /// ダークモード連動を有効にするか
-    pub enabled: bool,
-    /// ライトモード時に使用するテーマID
-    pub light_theme_id: Option<Uuid>,
-    /// ダークモード時に使用するテーマID
-    pub dark_theme_id: Option<Uuid>,
-}
-
 /// セキュリティ閾値設定
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SecurityConfig {
@@ -138,11 +124,6 @@ impl Default for AppConfig {
                 crash_reporting: false,
                 favorites: Vec::new(),
                 usage: HashMap::new(),
-            },
-            dark_mode: DarkModeConfig {
-                enabled: false,
-                light_theme_id: None,
-                dark_theme_id: None,
             },
             security: SecurityConfig {
                 // 50 MB
@@ -452,15 +433,6 @@ mod tests {
     }
 
     #[test]
-    fn default_dark_mode_is_disabled_with_no_pairing() {
-        // ペアリング未設定で勝手に切替えないため、初期状態は enabled=false。
-        let cfg = AppConfig::default();
-        assert!(!cfg.dark_mode.enabled);
-        assert!(cfg.dark_mode.light_theme_id.is_none());
-        assert!(cfg.dark_mode.dark_theme_id.is_none());
-    }
-
-    #[test]
     fn default_crash_reporting_is_opt_in() {
         // プライバシー優先で既定は false。ユーザーが明示 ON にしないと送信しない。
         let cfg = AppConfig::default();
@@ -494,7 +466,11 @@ mod tests {
 
     #[test]
     fn deserialize_accepts_missing_crash_reporting() {
-        // 旧スキーマ (crash_reporting が無い) からの後方互換: serde(default) で false
+        // 旧スキーマ (crash_reporting が無い) からの後方互換: serde(default) で false。
+        // JSON 中に残っている "dark_mode" ブロックは新スキーマでは未知フィールドとなり、
+        // serde の既定挙動 (deny_unknown_fields 未指定) で読み飛ばされる。
+        // これにより既存ユーザーの config.json から dark_mode キーが自然消滅する
+        // ソフトマイグレーションが壊れていないことを兼ねて検証している。
         let json = r#"{
             "schema_version": 1,
             "general": {
@@ -528,7 +504,9 @@ mod tests {
 
     #[test]
     fn deserialize_accepts_missing_favorites_and_usage() {
-        // 旧スキーマ (favorites / usage が無い) は serde(default) で空コレクションになる
+        // 旧スキーマ (favorites / usage が無い) は serde(default) で空コレクションになる。
+        // dark_mode は新スキーマで削除済だが、旧 config.json には残っている。
+        // serde が未知フィールドを読み飛ばすことで透過マイグレーションする。
         let json = r#"{
             "schema_version": 1,
             "general": {

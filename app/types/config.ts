@@ -45,12 +45,6 @@ export interface CrashSubmitSummary {
   skipped: number
 }
 
-export interface DarkModeConfig {
-  enabled: boolean
-  light_theme_id: string | null
-  dark_theme_id: string | null
-}
-
 export interface SecurityConfig {
   max_pack_compressed_size: number
   max_pack_uncompressed_size: number
@@ -67,7 +61,6 @@ export interface LoggingConfig {
 export interface AppConfig {
   schema_version: number
   general: GeneralConfig
-  dark_mode: DarkModeConfig
   security: SecurityConfig
   logging: LoggingConfig
 }

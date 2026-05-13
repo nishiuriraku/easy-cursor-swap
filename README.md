@@ -12,15 +12,13 @@
 
 EasyCursorSwap is a Windows-only desktop application for managing custom mouse cursor themes.
 It lets you import, create, and switch cursor themes as `.cursorpack` files, with full support
-for all 17 Windows cursor roles, 6 DPI sizes, Ed25519-signed theme distribution, and automatic
-dark/light mode switching.
+for all 17 Windows cursor roles, 6 DPI sizes, and Ed25519-signed theme distribution.
 
 ## Features
 
 - **Theme library** — Import `.cursorpack` files by drag-and-drop or file dialog; browse, filter, and sort your collection
 - **One-click apply** — Writes all 17 cursor slots × 6 resolutions to the registry with atomic snapshot/rollback
 - **Creator mode** — Build cursor themes from PNG/SVG images; assign hotspots; export signed `.cursorpack` files
-- **Dark mode auto-switch** — Pair two themes with OS light/dark state; switches automatically without user action
 - **Official index** — Browse and install Ed25519-verified themes from the curated community index
 - **Panic button** — One-click restore to Windows default or the pre-install snapshot, at any time
 - **Tray resident** — Runs silently in the system tray; optional silent launch on OS startup
@@ -99,8 +97,8 @@ easy-cursor-swap/
 │   └── types/                  # TypeScript interfaces for IPC payloads
 ├── src-tauri/                  # Tauri + Rust backend
 │   ├── src/
-│   │   ├── main.rs             # Entry point: tray, dark-mode watcher, health check
-│   │   ├── lib.rs              # Module declarations (21 modules)
+│   │   ├── main.rs             # Entry point: tray, health check
+│   │   ├── lib.rs              # Module declarations (20 modules)
 │   │   ├── commands/           # Tauri IPC command handlers (53 endpoints across 9 sub-modules)
 │   │   ├── config.rs           # Config manager (RwLock, schema migration, backups)
 │   │   ├── cursor/             # PNG → .cur / .ani pipeline (6 sizes, hotspot, ANI read/write)
@@ -110,7 +108,7 @@ easy-cursor-swap/
 │   │   ├── marketplace.rs      # HTTP index fetch, SHA-256 + Ed25519 verification
 │   │   ├── keystore.rs         # Ed25519 key generation, DPAPI encryption, .cfkey
 │   │   ├── health.rs           # Startup failure counter, rollback detection
-│   │   └── …                   # darkmode, tray, logging, backup, accessibility, …
+│   │   └── …                   # tray, logging, backup, accessibility, …
 │   ├── benches/                # Criterion micro-benchmarks
 │   ├── Cargo.toml
 │   └── tauri.conf.json

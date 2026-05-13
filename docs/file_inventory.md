@@ -14,12 +14,12 @@
 
 | ファイル | 機能 |
 |---|---|
-| [main.rs](../src-tauri/src/main.rs) | Tauri アプリのエントリ。tracing 初期化、`StartupCheck::begin()`、AppUserModelID 登録、ConfigManager 初期化、孤児カーソル復旧、pending snapshot リカバリ、`tauri::Builder` 構築 (single-instance プラグイン / 各種 plugin / setup でトレイ・ホットキー・ダークモード監視) |
-| [lib.rs](../src-tauri/src/lib.rs) | 21 モジュールの `pub mod` 宣言 |
+| [main.rs](../src-tauri/src/main.rs) | Tauri アプリのエントリ。tracing 初期化、`StartupCheck::begin()`、AppUserModelID 登録、ConfigManager 初期化、孤児カーソル復旧、pending snapshot リカバリ、`tauri::Builder` 構築 (single-instance プラグイン / 各種 plugin / setup でトレイ・ホットキー) |
+| [lib.rs](../src-tauri/src/lib.rs) | 20 モジュールの `pub mod` 宣言 |
 | [commands/mod.rs](../src-tauri/src/commands/mod.rs) | 全 Tauri コマンドのハンドラ登録 (`get_command_handlers()` が 53 IPC を `tauri::generate_handler!` に渡す) |
 | [errors.rs](../src-tauri/src/errors.rs) | `AppError` (`thiserror`、`Serialize` 派生で IPC 経由 throw 対応) |
 
-### 1-2. IPC コマンド実体 (9 サブモジュール / 53 個)
+### 1-2. IPC コマンド実体 (9 サブモジュール / 52 個)
 
 | ファイル | 主な IPC |
 |---|---|
@@ -27,7 +27,7 @@
 | [commands/cursor_io.rs](../src-tauri/src/commands/cursor_io.rs) | `import_cursor_file` (.cur/.ico → PNG) / `inspect_ani_file` (RIFF 解析・プレビュー) / `take_pending_cursorpack` (起動時 argv からの引き継ぎ) |
 | [commands/ani_export.rs](../src-tauri/src/commands/ani_export.rs) | `export_ani_with_hotspot` (.ani 書き出し + hotspot 埋込) |
 | [commands/theme.rs](../src-tauri/src/commands/theme.rs) | `get_cursor_roles` / `get_current_cursors` / `get_themes` / `get_theme_previews` / `get_theme_role_previews` / `apply_theme` / `set_theme_favorite` / `clear_cursor_cache` / `inspect_cursorpack` / `import_cursorpack` / `delete_theme` / `duplicate_theme` / `repackage_theme` |
-| [commands/system.rs](../src-tauri/src/commands/system.rs) | `reset_to_default` / `reset_to_initial` / `get_dark_mode_status` / `get_environment_report` / `get_config` / `update_config` / `get_autostart_status` / `get_app_info` / `list_config_backups` / `restore_config_backup` / `open_url` / `open_log_folder` / `get_accessibility_conflicts` / `check_update_is_major_jump` / `list_crash_reports` / `clear_crash_reports` / `submit_crash_reports` |
+| [commands/system.rs](../src-tauri/src/commands/system.rs) | `reset_to_default` / `reset_to_initial` / `get_environment_report` / `get_config` / `update_config` / `get_autostart_status` / `get_app_info` / `list_config_backups` / `restore_config_backup` / `open_url` / `open_log_folder` / `get_accessibility_conflicts` / `check_update_is_major_jump` / `list_crash_reports` / `clear_crash_reports` / `submit_crash_reports` |
 | [commands/keystore.rs](../src-tauri/src/commands/keystore.rs) | `keystore_info` / `keystore_generate` / `keystore_delete` / `keystore_export` / `keystore_import` |
 | [commands/marketplace.rs](../src-tauri/src/commands/marketplace.rs) | `marketplace_fetch_index` / `marketplace_install` |
 | [commands/profile.rs](../src-tauri/src/commands/profile.rs) | `export_profile` / `import_profile` |
@@ -61,7 +61,6 @@
 | [health.rs](../src-tauri/src/health.rs) | `startup.json` の `pending_failures`、3 回連続失敗検知、バージョン変更で自動リセット |
 | [crash.rs](../src-tauri/src/crash.rs) | `install_panic_hook`、`%LOCALAPPDATA%\...\crash\panic-{epoch}.json`、`prune_old_reports`、`general.crash_reporting` 同意、送信ペイロード生成 |
 | [tray.rs](../src-tauri/src/tray.rs) | システムトレイ + `show_or_recreate_main_window` (WebView 破棄/再生成) |
-| [darkmode.rs](../src-tauri/src/darkmode.rs) | `AppsUseLightTheme` 監視 + `WM_SETTINGCHANGE` (不可視ウィンドウ) |
 | [hotkey.rs](../src-tauri/src/hotkey.rs) | `RegisterHotKey` で `Ctrl+Alt+Shift+R` → `panic-hotkey` イベント |
 | [autostart.rs](../src-tauri/src/autostart.rs) | `HKCU\...\Run` 登録、MSIX 検出時は no-op で `startupTask` に委譲 |
 | [appusermodel.rs](../src-tauri/src/appusermodel.rs) | `SetCurrentProcessExplicitAppUserModelID("dev.easycursorswap.app")` |
@@ -90,7 +89,6 @@
 | [pages/creator.vue](../app/pages/creator.vue) | クリエイターモード (3 カラム + バルクインポート + .cursorpack 出力) |
 | [pages/marketplace.vue](../app/pages/marketplace.vue) | 公式インデックス (フィルタ/検索/Featured/PR 提出) |
 | [pages/settings.vue](../app/pages/settings.vue) | 設定 8 セクション (一般/起動/ライブラリ/セキュリティ/鍵/ログ/更新/About) |
-| [pages/appearance.vue](../app/pages/appearance.vue) | ダークモード連動ペアリング |
 
 ### 2-2. コンポーネント (責務別グループ)
 
@@ -100,7 +98,7 @@
 | [library/](../app/components/library/) | `ThemeCard` / `ThemeRow` / `ThemeDetailModal` / `ThemeDetailDrawer` / `ApplyModal` / `ImportConflictDialog` / `ThemePickerModal` / `CursorMatrix` / `LibraryToolbar` / `LibraryFilterBar` / `LibraryEmptyState` / `LibraryDropOverlay` |
 | [creator/](../app/components/creator/) | `CreatorStartScreen` / `CreatorToolbar` / `CreatorRoleList` / `CreatorMetadataPane` (Hotspot 節を内包) / `NewThemeStartModal` / `SaveDestinationModal` / `BulkImportButton` / `BulkImportPreviewModal` / `BulkImportRoleRow` / `RoleListItem` / `SizeStrip` / `AniThumb` |
 | [marketplace/](../app/components/marketplace/) | `FeaturedCard` / `MarketplaceCard` / `SubmitThemeDialog` |
-| [settings/](../app/components/settings/) | `GeneralSection` / `StartupSection` / `LibrarySection` / `SecuritySection` / `KeysSection` / `LoggingSection` / `UpdatesSection` / `AboutSection` / `SettingsRow` (anchor prop で検索ジャンプ対応) / `SettingsToggle` / `PassphrasePrompt` / `ConfigRecoveryPanel` / `PairingSlot` / `ModeIndicator` / `SettingsSearchDropdown` (ja/en 両言語の横断検索ドロップダウン) |
+| [settings/](../app/components/settings/) | `GeneralSection` / `StartupSection` / `LibrarySection` / `SecuritySection` / `KeysSection` / `LoggingSection` / `UpdatesSection` / `AboutSection` / `SettingsRow` (anchor prop で検索ジャンプ対応) / `SettingsToggle` / `PassphrasePrompt` / `ConfigRecoveryPanel` / `SettingsSearchDropdown` (ja/en 両言語の横断検索ドロップダウン) |
 | [preview/](../app/components/preview/) | `CursorPreview` (theme detail で使うプレビュー) |
 | [panic/](../app/components/panic/) | `PanicFlow` (ステージ選択 + ライブログ + 17 ロールグリッド) |
 | [icons/](../app/components/icons/) | `UiIcon` + `UI_ICONS`、`CursorIcon` + `CURSOR_ICONS` — render 関数で v-html 回避 |
@@ -162,10 +160,10 @@
 
 | 指標 | 値 |
 |---|---|
-| Rust モジュール数 (lib.rs `pub mod`) | 21 + ベンチ 2 |
-| Tauri IPC コマンド数 | 53 |
-| Vue ページ数 | 5 |
-| Vue コンポーネント (subdir 別) | shell 3 / library 12 / creator 12 / marketplace 3 / settings 14 / preview 1 / panic 1 / icons 2 / ui 1 |
+| Rust モジュール数 (lib.rs `pub mod`) | 20 + ベンチ 2 |
+| Tauri IPC コマンド数 | 52 |
+| Vue ページ数 | 4 |
+| Vue コンポーネント (subdir 別) | shell 3 / library 12 / creator 12 / marketplace 3 / settings 12 / preview 1 / panic 1 / icons 2 / ui 1 |
 | Composables 数 | 21 |
 | Vitest テストファイル数 | 10 (composables) + 1 (components/creator) |
 | CI ワークフロー数 | 3 (ci / performance / release) |

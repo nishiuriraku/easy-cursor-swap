@@ -81,7 +81,6 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         // システム / 設定 / 診断
         system::reset_to_default,
         system::reset_to_initial,
-        system::get_dark_mode_status,
         system::get_environment_report,
         system::get_config,
         system::update_config,

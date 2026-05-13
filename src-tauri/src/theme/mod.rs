@@ -61,10 +61,8 @@ impl ThemeManager {
 
     /// 起動時の孤児カーソル復旧チェック。
     ///
-    /// config が指すテーマ ID (`active_theme_id` / `dark_mode.{light,dark}_theme_id`) が
-    /// ディスク上に存在しない場合、以下を実行する:
-    ///  - `active_theme_id` が孤児: レジストリを Windows 既定に戻し、`active_theme_id = None`
-    ///  - dark_mode 側の孤児: 該当フィールドを `None` に戻す (適用済みでなければレジストリは触らない)
+    /// config が指すテーマ ID (`active_theme_id`) がディスク上に存在しない場合、
+    /// レジストリを Windows 既定に戻し、`active_theme_id = None` に戻す。
     ///
     /// 何もする必要がなければ `Ok(false)` を返す。復旧した場合は `Ok(true)`。
     pub fn cleanup_orphan_references(config: &crate::config::ConfigManager) -> AppResult<bool> {
@@ -75,52 +73,21 @@ impl ThemeManager {
             .general
             .active_theme_id
             .is_some_and(|id| !Self::theme_exists(id));
-        let dark_orphan = cfg
-            .dark_mode
-            .dark_theme_id
-            .is_some_and(|id| !Self::theme_exists(id));
-        let light_orphan = cfg
-            .dark_mode
-            .light_theme_id
-            .is_some_and(|id| !Self::theme_exists(id));
 
-        if !active_orphan && !dark_orphan && !light_orphan {
+        if !active_orphan {
             return Ok(false);
         }
 
-        if active_orphan {
-            tracing::warn!(
-                "孤児カーソル検出: active_theme_id={:?} のディレクトリが消失 → Windows 既定へ復元",
-                cfg.general.active_theme_id
-            );
-            // 失敗してもベストエフォートで config 側は修正する
-            if let Err(e) = RegistryManager::reset_to_windows_default() {
-                tracing::warn!("孤児復旧時の Windows 既定への戻し失敗: {}", e);
-            }
-        }
-        if dark_orphan {
-            tracing::warn!(
-                "孤児カーソル検出: dark_mode.dark_theme_id={:?} のディレクトリが消失",
-                cfg.dark_mode.dark_theme_id
-            );
-        }
-        if light_orphan {
-            tracing::warn!(
-                "孤児カーソル検出: dark_mode.light_theme_id={:?} のディレクトリが消失",
-                cfg.dark_mode.light_theme_id
-            );
+        tracing::warn!(
+            "孤児カーソル検出: active_theme_id={:?} のディレクトリが消失 → Windows 既定へ復元",
+            cfg.general.active_theme_id
+        );
+        if let Err(e) = RegistryManager::reset_to_windows_default() {
+            tracing::warn!("孤児復旧時の Windows 既定への戻し失敗: {}", e);
         }
 
         config.update(|c| {
-            if active_orphan {
-                c.general.active_theme_id = None;
-            }
-            if dark_orphan {
-                c.dark_mode.dark_theme_id = None;
-            }
-            if light_orphan {
-                c.dark_mode.light_theme_id = None;
-            }
+            c.general.active_theme_id = None;
         })?;
         Ok(true)
     }

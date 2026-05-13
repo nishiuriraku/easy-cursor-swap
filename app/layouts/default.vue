@@ -44,7 +44,6 @@ const NAV_ROUTES: Record<string, string> = {
   creator: '/creator',
   marketplace: '/marketplace',
   settings: '/settings',
-  appearance: '/appearance',
 }
 
 // パス → ナビ ID の逆引き

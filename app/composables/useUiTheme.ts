@@ -1,7 +1,7 @@
 /**
  * UI のライト/ダーク表示モード切替。
  *
- * Rust の dark_mode.enabled (= カーソル自動切替) とは別軸で、
+ * OS のダークモード設定や Rust 側の config とは独立した、
  * アプリ自身の見た目を Light/Dark/Auto から選ぶための composable。
  *
  * - Auto: prefers-color-scheme に追従

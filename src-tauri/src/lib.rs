@@ -6,7 +6,6 @@
 //! - cursor: .cur バイナリ生成、画像処理パイプライン
 //! - theme: テーマパッケージ (.cursorpack) の管理
 //! - tray: システムトレイ常駐ロジック
-//! - darkmode: ダークモード監視と自動切替
 //! - commands: Tauri IPC コマンド定義
 //! - errors: エラー型定義
 
@@ -20,7 +19,6 @@ pub mod config;
 pub mod crash;
 pub mod cursor;
 pub mod cursor_watcher;
-pub mod darkmode;
 pub mod environment;
 pub mod errors;
 pub mod health;

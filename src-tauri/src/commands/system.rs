@@ -6,7 +6,6 @@
 use crate::accessibility::AccessibilityConflicts;
 use crate::autostart;
 use crate::config::{AppConfig, BackupInfo, ConfigManager};
-use crate::darkmode;
 use crate::environment::EnvironmentReport;
 use crate::errors::AppError;
 use crate::health::is_major_bump;
@@ -49,12 +48,6 @@ pub fn reset_to_initial(app: AppHandle, config: State<'_, ConfigManager>) -> Res
         tracing::warn!("reset_to_initial: cursor-changed emit 失敗: {}", err);
     }
     Ok(())
-}
-
-/// 現在のダークモード状態を取得する
-#[tauri::command]
-pub fn get_dark_mode_status() -> Result<bool, AppError> {
-    darkmode::is_dark_mode()
 }
 
 /// 動作環境レポートを返す (RDP / Server SKU 検出)。

@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- _Nothing yet._
+- OS ダークモード連動による自動テーマ切替機能 (UI 配線が未完了のままだった半実装) を完全に除去。これに伴い `AppConfig.dark_mode` フィールドが削除され、IPC `get_dark_mode_status` も廃止。既存ユーザーの `config.json` 内 `dark_mode` キーは serde の未知フィールド読み飛ばしで透過的に消滅する (`schema_version` は据え置き)。**旧バイナリへのダウングレードは非推奨** (旧バイナリは新スキーマを parse error として扱う)。
 
 ### Fixed
 
