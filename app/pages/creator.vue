@@ -715,23 +715,15 @@ async function onFileChange(e: Event) {
         v-model:meta-version="metaVersion"
         v-model:meta-description="metaDescription"
         v-model:shadow-enabled="shadowEnabled"
-        v-model:hotspot="activeHotspotModel"
-        :primary-size="assigned[activeRoleId]?.primarySize ?? activeSize"
-        v-model:per-size-hotspot="perSizeHotspot"
         :arrow-assigned="arrowAssigned"
         :assigned-role-count="assignedRoleCount"
         :export-message="exportMessage"
         :export-progress="exportProgress"
         :export-busy="exportBusy"
-        :active-role-jp="activeRole.jp"
-        :show-advanced-resolutions="showAdvancedResolutions"
         :failed-apply-theme-id="failedApplyThemeId"
-        :sized-override-active="sizedOverrideActive"
-        :can-edit-sized-override="canEditSizedOverride"
         @dismiss-export-message="exportMessage = null"
         @cancel-export="cancelExport"
         @retry-apply="retryApply"
-        @enable-sized-override="enableSizedOverride"
       />
 
       <!-- 2 カラムグリッド (assign タブのみ) -->
