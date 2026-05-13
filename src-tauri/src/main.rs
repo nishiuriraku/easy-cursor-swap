@@ -228,6 +228,9 @@ fn main() {
         .unwrap_or_else(|_| "Ctrl+Alt+Shift+R".to_string());
 
     // Tauri アプリケーションビルド
+    // release ビルドでは debug_assertions ブロックが消えて再代入が無くなるため
+    // `mut` が unused 扱いになる。条件付きで allow する。
+    #[cfg_attr(not(debug_assertions), allow(unused_mut))]
     let mut builder = tauri::Builder::default();
     #[cfg(debug_assertions)]
     {
