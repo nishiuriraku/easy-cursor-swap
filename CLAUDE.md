@@ -137,6 +137,33 @@ When starting any new feature, refactor, or bug fix, **always** follow these ste
 1. **Invoke the relevant skill.** If there is even a 1% chance a skill applies to the task, launch it via the `Skill` tool (e.g. `superpowers:brainstorming` for ideation, `superpowers:test-driven-development` for TDD, `superpowers:systematic-debugging` for debugging, `rust-skills:m01-ownership` for Rust ownership/concurrency errors, and the matching skill for Cloudflare / Tauri / Nuxt-specific work). When in doubt, launch it and discard if it doesn't fit.
 2. **Read existing code before writing.** Read the relevant areas of `app/` / `src-tauri/src/` / `composables/` / `commands/` first, then match the prior naming, types, and IPC conventions. Update both `locales/{ja,en}.ts` so `scripts/check-i18n.mjs` stays green. Prefer extending an existing composable / module over introducing duplicate code.
 3. **Use `scripts/verify-gate.sh` as the verification gate.** Run `bash scripts/verify-gate.sh` right before committing and confirm it passes green. Do not use the inline sequence (`cargo fmt` … `npm run tauri:build`) — the script is canonical.
+4. **Update docs in the same commit.** See "Documentation update policy" below. Code-only commits that move the source-of-truth without touching the living docs are the main cause of doc rot in this repo — do not create them.
+
+## Documentation update policy
+
+Living docs must move with the code. The mapping below is the **trigger → action** contract: when you make the change in the left column, update the file(s) in the right column **in the same commit**.
+
+| Trigger (what you changed in code) | Update these |
+| --- | --- |
+| Added / removed / renamed a Rust file under `src-tauri/src/` | `docs/file_inventory.md` section 1 (file table). If it changes a module boundary, also update `docs/architecture.md` "Backend layout / responsibility map". |
+| Added / removed a `#[tauri::command]` | `docs/architecture.md` IPC inventory (count + category table) **and** `docs/file_inventory.md` section 1-2. The two numbers must stay in sync. |
+| Module split / merge (e.g. `foo.rs` → `foo/`) | `docs/architecture.md` "responsibility map" + "Backend layout" + "refactor tracking" entry, plus `docs/file_inventory.md`. |
+| Startup sequence changed (`main.rs`) | `docs/architecture.md` "Startup sequence" numbered list. |
+| New security invariant or threat-mitigation primitive | `docs/architecture.md` "Security" table (invariant + responsible module). Re-check whether the README "Security Model" table needs an entry too. |
+| New / changed Vue page, composable, or component sub-directory | `docs/architecture.md` "Frontend layout" + "Page → Composable → IPC" table, and `docs/file_inventory.md` section 2. |
+| Tailwind / global CSS pattern change | `CLAUDE.md` "Coding conventions" CSS subsection (this file). |
+| Verification gate changed | Edit `scripts/verify-gate.sh` itself (canonical) — do **not** re-document the steps in CLAUDE.md or `docs/architecture.md`. |
+| Operational procedure change (Updater key issuance, Authenticode procurement, MSIX distribution, key rotation, author onboarding) | The corresponding runbook in `docs/` (`updater_signing.md` / `authenticode_signing.md` / `distribution.md` / `key_rotation.md` / `author_registration.md`). |
+| New feature design or multi-step plan | Add a new dated file under `docs/superpowers/{specs,plans,issue}/` (`YYYY-MM-DD-short-slug.md`). Never edit superpowers files retroactively — append-only. |
+| User-visible behaviour, install flow, supported OS, security model, or installation step changed | Both `README.md` and `README.ja.md` in parity, and `CHANGELOG.md` under `## [Unreleased]` with the right Keep-a-Changelog sub-section (`Added` / `Changed` / `Deprecated` / `Removed` / `Fixed` / `Security`). |
+| Module count, IPC count, composable count, or any other numeric claim in any doc | Re-verify the number against the actual source (`grep -c` / `glob`) before changing it. **Numbers in docs are the most common drift signal** — don't trust them, count them. |
+
+**Do not touch:**
+
+- Anything under `docs/legacy/` (frozen original plans — see "Documentation map").
+- Past dated files under `docs/superpowers/` (append-only history — add a new file instead).
+
+**Doc-only changes** (no code touched) are fine as standalone commits — for example, fixing a stale number, clarifying a pitfall, or adding a new runbook step. Use a `docs: ...` Conventional Commit prefix.
 
 ## Workflow rule (auto-memory)
 
