@@ -104,7 +104,7 @@
 | [icons/](../app/components/icons/) | `UiIcon` + `UI_ICONS`、`CursorIcon` + `CURSOR_ICONS` — render 関数で v-html 回避 |
 | [ui/](../app/components/ui/) | `UiSelect` (ネイティブ select の白背景を回避) |
 
-### 2-3. Composables (21 個)
+### 2-3. Composables (23 個)
 
 | ファイル | 役割 |
 |---|---|
@@ -164,6 +164,6 @@
 | Tauri IPC コマンド数 | 52 |
 | Vue ページ数 | 4 |
 | Vue コンポーネント (subdir 別) | shell 3 / library 12 / creator 12 / marketplace 3 / settings 12 / preview 1 / panic 1 / icons 2 / ui 1 |
-| Composables 数 | 21 |
+| Composables 数 | 23 |
 | Vitest テストファイル数 | 10 (composables) + 1 (components/creator) |
 | CI ワークフロー数 | 3 (ci / performance / release) |

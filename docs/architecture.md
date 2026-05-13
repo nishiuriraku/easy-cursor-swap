@@ -144,8 +144,8 @@ app/
 │  │                NewThemeStartModal, SaveDestinationModal, BulkImportButton,
 │  │                BulkImportPreviewModal, BulkImportRoleRow, RoleListItem, SizeStrip, AniThumb
 │  ├─ marketplace/ ← MarketplaceCard, FeaturedCard, SubmitThemeDialog
-│  ├─ settings/    ← SettingsRow, SettingsToggle, ConfigRecoveryPanel, ModeIndicator,
-│  │                PassphrasePrompt, PairingSlot, GeneralSection, StartupSection,
+│  ├─ settings/    ← SettingsRow, SettingsToggle, ConfigRecoveryPanel, PassphrasePrompt,
+│  │                SettingsSearchDropdown, GeneralSection, StartupSection,
 │  │                LibrarySection, SecuritySection, KeysSection, LoggingSection,
 │  │                UpdatesSection, AboutSection
 │  ├─ preview/     ← CursorPreview (theme detail で使うプレビュー)
