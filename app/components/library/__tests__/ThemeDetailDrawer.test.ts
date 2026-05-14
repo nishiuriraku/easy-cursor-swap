@@ -117,11 +117,12 @@ describe('ThemeDetailDrawer — 静的要素の整理', () => {
     expect(cellKeys).toEqual(['PACKAGE', 'USAGE', 'SOURCE'])
   })
 
-  it('PACKAGE セルに schema v{n} とサイズを表示', () => {
+  it('PACKAGE セルに roles・サイズ (v) と schema v{n} (sub) を表示', () => {
     const w = mountDrawer(makeTheme({ schemaVersion: 1, sizeBytes: 2 * 1024 * 1024 }))
     const pkg = w.findAll('.td-cell')[0]!
-    expect(pkg.find('.td-cell-v').text()).toContain('schema v1')
-    expect(pkg.find('.td-cell-sub').text()).toContain('2.0 MB')
+    expect(pkg.find('.td-cell-v').text()).toContain('roles')
+    expect(pkg.find('.td-cell-v').text()).toContain('2.0 MB')
+    expect(pkg.find('.td-cell-sub').text()).toContain('schema v1')
   })
 
   it('lastAppliedAt があれば USAGE サブに「lastAppliedPrefix YYYY-MM-DD」を出す', () => {
