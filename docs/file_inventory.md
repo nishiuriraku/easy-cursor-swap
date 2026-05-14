@@ -86,8 +86,10 @@
 | ファイル | 役割 |
 |---|---|
 | [pages/index.vue](../app/pages/index.vue) | テーマライブラリ (grid/list/タグフィルタ/インポート/D&D) |
+| [pages/index.helpers.ts](../app/pages/index.helpers.ts) | Library ページの IPC → Card マッピング (`IpcThemeSummary` 型 + `mapLocalSummaryToCard`) |
 | [pages/creator.vue](../app/pages/creator.vue) | クリエイターモード (3 カラム + バルクインポート + .cursorpack 出力) |
 | [pages/marketplace.vue](../app/pages/marketplace.vue) | 公式インデックス (フィルタ/検索/Featured/PR 提出) |
+| [pages/marketplace.helpers.ts](../app/pages/marketplace.helpers.ts) | Marketplace ページの `filteredGrid` 計算 (純関数 `computeFilteredGrid`) |
 | [pages/settings.vue](../app/pages/settings.vue) | 設定 8 セクション (一般/起動/ライブラリ/セキュリティ/鍵/ログ/更新/About) |
 
 ### 2-2. コンポーネント (責務別グループ)
@@ -163,7 +165,7 @@
 |---|---|
 | Rust モジュール数 (lib.rs `pub mod`) | 20 + ベンチ 2 |
 | Tauri IPC コマンド数 | 54 |
-| Vue ページ数 | 4 |
+| Vue ページ数 | 4 (+2 helpers) |
 | Vue コンポーネント (subdir 別) | shell 3 / library 12 / creator 12 / marketplace 4 / settings 12 / preview 1 / panic 1 / icons 2 / ui 1 |
 | Composables 数 | 23 |
 | Vitest テストファイル数 | 12 (composables) + 1 (components/creator) |
