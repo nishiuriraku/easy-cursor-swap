@@ -815,9 +815,10 @@
 
 /* --- Modal shell (Phase 12-F) ---
  * 8 モーダル (Apply / NewThemeStart / BulkImport / ImportConflict / ThemePicker /
- * ThemeDetail / SubmitTheme / PassphrasePrompt) で共有。 */
+ * ThemeDetail / SubmitTheme / PassphrasePrompt) で共有。
+ * top-9 (36px) で AppTitlebar (h-9) を避け、透過背景がタイトルバーに被らないようにする。 */
 .modal-page {
-  @apply fixed inset-0 z-[100] grid place-items-center p-6;
+  @apply fixed inset-x-0 bottom-0 top-9 z-[100] grid place-items-center p-6;
   /* color と gradient を background shorthand で並べる CSS は spec 違反で全体が無効化されるため、
    * 半透明黒オーバーレイは background-color、装飾グラデーションは background-image に分ける。 */
   background-color: rgba(0, 0, 0, 0.5);

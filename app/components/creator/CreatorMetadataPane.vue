@@ -252,16 +252,28 @@ defineEmits<{
   border-color: rgba(106, 213, 184, 0.3);
 }
 
+/* エクスポート結果ポップアップ。Library の .apply-error と同じく画面下部に固定表示する。
+ * メタデータペイン内のレイアウトに影響しないよう viewport 基準で配置。 */
 .import-banner {
+  position: fixed;
+  bottom: 48px;
+  left: 50%;
+  z-index: 90;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  min-width: 320px;
+  max-width: 80%;
   padding: 10px 14px;
-  border-radius: 10px;
-  background: var(--bg-elev2);
-  border: 1px solid var(--border);
-  font-size: 12px;
-  color: var(--text);
+  border-radius: 8px;
+  background: rgba(124, 242, 212, 0.1);
+  border: 1px solid var(--accent-line);
+  font-size: 12.5px;
+  color: var(--fg-dim);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-2);
 }
 
 .export-progress {

@@ -816,24 +816,6 @@ async function onFileChange(e: Event) {
             </div>
           </div>
 
-          <!-- インポート結果メッセージ -->
-          <Transition name="fade">
-            <div v-if="importMessage" class="import-banner" role="status">
-              <UiIcon
-                :name="importMessage.startsWith(t('creator.errImportPrefix')) ? 'Alert' : 'Check'"
-                :size="13"
-              />
-              <span>{{ importMessage }}</span>
-              <button
-                class="btn ghost"
-                style="margin-left: auto; height: 24px"
-                @click="importMessage = null"
-              >
-                <UiIcon name="X" :size="11" />
-              </button>
-            </div>
-          </Transition>
-
           <div class="canvas-area">
             <div class="canvas-stage">
               <!-- ビッグプレビュー (CursorPreview に委譲、メタコーナーは外側でオーバーレイ) -->
@@ -997,6 +979,24 @@ async function onFileChange(e: Event) {
         </div>
       </div>
     </Transition>
+
+    <!-- インポート結果メッセージ (Library の apply-error と同じく画面下部のポップアップ) -->
+    <Transition name="fade">
+      <div v-if="importMessage" class="import-banner" role="status">
+        <UiIcon
+          :name="importMessage.startsWith(t('creator.errImportPrefix')) ? 'Alert' : 'Check'"
+          :size="13"
+        />
+        <span>{{ importMessage }}</span>
+        <button
+          class="btn ghost"
+          style="margin-left: auto; height: 24px"
+          @click="importMessage = null"
+        >
+          <UiIcon name="X" :size="11" />
+        </button>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -1090,9 +1090,12 @@ async function onFileChange(e: Event) {
   @apply text-fg-dim;
 }
 
+/* インポート結果ポップアップ。Library の .apply-error と同じ位置/挙動で、
+ * 色だけ accent (緑) を維持して「成功+失敗」両用で使う。 */
 .import-banner {
-  @apply mx-[18px] mb-2 mt-0 flex items-center gap-2 rounded-[8px] border border-accent-line px-3 py-2 text-[12px] text-fg-dim;
-  background: rgba(124, 242, 212, 0.06);
+  @apply fixed bottom-12 left-1/2 z-[90] flex min-w-[320px] max-w-[80%] -translate-x-1/2 items-center gap-2.5 rounded-[8px] border border-accent-line px-3.5 py-2.5 text-[12.5px] text-fg-dim backdrop-blur-[12px];
+  background: rgba(124, 242, 212, 0.1);
+  box-shadow: var(--shadow-2);
 }
 
 .export-progress {
