@@ -53,6 +53,30 @@ watch(installStatus, (next) => {
 // これで「Marketplace でインポート → サイドバーバッジ・Library 画面に即時反映」が実現する。
 const { refresh: refreshThemes } = useThemes()
 
+// 詳細モーダル管理
+const selectedEntry = ref<MarketplaceEntry | null>(null)
+const detailInstalling = ref(false)
+
+function openDetails(id: string) {
+  const entry = entries.value.find((x) => x.id === id) ?? null
+  selectedEntry.value = entry
+}
+
+function closeDetails() {
+  selectedEntry.value = null
+}
+
+async function installFromDetail(id: string) {
+  detailInstalling.value = true
+  try {
+    await installEntry(id)
+    // 成功してたら詳細モーダルを閉じる
+    if (installStatus.value?.kind === 'ok') closeDetails()
+  } finally {
+    detailInstalling.value = false
+  }
+}
+
 // --- IPC 経由で受け取る Rust 側スキーマ (snake_case) ---
 interface RustMarketplaceEntry {
   id: string
@@ -69,6 +93,7 @@ interface RustMarketplaceEntry {
   homepage?: string
   download_count: number
   highlight?: 'new' | 'popular' | null
+  preview_base_url?: string
 }
 
 interface RustMarketplaceIndex {
@@ -94,6 +119,7 @@ function adaptEntry(e: RustMarketplaceEntry): MarketplaceEntry {
     tags: e.tags,
     highlight: (e.highlight ?? null) as MarketplaceEntry['highlight'],
     verified: true, // 公式インデックス掲載 = CI で署名検証済み
+    previewBaseUrl: e.preview_base_url,
   }
 }
 
@@ -301,7 +327,7 @@ onMounted(loadIndex)
             v-for="entry in featured"
             :key="entry.id"
             :entry="entry"
-            @install="installEntry"
+            @show-details="openDetails"
           />
         </div>
 
@@ -311,7 +337,7 @@ onMounted(loadIndex)
             v-for="entry in filteredGrid"
             :key="entry.id"
             :entry="entry"
-            @install="installEntry"
+            @show-details="openDetails"
           />
         </div>
 
@@ -326,6 +352,14 @@ onMounted(loadIndex)
 
     <!-- テーマ提出ダイアログ -->
     <SubmitThemeDialog v-model:open="submitOpen" />
+
+    <!-- Marketplace 詳細モーダル -->
+    <MarketplaceDetailModal
+      :entry="selectedEntry"
+      :installing="detailInstalling"
+      @close="closeDetails"
+      @install="installFromDetail"
+    />
   </div>
 </template>
 

@@ -30,6 +30,12 @@ export interface MarketplaceEntry {
   highlight?: 'new' | 'popular' | null
   /** 検証ステータス: signature 検証 + マルウェアハッシュチェック完了 */
   verified: boolean
+  /**
+   * 公式インデックス側 previews/<uuid>/ のベース URL。
+   * 詳細モーダルで <role>.png を組み立てて取得するために使う。
+   * 未定義の場合はサムネ表示を SVG にフォールバック。
+   */
+  previewBaseUrl?: string
 }
 
 export type MarketplaceTag = 'all' | 'pixel' | 'minimal' | 'animated' | 'dark'
