@@ -201,7 +201,7 @@ html.light {
 
   --fg: #14171f;
   --fg-dim: #5b6070;
-  --fg-mute: #626872; /* WCAG AA on --bg-0 #f4f6fb: 5.18:1 */
+  --fg-mute: #626872; /* WCAG AA on --bg-0 #f4f6fb: 5.19:1 */
   --fg-faint: #696e80; /* WCAG AA on --bg-0 #f4f6fb: 4.69:1 */
 
   --accent: #0fa885;
