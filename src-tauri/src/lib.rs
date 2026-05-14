@@ -21,6 +21,7 @@ pub mod cursor;
 pub mod cursor_watcher;
 pub mod environment;
 pub mod errors;
+pub mod github;
 pub mod health;
 pub mod hotkey;
 pub mod keystore;
