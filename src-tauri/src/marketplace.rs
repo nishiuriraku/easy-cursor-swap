@@ -74,6 +74,11 @@ pub struct MarketplaceEntry {
     /// 将来このフィールドを含める可能性があるため `serde(default)` で受け取る。
     #[serde(default)]
     pub highlight: Option<String>,
+    /// 公式インデックス側 `previews/<uuid>/` のベース URL。
+    /// `MarketplaceDetailModal` がここに `/<role>.png` を結合して PNG を取得する。
+    /// 旧スキーマとの互換のため `serde(default)` で `None` フォールバック。
+    #[serde(rename = "preview_base_url", default)]
+    pub preview_base_url: Option<String>,
 }
 
 /// 公開鍵レジストリ (`authors/{github}.json`) のスキーマ。
@@ -492,5 +497,45 @@ mod tests {
         assert!(vkey
             .verify(b"sha256-of-tampered-payload", &decoded_sig)
             .is_err());
+    }
+
+    #[test]
+    fn entry_deserializes_preview_base_url() {
+        // 実 index.json で配信される形 (preview_base_url を含む) が正しく struct に入ること。
+        let json = r#"{
+            "id": "6d364941-c605-4def-801a-14ebb401936f",
+            "name": "Mint",
+            "author": "x",
+            "author_github": "x",
+            "author_pubkey_id": "abcd",
+            "sha256": "00",
+            "signature": "AA==",
+            "download_url": "https://example.com/pack",
+            "version": "1.0.0",
+            "preview_base_url": "https://raw.githubusercontent.com/x/y/main/previews/6d364941"
+        }"#;
+        let entry: MarketplaceEntry = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            entry.preview_base_url.as_deref(),
+            Some("https://raw.githubusercontent.com/x/y/main/previews/6d364941")
+        );
+    }
+
+    #[test]
+    fn entry_omits_preview_base_url_when_none() {
+        // 旧スキーマ互換: preview_base_url 不在の JSON でも None で受けられる。
+        let json = r#"{
+            "id": "00000000-0000-0000-0000-000000000000",
+            "name": "Legacy",
+            "author": "x",
+            "author_github": "x",
+            "author_pubkey_id": "abcd",
+            "sha256": "00",
+            "signature": "AA==",
+            "download_url": "https://example.com/pack",
+            "version": "1.0.0"
+        }"#;
+        let entry: MarketplaceEntry = serde_json::from_str(json).unwrap();
+        assert!(entry.preview_base_url.is_none());
     }
 }
