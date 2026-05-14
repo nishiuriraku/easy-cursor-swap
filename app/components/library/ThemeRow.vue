@@ -46,6 +46,7 @@ watch(() => props.theme.id, fetchPreview)
 const arrowPreviewUrl = computed(() => previewMap.value?.['Arrow'] ?? null)
 
 const isSystem = computed(() => props.theme.kind === 'system')
+const isMarketplace = computed(() => props.theme.kind === 'marketplace')
 
 /** ISO8601 / YYYY-MM-DD どちらでも先頭 10 文字に切り詰める。
  *  Windows システムスキームは `date` が空文字で来るので「—」で代替。 */
@@ -138,6 +139,11 @@ function onRowKeydown(e: KeyboardEvent) {
           <span v-if="theme.isActive" class="lt-active-pill">
             <span class="pulse" aria-hidden="true" />{{ t('library.activeTag') }}
           </span>
+          <span
+            v-if="isMarketplace"
+            class="lt-tag lt-tag-marketplace"
+            :aria-label="t('library.sourceTagMarketplaceAria')"
+          >MARKETPLACE</span>
           <span v-for="tag in theme.tags ?? []" :key="tag" class="lt-tag">{{ tag }}</span>
         </div>
         <div class="lt-author">@{{ theme.author ?? 'unknown' }}</div>
@@ -156,3 +162,13 @@ function onRowKeydown(e: KeyboardEvent) {
     </div>
   </div>
 </template>
+
+<style scoped>
+@reference '~/assets/css/tailwind.css';
+
+.lt-tag-marketplace {
+  background: linear-gradient(135deg, rgba(124, 242, 212, 0.16), rgba(124, 242, 212, 0.04));
+  color: var(--accent, #7cf2d4);
+  border-color: rgba(124, 242, 212, 0.35);
+}
+</style>

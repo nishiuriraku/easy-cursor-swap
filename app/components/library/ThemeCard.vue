@@ -53,6 +53,7 @@ const displayDate = computed(() => {
 
 /** Windows のシステムスキーム (HKCU\Cursors\Schemes) は編集・お気に入りを許可しない。 */
 const isSystem = computed(() => props.theme.kind === 'system')
+const isMarketplace = computed(() => props.theme.kind === 'marketplace')
 
 // 実カーソル画像のプレビュー (キャッシュ越しに取得)
 const previewMap = ref<Record<string, string> | null>(null)
@@ -83,6 +84,13 @@ watch(() => props.theme.id, fetchPreview)
       </div>
       <div v-if="isSystem" class="card-source-tag" :aria-label="t('library.sourceTagSchemeAria')">
         SYSTEM
+      </div>
+      <div
+        v-else-if="isMarketplace"
+        class="card-source-tag marketplace"
+        :aria-label="t('library.sourceTagMarketplaceAria')"
+      >
+        MARKETPLACE
       </div>
       <CursorMatrix
         :included="theme.includedRoles"
@@ -138,5 +146,11 @@ watch(() => props.theme.id, fetchPreview)
  * Marketplace は別ファイル (.card-preview グローバル既定 132px) のまま。 */
 .card-preview {
   @apply min-h-[112px] p-3;
+}
+
+.card-source-tag.marketplace {
+  background: linear-gradient(135deg, rgba(124, 242, 212, 0.16), rgba(124, 242, 212, 0.04));
+  color: var(--accent, #7cf2d4);
+  border-color: rgba(124, 242, 212, 0.35);
 }
 </style>
