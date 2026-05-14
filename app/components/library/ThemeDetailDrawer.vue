@@ -47,6 +47,7 @@ const emit = defineEmits<{
 }>()
 
 const isSystem = computed(() => props.theme.kind === 'system')
+const isMarketplace = computed(() => props.theme.kind === 'marketplace')
 
 const includedSet = computed(() => new Set(props.theme.includedRoles))
 const coverage = computed(() => props.theme.includedRoles.length)
@@ -298,6 +299,7 @@ async function openHomepage() {
       <div class="td-foot-l">
         <template v-if="!isSystem">
           <button
+            v-if="!isMarketplace"
             class="td-act"
             :aria-label="t('themeDetail.editAria', { name: theme.name })"
             @click="emit('edit', theme.id)"
@@ -305,6 +307,7 @@ async function openHomepage() {
             <UiIcon name="Brush" :size="13" />{{ t('themeDetail.editLabel') }}
           </button>
           <button
+            v-if="!isMarketplace"
             class="td-act"
             :aria-label="t('themeDetail.exportAria', { name: theme.name })"
             @click="emit('exportPack', theme.id)"
@@ -325,6 +328,9 @@ async function openHomepage() {
           >
             {{ t('themeDetail.deleteLabel') }}
           </button>
+          <p v-if="isMarketplace" class="td-marketplace-hint">
+            {{ t('themeDetail.cannotEditMarketplace') }}
+          </p>
         </template>
         <template v-else>
           <!--
@@ -605,5 +611,9 @@ async function openHomepage() {
 
 .td-source {
   @apply inline-flex items-center gap-1.5 font-mono text-[10.5px] tracking-[0.02em] text-fg-mute;
+}
+
+.td-marketplace-hint {
+  @apply m-0 ml-auto text-[11px] text-fg-mute;
 }
 </style>
