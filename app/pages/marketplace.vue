@@ -58,7 +58,11 @@ const { refresh: refreshThemes } = useThemes()
 const selectedEntry = ref<MarketplaceEntry | null>(null)
 const detailInstalling = ref(false)
 
-function openDetails(id: string) {
+async function openDetails(id: string) {
+  // Library 画面で削除されたケースに備えて useThemes シングルトンを再同期する。
+  // これを怠ると alreadyInstalled が stale で true のまま「ライブラリに追加」ボタンが
+  // disabled になり、削除→再インストールが不可能になる。
+  await refreshThemes()
   const entry = entries.value.find((x) => x.id === id) ?? null
   selectedEntry.value = entry
 }
@@ -205,7 +209,11 @@ const filters: Array<{ id: MarketplaceTag; label: string }> = [
   { id: 'dark', label: 'Dark' },
 ]
 
-onMounted(loadIndex)
+onMounted(async () => {
+  // marketplace 由来テーマの alreadyInstalled 判定で stale state を踏まないよう、
+  // Library のテーマ一覧と marketplace index を並列取得して singleton を最新化する。
+  await Promise.all([loadIndex(), refreshThemes()])
+})
 </script>
 
 <template>
