@@ -196,14 +196,20 @@ pub async fn submit_theme_auto(app: AppHandle, theme_id: String) -> Result<Submi
 
     emit_progress(&app, "fork");
     let fork = gh.ensure_fork(UPSTREAM_OWNER, UPSTREAM_REPO).await?;
+    // GitHub は「upstream owner 本人」が fork を作ろうとすると、新規 fork ではなく
+    // upstream 本体 (= 同じ owner / 同じ repo) を返す。この場合 `merge-upstream` も
+    // 「自分の main を自分の main に merge」になり 422 で落ちる。
+    // 自前の fork でない (= upstream owner 本人) なら sync をスキップする。
+    let is_self_owned = fork.owner.login == UPSTREAM_OWNER && fork.name == UPSTREAM_REPO;
 
     emit_progress(&app, "sync_fork");
-    // fork sync は失敗しても致命ではない (新規 fork なら upstream と一致しているはず)。
-    // 失敗時は warn だけ出して branch 作成に進む。
-    if let Err(e) = gh
+    if is_self_owned {
+        tracing::info!("upstream owner 本人のため fork sync をスキップ");
+    } else if let Err(e) = gh
         .sync_fork_with_upstream(&fork.owner.login, &fork.name, &fork.default_branch)
         .await
     {
+        // fork sync は失敗しても致命ではない (新規 fork なら upstream と一致しているはず)。
         tracing::warn!("fork sync 失敗 (続行): {}", e);
     }
 
