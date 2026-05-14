@@ -4,6 +4,8 @@
  * UI 開発を妨げないようフォールバックする。
  */
 
+import type { EventCallback, UnlistenFn } from '@tauri-apps/api/event'
+
 let invokeFn: (<T>(cmd: string, args?: Record<string, unknown>) => Promise<T>) | null = null
 let warnedNoTauri = false
 
@@ -43,4 +45,29 @@ export async function invokeTauri<T = unknown>(
 export async function takePendingCursorpack(): Promise<string | null> {
   const result = await invokeTauri<string | null>('take_pending_cursorpack')
   return result ?? null
+}
+
+let listenFn: (<T>(event: string, cb: EventCallback<T>) => Promise<UnlistenFn>) | null = null
+
+async function getListen() {
+  if (listenFn) return listenFn
+  try {
+    const mod = await import('@tauri-apps/api/event')
+    listenFn = mod.listen as typeof listenFn
+    return listenFn
+  } catch {
+    // Tauri 未接続環境: 何もしない unlisten を返すフォールバック
+    return null
+  }
+}
+
+/**
+ * Tauri Event を listen する。Tauri 未接続時は no-op unlisten を返す。
+ */
+export async function listenTauri<T>(event: string, cb: EventCallback<T>): Promise<UnlistenFn> {
+  const fn = await getListen()
+  if (!fn) {
+    return (() => {}) as UnlistenFn
+  }
+  return await fn<T>(event, cb)
 }
