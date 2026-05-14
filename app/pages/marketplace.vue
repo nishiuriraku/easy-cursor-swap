@@ -6,7 +6,7 @@
  * Phase 5-6 に対応。
  *
  * - GitHub 上の公式メタデータインデックス (`index.json`) から取得
- * - Featured (3 件) + 一般グリッド表示
+ * - 全エントリを FeaturedCard の横並びレイアウトで 1 グリッドに表示
  * - Ed25519 署名検証済みのテーマのみ掲載 (CI 自動検証)
  * - インポートは Rust 側の `import_from_marketplace` (将来実装) に委譲
  */
@@ -145,12 +145,8 @@ async function loadIndex() {
 }
 
 // --- 計算プロパティ ---
-const featured = computed(() =>
-  entries.value.filter((e) => e.highlight !== null && e.highlight !== undefined),
-)
-
 const filteredGrid = computed(() =>
-  computeFilteredGrid(entries.value, featured.value, filter.value, searchQuery.value),
+  computeFilteredGrid(entries.value, filter.value, searchQuery.value),
 )
 
 // --- ハンドラ ---
@@ -309,19 +305,9 @@ onMounted(loadIndex)
       </div>
 
       <template v-else>
-        <!-- Featured ストリップ -->
-        <div v-if="featured.length > 0" class="featured-strip">
-          <FeaturedCard
-            v-for="entry in featured"
-            :key="entry.id"
-            :entry="entry"
-            @show-details="openDetails"
-          />
-        </div>
-
-        <!-- 一般グリッド -->
+        <!-- 全エントリを一覧 -->
         <div v-if="filteredGrid.length > 0" class="grid">
-          <MarketplaceCard
+          <FeaturedCard
             v-for="entry in filteredGrid"
             :key="entry.id"
             :entry="entry"
@@ -360,22 +346,6 @@ onMounted(loadIndex)
 
 .repo-link {
   @apply ml-3 font-mono text-[12px] font-normal text-fg-mute;
-}
-
-.featured-strip {
-  @apply mb-6 grid grid-cols-3 gap-3.5;
-}
-
-@media (max-width: 1100px) {
-  .featured-strip {
-    @apply grid-cols-2;
-  }
-}
-
-@media (max-width: 700px) {
-  .featured-strip {
-    @apply grid-cols-1;
-  }
 }
 
 .empty-state,

@@ -30,32 +30,28 @@ const baseEntries: MarketplaceEntry[] = [
 ]
 
 describe('computeFilteredGrid', () => {
-  it('Featured エントリは Grid に出ない (重複排除)', () => {
-    const featured = baseEntries.filter((e) => e.highlight !== null && e.highlight !== undefined)
-    const grid = computeFilteredGrid(baseEntries, featured, 'all', '')
-    for (const f of featured) {
-      expect(grid.find((g) => g.id === f.id)).toBeUndefined()
-    }
+  it('filter "all" + searchQuery 空ならすべてのエントリを返す', () => {
+    const grid = computeFilteredGrid(baseEntries, 'all', '')
+    expect(grid.map((e) => e.id)).toEqual(['a', 'b', 'c'])
   })
 
-  it('tag フィルタは Featured 除外の後に効く', () => {
-    const featured = baseEntries.filter((e) => e.highlight !== null && e.highlight !== undefined)
-    const grid = computeFilteredGrid(baseEntries, featured, 'minimal', '')
-    expect(grid.map((e) => e.id)).toEqual(['b'])
+  it('tag フィルタは複数該当を絞り込む', () => {
+    const grid = computeFilteredGrid(baseEntries, 'minimal', '')
+    expect(grid.map((e) => e.id)).toEqual(['a', 'b'])
   })
 
   it('searchQuery は name / author 部分一致 (case-insensitive)', () => {
-    const grid = computeFilteredGrid(baseEntries, [], 'all', 'c')
+    const grid = computeFilteredGrid(baseEntries, 'all', 'C')
     expect(grid.map((e) => e.id)).toEqual(['c'])
   })
 
   it('searchQuery が空白だけならフィルタしない', () => {
-    const grid = computeFilteredGrid(baseEntries, [], 'all', '   ')
+    const grid = computeFilteredGrid(baseEntries, 'all', '   ')
     expect(grid.length).toBe(3)
   })
 
   it('searchQuery の前後空白は trim され、語そのもので部分一致する', () => {
-    const grid = computeFilteredGrid(baseEntries, [], 'all', '  c  ')
+    const grid = computeFilteredGrid(baseEntries, 'all', '  c  ')
     expect(grid.map((e) => e.id)).toEqual(['c'])
   })
 })
