@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Creator のビッグプレビュー描画倍率を 90% → 80% に変更し、ホットスポット編集領域の周囲余白を広げた。
 - `theme.json` の `schema_version` を `1` に統一 (従来 `2`)。リリース前の段階で複数回 bump していた値を v1 へ巻き戻し、初回公開を `schema_version: 1` で揃える。既存の `~/.custom_cursors/` 配下に `schema_version: 2` のテーマが残っている場合は読込時に skip + warning ログとなる (`schema_version != 1`)。
 - 公式インデックス (Marketplace) のグリッドカード視覚スタイルを Library の `ThemeCard` と揃えた。プレビューを 3x2 (6 セル) のコンパクトマトリクスに縮小し、`.card-preview` の高さを 112px に詰め、カバレッジ表記を `X%` → `X/17` に変更。meta-row はダウンロード数とバージョンの 2 項目構成にし、`X/17` 重複を排除した。インポートボタン・verified バッジ・ダウンロード数などマーケットプレイス固有機能は維持。実カーソル PNG プレビューは別 issue (`docs/superpowers/issue/2026-05-12-marketplace-icon-preview.md`) のまま保留。
+- Marketplace 画面の Featured ストリップを廃止し、全エントリを横並びレイアウト (旧 `FeaturedCard`) の 1 つのグリッドに統一。Featured / 通常の視覚的区別を取り除き、ハイライトラベル (`new` / `popular`) はカード内に残す。
+- 詳細モーダル (`MarketplaceDetailModal`) から SHA-256 表示行を削除 (UX 簡素化)。バックグラウンドでの整合性検証は変更なし。
 
 ### Deprecated
 
@@ -43,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 公式インデックス由来テーマの `preview_base_url` を Rust 側 `MarketplaceEntry` が受け取れず、`MarketplaceDetailModal` の PNG プレビューが一度もフェッチされなかった問題を修正。
 - Marketplace 画面で `highlight` 付きエントリが Featured ストリップとメイン Grid に二重表示される問題を修正。
 - Library 画面で `get_themes` IPC が返す `source: "marketplace"` を読まず `kind: "local"` がハードコードされていたため、MARKETPLACE タグ表示と編集/エクスポートの readonly ガード UI が効いていなかった問題を修正。
+- 公式インデックスのインストール時に `JSONエラー: missing field "github_username"` が出てダウンロードできない問題を修正。Rust 側 `AuthorRecord` が server の `"github"` キーを `serde(alias)` で受け入れるようにした。
 
 ### Security
 
