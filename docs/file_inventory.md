@@ -167,6 +167,6 @@
 | Tauri IPC コマンド数 | 54 |
 | Vue ページ数 | 4 (+2 helpers) |
 | Vue コンポーネント (subdir 別) | shell 3 / library 12 / creator 12 / marketplace 4 / settings 12 / preview 1 / panic 1 / icons 2 / ui 1 |
-| Composables 数 | 23 |
-| Vitest テストファイル数 | 12 (composables) + 1 (components/creator) |
+| Composables 数 | 24 |
+| Vitest テストファイル数 | 12 (composables) + 4 (pages) + 5 (components/creator) + 7 (components/library) + 7 (components/settings) + 1 (components/preview) = 36 |
 | CI ワークフロー数 | 3 (ci / performance / release) |
