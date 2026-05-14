@@ -228,9 +228,6 @@ function onInstall() {
 .md-v {
   @apply text-fg-dim;
 }
-.md-v.mono {
-  @apply font-mono text-[12px];
-}
 .md-v.link {
   @apply text-accent underline;
 }
