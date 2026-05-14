@@ -58,13 +58,16 @@ const { refresh: refreshThemes } = useThemes()
 const selectedEntry = ref<MarketplaceEntry | null>(null)
 const detailInstalling = ref(false)
 
-async function openDetails(id: string) {
-  // Library 画面で削除されたケースに備えて useThemes シングルトンを再同期する。
-  // これを怠ると alreadyInstalled が stale で true のまま「ライブラリに追加」ボタンが
-  // disabled になり、削除→再インストールが不可能になる。
-  await refreshThemes()
+function openDetails(id: string) {
+  // モーダルを即時表示してから useThemes シングルトンを再同期する。
+  // `alreadyInstalled` は themes ref のリアクティブ computed なので、
+  // refresh が完了した時点で自動的に再評価され、ボタンは正しい状態に補正される。
+  // (Library 画面で削除されていた場合に "ライブラリに追加" が disabled のままになる
+  // バグへの defensive refresh。await すると IPC レイテンシ分モーダル表示が遅れるため
+  // void で fire-and-forget する。)
   const entry = entries.value.find((x) => x.id === id) ?? null
   selectedEntry.value = entry
+  void refreshThemes()
 }
 
 function closeDetails() {
