@@ -35,7 +35,7 @@ describe('computeFilteredGrid', () => {
     expect(grid.map((e) => e.id)).toEqual(['a', 'b', 'c'])
   })
 
-  it('tag フィルタは複数該当を絞り込む', () => {
+  it('tag フィルタはタグに合致するエントリのみ返す', () => {
     const grid = computeFilteredGrid(baseEntries, 'minimal', '')
     expect(grid.map((e) => e.id)).toEqual(['a', 'b'])
   })

@@ -1,10 +1,12 @@
 <script setup lang="ts">
 /**
- * Marketplace の Featured ストリップ用カード。
+ * Marketplace のグリッドカード (全エントリ共通)。
  * 横並びレイアウト + ハイライトラベル + 詳細モーダルを開くボタン。
  *
- * 2026-05-14: install emit を showDetails に変更。
- * 「ライブラリに追加」フローは MarketplaceDetailModal の中で行う。
+ * 2026-05-14: Featured ストリップ廃止に伴い、Featured/通常の区別なく
+ * `pages/marketplace.vue` の `.grid` 内で全エントリの描画に使う。
+ * クリック / Enter / Space で showDetails を emit し、MarketplaceDetailModal
+ * が「ライブラリに追加」フローを担う。
  */
 import { useI18n } from '~/composables/useI18n'
 import type { MarketplaceEntry } from '~/types/marketplace'
