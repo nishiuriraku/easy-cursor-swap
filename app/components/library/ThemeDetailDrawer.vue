@@ -323,7 +323,13 @@ async function openHomepage() {
           </button>
           <button
             class="td-act danger"
-            :aria-label="t('themeDetail.deleteAria', { name: theme.name })"
+            :disabled="theme.isActive"
+            :aria-label="
+              theme.isActive
+                ? t('themeDetail.deleteDisabledAria', { name: theme.name })
+                : t('themeDetail.deleteAria', { name: theme.name })
+            "
+            :title="theme.isActive ? t('themeDetail.deleteDisabledTitle') : undefined"
             @click="emit('delete', theme.id)"
           >
             {{ t('themeDetail.deleteLabel') }}
@@ -606,6 +612,14 @@ async function openHomepage() {
   color: #fff;
 }
 :where(html.light) .td-act.danger:hover {
+  color: var(--rose);
+}
+.td-act.danger:disabled,
+.td-act.danger:disabled:hover {
+  @apply cursor-not-allowed;
+  opacity: 0.45;
+  background: transparent;
+  border-color: transparent;
   color: var(--rose);
 }
 

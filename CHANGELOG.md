@@ -48,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Marketplace 画面で `highlight` 付きエントリが Featured ストリップとメイン Grid に二重表示される問題を修正。
 - Library 画面で `get_themes` IPC が返す `source: "marketplace"` を読まず `kind: "local"` がハードコードされていたため、MARKETPLACE タグ表示と編集/エクスポートの readonly ガード UI が効いていなかった問題を修正。
 - 公式インデックスのインストール時に `JSONエラー: missing field "github_username"` が出てダウンロードできない問題を修正。Rust 側 `AuthorRecord` が server の `"github"` キーを `serde(alias)` で受け入れるようにした。
+- 適用中のテーマを Library 詳細ドロワーから削除できてしまう問題を修正。`isActive=true` のとき削除ボタンは disabled になり、IPC 経由でも `delete_theme` がレジストリ実態を照合してアクティブテーマの削除要求を拒否する。
 
 ### Security
 

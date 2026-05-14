@@ -150,4 +150,25 @@ describe('ThemeDetailDrawer — 静的要素の整理', () => {
     const w = mountDrawer(makeTheme({ kind: 'system', description: null }))
     expect(w.find('.td-desc').text()).toContain('Windows のマウスのプロパティ')
   })
+
+  it('isActive=true のとき削除ボタンが disabled', () => {
+    const w = mountDrawer(makeTheme({ isActive: true }))
+    const deleteBtn = w.find('.td-act.danger')
+    expect(deleteBtn.exists()).toBe(true)
+    expect(deleteBtn.attributes('disabled')).toBeDefined()
+  })
+
+  it('isActive=true のとき削除ボタンの aria-label が「適用中のため削除できません」を含む', () => {
+    const w = mountDrawer(makeTheme({ isActive: true, name: 'TestTheme' }))
+    const deleteBtn = w.find('.td-act.danger')
+    expect(deleteBtn.attributes('aria-label')).toContain('適用中')
+    expect(deleteBtn.attributes('aria-label')).toContain('TestTheme')
+  })
+
+  it('isActive=false のとき削除ボタンは disabled でない', () => {
+    const w = mountDrawer(makeTheme({ isActive: false }))
+    const deleteBtn = w.find('.td-act.danger')
+    expect(deleteBtn.exists()).toBe(true)
+    expect(deleteBtn.attributes('disabled')).toBeUndefined()
+  })
 })

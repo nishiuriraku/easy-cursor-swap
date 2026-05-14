@@ -324,6 +324,12 @@ async function exportTheme(id: string) {
 async function deleteTheme(id: string) {
   const target = themes.value.find((tt) => tt.id === id)
   if (!target) return
+  // UI で削除ボタンを disabled にしているが、IPC 直叩きや競合状態 (削除直前に
+  // 別経路で apply されたケース) を防ぐため二重チェック。
+  if (target.isActive) {
+    applyError.value = t('library.errDeleteActive')
+    return
+  }
   // ネイティブ confirm はテストしづらいが Tauri WebView では機能するので暫定使用。
   // 将来的には専用の確認モーダルに置き換える。
   const ok = window.confirm(t('library.confirmDeleteMsg', { name: target.name }))

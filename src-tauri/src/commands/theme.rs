@@ -206,12 +206,24 @@ pub fn import_cursorpack(path: String) -> Result<String, AppError> {
 /// 削除されたテーマがアクティブだった場合、呼び出し側 (UI) は config の
 /// active_theme_id をクリアする責任を持つ。Windows 側はファイル不在時に
 /// 既定カーソルへフォールバックするので追加処理は不要。
+///
+/// # エラー
+/// レジストリで現在適用中のテーマを削除しようとした場合は `AppError::Theme` を返す。
 #[tauri::command]
 pub fn delete_theme(config: State<'_, ConfigManager>, theme_id: String) -> Result<(), AppError> {
     let id = uuid::Uuid::parse_str(&theme_id)
         .map_err(|e| AppError::Theme(format!("無効なテーマ ID: {}", e)))?;
+    // 適用中のテーマは削除不可。UI 側でもボタンを disabled にしているが、
+    // IPC 直叩き / 競合状態 / 別経路からの呼び出しに備えた IPC 層ガード。
+    // Source of Truth はレジストリなので theme_active_in_registry を使う。
+    if ThemeManager::theme_active_in_registry(id) {
+        return Err(AppError::Theme(
+            "適用中のテーマは削除できません。先に別のテーマを適用してから削除してください。"
+                .to_string(),
+        ));
+    }
     ThemeManager::delete_theme(id)?;
-    // 削除されたテーマが active なら config 側もクリアする
+    // 削除されたテーマが (active_in_registry でなくても) config 側に残っていれば掃除
     if let Ok(c) = config.get() {
         if c.general.active_theme_id == Some(id) {
             let _ = config.update(|c| c.general.active_theme_id = None);
