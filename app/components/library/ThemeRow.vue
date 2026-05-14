@@ -143,7 +143,8 @@ function onRowKeydown(e: KeyboardEvent) {
             v-if="isMarketplace"
             class="lt-tag lt-tag-marketplace"
             :aria-label="t('library.sourceTagMarketplaceAria')"
-          >MARKETPLACE</span>
+            >MARKETPLACE</span
+          >
           <span v-for="tag in theme.tags ?? []" :key="tag" class="lt-tag">{{ tag }}</span>
         </div>
         <div class="lt-author">@{{ theme.author ?? 'unknown' }}</div>

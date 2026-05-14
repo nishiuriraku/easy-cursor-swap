@@ -168,7 +168,8 @@ function onInstall() {
                   target="_blank"
                   rel="noopener noreferrer"
                   class="md-v link"
-                >{{ entry.homepage }}</a>
+                  >{{ entry.homepage }}</a
+                >
               </div>
             </div>
           </div>
@@ -180,11 +181,7 @@ function onInstall() {
               :disabled="alreadyInstalled || installing"
               @click="onInstall"
             >
-              <UiIcon
-                :name="alreadyInstalled ? 'Check' : 'Import'"
-                :size="13"
-                aria-hidden="true"
-              />
+              <UiIcon :name="alreadyInstalled ? 'Check' : 'Import'" :size="13" aria-hidden="true" />
               <span v-if="alreadyInstalled">{{ t('marketplace.alreadyInstalled') }}</span>
               <span v-else-if="installing">{{ t('marketplace.installing') }}</span>
               <span v-else>{{ t('marketplace.addToLibrary') }}</span>
