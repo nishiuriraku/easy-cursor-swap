@@ -2,8 +2,6 @@
 //!
 //! Task 5 (device_flow.rs) と Task 6 (client.rs) で実装する関数の入出力型を集約する。
 
-#![allow(dead_code)]
-
 use serde::{Deserialize, Serialize};
 
 /// Device Flow 開始 (`POST /login/device/code`) のレスポンス。
