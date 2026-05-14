@@ -12,6 +12,7 @@
  */
 import { computed, onMounted, ref, watch } from 'vue'
 import type { MarketplaceEntry, MarketplaceTag } from '~/types/marketplace'
+import { computeFilteredGrid } from './marketplace.helpers'
 import { invokeTauri } from '~/composables/useTauri'
 import { useI18n } from '~/composables/useI18n'
 import { useThemes } from '~/composables/useThemes'
@@ -148,22 +149,9 @@ const featured = computed(() =>
   entries.value.filter((e) => e.highlight !== null && e.highlight !== undefined),
 )
 
-const filteredGrid = computed(() => {
-  let result = [...entries.value]
-
-  if (filter.value !== 'all') {
-    result = result.filter((e) => e.tags.includes(filter.value))
-  }
-
-  if (searchQuery.value.trim()) {
-    const q = searchQuery.value.toLowerCase()
-    result = result.filter(
-      (e) => e.name.toLowerCase().includes(q) || e.author.toLowerCase().includes(q),
-    )
-  }
-
-  return result
-})
+const filteredGrid = computed(() =>
+  computeFilteredGrid(entries.value, featured.value, filter.value, searchQuery.value),
+)
 
 // --- ハンドラ ---
 async function installEntry(id: string) {
