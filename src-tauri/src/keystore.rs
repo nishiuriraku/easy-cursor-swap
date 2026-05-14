@@ -328,7 +328,7 @@ impl Keystore {
         let encrypted = std::fs::read(&p)?;
         let raw = dpapi_decrypt(&encrypted)?;
         let token = String::from_utf8(raw)
-            .map_err(|e| AppError::Theme(format!("OAuth トークン UTF-8 不正: {}", e)))?;
+            .map_err(|_| AppError::Theme("OAuth トークン UTF-8 不正 (破損ファイル)".to_string()))?;
         Ok(Some(token))
     }
 
@@ -457,6 +457,22 @@ fn dpapi_decrypt(_cipher: &[u8]) -> AppResult<Vec<u8>> {
 mod tests {
     use super::*;
 
+    /// パニック時でも env var を確実に復元するための RAII ガード。
+    /// テスト関数内でのみ使用し、pub 公開は行わない。
+    struct EnvGuard {
+        key: &'static str,
+        prev: Option<String>,
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            match &self.prev {
+                Some(v) => std::env::set_var(self.key, v),
+                None => std::env::remove_var(self.key),
+            }
+        }
+    }
+
     #[test]
     fn compute_key_id_returns_16_lowercase_hex() {
         let pk = base64::engine::general_purpose::STANDARD.encode([0xABu8; 32]);
@@ -528,9 +544,13 @@ mod tests {
         // config::cursors_dir_override_lock() でプロセス全体の env 競合を直列化する。
         let _g = crate::config::cursors_dir_override_lock()
             .lock()
-            .expect("cursors_dir_override_lock poisoned");
+            .unwrap_or_else(|e| e.into_inner());
         let tmp = tempfile::TempDir::new().unwrap();
-        let prev = std::env::var("CUSTOM_CURSORS_DIR_OVERRIDE").ok();
+        // パニック時でも env var が復元されるよう RAII ガードを先に設置する。
+        let _env_guard = EnvGuard {
+            key: "CUSTOM_CURSORS_DIR_OVERRIDE",
+            prev: std::env::var("CUSTOM_CURSORS_DIR_OVERRIDE").ok(),
+        };
         std::env::set_var("CUSTOM_CURSORS_DIR_OVERRIDE", tmp.path());
 
         // 初期状態は None
@@ -547,11 +567,5 @@ mod tests {
 
         // 削除済みでも delete はエラーにならない (idempotent)
         Keystore::delete_github_oauth_token().unwrap();
-
-        // env var の状態を復元
-        match prev {
-            Some(v) => std::env::set_var("CUSTOM_CURSORS_DIR_OVERRIDE", v),
-            None => std::env::remove_var("CUSTOM_CURSORS_DIR_OVERRIDE"),
-        }
     }
 }
