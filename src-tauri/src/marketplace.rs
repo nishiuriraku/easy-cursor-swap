@@ -223,6 +223,45 @@ impl MarketplaceClient {
         Ok(theme_id)
     }
 
+    /// プレビュー画像サイズの上限 (500 KB)。
+    const MAX_PREVIEW_BYTES: u64 = 500 * 1024;
+
+    /// preview_base_url が https:// で始まり ".." を含まないことを検証。
+    pub fn validate_preview_url(url: &str) -> AppResult<()> {
+        if !url.starts_with("https://") {
+            return Err(AppError::Theme(
+                "preview_base_url は https:// で始まる必要があります".to_string(),
+            ));
+        }
+        if url.contains("..") {
+            return Err(AppError::Theme(
+                "preview_base_url に .. を含めることはできません".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    /// role 識別子が ASCII 英数字 + アンダースコアのみで構成されることを検証。
+    /// パストラバーサル / 拡張子付与 / クエリ文字列を排除する。
+    pub fn validate_role_name(role: &str) -> AppResult<()> {
+        if role.is_empty() || role.len() > 32 {
+            return Err(AppError::Theme("role 名が不正です".to_string()));
+        }
+        if !role.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+            return Err(AppError::Theme(format!("role 名に不正な文字: {}", role)));
+        }
+        Ok(())
+    }
+
+    /// 公式インデックスから 1 ロール分のプレビュー PNG を取得する。
+    /// MarketplaceDetailModal で 6 ロール並列に呼ばれる。
+    pub async fn fetch_preview(preview_base_url: &str, role: &str) -> AppResult<Vec<u8>> {
+        Self::validate_preview_url(preview_base_url)?;
+        Self::validate_role_name(role)?;
+        let url = format!("{}/{}.png", preview_base_url.trim_end_matches('/'), role);
+        Self::download_with_limit(&url, Self::MAX_PREVIEW_BYTES).await
+    }
+
     /// 上限サイズ付きでバイト列をダウンロードする (Zip 爆弾対策の第一歩)。
     async fn download_with_limit(url: &str, limit: u64) -> AppResult<Vec<u8>> {
         let client = Self::http()?;
@@ -399,6 +438,38 @@ mod tests {
         let content = std::fs::read_to_string(theme_dir.join("theme.json")).unwrap();
         assert!(content.contains(r#""source""#));
         assert!(content.contains(r#""marketplace""#));
+    }
+
+    #[test]
+    fn preview_url_rejects_non_https() {
+        let r = MarketplaceClient::validate_preview_url("http://evil.com/preview");
+        assert!(r.is_err(), "http:// は拒否されるべき");
+    }
+
+    #[test]
+    fn preview_url_accepts_https() {
+        let r = MarketplaceClient::validate_preview_url(
+            "https://raw.githubusercontent.com/x/y/main/previews/abc",
+        );
+        assert!(r.is_ok());
+    }
+
+    #[test]
+    fn preview_role_rejects_path_traversal() {
+        assert!(MarketplaceClient::validate_role_name("../escape").is_err());
+        assert!(MarketplaceClient::validate_role_name("Arrow/extra").is_err());
+        assert!(MarketplaceClient::validate_role_name("Arrow.png").is_err());
+    }
+
+    #[test]
+    fn preview_role_accepts_canonical_role_names() {
+        for name in ["Arrow", "Help", "AppStarting", "Wait", "Crosshair", "IBeam"] {
+            assert!(
+                MarketplaceClient::validate_role_name(name).is_ok(),
+                "{} should be valid",
+                name
+            );
+        }
     }
 
     #[test]

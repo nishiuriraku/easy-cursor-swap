@@ -21,3 +21,13 @@ pub async fn marketplace_install(req: MarketplaceInstallRequest) -> Result<Strin
     let id = MarketplaceClient::install(req).await?;
     Ok(id.to_string())
 }
+
+/// 公式インデックスから 1 ロール分のプレビュー PNG を取得する。
+/// MarketplaceDetailModal で 6 ロール並列に呼ばれる。
+#[tauri::command]
+pub async fn marketplace_fetch_preview(
+    preview_base_url: String,
+    role: String,
+) -> Result<Vec<u8>, AppError> {
+    MarketplaceClient::fetch_preview(&preview_base_url, &role).await
+}

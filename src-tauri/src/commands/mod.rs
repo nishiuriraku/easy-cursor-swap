@@ -69,6 +69,7 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         // 公式インデックス
         marketplace::marketplace_fetch_index,
         marketplace::marketplace_install,
+        marketplace::marketplace_fetch_preview,
         // バックアッププロファイル
         profile::export_profile,
         profile::import_profile,
