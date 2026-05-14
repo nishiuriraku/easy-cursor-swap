@@ -39,8 +39,18 @@ describe('mapLocalSummaryToCard', () => {
     expect(mapLocalSummaryToCard(fixture({ source: 'future_value' })).kind).toBe('local')
   })
 
-  it('description / license / homepage の null フォールバックを保つ', () => {
+  it('description / license / homepage が undefined のとき null フォールバック', () => {
     const card = mapLocalSummaryToCard(fixture({ description: undefined }))
+    expect(card.description).toBeNull()
+    expect(card.license).toBeNull()
+    expect(card.homepage).toBeNull()
+  })
+
+  it('description / license / homepage が明示的 null のとき null を保つ', () => {
+    // Rust から JSON null が来るケース。?? null で吸収される。
+    const card = mapLocalSummaryToCard(
+      fixture({ description: null, license: null, homepage: null }),
+    )
     expect(card.description).toBeNull()
     expect(card.license).toBeNull()
     expect(card.homepage).toBeNull()

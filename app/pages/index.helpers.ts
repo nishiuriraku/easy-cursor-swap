@@ -29,10 +29,10 @@ export interface IpcThemeSummary {
   size_bytes: number
   signed: boolean
   last_applied_at: string | null
-  description?: string
+  description?: string | null
   schema_version: number
-  license?: string
-  homepage?: string
+  license?: string | null
+  homepage?: string | null
   /** `theme.json` の `source` フィールド。`mapSourceToKind` 経由で `kind` に反映する。 */
   source?: string
 }
