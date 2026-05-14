@@ -82,8 +82,16 @@ pub struct MarketplaceEntry {
 }
 
 /// 公開鍵レジストリ (`authors/{github}.json`) のスキーマ。
+///
+/// 実サーバーは現在 `"github"` キーで author username を返すが、過去 `"github_username"`
+/// だった経緯と将来の rename 余地を残すため `serde(alias)` で両対応する。`github_username`
+/// 自体は install ロジックでは未使用 (作者識別は `MarketplaceInstallRequest.author_github`
+/// で完結する) のため `serde(default)` で欠落も許容する。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthorRecord {
+    /// 作者の GitHub username。server JSON のキーは `"github"`。
+    /// 旧スキーマ (`"github_username"`) も alias で受け入れる。
+    #[serde(default, alias = "github")]
     pub github_username: String,
     /// 現行公開鍵 (Base64)
     pub public_key: String,
@@ -537,5 +545,43 @@ mod tests {
         }"#;
         let entry: MarketplaceEntry = serde_json::from_str(json).unwrap();
         assert!(entry.preview_base_url.is_none());
+    }
+
+    #[test]
+    fn author_record_accepts_github_key_alias() {
+        // 実サーバーが返す JSON 形式: `github` キー + `display_name` を含む (display_name は捨てられて OK)
+        let json = r#"{
+            "github": "nishiuriraku",
+            "display_name": "nishiuriraku",
+            "public_key": "0k3mqDQtxdbY9LN7VX9n9vDO8QTB5fySZBDbJqBwfaQ="
+        }"#;
+        let record: AuthorRecord = serde_json::from_str(json).unwrap();
+        assert_eq!(record.github_username, "nishiuriraku");
+        assert_eq!(
+            record.public_key,
+            "0k3mqDQtxdbY9LN7VX9n9vDO8QTB5fySZBDbJqBwfaQ="
+        );
+        assert!(record.historical_keys.is_empty());
+    }
+
+    #[test]
+    fn author_record_accepts_legacy_github_username_key() {
+        // 旧スキーマ互換: `github_username` キーでも引き続き受け入れる
+        let json = r#"{
+            "github_username": "alice",
+            "public_key": "AAAA"
+        }"#;
+        let record: AuthorRecord = serde_json::from_str(json).unwrap();
+        assert_eq!(record.github_username, "alice");
+    }
+
+    #[test]
+    fn author_record_defaults_github_username_when_missing() {
+        // 両方のキーが欠落していても deserialize できる (empty string にフォールバック)
+        let json = r#"{
+            "public_key": "AAAA"
+        }"#;
+        let record: AuthorRecord = serde_json::from_str(json).unwrap();
+        assert_eq!(record.github_username, "");
     }
 }
