@@ -44,7 +44,7 @@ const loading = ref(false)
 const lastError = ref<string | null>(null)
 let inflight: Promise<ThemeCardData[]> | null = null
 
-function mapSourceToKind(source: string | undefined): ThemeKind {
+export function mapSourceToKind(source: string | undefined): ThemeKind {
   if (source === 'marketplace') return 'marketplace'
   return 'local'
 }

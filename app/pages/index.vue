@@ -17,6 +17,7 @@ import { useI18n } from '~/composables/useI18n'
 import { useThemePreviews } from '~/composables/useThemePreviews'
 import { useAppSettings } from '~/composables/useAppSettings'
 import { useCursorpackOpener } from '~/composables/useCursorpackOpener'
+import { mapLocalSummaryToCard, type IpcThemeSummary } from '~/pages/index.helpers'
 
 const { t } = useI18n()
 // UiIcon / ThemeCard / ApplyModal は Nuxt の自動インポートで解決される。
@@ -467,36 +468,6 @@ function sortBy(key: SortKey) {
   }
 }
 
-/** Rust から `get_themes` を取得し、UI 形状にマップする */
-interface IpcThemeSummary {
-  id: string
-  name: string
-  author: string | null
-  version: string
-  created_at: string
-  is_active: boolean
-  is_favorite: boolean
-  apply_count: number
-  included_roles: string[]
-  path: string
-  /** theme.json の `tags` フィールドをそのまま転送 (Phase 5-3 一覧表示で chip 描画) */
-  tags: string[]
-  /** テーマディレクトリ全体のバイト合計 (一覧の「サイズ」列用) */
-  size_bytes: number
-  /** `metadata.signature.is_some()` の結果 (検証ではなく存在判定のみ) */
-  signed: boolean
-  /** 最終適用日時 (RFC3339)。一度も適用されていなければ null。 */
-  last_applied_at: string | null
-  /** theme.json `description` を `"ja"` 解決した文字列。 未設定なら省略。 */
-  description?: string
-  /** theme.json `schema_version` (必須フィールド)。 */
-  schema_version: number
-  /** theme.json `license` (SPDX)。 未設定なら省略。 */
-  license?: string
-  /** theme.json `homepage`。 未設定なら省略。 */
-  homepage?: string
-}
-
 /** `list_windows_schemes` のレスポンス。Windows レジストリ HKCU\Cursors\Schemes 由来。 */
 interface IpcWindowsScheme {
   name: string
@@ -562,26 +533,7 @@ async function loadThemes() {
       }),
     ])
 
-    const local: ThemeCardData[] = (localList ?? []).map((tt) => ({
-      id: tt.id,
-      name: tt.name,
-      author: tt.author,
-      version: tt.version,
-      date: tt.created_at,
-      applyCount: tt.apply_count,
-      isFavorite: tt.is_favorite,
-      isActive: tt.is_active,
-      includedRoles: tt.included_roles,
-      kind: 'local' as const,
-      tags: tt.tags,
-      sizeBytes: tt.size_bytes,
-      signed: tt.signed,
-      lastAppliedAt: tt.last_applied_at,
-      description: tt.description ?? null,
-      schemaVersion: tt.schema_version,
-      license: tt.license ?? null,
-      homepage: tt.homepage ?? null,
-    }))
+    const local: ThemeCardData[] = (localList ?? []).map(mapLocalSummaryToCard)
 
     // EasyCursorSwap が register_scheme で書き込んだスキームはローカルテーマと
     // 名前が一致するので除外する (重複表示防止)。
