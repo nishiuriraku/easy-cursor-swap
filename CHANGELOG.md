@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - ライブラリのテーマ詳細モーダルがコンテンツ高さに追従せず、常にビューポート最大サイズで開いていた不具合を修正。`.td-standalone` から `height: 100%` (`h-full`) を外し、レイアウトを `.td-modal-shell` の `h-auto` + `max-h` に一本化。あわせて `.td-modal-body` に `min-h-0` を付与し、コンテンツ超過時のみ body 内でスクロールするようにした。
 - Creator のビッグプレビューがロール未取り込み (`empty`) 状態でも既定のカーソルアイコンとホットスポット dot を描画してしまい、取り込み済みロールとの判別がつかなかった問題を修正。`creator.vue` の `<CursorPreview>` 呼び出しから `role-id` / `fallback-icon-size` を外し、`:hide-dot="activePreviewAsset.kind === 'empty'"` を付与して未取り込み時は完全に空表示にした (共有コンポーネント側の semantics は維持し、Library のテーマ詳細ドロワーのプレースホルダ表示には影響しない)。
+- WCAG 2.1 AA コントラスト監査 (`docs/superpowers/2026-05-14-wcag-aa-audit.md`) で違反 560 件の約 79% が `--fg-mute` / `--fg-faint` の輝度不足に起因すると判明したため、両テーマの該当トークンを AA 通過値へ引き上げた (Dark `--fg-mute` `#5a6076` → `#9aa0b3` / `--fg-faint` `#3a3f50` → `#6e7488`、Light `--fg-mute` `#8b91a3` → `#5b6070` / `--fg-faint` `#c2c7d4` → `#7a8095`)。あわせてライトモードでのみ閾値割れしていた `--violet` を `#6a5cff` → `#4f3fde` に補正。これによりサイドバーのセクション見出し・`nav-count` バッジ・カードのメタ行・breadcrumb 区切り・キーキャップ等のコントラストが AA を満たすようになる。
 
 ### Security
 
