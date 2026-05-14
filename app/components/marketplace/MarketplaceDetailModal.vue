@@ -43,11 +43,6 @@ const coveragePct = computed(() => {
   return Math.round((n / 17) * 100)
 })
 
-const sha256Short = computed(() => {
-  const s = props.entry?.sha256 ?? ''
-  return s.length > 16 ? `${s.slice(0, 16)}…` : s
-})
-
 async function fetchPreviews(entry: MarketplaceEntry | null) {
   previewMap.value = null
   if (!entry || !entry.previewBaseUrl) return
@@ -156,10 +151,6 @@ function onInstall() {
                 <span class="md-v chips-row">
                   <span v-for="tag in entry.tags" :key="tag" class="chip">{{ tag }}</span>
                 </span>
-              </div>
-              <div class="md-row">
-                <span class="md-k">SHA-256</span>
-                <span class="md-v mono">{{ sha256Short }}</span>
               </div>
               <div v-if="entry.homepage" class="md-row">
                 <span class="md-k">Homepage</span>
