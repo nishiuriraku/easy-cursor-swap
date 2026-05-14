@@ -63,6 +63,7 @@ export default {
     favAdd: 'Add to favorites',
     filterGroupAria: 'Filter',
     sourceTagSchemeAria: 'Windows system scheme',
+    sourceTagMarketplaceAria: 'From official index',
     coverageAria: 'Coverage {filled}/17',
     detailAria: 'Open details for {name}',
     emptyBodyPrefix: 'Drag a ',
@@ -113,6 +114,7 @@ export default {
     applyTheme: 'Apply theme',
     modalAria: 'Details for {name}',
     officialBadge: 'Official',
+    cannotEditMarketplace: 'Themes from the official index cannot be edited or exported. Duplicate first.',
   },
   apply: {
     title: 'Apply "{name}" to system',
@@ -406,6 +408,12 @@ export default {
     featuredNew: 'New',
     featuredPopular: 'Popular',
     installAria: 'Install {name}',
+    detailEyebrow: 'MARKETPLACE THEME',
+    addToLibrary: 'Add to Library',
+    alreadyInstalled: 'Already installed',
+    installing: 'Installing…',
+    downloads: 'Downloads',
+    openMarketplaceDetailAria: 'Open details for {name}',
   },
   conflict: {
     headerNewer: 'Update to a newer version',

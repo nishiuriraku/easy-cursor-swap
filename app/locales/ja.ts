@@ -62,6 +62,7 @@ export default {
     favAdd: 'お気に入りに追加',
     filterGroupAria: 'フィルター',
     sourceTagSchemeAria: 'Windows システムスキーム',
+    sourceTagMarketplaceAria: '公式インデックス由来',
     coverageAria: 'カバレッジ {filled}/17',
     detailAria: '{name} の詳細を開く',
     emptyBodyPrefix: '',
@@ -112,6 +113,7 @@ export default {
     applyTheme: 'テーマを適用',
     modalAria: '{name} の詳細',
     officialBadge: '公式',
+    cannotEditMarketplace: '公式インデックス由来のテーマは編集・エクスポートできません。複製してからお試しください。',
   },
   apply: {
     title: '「{name}」をシステムに適用',
@@ -405,6 +407,12 @@ export default {
     featuredNew: '新着',
     featuredPopular: '人気',
     installAria: '{name} をインストール',
+    detailEyebrow: 'MARKETPLACE THEME',
+    addToLibrary: 'ライブラリに追加',
+    alreadyInstalled: 'インストール済み',
+    installing: 'インストール中…',
+    downloads: 'ダウンロード',
+    openMarketplaceDetailAria: '{name} の詳細を開く',
   },
   conflict: {
     headerNewer: '新しいバージョンへの更新',
