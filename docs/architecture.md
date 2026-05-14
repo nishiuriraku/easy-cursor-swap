@@ -16,7 +16,7 @@
                         │ IPC (Tauri 2 / serde)
 ┌───────────────────────▼─────────────────────────────────────────┐
 │ Rust バックエンド  (src-tauri/src/)                              │
-│   commands/ (54 IPC 受け口を 9 サブモジュールに分割)              │
+│   commands/ (59 IPC 受け口を 10 サブモジュールに分割)             │
 │   ├─ config / theme / cursor / registry  ← Source of Truth      │
 │   ├─ marketplace / keystore / bulk_import                       │
 │   └─ tray / hotkey / health / crash                             │
@@ -51,7 +51,8 @@
 
 | カテゴリ | モジュール | 主な役割 |
 |---|---|---|
-| **IPC 表玄関** | `commands/` | 54 個の `#[tauri::command]` を 9 サブモジュールに分割。`mod.rs::get_command_handlers()` が `tauri::generate_handler!` にまとめて渡す。サブモジュール: `theme` / `cursor_build/` (build / cancel / dto / sign / stream の 5 ファイル分割) / `cursor_io` / `ani_export` / `keystore` / `marketplace` / `profile` / `system` / `windows_scheme` |
+| **IPC 表玄関** | `commands/` | 59 個の `#[tauri::command]` を 10 サブモジュールに分割。`mod.rs::get_command_handlers()` が `tauri::generate_handler!` にまとめて渡す。サブモジュール: `theme` / `cursor_build/` (build / cancel / dto / sign / stream の 5 ファイル分割) / `cursor_io` / `ani_export` / `keystore` / `marketplace` / `marketplace_submit` / `profile` / `system` / `windows_scheme` |
+| **GitHub API クライアント** | `github/` | OAuth Device Flow + REST API (`mod.rs` / `types.rs` / `device_flow.rs` / `client.rs`)。Marketplace 自動提出フローから利用。`client_id` は build 時に `option_env!("GITHUB_OAUTH_CLIENT_ID")` で注入。 |
 | **設定 / 状態** | `config.rs` | `AppConfig` / `ConfigManager` (RwLock + 自動 schema migration + バックアップ) |
 | | `errors.rs` | `AppError` / `AppResult` 共通型 |
 | **カーソル生成パイプライン** | `cursor/` | 5 サブモジュール: `image` (リサイズ / hotspot / メタデータ剥離) / `cur_build` (PNG → 6 解像度 .cur) / `ico_cur` (ICO/CUR 解析) / `ani` (RIFF/ACON 解析) / `ani_write` (ANI 書き出し)。`mod.rs` で全シンボルを `pub use` 再エクスポート |
@@ -74,9 +75,9 @@
 
 > 多重起動防止は `tauri_plugin_single_instance::init` プラグインに集約 (argv ハンドオーバ含む)。旧 `single_instance.rs` モジュールは削除済。
 
-### IPC 一覧 (54 commands)
+### IPC 一覧 (59 commands)
 
-`commands::get_command_handlers()` が `tauri::generate_handler!` に登録する 54 個。フロントは `app/composables/useTauri.ts::invokeTauri<T>(name, args)` で呼ぶ。
+`commands::get_command_handlers()` が `tauri::generate_handler!` に登録する 59 個。フロントは `app/composables/useTauri.ts::invokeTauri<T>(name, args)` で呼ぶ。
 
 | カテゴリ | コマンド名 |
 |---|---|
@@ -86,6 +87,7 @@
 | .ani 書き出し (1) | `export_ani_with_hotspot` |
 | 鍵管理 (5) | `keystore_info`, `keystore_generate`, `keystore_delete`, `keystore_export`, `keystore_import` |
 | マーケットプレース (3) | `marketplace_fetch_index`, `marketplace_install`, `marketplace_fetch_preview` |
+| マーケットプレース自動提出 (5) | `start_device_flow`, `complete_device_flow`, `cancel_device_flow`, `submit_theme_auto`, `revoke_github_link` |
 | プロファイル (2) | `export_profile`, `import_profile` |
 | Windows スキーム (5) | `list_windows_schemes`, `apply_windows_scheme`, `get_windows_scheme_previews`, `get_windows_scheme_role_previews`, `export_windows_scheme_as_cursorpack` |
 | システム / 設定 / 診断 (16) | `reset_to_default`, `reset_to_initial`, `get_environment_report`, `get_config`, `update_config`, `get_app_info`, `list_config_backups`, `restore_config_backup`, `check_update_is_major_jump`, `open_url`, `open_log_folder`, `get_accessibility_conflicts`, `get_autostart_status`, `list_crash_reports`, `clear_crash_reports`, `submit_crash_reports` |
@@ -117,6 +119,7 @@ README の security テーブルは概要、本セクションは **不変条件
 | 著者鍵は DPAPI で暗号化して `~/.custom_cursors/_keys/` に保存 (`CryptProtectData`) | `keystore.rs::dpapi_encrypt` |
 | 鍵エクスポート時は XChaCha20-Poly1305 + Argon2id でパスフレーズ暗号化 (`.cfkey`) | `keystore.rs` |
 | Marketplace 投稿パックは SHA-256 + Ed25519 を**ダウンロード後に必ず検証** | `marketplace.rs::verify_pack` |
+| Marketplace 自動提出の GitHub OAuth トークンは DPAPI で暗号化、scope は `public_repo` 限定 | `keystore.rs::save_github_oauth_token` / `github/device_flow.rs` |
 | ダウンロード前に Content-Length を見て三段階サイズ上限 (50 MB 圧縮 / 200 MB 展開 / 10 MB / image) | `marketplace.rs` / `theme/sanitize.rs` |
 | Marketplace テーマは**読み取り専用**: `repackage_theme` IPC がソース確認し、marketplace 由来のテーマは編集・エクスポート要求を拒否する | `commands/theme.rs::repackage_theme` |
 | プレビュー PNG 取得は URL スキーム + ホスト + ロール名を検証し、500KB を超えるレスポンスは拒否 | `marketplace.rs::fetch_preview` |
@@ -145,7 +148,7 @@ app/
 │  ├─ creator/     ← CreatorStartScreen, CreatorToolbar, CreatorRoleList, CreatorMetadataPane,
 │  │                NewThemeStartModal, SaveDestinationModal, BulkImportButton,
 │  │                BulkImportPreviewModal, BulkImportRoleRow, RoleListItem, SizeStrip, AniThumb
-│  ├─ marketplace/ ← MarketplaceCard, FeaturedCard, SubmitThemeDialog, MarketplaceDetailModal
+│  ├─ marketplace/ ← MarketplaceCard, FeaturedCard, SubmitThemeDialog, MarketplaceDetailModal, SubmitDeviceFlowModal
 │  ├─ settings/    ← SettingsRow, SettingsToggle, ConfigRecoveryPanel, PassphrasePrompt,
 │  │                SettingsSearchDropdown, GeneralSection, StartupSection,
 │  │                LibrarySection, SecuritySection, KeysSection, LoggingSection,
@@ -159,7 +162,9 @@ app/
 │                    sanitizeSvg, useCreatorAssets, useCreatorPickers, useCreatorImport,
 │                    useCreatorBulkImportFlow, useCreatorExport, useHotspotDefaults,
 │                    useHotspotInteraction, useAniPlayer, useCursorpackOpener,
-│                    useAppInfo, useSettingsSearch, useMarketplacePreviews (合計 23)
+│                    useAppInfo, useSettingsSearch, useMarketplacePreviews,
+│                    useGithubAuth (GitHub Device Flow 認証・トークン管理),
+│                    useMarketplaceSubmit (自動 PR 提出フロー) (合計 25)
 ├─ types/          ← config.ts, theme.ts, marketplace.ts (Rust struct と 1:1)
 ├─ locales/        ← ja.ts, en.ts (CI で parity チェック)
 ├─ assets/css/     ← tailwind.css (Tailwind v4 entry + @theme + 横断 shared utility) +
@@ -173,7 +178,7 @@ app/
 |---|---|---|
 | `index.vue` (Library) | useThemes, useCursorpackOpener, ThemeCard / ThemeRow, ApplyModal, ImportConflictDialog, ThemePickerModal | `get_themes`, `apply_theme`, `import_cursorpack`, `inspect_cursorpack`, `delete_theme`, `duplicate_theme`, `repackage_theme`, `list_windows_schemes`, `apply_windows_scheme`, `get_windows_scheme_previews`, `set_theme_favorite`, `take_pending_cursorpack` |
 | `creator.vue` | useCreatorAssets, useCreatorPickers, useCreatorImport, useCreatorBulkImportFlow, useCreatorExport, useRoleMatcher, useBulkImport, useKeystore, useHotspotDefaults, useHotspotInteraction, useAniPlayer, sanitizeSvg, NewThemeStartModal, BulkImportPreviewModal | `import_cursor_file`, `inspect_ani_file`, `parse_cursorpack_for_creator`, `bulk_resolve_assets`, `cancel_bulk_import`, `export_cursorpack_streamed`, `cancel_build`, `export_ani_with_hotspot`, `keystore_info` |
-| `marketplace.vue` | useThemes, useMarketplacePreviews, MarketplaceCard, FeaturedCard, MarketplaceDetailModal, SubmitThemeDialog | `marketplace_fetch_index`, `marketplace_install`, `marketplace_fetch_preview`, `keystore_info` |
+| `marketplace.vue` | useThemes, useMarketplacePreviews, useGithubAuth, useMarketplaceSubmit, MarketplaceCard, FeaturedCard, MarketplaceDetailModal, SubmitThemeDialog, SubmitDeviceFlowModal | `marketplace_fetch_index`, `marketplace_install`, `marketplace_fetch_preview`, `keystore_info`, `start_device_flow`, `complete_device_flow`, `cancel_device_flow`, `submit_theme_auto`, `revoke_github_link` |
 | `settings.vue` | useAppSettings, useKeystore, useUpdater, useSettingsSearch, ConfigRecoveryPanel, PassphrasePrompt, SettingsSearchDropdown, GeneralSection 〜 AboutSection の 8 セクション | `get_config`, `update_config`, `keystore_*`, `list_config_backups`, `restore_config_backup`, `export_profile`, `import_profile`, `list_crash_reports`, `clear_crash_reports`, `submit_crash_reports`, `check_update_is_major_jump` |
 | `PanicFlow.vue` (modal) | useNotify | `reset_to_default`, `reset_to_initial` |
 
@@ -181,7 +186,7 @@ app/
 
 **Rust** (分割完了)
 
-1. ✅ `commands.rs` 1229 行 → `commands/` 9 サブモジュール (うち `cursor_build/` はさらに build / cancel / dto / sign / stream の 5 ファイル分割)
+1. ✅ `commands.rs` 1229 行 → `commands/` 10 サブモジュール (うち `cursor_build/` はさらに build / cancel / dto / sign / stream の 5 ファイル分割)
 2. ✅ `cursor.rs` 1289 行 → `cursor/` 5 サブモジュール
 3. ✅ `theme.rs` 1255 行 → `theme/` 3 ファイル
 4. ✅ `registry.rs` 1020 行 → `registry/` 4 ファイル (mod / scheme / roles / env)
