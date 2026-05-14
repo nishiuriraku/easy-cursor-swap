@@ -53,4 +53,9 @@ describe('computeFilteredGrid', () => {
     const grid = computeFilteredGrid(baseEntries, [], 'all', '   ')
     expect(grid.length).toBe(3)
   })
+
+  it('searchQuery の前後空白は trim され、語そのもので部分一致する', () => {
+    const grid = computeFilteredGrid(baseEntries, [], 'all', '  c  ')
+    expect(grid.map((e) => e.id)).toEqual(['c'])
+  })
 })

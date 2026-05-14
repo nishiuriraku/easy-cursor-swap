@@ -12,7 +12,7 @@
  */
 import { computed, onMounted, ref, watch } from 'vue'
 import type { MarketplaceEntry, MarketplaceTag } from '~/types/marketplace'
-import { computeFilteredGrid } from './marketplace.helpers'
+import { computeFilteredGrid } from '~/pages/marketplace.helpers'
 import { invokeTauri } from '~/composables/useTauri'
 import { useI18n } from '~/composables/useI18n'
 import { useThemes } from '~/composables/useThemes'
