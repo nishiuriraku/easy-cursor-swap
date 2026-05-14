@@ -5,13 +5,12 @@
 /**
  * テーマカードのソース種別。
  *
- * - `local`:   EasyCursorSwap が管理する `.cursorpack` 形式のテーマ。
- *              編集・エクスポート・お気に入り・署名検証の対象。
- * - `system`:  Windows のマウスのプロパティ → ポインター タブに保存された
- *              既存スキーム (`HKCU\Control Panel\Cursors\Schemes`)。
- *              **適用のみ可能** で、編集・エクスポート・お気に入り設定は不可。
+ * - `local`:        ユーザー作成 / 手動取り込みテーマ。編集可・エクスポート可。
+ * - `system`:       Windows のマウスのプロパティの既存スキーム。**適用のみ可**。
+ * - `marketplace`:  公式インデックスから取得したテーマ。**編集とエクスポート不可**。
+ *                   適用・お気に入り・複製・削除は可能。複製先は `local` 扱いになる。
  */
-export type ThemeKind = 'local' | 'system'
+export type ThemeKind = 'local' | 'system' | 'marketplace'
 
 export interface ThemeCardData {
   id: string

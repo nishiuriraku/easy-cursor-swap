@@ -4,7 +4,7 @@
  * 複数画面で同じインスタンスを参照したいので Pinia 不使用のシンプル composable で実装。
  */
 import { ref } from 'vue'
-import type { ThemeCardData } from '~/types/theme'
+import type { ThemeCardData, ThemeKind } from '~/types/theme'
 import { invokeTauri } from './useTauri'
 
 /**
@@ -36,12 +36,18 @@ interface IpcThemeSummary {
   schema_version: number
   license?: string | null
   homepage?: string | null
+  source?: string
 }
 
 const themes = ref<ThemeCardData[]>([])
 const loading = ref(false)
 const lastError = ref<string | null>(null)
 let inflight: Promise<ThemeCardData[]> | null = null
+
+function mapSourceToKind(source: string | undefined): ThemeKind {
+  if (source === 'marketplace') return 'marketplace'
+  return 'local'
+}
 
 function mapSummary(t: IpcThemeSummary): ThemeCardData {
   return {
@@ -53,6 +59,7 @@ function mapSummary(t: IpcThemeSummary): ThemeCardData {
     applyCount: t.apply_count,
     isFavorite: t.is_favorite,
     isActive: t.is_active,
+    kind: mapSourceToKind(t.source),
     includedRoles: t.included_roles,
     tags: t.tags,
     sizeBytes: t.size_bytes,
