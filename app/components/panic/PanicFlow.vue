@@ -439,7 +439,11 @@ function logMark(s: LogEntry['status']): string {
 
 /* フッター */
 .panic-foot {
-  @apply flex items-center justify-between gap-3 border-t border-line bg-black/25 px-[26px] py-3.5;
+  @apply flex items-center justify-between gap-3 border-t border-line px-[26px] py-3.5;
+  background: rgba(0, 0, 0, 0.18);
+}
+:where(html.light) .panic-foot {
+  background: rgba(15, 20, 35, 0.025);
 }
 .foot-note {
   @apply font-mono text-[10.5px] text-fg-mute;
