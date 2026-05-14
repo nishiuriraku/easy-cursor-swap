@@ -2,20 +2,17 @@
 /**
  * テーマ公式インデックス提出ダイアログ (Phase 9-2)
  *
- * フロー:
- *  1. ローカルライブラリからテーマを選択
- *  2. GitHub ユーザー名を入力
- *  3. entry JSON テンプレートを生成 (sha256/signature/download_url は TODO として表示)
- *  4. 「GitHub で PR を開く」→ github.com/nishiuriraku/easy-cursor-swap-index/new/main でファイルを作成
- *
- * sha256 / signature / download_url はユーザーが cursorpack を自分の GitHub Release 等に
- * アップロードした後、手動で埋めてもらう形式とする。
- * app 内 export_cursorpack でエクスポートした値を使う手順をダイアログ内で説明する。
+ * タブ構成:
+ *   - 自動 (Auto): useMarketplaceSubmit + useGithubAuth Device Flow を使って PR を自動作成
+ *   - 手動 (Manual): GitHub ユーザー名 + ダウンロード URL → JSON 生成 → GitHub Web Editor
  */
 import { computed, onMounted, ref } from 'vue'
 import { invokeTauri } from '~/composables/useTauri'
 import { useKeystore } from '~/composables/useKeystore'
 import { useI18n } from '~/composables/useI18n'
+import { useMarketplaceSubmit } from '~/composables/useMarketplaceSubmit'
+import SubmitDeviceFlowModal from './SubmitDeviceFlowModal.vue'
+import type { GithubAccount, SubmitStage } from '~/types/githubAuth'
 
 const { t } = useI18n()
 
@@ -39,16 +36,85 @@ interface ThemeSummary {
 
 const { info: keystoreInfo, refresh: refreshKeystore } = useKeystore()
 
+// 共有状態
 const themes = ref<ThemeSummary[]>([])
 const selectedThemeId = ref<string | null>(null)
+const loading = ref(false)
+
+// タブ管理
+const tab = ref<'auto' | 'manual'>('auto')
+
+// ── 自動タブ ──────────────────────────────────────────
+const githubAccount = ref<GithubAccount | null>(null)
+const deviceFlowOpen = ref(false)
+const submitter = useMarketplaceSubmit()
+const submitDone = ref<{ prUrl: string } | null>(null)
+
+const STAGE_LABEL_KEY: Record<SubmitStage, string> = {
+  build: 'marketplace.submitStageBuild',
+  auth: 'marketplace.submitStageAuth',
+  fork: 'marketplace.submitStageFork',
+  sync_fork: 'marketplace.submitStageSyncFork',
+  branch: 'marketplace.submitStageBranch',
+  upload_pack: 'marketplace.submitStageUploadPack',
+  upload_entry: 'marketplace.submitStageUploadEntry',
+  open_pr: 'marketplace.submitStageOpenPr',
+}
+
+function stageLabel(s: SubmitStage | null): string {
+  if (!s) return ''
+  return t(STAGE_LABEL_KEY[s])
+}
+
+async function loadGithubAccount() {
+  try {
+    const cfg = await invokeTauri<{ github_account: GithubAccount | null }>('get_config')
+    githubAccount.value = cfg?.github_account ?? null
+  } catch {
+    githubAccount.value = null
+  }
+}
+
+async function runAutoSubmit() {
+  if (!selectedThemeId.value) return
+  submitDone.value = null
+  try {
+    const r = await submitter.submit(selectedThemeId.value)
+    submitDone.value = { prUrl: r.prUrl }
+  } catch {
+    // submitter.errorMsg は composable 内でセット済み; UI でバナー表示
+  }
+}
+
+async function onAutoSubmitClick() {
+  if (!selectedThemeId.value) return
+  if (!githubAccount.value) {
+    deviceFlowOpen.value = true
+    return
+  }
+  await runAutoSubmit()
+}
+
+async function onDeviceFlowReady() {
+  await loadGithubAccount()
+  await runAutoSubmit()
+}
+
+function openPr() {
+  if (!submitDone.value) return
+  void invokeTauri<void>('open_url', { url: submitDone.value.prUrl }).catch(() => {
+    window.open(submitDone.value!.prUrl, '_blank', 'noopener,noreferrer')
+  })
+}
+
+// ── 手動タブ ──────────────────────────────────────────
 const githubUsername = ref('')
 const downloadUrl = ref('')
 const step = ref<'select' | 'preview'>('select')
-const loading = ref(false)
 const copyDone = ref(false)
 
 const selectedTheme = computed(
-  () => themes.value.find((t) => t.id === selectedThemeId.value) ?? null,
+  () => themes.value.find((th) => th.id === selectedThemeId.value) ?? null,
 )
 
 // GitHub インデックスリポジトリのベース URL
@@ -86,17 +152,6 @@ const canProceed = computed(
   () => selectedThemeId.value !== null && githubUsername.value.trim().length > 0,
 )
 
-async function loadThemes() {
-  loading.value = true
-  try {
-    themes.value = await invokeTauri<ThemeSummary[]>('get_themes')
-  } catch {
-    themes.value = []
-  } finally {
-    loading.value = false
-  }
-}
-
 async function openGitHub() {
   const url = githubNewFileUrl.value
   if (!url) return
@@ -116,8 +171,25 @@ async function copyJson() {
   }, 2000)
 }
 
+// ── 共通 ──────────────────────────────────────────────
+async function loadThemes() {
+  loading.value = true
+  try {
+    themes.value = await invokeTauri<ThemeSummary[]>('get_themes')
+  } catch {
+    themes.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
 function close() {
   emit('update:open', false)
+  // 自動タブのリセット
+  tab.value = 'auto'
+  deviceFlowOpen.value = false
+  submitDone.value = null
+  // 手動タブのリセット
   step.value = 'select'
   selectedThemeId.value = null
   githubUsername.value = ''
@@ -125,7 +197,7 @@ function close() {
 }
 
 onMounted(async () => {
-  await Promise.all([loadThemes(), refreshKeystore()])
+  await Promise.all([loadThemes(), refreshKeystore(), loadGithubAccount()])
 })
 </script>
 
@@ -156,13 +228,37 @@ onMounted(async () => {
         </div>
 
         <div class="modal-body submit-body">
-          <!-- Step 1: テーマ選択 + GitHub ユーザー名 -->
-          <template v-if="step === 'select'">
-            <p class="hint">{{ t('marketplace.submitHint') }}</p>
+          <!-- タブバー -->
+          <div class="submit-mode-label">{{ t('marketplace.submitMode') }}</div>
+          <div
+            class="tabs"
+            style="border: none; background: transparent; padding: 0; height: auto"
+            role="tablist"
+          >
+            <button
+              type="button"
+              :class="['tab', { active: tab === 'auto' }]"
+              @click="tab = 'auto'"
+            >
+              {{ t('marketplace.submitModeAuto') }}
+            </button>
+            <button
+              type="button"
+              :class="['tab', { active: tab === 'manual' }]"
+              @click="tab = 'manual'"
+            >
+              {{ t('marketplace.submitModeManual') }}
+            </button>
+          </div>
+
+          <!-- 自動タブ -->
+          <template v-if="tab === 'auto'">
+            <p class="hint">{{ t('marketplace.submitAutoIntro') }}</p>
 
             <div class="field">
-              <label for="submit-theme">{{ t('marketplace.submitSelectTheme') }}</label>
+              <label for="submit-auto-theme">{{ t('marketplace.submitSelectTheme') }}</label>
               <UiSelect
+                id="submit-auto-theme"
                 v-model="selectedThemeId"
                 width="100%"
                 :placeholder="t('marketplace.submitSelectPlaceholder')"
@@ -175,27 +271,20 @@ onMounted(async () => {
               />
             </div>
 
-            <div class="field">
-              <label for="submit-github">{{ t('marketplace.submitGithubUser') }}</label>
-              <input
-                id="submit-github"
-                v-model="githubUsername"
-                type="text"
-                class="input"
-                :placeholder="t('marketplace.submitGithubUserPlaceholder')"
-              />
+            <div v-if="githubAccount" class="hint">
+              {{ t('marketplace.submitAutoLinkedAs', { login: githubAccount.login }) }}
             </div>
+            <div v-else class="hint">{{ t('marketplace.submitAutoNeedsLink') }}</div>
 
-            <div class="field">
-              <label for="submit-dl-url">{{ t('marketplace.submitDownloadUrl') }}</label>
-              <input
-                id="submit-dl-url"
-                v-model="downloadUrl"
-                type="url"
-                class="input"
-                :placeholder="t('marketplace.submitDownloadUrlPlaceholder')"
-              />
-              <span class="field-note">{{ t('marketplace.submitDownloadUrlNote') }}</span>
+            <div v-if="submitter.busy.value" class="hint" aria-live="polite">
+              {{ stageLabel(submitter.stage.value) }}
+            </div>
+            <div v-if="submitter.errorMsg.value" class="warn-box">
+              <UiIcon name="AlertTriangle" :size="14" />
+              {{ submitter.errorMsg.value }}
+            </div>
+            <div v-if="submitDone" class="hint">
+              {{ t('marketplace.submitDone') }}
             </div>
 
             <div v-if="!keystoreInfo.has_keypair" class="warn-box">
@@ -204,46 +293,124 @@ onMounted(async () => {
             </div>
           </template>
 
-          <!-- Step 2: JSON プレビュー -->
+          <!-- 手動タブ -->
           <template v-else>
-            <p class="hint">{{ t('marketplace.submitPreviewHint') }}</p>
-            <div class="json-preview">
-              <pre>{{ entryJson }}</pre>
-            </div>
-            <p class="hint small">{{ t('marketplace.submitFillInNote') }}</p>
+            <!-- Step 1: テーマ選択 + GitHub ユーザー名 -->
+            <template v-if="step === 'select'">
+              <p class="hint">{{ t('marketplace.submitHint') }}</p>
+
+              <div class="field">
+                <label for="submit-theme">{{ t('marketplace.submitSelectTheme') }}</label>
+                <UiSelect
+                  v-model="selectedThemeId"
+                  width="100%"
+                  :placeholder="t('marketplace.submitSelectPlaceholder')"
+                  :options="
+                    themes.map((th) => ({
+                      value: th.id,
+                      label: `${th.name} (v${th.version})`,
+                    }))
+                  "
+                />
+              </div>
+
+              <div class="field">
+                <label for="submit-github">{{ t('marketplace.submitGithubUser') }}</label>
+                <input
+                  id="submit-github"
+                  v-model="githubUsername"
+                  type="text"
+                  class="input"
+                  :placeholder="t('marketplace.submitGithubUserPlaceholder')"
+                />
+              </div>
+
+              <div class="field">
+                <label for="submit-dl-url">{{ t('marketplace.submitDownloadUrl') }}</label>
+                <input
+                  id="submit-dl-url"
+                  v-model="downloadUrl"
+                  type="url"
+                  class="input"
+                  :placeholder="t('marketplace.submitDownloadUrlPlaceholder')"
+                />
+                <span class="field-note">{{ t('marketplace.submitDownloadUrlNote') }}</span>
+              </div>
+
+              <div v-if="!keystoreInfo.has_keypair" class="warn-box">
+                <UiIcon name="AlertTriangle" :size="14" />
+                {{ t('marketplace.submitNoKeystore') }}
+              </div>
+            </template>
+
+            <!-- Step 2: JSON プレビュー -->
+            <template v-else>
+              <p class="hint">{{ t('marketplace.submitPreviewHint') }}</p>
+              <div class="json-preview">
+                <pre>{{ entryJson }}</pre>
+              </div>
+              <p class="hint small">{{ t('marketplace.submitFillInNote') }}</p>
+            </template>
           </template>
         </div>
 
         <div class="modal-foot">
-          <span class="left-note">step {{ step === 'select' ? '1' : '2' }} / 2</span>
-          <div class="actions">
-            <button v-if="step === 'select'" class="btn" @click="close">
-              {{ t('common.cancel') }}
-            </button>
+          <!-- 自動タブのフッター -->
+          <template v-if="tab === 'auto'">
+            <button class="btn" @click="close">{{ t('common.cancel') }}</button>
             <button
-              v-if="step === 'select'"
+              v-if="!submitDone"
               class="btn primary"
-              :disabled="!canProceed"
-              @click="step = 'preview'"
+              :disabled="!selectedThemeId || submitter.busy.value"
+              @click="onAutoSubmitClick"
             >
-              {{ t('marketplace.submitPreviewBtn') }}
+              {{
+                githubAccount
+                  ? t('marketplace.submitAutoSubmitBtn')
+                  : t('marketplace.submitAutoLinkBtn')
+              }}
             </button>
-
-            <button v-if="step === 'preview'" class="btn" @click="step = 'select'">
-              {{ t('common.back') }}
-            </button>
-            <button v-if="step === 'preview'" class="btn ghost" @click="copyJson">
-              {{ copyDone ? t('common.copied') : t('common.copyJson') }}
-            </button>
-            <button v-if="step === 'preview'" class="btn primary" @click="openGitHub">
+            <button v-else class="btn primary" @click="openPr">
               <UiIcon name="Globe" :size="14" />
-              {{ t('marketplace.submitOpenGithub') }}
+              {{ t('marketplace.submitOpenPrBtn') }}
             </button>
-          </div>
+          </template>
+
+          <!-- 手動タブのフッター -->
+          <template v-else>
+            <span class="left-note">step {{ step === 'select' ? '1' : '2' }} / 2</span>
+            <div class="actions">
+              <button v-if="step === 'select'" class="btn" @click="close">
+                {{ t('common.cancel') }}
+              </button>
+              <button
+                v-if="step === 'select'"
+                class="btn primary"
+                :disabled="!canProceed"
+                @click="step = 'preview'"
+              >
+                {{ t('marketplace.submitPreviewBtn') }}
+              </button>
+
+              <button v-if="step === 'preview'" class="btn" @click="step = 'select'">
+                {{ t('common.back') }}
+              </button>
+              <button v-if="step === 'preview'" class="btn ghost" @click="copyJson">
+                {{ copyDone ? t('common.copied') : t('common.copyJson') }}
+              </button>
+              <button v-if="step === 'preview'" class="btn primary" @click="openGitHub">
+                <UiIcon name="Globe" :size="14" />
+                {{ t('marketplace.submitOpenGithub') }}
+              </button>
+            </div>
+          </template>
         </div>
       </div>
     </div>
   </Teleport>
+
+  <!-- Device Flow モーダル (自動タブ) -->
+  <SubmitDeviceFlowModal v-model:open="deviceFlowOpen" @ready="onDeviceFlowReady" />
 </template>
 
 <style scoped>
@@ -296,6 +463,10 @@ onMounted(async () => {
 
 :where(html.light) .json-preview {
   background: rgba(15, 20, 35, 0.04);
+}
+
+.submit-mode-label {
+  @apply text-[11px] font-medium uppercase tracking-wide text-fg-mute;
 }
 
 .warn-box {
