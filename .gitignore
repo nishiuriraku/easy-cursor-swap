@@ -36,3 +36,6 @@ sample-cursor/
 
 # Superpowers brainstorming visual companion
 .superpowers/
+
+# Local git worktrees for parallel work
+.claude/worktrees/
