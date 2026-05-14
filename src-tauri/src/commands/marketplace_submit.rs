@@ -217,7 +217,7 @@ pub async fn submit_theme_auto(app: AppHandle, theme_id: String) -> Result<Submi
         &fork.owner.login,
         &fork.name,
         &branch,
-        &format!("packs/{}.cursorpack", theme_id),
+        &format!("themes/{}.cursorpack", theme_id),
         &pack_bytes,
         &format!("feat: add cursorpack for {}", theme_id),
     )
@@ -226,7 +226,7 @@ pub async fn submit_theme_auto(app: AppHandle, theme_id: String) -> Result<Submi
     emit_progress(&app, "upload_entry");
     let meta = load_theme_meta_for_submit(parsed_id)?;
     let download_url = format!(
-        "https://raw.githubusercontent.com/{}/{}/main/packs/{}.cursorpack",
+        "https://raw.githubusercontent.com/{}/{}/main/themes/{}.cursorpack",
         UPSTREAM_OWNER, UPSTREAM_REPO, theme_id
     );
     let entry_json = build_entry_json(
