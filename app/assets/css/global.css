@@ -38,8 +38,8 @@
   /* --- テキスト --- */
   --fg: #eef0f6;
   --fg-dim: #a0a6b8;
-  --fg-mute: #5a6076;
-  --fg-faint: #3a3f50;
+  --fg-mute: #9aa0b3; /* WCAG AA on --bg-0 #0a0b0f: 7.54:1 */
+  --fg-faint: #787e94; /* WCAG AA on --bg-0 #0a0b0f: 4.88:1 */
 
   /* --- アクセント --- */
   --accent: #7cf2d4;
@@ -201,15 +201,15 @@ html.light {
 
   --fg: #14171f;
   --fg-dim: #5b6070;
-  --fg-mute: #8b91a3;
-  --fg-faint: #c2c7d4;
+  --fg-mute: #626872; /* WCAG AA on --bg-0 #f4f6fb: 5.19:1 */
+  --fg-faint: #696e80; /* WCAG AA on --bg-0 #f4f6fb: 4.69:1 */
 
   --accent: #0fa885;
   --accent-hi: #0c8a6c;
   --accent-dim: rgba(15, 168, 133, 0.12);
   --accent-line: rgba(15, 168, 133, 0.32);
 
-  --violet: #6a5cff;
+  --violet: #4f3fde; /* WCAG AA on --bg-0 #f4f6fb: 6.27:1 */
   --amber: #c8881f;
   --rose: #d83a5e;
 
