@@ -24,6 +24,7 @@ pub mod cursor_build;
 pub mod cursor_io;
 pub mod keystore;
 pub mod marketplace;
+pub mod marketplace_submit;
 pub mod profile;
 pub mod system;
 pub mod theme;
