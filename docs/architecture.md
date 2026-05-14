@@ -225,9 +225,9 @@ pure function を中心に層が薄い。主要モジュール:
 
 ### Frontend (vitest)
 
-`app/composables/__tests__/` に 12 ファイル:
+`app/composables/__tests__/` に 14 ファイル:
 
-- `sanitizeSvg.test.ts`, `settingsSearch.test.ts`, `useAniPlayer.test.ts`, `useCreatorAssets.test.ts`, `useCreatorBulkImportFlow.test.ts`, `useCursorpackOpener.test.ts`, `useHotspotDefaults.test.ts`, `useHotspotInteraction.test.ts`, `useI18n.test.ts`, `useMarketplacePreviews.test.ts`, `useRoleMatcher.test.ts`, `useThemes.test.ts`
+- `sanitizeSvg.test.ts`, `settingsSearch.test.ts`, `useAniPlayer.test.ts`, `useCreatorAssets.test.ts`, `useCreatorBulkImportFlow.test.ts`, `useCursorpackOpener.test.ts`, `useGithubAuth.test.ts`, `useHotspotDefaults.test.ts`, `useHotspotInteraction.test.ts`, `useI18n.test.ts`, `useMarketplacePreviews.test.ts`, `useMarketplaceSubmit.test.ts`, `useRoleMatcher.test.ts`, `useThemes.test.ts`
 - コンポーネントは `app/components/creator/__tests__/BulkImportPreviewModal.test.ts`
 
 ### CI (`.github/workflows/`)

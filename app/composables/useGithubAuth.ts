@@ -7,7 +7,7 @@
  * Rust 側 (commands/marketplace_submit.rs) は単発 IPC のみ提供し、
  * interval / slow_down の制御はこの composable が行う。
  */
-import { ref, type Ref } from 'vue'
+import { ref, getCurrentScope, onScopeDispose, type Ref } from 'vue'
 import { invokeTauri } from '~/composables/useTauri'
 import type { StartFlowResult, CompleteFlowResult } from '~/types/githubAuth'
 
@@ -97,6 +97,12 @@ export function useGithubAuth() {
     userCode.value = null
     verificationUri.value = null
     expiresAt.value = null
+  }
+
+  // Component / effect scope の dispose 時に timer を必ず停止する。
+  // 親ダイアログがモーダルを閉じ忘れた場合のクリーンアップ。
+  if (getCurrentScope()) {
+    onScopeDispose(() => stopTimer())
   }
 
   return { status, userCode, verificationUri, expiresAt, login, errorMsg, start, cancel }

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { effectScope } from 'vue'
 
 const invokeMock = vi.fn()
 vi.mock('~/composables/useTauri', () => ({
@@ -99,6 +100,23 @@ describe('useGithubAuth', () => {
     // 6000ms total since slow_down -> poll fires
     // (Allow some slack — the test mostly verifies interval was reset, not exact ms.)
     expect(auth.status.value).toBe('waiting')
+  })
+
+  it('stops polling when the effect scope is disposed', async () => {
+    invokeMock.mockResolvedValueOnce({
+      userCode: 'X',
+      verificationUri: 'https://x',
+      expiresIn: 900,
+      interval: 1,
+    })
+    const scope = effectScope()
+    const auth = scope.run(() => useGithubAuth())!
+    await auth.start()
+    invokeMock.mockClear()
+    scope.stop()
+    // Tick past the interval — no further poll IPC should fire.
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(invokeMock).not.toHaveBeenCalled()
   })
 
   it('cancel() calls cancel_device_flow IPC and resets status', async () => {
