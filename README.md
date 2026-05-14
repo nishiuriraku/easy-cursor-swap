@@ -84,6 +84,22 @@ cargo test --manifest-path src-tauri/Cargo.toml
 npx tauri build
 ```
 
+### Marketplace auto-submit (optional development setup)
+
+The Marketplace auto-submit flow uses GitHub's OAuth Device Flow. To exercise it
+in `npm run tauri:dev`, register a GitHub OAuth App at
+<https://github.com/settings/applications/new> (no callback URL required) and
+export its Client ID:
+
+```powershell
+$env:GITHUB_OAUTH_CLIENT_ID = "Iv1.xxxxxxxx"
+npm run tauri:dev
+```
+
+Without `GITHUB_OAUTH_CLIENT_ID`, the app still builds and runs — only the
+auto-submit IPC reports "OAuth Client ID not configured" and users fall back
+to the manual submission flow.
+
 ### Project structure
 
 ```
