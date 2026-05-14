@@ -1,19 +1,22 @@
 <script setup lang="ts">
 /**
  * Marketplace の Featured ストリップ用カード。
- * 横並びレイアウト + ハイライトラベル + ダウンロードボタン。
+ * 横並びレイアウト + ハイライトラベル + 詳細モーダルを開くボタン。
+ *
+ * 2026-05-14: install emit を showDetails に変更。
+ * 「ライブラリに追加」フローは MarketplaceDetailModal の中で行う。
  */
 import { useI18n } from '~/composables/useI18n'
 import type { MarketplaceEntry } from '~/types/marketplace'
 
 const { t } = useI18n()
 
-defineProps<{
+const props = defineProps<{
   entry: MarketplaceEntry
 }>()
 
 const emit = defineEmits<{
-  install: [id: string]
+  showDetails: [id: string]
 }>()
 
 function fmtNumber(n: number): string {
@@ -25,10 +28,30 @@ function highlightLabel(h: MarketplaceEntry['highlight']): string {
   if (h === 'popular') return t('marketplace.featuredPopular')
   return ''
 }
+
+function onCardActivate(e: Event) {
+  const target = e.target as HTMLElement | null
+  if (target?.closest('button, a, input')) return
+  emit('showDetails', props.entry.id)
+}
+
+function onCardKeydown(e: KeyboardEvent) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault()
+    onCardActivate(e)
+  }
+}
 </script>
 
 <template>
-  <div class="card featured-card">
+  <article
+    class="card featured-card interactive"
+    tabindex="0"
+    role="button"
+    :aria-label="t('marketplace.openMarketplaceDetailAria', { name: entry.name })"
+    @click="onCardActivate"
+    @keydown="onCardKeydown"
+  >
     <div class="featured-thumb">
       <CursorIcon role="Arrow" :size="28" style="color: var(--fg)" />
     </div>
@@ -49,12 +72,12 @@ function highlightLabel(h: MarketplaceEntry['highlight']): string {
     </div>
     <button
       class="btn"
-      :aria-label="t('marketplace.installAria', { name: entry.name })"
-      @click="emit('install', entry.id)"
+      :aria-label="t('marketplace.openMarketplaceDetailAria', { name: entry.name })"
+      @click.stop="emit('showDetails', entry.id)"
     >
       <UiIcon name="Import" :size="13" />
     </button>
-  </div>
+  </article>
 </template>
 
 <style scoped>
