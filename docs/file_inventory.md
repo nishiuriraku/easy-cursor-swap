@@ -16,10 +16,10 @@
 |---|---|
 | [main.rs](../src-tauri/src/main.rs) | Tauri アプリのエントリ。tracing 初期化、`StartupCheck::begin()`、AppUserModelID 登録、ConfigManager 初期化、孤児カーソル復旧、pending snapshot リカバリ、`tauri::Builder` 構築 (single-instance プラグイン / 各種 plugin / setup でトレイ・ホットキー) |
 | [lib.rs](../src-tauri/src/lib.rs) | 20 モジュールの `pub mod` 宣言 |
-| [commands/mod.rs](../src-tauri/src/commands/mod.rs) | 全 Tauri コマンドのハンドラ登録 (`get_command_handlers()` が 53 IPC を `tauri::generate_handler!` に渡す) |
+| [commands/mod.rs](../src-tauri/src/commands/mod.rs) | 全 Tauri コマンドのハンドラ登録 (`get_command_handlers()` が 54 IPC を `tauri::generate_handler!` に渡す) |
 | [errors.rs](../src-tauri/src/errors.rs) | `AppError` (`thiserror`、`Serialize` 派生で IPC 経由 throw 対応) |
 
-### 1-2. IPC コマンド実体 (9 サブモジュール / 52 個)
+### 1-2. IPC コマンド実体 (9 サブモジュール / 54 個)
 
 | ファイル | 主な IPC |
 |---|---|
@@ -29,7 +29,7 @@
 | [commands/theme.rs](../src-tauri/src/commands/theme.rs) | `get_cursor_roles` / `get_current_cursors` / `get_themes` / `get_theme_previews` / `get_theme_role_previews` / `apply_theme` / `set_theme_favorite` / `clear_cursor_cache` / `inspect_cursorpack` / `import_cursorpack` / `delete_theme` / `duplicate_theme` / `repackage_theme` |
 | [commands/system.rs](../src-tauri/src/commands/system.rs) | `reset_to_default` / `reset_to_initial` / `get_environment_report` / `get_config` / `update_config` / `get_autostart_status` / `get_app_info` / `list_config_backups` / `restore_config_backup` / `open_url` / `open_log_folder` / `get_accessibility_conflicts` / `check_update_is_major_jump` / `list_crash_reports` / `clear_crash_reports` / `submit_crash_reports` |
 | [commands/keystore.rs](../src-tauri/src/commands/keystore.rs) | `keystore_info` / `keystore_generate` / `keystore_delete` / `keystore_export` / `keystore_import` |
-| [commands/marketplace.rs](../src-tauri/src/commands/marketplace.rs) | `marketplace_fetch_index` / `marketplace_install` |
+| [commands/marketplace.rs](../src-tauri/src/commands/marketplace.rs) | `marketplace_fetch_index` / `marketplace_install` / `marketplace_fetch_preview` |
 | [commands/profile.rs](../src-tauri/src/commands/profile.rs) | `export_profile` / `import_profile` |
 | [commands/windows_scheme.rs](../src-tauri/src/commands/windows_scheme.rs) | `list_windows_schemes` / `apply_windows_scheme` / `get_windows_scheme_previews` / `get_windows_scheme_role_previews` / `export_windows_scheme_as_cursorpack` |
 | [bulk_import/](../src-tauri/src/bulk_import/) | `bulk_resolve_assets` / `cancel_bulk_import` / `parse_cursorpack_for_creator` (実体は `bulk_import` モジュール側、`tauri::command` 属性付きの関数を `commands/mod.rs` から再エクスポート) |
@@ -56,7 +56,7 @@
 | [bulk_import/assets.rs](../src-tauri/src/bulk_import/assets.rs) | 複数ファイル/フォルダ走査 → `ResolvedAsset` 変換、ファジーマッチ、リサンプル並列化 |
 | [bulk_import/cursorpack.rs](../src-tauri/src/bulk_import/cursorpack.rs) | `.cursorpack` 読込 (ライブラリ非依存、creator 直挿入用) |
 | [backup.rs](../src-tauri/src/backup.rs) | `.cursorprofile` Zip 入出力、`ProfileEnvelope`、merge/overwrite |
-| [marketplace.rs](../src-tauri/src/marketplace.rs) | `MarketplaceClient`：reqwest(rustls) + SHA-256 + Ed25519 + `historical_keys` ローテーション + 50MB ガード |
+| [marketplace.rs](../src-tauri/src/marketplace.rs) | `MarketplaceClient`：reqwest(rustls) + SHA-256 + Ed25519 + `historical_keys` ローテーション + 50MB ガード。`fetch_preview`：URL スキーム/ホスト + ロール名バリデーション + 500KB 上限でプレビュー PNG を取得 |
 | [keystore.rs](../src-tauri/src/keystore.rs) | DPAPI 暗号化保存、`generate`/`sign`/`verify`、XChaCha20-Poly1305 + Argon2id `.cfkey` 入出力 |
 | [health.rs](../src-tauri/src/health.rs) | `startup.json` の `pending_failures`、3 回連続失敗検知、バージョン変更で自動リセット |
 | [crash.rs](../src-tauri/src/crash.rs) | `install_panic_hook`、`%LOCALAPPDATA%\...\crash\panic-{epoch}.json`、`prune_old_reports`、`general.crash_reporting` 同意、送信ペイロード生成 |
@@ -97,7 +97,7 @@
 | [shell/](../app/components/shell/) | `AppTitlebar` / `AppSidebar` / `EnvironmentBanner` |
 | [library/](../app/components/library/) | `ThemeCard` / `ThemeRow` / `ThemeDetailModal` / `ThemeDetailDrawer` / `ApplyModal` / `ImportConflictDialog` / `ThemePickerModal` / `CursorMatrix` / `LibraryToolbar` / `LibraryFilterBar` / `LibraryEmptyState` / `LibraryDropOverlay` |
 | [creator/](../app/components/creator/) | `CreatorStartScreen` / `CreatorToolbar` / `CreatorRoleList` / `CreatorMetadataPane` (Hotspot 節を内包) / `NewThemeStartModal` / `SaveDestinationModal` / `BulkImportButton` / `BulkImportPreviewModal` / `BulkImportRoleRow` / `RoleListItem` / `SizeStrip` / `AniThumb` |
-| [marketplace/](../app/components/marketplace/) | `FeaturedCard` / `MarketplaceCard` / `SubmitThemeDialog` |
+| [marketplace/](../app/components/marketplace/) | `FeaturedCard` / `MarketplaceCard` / `SubmitThemeDialog` / `MarketplaceDetailModal` |
 | [settings/](../app/components/settings/) | `GeneralSection` / `StartupSection` / `LibrarySection` / `SecuritySection` / `KeysSection` / `LoggingSection` / `UpdatesSection` / `AboutSection` / `SettingsRow` (anchor prop で検索ジャンプ対応) / `SettingsToggle` / `PassphrasePrompt` / `ConfigRecoveryPanel` / `SettingsSearchDropdown` (ja/en 両言語の横断検索ドロップダウン) |
 | [preview/](../app/components/preview/) | `CursorPreview` (theme detail で使うプレビュー) |
 | [panic/](../app/components/panic/) | `PanicFlow` (ステージ選択 + ライブログ + 17 ロールグリッド) |
@@ -131,6 +131,7 @@
 | [sanitizeSvg.ts](../app/composables/sanitizeSvg.ts) | SVG サニタイズ (`<script>`/`href`/`on*`/`javascript:` 除去) |
 | [useAppInfo.ts](../app/composables/useAppInfo.ts) | `get_app_info` IPC で取得したアプリ情報 (version, cursors_dir 等) の共有 |
 | [useSettingsSearch.ts](../app/composables/useSettingsSearch.ts) | 設定検索カタログ + ja/en 横断 substring 検索 + アンカージャンプ |
+| [useMarketplacePreviews.ts](../app/composables/useMarketplacePreviews.ts) | マーケットプレース プレビュー PNG のシングルトンキャッシュ + in-flight 重複排除 (`marketplace_fetch_preview` IPC ラッパー) |
 
 ### 2-4. その他
 
@@ -161,9 +162,9 @@
 | 指標 | 値 |
 |---|---|
 | Rust モジュール数 (lib.rs `pub mod`) | 20 + ベンチ 2 |
-| Tauri IPC コマンド数 | 52 |
+| Tauri IPC コマンド数 | 54 |
 | Vue ページ数 | 4 |
-| Vue コンポーネント (subdir 別) | shell 3 / library 12 / creator 12 / marketplace 3 / settings 12 / preview 1 / panic 1 / icons 2 / ui 1 |
+| Vue コンポーネント (subdir 別) | shell 3 / library 12 / creator 12 / marketplace 4 / settings 12 / preview 1 / panic 1 / icons 2 / ui 1 |
 | Composables 数 | 23 |
-| Vitest テストファイル数 | 10 (composables) + 1 (components/creator) |
+| Vitest テストファイル数 | 12 (composables) + 1 (components/creator) |
 | CI ワークフロー数 | 3 (ci / performance / release) |

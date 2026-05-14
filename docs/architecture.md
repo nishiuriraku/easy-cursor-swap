@@ -16,7 +16,7 @@
                         │ IPC (Tauri 2 / serde)
 ┌───────────────────────▼─────────────────────────────────────────┐
 │ Rust バックエンド  (src-tauri/src/)                              │
-│   commands/ (53 IPC 受け口を 9 サブモジュールに分割)              │
+│   commands/ (54 IPC 受け口を 9 サブモジュールに分割)              │
 │   ├─ config / theme / cursor / registry  ← Source of Truth      │
 │   ├─ marketplace / keystore / bulk_import                       │
 │   └─ tray / hotkey / health / crash                             │
@@ -51,7 +51,7 @@
 
 | カテゴリ | モジュール | 主な役割 |
 |---|---|---|
-| **IPC 表玄関** | `commands/` | 53 個の `#[tauri::command]` を 9 サブモジュールに分割。`mod.rs::get_command_handlers()` が `tauri::generate_handler!` にまとめて渡す。サブモジュール: `theme` / `cursor_build/` (build / cancel / dto / sign / stream の 5 ファイル分割) / `cursor_io` / `ani_export` / `keystore` / `marketplace` / `profile` / `system` / `windows_scheme` |
+| **IPC 表玄関** | `commands/` | 54 個の `#[tauri::command]` を 9 サブモジュールに分割。`mod.rs::get_command_handlers()` が `tauri::generate_handler!` にまとめて渡す。サブモジュール: `theme` / `cursor_build/` (build / cancel / dto / sign / stream の 5 ファイル分割) / `cursor_io` / `ani_export` / `keystore` / `marketplace` / `profile` / `system` / `windows_scheme` |
 | **設定 / 状態** | `config.rs` | `AppConfig` / `ConfigManager` (RwLock + 自動 schema migration + バックアップ) |
 | | `errors.rs` | `AppError` / `AppResult` 共通型 |
 | **カーソル生成パイプライン** | `cursor/` | 5 サブモジュール: `image` (リサイズ / hotspot / メタデータ剥離) / `cur_build` (PNG → 6 解像度 .cur) / `ico_cur` (ICO/CUR 解析) / `ani` (RIFF/ACON 解析) / `ani_write` (ANI 書き出し)。`mod.rs` で全シンボルを `pub use` 再エクスポート |
@@ -60,7 +60,7 @@
 | **テーマパッケージ** | `theme/` | 3 ファイル: `types` (DTO + 内部 helper) / `sanitize` (path traversal 対策) / `mod` (`ThemeManager` impl 本体)。`.cursorpack` の作成・解凍・バリデーション、theme.json 管理、孤児カーソル復旧 |
 | | `bulk_import/` | 3 ファイル: `mod` (CancelRegistry / 公開 API) / `assets` (ファイル・フォルダ並列解決) / `cursorpack` (パック解析の Creator 向けエントリ) |
 | | `backup.rs` | `.cursorprofile` (config + 全テーマの ZIP) の export/import |
-| **マーケットプレース** | `marketplace.rs` | HTTP インデックス取得 (rustls-tls)、SHA-256 + Ed25519 検証、ダウンロードサイズ上限 |
+| **マーケットプレース** | `marketplace.rs` | HTTP インデックス取得 (rustls-tls)、SHA-256 + Ed25519 検証、ダウンロードサイズ上限。プレビュー PNG 取得 (`fetch_preview`: URL バリデーション + ロール名バリデーション + 500KB 上限) |
 | | `keystore.rs` | クリエイター用 Ed25519 鍵ペア (DPAPI 暗号化), `.cfkey` import/export (XChaCha20-Poly1305 + Argon2id), key_id 計算 (SHA-256[:16]) |
 | **信頼性 / 復旧** | `health.rs` | 起動連続失敗カウンタ + ロールバック対象バージョン算出 |
 | | `crash.rs` | panic フック + `crash-reports/` ディレクトリの retention + 投稿ペイロード生成 |
@@ -74,9 +74,9 @@
 
 > 多重起動防止は `tauri_plugin_single_instance::init` プラグインに集約 (argv ハンドオーバ含む)。旧 `single_instance.rs` モジュールは削除済。
 
-### IPC 一覧 (53 commands)
+### IPC 一覧 (54 commands)
 
-`commands::get_command_handlers()` が `tauri::generate_handler!` に登録する 53 個。フロントは `app/composables/useTauri.ts::invokeTauri<T>(name, args)` で呼ぶ。
+`commands::get_command_handlers()` が `tauri::generate_handler!` に登録する 54 個。フロントは `app/composables/useTauri.ts::invokeTauri<T>(name, args)` で呼ぶ。
 
 | カテゴリ | コマンド名 |
 |---|---|
@@ -85,7 +85,7 @@
 | .cur/.ico/.ani 取り込み (3) | `import_cursor_file`, `inspect_ani_file`, `take_pending_cursorpack` |
 | .ani 書き出し (1) | `export_ani_with_hotspot` |
 | 鍵管理 (5) | `keystore_info`, `keystore_generate`, `keystore_delete`, `keystore_export`, `keystore_import` |
-| マーケットプレース (2) | `marketplace_fetch_index`, `marketplace_install` |
+| マーケットプレース (3) | `marketplace_fetch_index`, `marketplace_install`, `marketplace_fetch_preview` |
 | プロファイル (2) | `export_profile`, `import_profile` |
 | Windows スキーム (5) | `list_windows_schemes`, `apply_windows_scheme`, `get_windows_scheme_previews`, `get_windows_scheme_role_previews`, `export_windows_scheme_as_cursorpack` |
 | システム / 設定 / 診断 (16) | `reset_to_default`, `reset_to_initial`, `get_environment_report`, `get_config`, `update_config`, `get_app_info`, `list_config_backups`, `restore_config_backup`, `check_update_is_major_jump`, `open_url`, `open_log_folder`, `get_accessibility_conflicts`, `get_autostart_status`, `list_crash_reports`, `clear_crash_reports`, `submit_crash_reports` |
@@ -118,6 +118,8 @@ README の security テーブルは概要、本セクションは **不変条件
 | 鍵エクスポート時は XChaCha20-Poly1305 + Argon2id でパスフレーズ暗号化 (`.cfkey`) | `keystore.rs` |
 | Marketplace 投稿パックは SHA-256 + Ed25519 を**ダウンロード後に必ず検証** | `marketplace.rs::verify_pack` |
 | ダウンロード前に Content-Length を見て三段階サイズ上限 (50 MB 圧縮 / 200 MB 展開 / 10 MB / image) | `marketplace.rs` / `theme/sanitize.rs` |
+| Marketplace テーマは**読み取り専用**: `repackage_theme` IPC がソース確認し、marketplace 由来のテーマは編集・エクスポート要求を拒否する | `commands/theme.rs::repackage_theme` |
+| プレビュー PNG 取得は URL スキーム + ホスト + ロール名を検証し、500KB を超えるレスポンスは拒否 | `marketplace.rs::fetch_preview` |
 | アーカイブ展開は `sanitize_archive_path` を必ず通す (path traversal / symlink / 絶対パス拒否) | `theme/sanitize.rs::sanitize_archive_path` |
 | PNG 取り込み時に eXIf / iTXt / zTXt メタデータを剥離 | `cursor/image.rs` |
 | SVG は WebView で表示する前に script / style / on* 属性を除去 | `app/composables/sanitizeSvg.ts` |
@@ -143,7 +145,7 @@ app/
 │  ├─ creator/     ← CreatorStartScreen, CreatorToolbar, CreatorRoleList, CreatorMetadataPane,
 │  │                NewThemeStartModal, SaveDestinationModal, BulkImportButton,
 │  │                BulkImportPreviewModal, BulkImportRoleRow, RoleListItem, SizeStrip, AniThumb
-│  ├─ marketplace/ ← MarketplaceCard, FeaturedCard, SubmitThemeDialog
+│  ├─ marketplace/ ← MarketplaceCard, FeaturedCard, SubmitThemeDialog, MarketplaceDetailModal
 │  ├─ settings/    ← SettingsRow, SettingsToggle, ConfigRecoveryPanel, PassphrasePrompt,
 │  │                SettingsSearchDropdown, GeneralSection, StartupSection,
 │  │                LibrarySection, SecuritySection, KeysSection, LoggingSection,
@@ -157,7 +159,7 @@ app/
 │                    sanitizeSvg, useCreatorAssets, useCreatorPickers, useCreatorImport,
 │                    useCreatorBulkImportFlow, useCreatorExport, useHotspotDefaults,
 │                    useHotspotInteraction, useAniPlayer, useCursorpackOpener,
-│                    useAppInfo, useSettingsSearch (合計 23)
+│                    useAppInfo, useSettingsSearch, useMarketplacePreviews (合計 23)
 ├─ types/          ← config.ts, theme.ts, marketplace.ts (Rust struct と 1:1)
 ├─ locales/        ← ja.ts, en.ts (CI で parity チェック)
 ├─ assets/css/     ← tailwind.css (Tailwind v4 entry + @theme + 横断 shared utility) +
@@ -171,7 +173,7 @@ app/
 |---|---|---|
 | `index.vue` (Library) | useThemes, useCursorpackOpener, ThemeCard / ThemeRow, ApplyModal, ImportConflictDialog, ThemePickerModal | `get_themes`, `apply_theme`, `import_cursorpack`, `inspect_cursorpack`, `delete_theme`, `duplicate_theme`, `repackage_theme`, `list_windows_schemes`, `apply_windows_scheme`, `get_windows_scheme_previews`, `set_theme_favorite`, `take_pending_cursorpack` |
 | `creator.vue` | useCreatorAssets, useCreatorPickers, useCreatorImport, useCreatorBulkImportFlow, useCreatorExport, useRoleMatcher, useBulkImport, useKeystore, useHotspotDefaults, useHotspotInteraction, useAniPlayer, sanitizeSvg, NewThemeStartModal, BulkImportPreviewModal | `import_cursor_file`, `inspect_ani_file`, `parse_cursorpack_for_creator`, `bulk_resolve_assets`, `cancel_bulk_import`, `export_cursorpack_streamed`, `cancel_build`, `export_ani_with_hotspot`, `keystore_info` |
-| `marketplace.vue` | useThemes, MarketplaceCard, FeaturedCard, SubmitThemeDialog | `marketplace_fetch_index`, `marketplace_install`, `keystore_info` |
+| `marketplace.vue` | useThemes, useMarketplacePreviews, MarketplaceCard, FeaturedCard, MarketplaceDetailModal, SubmitThemeDialog | `marketplace_fetch_index`, `marketplace_install`, `marketplace_fetch_preview`, `keystore_info` |
 | `settings.vue` | useAppSettings, useKeystore, useUpdater, useSettingsSearch, ConfigRecoveryPanel, PassphrasePrompt, SettingsSearchDropdown, GeneralSection 〜 AboutSection の 8 セクション | `get_config`, `update_config`, `keystore_*`, `list_config_backups`, `restore_config_backup`, `export_profile`, `import_profile`, `list_crash_reports`, `clear_crash_reports`, `submit_crash_reports`, `check_update_is_major_jump` |
 | `PanicFlow.vue` (modal) | useNotify | `reset_to_default`, `reset_to_initial` |
 
@@ -218,9 +220,9 @@ pure function を中心に層が薄い。主要モジュール:
 
 ### Frontend (vitest)
 
-`app/composables/__tests__/` に 10 ファイル:
+`app/composables/__tests__/` に 12 ファイル:
 
-- `sanitizeSvg.test.ts`, `useAniPlayer.test.ts`, `useCreatorAssets.test.ts`, `useCreatorBulkImportFlow.test.ts`, `useCursorpackOpener.test.ts`, `useHotspotDefaults.test.ts`, `useHotspotInteraction.test.ts`, `useI18n.test.ts`, `useRoleMatcher.test.ts`, `useThemes.test.ts`
+- `sanitizeSvg.test.ts`, `settingsSearch.test.ts`, `useAniPlayer.test.ts`, `useCreatorAssets.test.ts`, `useCreatorBulkImportFlow.test.ts`, `useCursorpackOpener.test.ts`, `useHotspotDefaults.test.ts`, `useHotspotInteraction.test.ts`, `useI18n.test.ts`, `useMarketplacePreviews.test.ts`, `useRoleMatcher.test.ts`, `useThemes.test.ts`
 - コンポーネントは `app/components/creator/__tests__/BulkImportPreviewModal.test.ts`
 
 ### CI (`.github/workflows/`)

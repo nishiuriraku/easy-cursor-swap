@@ -11,10 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- _Nothing yet._
+- Marketplace プレビュー画像: `.cursorpack` アーカイブに `previews/<role>.png` (64×64 PNG, Arrow / Help / AppStarting / Wait / Crosshair / IBeam の 6 ロール) を同梱するようになった。
+- `marketplace_fetch_preview` IPC コマンド: インデックス CDN からプレビュー PNG を取得する。URL スキーム・ホスト・ロール名の検証、および 500KB 上限を実施。
+- `useMarketplacePreviews` composable: `marketplace_fetch_preview` IPC ラッパー。シングルトンキャッシュ + in-flight 重複排除でカード表示の二重リクエストを防ぐ。
+- `MarketplaceDetailModal` コンポーネント: カードクリックで詳細モーダルを開き、プレビューマトリクスと Install ボタンを表示。インストールフローをモーダル内に集約。
+- ライブラリのカード / 行 / 詳細ドロワーに Marketplace ソースタグを追加し、マーケットプレース由来テーマを視覚的に区別できるようにした。
 
 ### Changed
 
+- `MarketplaceCard` と `FeaturedCard` が `install` イベントの代わりに `showDetails` イベントを emit するように変更。インストールフローは `MarketplaceDetailModal` に移動した。
+- `ThemeKind` 型に `'marketplace'` 値を追加。`useThemes` が source → kind のマッピングを更新。
 - Creator のビッグプレビュー描画倍率を 90% → 80% に変更し、ホットスポット編集領域の周囲余白を広げた。
 - `theme.json` の `schema_version` を `1` に統一 (従来 `2`)。リリース前の段階で複数回 bump していた値を v1 へ巻き戻し、初回公開を `schema_version: 1` で揃える。既存の `~/.custom_cursors/` 配下に `schema_version: 2` のテーマが残っている場合は読込時に skip + warning ログとなる (`schema_version != 1`)。
 - 公式インデックス (Marketplace) のグリッドカード視覚スタイルを Library の `ThemeCard` と揃えた。プレビューを 3x2 (6 セル) のコンパクトマトリクスに縮小し、`.card-preview` の高さを 112px に詰め、カバレッジ表記を `X%` → `X/17` に変更。meta-row はダウンロード数とバージョンの 2 項目構成にし、`X/17` 重複を排除した。インポートボタン・verified バッジ・ダウンロード数などマーケットプレイス固有機能は維持。実カーソル PNG プレビューは別 issue (`docs/superpowers/issue/2026-05-12-marketplace-icon-preview.md`) のまま保留。
@@ -37,7 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-- _Nothing yet._
+- Marketplace テーマの読み取り専用ガード: `repackage_theme` IPC がソースを確認し、公式インデックス由来のテーマに対する編集・エクスポート要求を拒否するようになった。
 
 ---
 
