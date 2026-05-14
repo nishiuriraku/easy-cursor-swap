@@ -32,6 +32,11 @@ fn public_key_path() -> AppResult<PathBuf> {
     Ok(keys_dir()?.join("public.key"))
 }
 
+/// GitHub OAuth アクセストークンの保存パス
+fn github_oauth_token_path() -> AppResult<PathBuf> {
+    Ok(keys_dir()?.join("github_oauth.token"))
+}
+
 /// 鍵ペアの存在を表すサマリー (UI 表示用)
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct KeystoreInfo {
@@ -302,6 +307,40 @@ impl Keystore {
         use ed25519_dalek::Verifier;
         Ok(verifying.verify(message, &signature).is_ok())
     }
+
+    /// GitHub OAuth アクセストークンを DPAPI で暗号化して保存する。
+    ///
+    /// トークン本体は絶対にログに出力しない。イベント動詞のみ記録する。
+    pub fn save_github_oauth_token(token: &str) -> AppResult<()> {
+        std::fs::create_dir_all(keys_dir()?)?;
+        let encrypted = dpapi_encrypt(token.as_bytes())?;
+        std::fs::write(github_oauth_token_path()?, &encrypted)?;
+        tracing::info!("GitHub OAuth トークンを保存しました");
+        Ok(())
+    }
+
+    /// GitHub OAuth アクセストークンを取り出す。ファイルが存在しない場合は `None` を返す。
+    pub fn load_github_oauth_token() -> AppResult<Option<String>> {
+        let p = github_oauth_token_path()?;
+        if !p.exists() {
+            return Ok(None);
+        }
+        let encrypted = std::fs::read(&p)?;
+        let raw = dpapi_decrypt(&encrypted)?;
+        let token = String::from_utf8(raw)
+            .map_err(|_| AppError::Theme("OAuth トークン UTF-8 不正 (破損ファイル)".to_string()))?;
+        Ok(Some(token))
+    }
+
+    /// GitHub OAuth アクセストークンを削除する。存在しなくても成功扱い (冪等)。
+    pub fn delete_github_oauth_token() -> AppResult<()> {
+        let p = github_oauth_token_path()?;
+        if p.exists() {
+            std::fs::remove_file(&p)?;
+            tracing::info!("GitHub OAuth トークンを削除しました");
+        }
+        Ok(())
+    }
 }
 
 /// パスフレーズ + salt から Argon2id で 32 byte 鍵を導出する。
@@ -418,6 +457,22 @@ fn dpapi_decrypt(_cipher: &[u8]) -> AppResult<Vec<u8>> {
 mod tests {
     use super::*;
 
+    /// パニック時でも env var を確実に復元するための RAII ガード。
+    /// テスト関数内でのみ使用し、pub 公開は行わない。
+    struct EnvGuard {
+        key: &'static str,
+        prev: Option<String>,
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            match &self.prev {
+                Some(v) => std::env::set_var(self.key, v),
+                None => std::env::remove_var(self.key),
+            }
+        }
+    }
+
     #[test]
     fn compute_key_id_returns_16_lowercase_hex() {
         let pk = base64::engine::general_purpose::STANDARD.encode([0xABu8; 32]);
@@ -481,5 +536,36 @@ mod tests {
         let k1 = derive_key_from_passphrase("alpha", &salt).unwrap();
         let k2 = derive_key_from_passphrase("beta", &salt).unwrap();
         assert_ne!(k1, k2);
+    }
+
+    #[test]
+    fn github_oauth_token_round_trip() {
+        // env var CUSTOM_CURSORS_DIR_OVERRIDE を使って一時ディレクトリに向ける。
+        // config::cursors_dir_override_lock() でプロセス全体の env 競合を直列化する。
+        let _g = crate::config::cursors_dir_override_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let tmp = tempfile::TempDir::new().unwrap();
+        // パニック時でも env var が復元されるよう RAII ガードを先に設置する。
+        let _env_guard = EnvGuard {
+            key: "CUSTOM_CURSORS_DIR_OVERRIDE",
+            prev: std::env::var("CUSTOM_CURSORS_DIR_OVERRIDE").ok(),
+        };
+        std::env::set_var("CUSTOM_CURSORS_DIR_OVERRIDE", tmp.path());
+
+        // 初期状態は None
+        assert!(Keystore::load_github_oauth_token().unwrap().is_none());
+
+        // 保存 → 読み出し
+        Keystore::save_github_oauth_token("ghu_abc123").unwrap();
+        let loaded = Keystore::load_github_oauth_token().unwrap();
+        assert_eq!(loaded.as_deref(), Some("ghu_abc123"));
+
+        // 削除 → 再び None
+        Keystore::delete_github_oauth_token().unwrap();
+        assert!(Keystore::load_github_oauth_token().unwrap().is_none());
+
+        // 削除済みでも delete はエラーにならない (idempotent)
+        Keystore::delete_github_oauth_token().unwrap();
     }
 }

@@ -12,6 +12,7 @@
 //! | [`cursor_io`]    | 単一 `.cur` / `.ico` / `.ani` ファイルの読み込み |
 //! | [`keystore`]     | Ed25519 鍵ペア管理 (生成 / 削除 / Export / Import) |
 //! | [`marketplace`]  | 公式インデックス取得 / インストール |
+//! | [`marketplace_submit`] | Device Flow 認証 + 自動 PR 作成 |
 //! | [`profile`]      | `.cursorprofile` (config + 全テーマ) の export / import |
 //! | [`system`]       | アプリ設定 / OS 状態 / クラッシュ / 自動起動など雑多な情報系 |
 //! | [`theme`]        | テーマ単体の CRUD と `.cursorpack` の inspect / import |
@@ -24,6 +25,7 @@ pub mod cursor_build;
 pub mod cursor_io;
 pub mod keystore;
 pub mod marketplace;
+pub mod marketplace_submit;
 pub mod profile;
 pub mod system;
 pub mod theme;
@@ -70,6 +72,12 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         marketplace::marketplace_fetch_index,
         marketplace::marketplace_install,
         marketplace::marketplace_fetch_preview,
+        // 公式インデックス自動提出 (Device Flow + PR 作成)
+        marketplace_submit::start_device_flow,
+        marketplace_submit::complete_device_flow,
+        marketplace_submit::cancel_device_flow,
+        marketplace_submit::submit_theme_auto,
+        marketplace_submit::revoke_github_link,
         // バックアッププロファイル
         profile::export_profile,
         profile::import_profile,

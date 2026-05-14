@@ -260,6 +260,7 @@ fn main() {
         .manage(config_manager)
         .manage(bulk_import::CancelRegistry::default())
         .manage(PendingCursorpack::default())
+        .manage(crate::commands::marketplace_submit::DeviceFlowState::default())
         // 閉じるボタン → WebView を破棄してメモリ解放 (Phase 4-1)
         // アプリ自体はトレイに常駐し続ける。再表示時に tray::show_or_recreate_main_window が
         // ウィンドウを再生成する。

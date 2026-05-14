@@ -25,7 +25,7 @@ pub struct BackupInfo {
 }
 
 /// 設定スキーマの現在のバージョン
-const CURRENT_SCHEMA_VERSION: u32 = 1;
+const CURRENT_SCHEMA_VERSION: u32 = 2;
 
 /// アプリケーション設定（Source of Truth）
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,6 +41,12 @@ pub struct AppConfig {
 
     /// ログ設定
     pub logging: LoggingConfig,
+
+    /// Marketplace 提出用 GitHub アカウント (Device Flow で連携済みの場合のみ Some)。
+    /// token 本体は `keystore.rs` の DPAPI スロットに別保管し、ここはメタのみ。
+    /// v1 スキーマ互換のため `serde(default)` で `None` フォールバック。
+    #[serde(default)]
+    pub github_account: Option<GithubAccount>,
 }
 
 /// 一般設定
@@ -111,6 +117,17 @@ pub struct LoggingConfig {
     pub max_total_size: u64,
 }
 
+/// Marketplace 提出フローで連携した GitHub アカウントのメタ情報。
+/// アクセストークン本体は `keystore.rs` の DPAPI スロット (`_keys/github_oauth.token`)
+/// に別保管し、ここはユーザーへの表示と「いつ連携したか」の記録のみ持つ。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GithubAccount {
+    /// GitHub のログイン名 (例: "octocat")
+    pub login: String,
+    /// トークンを保存した日時 (RFC3339, UTC)
+    pub token_saved_at: String,
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
@@ -141,6 +158,7 @@ impl Default for AppConfig {
                 // 100 MB
                 max_total_size: 100 * 1024 * 1024,
             },
+            github_account: None,
         }
     }
 }
@@ -560,6 +578,61 @@ mod tests {
         let cfg = AppConfig::default();
         assert!(cfg.general.favorites.is_empty());
         assert!(cfg.general.usage.is_empty());
+    }
+
+    #[test]
+    fn deserialize_accepts_missing_github_account() {
+        // v1 config (github_account 欠落) は serde(default) で None になる。
+        let json = r#"{
+            "schema_version": 1,
+            "general": {
+                "auto_start": true,
+                "auto_update": true,
+                "language": "ja",
+                "active_theme_id": null,
+                "panic_hotkey": "Ctrl+Alt+Shift+R",
+                "crash_reporting": false
+            },
+            "security": {
+                "max_pack_compressed_size": 52428800,
+                "max_pack_uncompressed_size": 209715200,
+                "max_image_file_size": 10485760,
+                "storage_warning_threshold": 1073741824
+            },
+            "logging": {
+                "level": "INFO",
+                "retention_days": 14,
+                "max_total_size": 104857600
+            }
+        }"#;
+        let cfg: AppConfig = serde_json::from_str(json).expect("legacy schema should parse");
+        assert!(cfg.github_account.is_none());
+    }
+
+    #[test]
+    fn github_account_round_trips_through_json() {
+        // struct update 構文で clippy::field_reassign_with_default を回避する。
+        let cfg = AppConfig {
+            github_account: Some(GithubAccount {
+                login: "octocat".to_string(),
+                token_saved_at: "2026-05-14T12:00:00Z".to_string(),
+            }),
+            ..AppConfig::default()
+        };
+        let json = serde_json::to_string(&cfg).unwrap();
+        let back: AppConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.github_account.as_ref().unwrap().login, "octocat");
+        assert_eq!(
+            back.github_account.as_ref().unwrap().token_saved_at,
+            "2026-05-14T12:00:00Z"
+        );
+    }
+
+    #[test]
+    fn default_schema_version_is_current() {
+        let cfg = AppConfig::default();
+        assert_eq!(cfg.schema_version, super::CURRENT_SCHEMA_VERSION);
+        assert_eq!(cfg.schema_version, 2);
     }
 
     #[test]

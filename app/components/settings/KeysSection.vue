@@ -5,8 +5,11 @@
  * Ed25519 鍵ペアの生成 / 削除 / Export / Import / Regenerate を提供する。
  * 鍵情報・進捗・エラー状態は `useKeystore()` 由来のものを親が渡し、
  * 子は表示と emit のみ担当する (鍵ペアの実体生成 / IPC 呼び出しは settings.vue 側)。
+ *
+ * また GitHub 連携状態 (githubAccount) を受け取り、連携解除 emit を提供する。
  */
 import { useI18n } from '~/composables/useI18n'
+import type { GithubAccount } from '~/types/githubAuth'
 
 const { t } = useI18n()
 
@@ -21,6 +24,7 @@ defineProps<{
   keystoreBusy: boolean
   keystoreError: string | null
   keystoreMessage: string | null
+  githubAccount: GithubAccount | null
 }>()
 
 defineEmits<{
@@ -29,6 +33,7 @@ defineEmits<{
   (e: 'delete'): void
   (e: 'export'): void
   (e: 'import'): void
+  (e: 'github-unlink'): void
 }>()
 </script>
 
@@ -134,6 +139,29 @@ defineEmits<{
         </div>
       </div>
     </div>
+    <!-- GitHub 連携 -->
+    <div class="prop-section" style="margin-top: 12px">
+      <div class="prop-head">
+        <template v-if="githubAccount">
+          {{ t('settings.keys.githubLinked', { login: githubAccount.login }) }}
+        </template>
+        <template v-else>
+          {{ t('settings.keys.githubUnlinked') }}
+        </template>
+      </div>
+      <div class="prop-body">
+        <SettingsRow anchor="githubLink" :label="t('settings.keys.githubLinkHint')">
+          <template v-if="githubAccount">
+            <button class="btn" @click="$emit('github-unlink')">
+              {{ t('settings.keys.githubUnlinkBtn') }}
+            </button>
+          </template>
+          <template v-else>
+            <span class="hint-text">{{ t('settings.keys.githubUnlinked') }}</span>
+          </template>
+        </SettingsRow>
+      </div>
+    </div>
   </section>
 </template>
 
@@ -204,5 +232,8 @@ defineEmits<{
   to {
     transform: rotate(360deg);
   }
+}
+.hint-text {
+  @apply text-[12px] text-fg-mute;
 }
 </style>

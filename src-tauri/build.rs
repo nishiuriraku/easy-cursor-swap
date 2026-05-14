@@ -1,8 +1,8 @@
 //! ビルドスクリプト
 //!
 //! 1. tauri-build の通常処理
-//! 2. リポジトリルート (`../`) の `.env` を読み込み、クラッシュレポート用
-//!    credentials を `option_env!` で参照可能なコンパイル時 env として注入する
+//! 2. リポジトリルート (`../`) の `.env` を読み込み、各種 credentials を
+//!    `option_env!` で参照可能なコンパイル時 env として注入する
 //!
 //! 優先順位は **シェル env > .env**。CI (GitHub Actions) ではシェル env で
 //! 渡されるため `.env` の有無に依存しない。
@@ -10,17 +10,21 @@
 use std::path::PathBuf;
 
 /// `.env` 経由 / シェル env 経由いずれかで埋め込みたい credentials の env 名。
-const CRASH_ENV_KEYS: [&str; 2] = [
+///
+/// - `EASY_CURSOR_SWAP_CRASH_REPORT_*` — クラッシュレポート Worker の URL と Token
+/// - `GITHUB_OAUTH_CLIENT_ID`           — Marketplace 自動提出フローの OAuth App ID
+const EMBED_ENV_KEYS: [&str; 3] = [
     "EASY_CURSOR_SWAP_CRASH_REPORT_ENDPOINT",
     "EASY_CURSOR_SWAP_CRASH_REPORT_APP_TOKEN",
+    "GITHUB_OAUTH_CLIENT_ID",
 ];
 
 fn main() {
-    embed_crash_report_env();
+    embed_compile_time_env();
     tauri_build::build()
 }
 
-fn embed_crash_report_env() {
+fn embed_compile_time_env() {
     let manifest_dir =
         std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is always set by cargo");
     let repo_root = PathBuf::from(&manifest_dir)
@@ -48,7 +52,7 @@ fn embed_crash_report_env() {
 
     // 明示的に env が変わったら再ビルドさせ、値があれば rustc に渡す。
     // option_env! はコンパイル時マクロなので、rustc に env を見せないと展開時に None になる。
-    for key in CRASH_ENV_KEYS {
+    for key in EMBED_ENV_KEYS {
         println!("cargo:rerun-if-env-changed={key}");
         if let Ok(val) = std::env::var(key) {
             println!("cargo:rustc-env={key}={val}");

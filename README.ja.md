@@ -81,6 +81,22 @@ cargo test --manifest-path src-tauri/Cargo.toml
 npx tauri build
 ```
 
+### Marketplace 自動提出を開発する場合 (任意)
+
+Marketplace 自動提出フローは GitHub OAuth Device Flow を使います。
+`npm run tauri:dev` でこの機能を試すには、まず
+<https://github.com/settings/applications/new> で GitHub OAuth App を登録し
+(コールバック URL は不要)、その Client ID を環境変数に設定してください:
+
+```powershell
+$env:GITHUB_OAUTH_CLIENT_ID = "Iv1.xxxxxxxx"
+npm run tauri:dev
+```
+
+`GITHUB_OAUTH_CLIENT_ID` 未設定でもビルド/起動は通り、自動提出 IPC のみ
+「OAuth Client ID 未設定」エラーで失敗します。その場合ユーザーは手動提出
+タブ (advanced) に切り替えて従来通り PR を作成できます。
+
 ### ディレクトリ構成
 
 ```

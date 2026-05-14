@@ -58,9 +58,13 @@ export interface LoggingConfig {
   max_total_size: number
 }
 
+import type { GithubAccount } from './githubAuth'
+
 export interface AppConfig {
   schema_version: number
   general: GeneralConfig
   security: SecurityConfig
   logging: LoggingConfig
+  /** GitHub 連携アカウント情報。未連携時は null / undefined。Rust: AppConfig.github_account (Option<GithubAccount>) */
+  github_account?: GithubAccount | null
 }
