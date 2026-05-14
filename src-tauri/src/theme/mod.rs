@@ -992,6 +992,17 @@ impl ThemeManager {
                 zip.start_file(entry_name, opts)?;
                 zip.write_all(bin)?;
             }
+
+            // previews/<role>.png を同梱 (Marketplace 詳細モーダルの 3×2 表示用)
+            // cursors マップに無いロールはスキップ。失敗してもパッケージ全体は壊さない。
+            let previews = Self::build_preview_pngs(cursors, &metadata.cursors);
+            for (role, png) in previews {
+                let name = format!("previews/{}.png", role);
+                if zip.start_file(&name, opts).is_ok() {
+                    let _ = zip.write_all(&png);
+                }
+            }
+
             zip.finish()?;
         }
 
@@ -1296,6 +1307,75 @@ impl ThemeManager {
         );
         Ok(size)
     }
+
+    /// CURSOR_ROLES 正規順の先頭 6 ロール固定（インデックスリポジトリと約束）。
+    pub(crate) const PREVIEW_ROLES: [&'static str; 6] =
+        ["Arrow", "Help", "AppStarting", "Wait", "Crosshair", "IBeam"];
+    pub(crate) const PREVIEW_SIZE: u32 = 64;
+
+    /// `.cursorpack` ビルド時、最終 ZIP の `previews/<role>.png` に書き込むバイト列を生成する。
+    ///
+    /// - `cursors` は role → `.cur` / `.ani` 等のビルド済みバイト列
+    /// - 結果は PREVIEW_ROLES 順、テーマに含まれるロールのみ
+    /// - 各画像は最大解像度エントリ / ANI 先頭フレームを 64×64 にリサイズ
+    pub fn build_preview_pngs(
+        cursors: &HashMap<String, Vec<u8>>,
+        cursor_metas: &HashMap<String, CursorDefinition>,
+    ) -> HashMap<String, Vec<u8>> {
+        use crate::cursor::{parse_ani, parse_ico_cur, pick_largest_as_png};
+        use image::ImageEncoder;
+
+        let mut out: HashMap<String, Vec<u8>> = HashMap::new();
+        for role in Self::PREVIEW_ROLES.iter() {
+            let role_s = role.to_string();
+            let Some(bytes) = cursors.get(&role_s) else {
+                continue;
+            };
+            let def = cursor_metas.get(&role_s);
+            let ext = def
+                .and_then(|d| std::path::Path::new(&d.file).extension())
+                .and_then(|e| e.to_str())
+                .unwrap_or("cur")
+                .to_ascii_lowercase();
+
+            // RGBA8 を取り出す
+            let rgba: Option<image::RgbaImage> = match ext.as_str() {
+                "png" => image::load_from_memory_with_format(bytes, image::ImageFormat::Png)
+                    .ok()
+                    .map(|img| img.to_rgba8()),
+                "ani" => parse_ani(bytes)
+                    .ok()
+                    .and_then(|p| p.frames.into_iter().next().map(|f| f.image)),
+                _ => parse_ico_cur(bytes)
+                    .ok()
+                    .and_then(|p| pick_largest_as_png(&p).ok().map(|(entry, _)| entry.image)),
+            };
+
+            let Some(img) = rgba else { continue };
+
+            // 64×64 にリサイズ
+            let resized = image::imageops::resize(
+                &img,
+                Self::PREVIEW_SIZE,
+                Self::PREVIEW_SIZE,
+                image::imageops::FilterType::Lanczos3,
+            );
+
+            let mut png = Vec::new();
+            if image::codecs::png::PngEncoder::new(&mut png)
+                .write_image(
+                    resized.as_raw(),
+                    Self::PREVIEW_SIZE,
+                    Self::PREVIEW_SIZE,
+                    image::ExtendedColorType::Rgba8,
+                )
+                .is_ok()
+            {
+                out.insert(role_s, png);
+            }
+        }
+        out
+    }
 }
 
 #[cfg(test)]
@@ -1339,6 +1419,20 @@ mod tests {
         // theme.json を含む = inspect_cursorpack_bytes でメタデータが取り出せる
         let inspected = ThemeManager::inspect_cursorpack_bytes(&bytes).unwrap();
         assert_eq!(inspected.id, metadata.id);
+
+        // previews/ は cursors が空なので含まれないこと
+        let mut archive = zip::ZipArchive::new(std::io::Cursor::new(&bytes)).unwrap();
+        let names: Vec<String> = (0..archive.len())
+            .map(|i| archive.by_index(i).unwrap().name().to_string())
+            .collect();
+        let preview_entries: Vec<_> = names
+            .iter()
+            .filter(|n| n.starts_with("previews/"))
+            .collect();
+        assert!(
+            preview_entries.is_empty(),
+            "cursors 空なら previews も空: {names:?}"
+        );
     }
 
     /// 回帰テスト: `.ani` 拡張子のロールが zip 出力で `.cur` に書き換えられないこと。
@@ -1472,6 +1566,82 @@ mod tests {
             serde_json::from_str(&std::fs::read_to_string(theme_dir.join("theme.json")).unwrap())
                 .unwrap();
         assert!(matches!(back.source, super::types::ThemeSource::Local));
+    }
+
+    #[test]
+    fn write_cursorpack_includes_preview_for_arrow() {
+        use crate::theme::types::{CursorDefinition, Hotspot, Ratio01};
+
+        // 32×32 の赤 PNG を build_cur_from_png に流して .cur を作る
+        let img: image::RgbaImage =
+            image::ImageBuffer::from_pixel(32, 32, image::Rgba([200, 50, 50, 255]));
+        let mut png = Vec::new();
+        image::ImageEncoder::write_image(
+            image::codecs::png::PngEncoder::new(&mut png),
+            img.as_raw(),
+            32,
+            32,
+            image::ExtendedColorType::Rgba8,
+        )
+        .unwrap();
+        let cur_bytes = crate::cursor::build_cur_from_png(
+            &png,
+            0,
+            0,
+            crate::cursor::ResizeMethod::Lanczos,
+            None,
+            None,
+        )
+        .unwrap();
+
+        let mut cursors_meta = std::collections::HashMap::new();
+        cursors_meta.insert(
+            "Arrow".into(),
+            CursorDefinition {
+                file: "cursors/Arrow.cur".into(),
+                hotspot: Hotspot {
+                    x: Ratio01::new(0.0),
+                    y: Ratio01::new(0.0),
+                },
+                resize_method: "lanczos".into(),
+                size_overrides: None,
+            },
+        );
+        let mut metadata = crate::theme::types::ThemeMetadata {
+            schema_version: 1,
+            id: uuid::Uuid::new_v4(),
+            name: crate::theme::types::LocalizedString::Simple("Preview Test".into()),
+            version: "1.0.0".into(),
+            created_at: chrono::Utc::now().to_rfc3339(),
+            requires_os_shadow: false,
+            cursors: cursors_meta,
+            author: None,
+            license: None,
+            homepage: None,
+            description: None,
+            min_app_version: None,
+            signature: None,
+            tags: vec![],
+            source: crate::theme::types::ThemeSource::Local,
+        };
+        let mut cursors = std::collections::HashMap::new();
+        cursors.insert("Arrow".to_string(), cur_bytes);
+
+        let bytes = ThemeManager::write_cursorpack_to_buffer(&mut metadata, &cursors).unwrap();
+
+        // ZIP 内に previews/Arrow.png があり、64×64 PNG であることを確認
+        let mut archive = zip::ZipArchive::new(std::io::Cursor::new(&bytes)).unwrap();
+        let mut preview_bytes = Vec::new();
+        {
+            let mut f = archive
+                .by_name("previews/Arrow.png")
+                .expect("previews/Arrow.png が必要");
+            std::io::Read::read_to_end(&mut f, &mut preview_bytes).unwrap();
+        }
+        let img =
+            image::load_from_memory_with_format(&preview_bytes, image::ImageFormat::Png).unwrap();
+        assert_eq!(img.width(), 64);
+        assert_eq!(img.height(), 64);
     }
 }
 
