@@ -16,6 +16,7 @@ import { invokeTauri } from '~/composables/useTauri'
 import { useI18n } from '~/composables/useI18n'
 import { useUpdater } from '~/composables/useUpdater'
 import { useSettingsSearch, type SettingsSearchEntry } from '~/composables/useSettingsSearch'
+import type { GithubAccount } from '~/types/githubAuth'
 
 const { t, locale } = useI18n()
 
@@ -156,6 +157,7 @@ const passphrasePrompt = ref<{ mode: 'export' | 'import'; open: boolean }>({
   open: false,
 })
 const keystoreMessage = ref<string | null>(null)
+const githubAccount = ref<GithubAccount | null>(null)
 const logging = ref({
   logLevel: 'INFO' as 'TRACE' | 'DEBUG' | 'INFO' | 'WARN' | 'ERROR',
   retentionDays: 14,
@@ -187,6 +189,8 @@ function applyConfigToLocal() {
   logging.value.logLevel = (c.logging.level as typeof logging.value.logLevel) ?? 'INFO'
   logging.value.retentionDays = c.logging.retention_days
   logging.value.maxSizeMb = c.logging.max_total_size / BYTES_PER_MB
+
+  githubAccount.value = c.github_account ?? null
 
   dirty.value = false
   // watch のマイクロタスク実行後にフラグを解除する
@@ -348,6 +352,12 @@ async function onKeystoreDelete() {
     kind: 'warning',
   })
   if (proceed) await removeKeystore()
+}
+
+async function onGithubUnlink() {
+  await invokeTauri<void>('revoke_github_link')
+  await loadConfig()
+  applyConfigToLocal()
 }
 
 async function onConfigRestored() {
@@ -556,11 +566,13 @@ function selectSection(id: SectionId) {
           :keystore-busy="keystoreBusy"
           :keystore-error="keystoreError"
           :keystore-message="keystoreMessage"
+          :github-account="githubAccount"
           @generate="onKeystoreGenerate"
           @regenerate="onKeystoreRegenerate"
           @delete="onKeystoreDelete"
           @export="onKeystoreExport"
           @import="onKeystoreImport"
+          @github-unlink="onGithubUnlink"
         />
 
         <LoggingSection
