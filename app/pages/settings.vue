@@ -356,7 +356,9 @@ async function onKeystoreDelete() {
 
 async function onGithubUnlink() {
   await invokeTauri<void>('revoke_github_link')
-  await loadConfig()
+  // useAppSettings の load() は force=false 既定でキャッシュを返すため、
+  // revoke 後にフロント ref に古い github_account が残ってしまう。force=true で再取得する。
+  await loadConfig(true)
   applyConfigToLocal()
 }
 
@@ -367,6 +369,9 @@ async function onConfigRestored() {
 }
 
 // 設定検索 composable (横断検索 → ジャンプ)
+// SettingsSearchDropdown は Teleport で body 直下に描画するため、トリガー要素の
+// 座標計算用に検索ラッパ div の ref を渡す。
+const searchAnchorRef = ref<HTMLElement | null>(null)
 const searchContext = computed(() => ({
   hasKeystore: keystoreInfo.value?.has_keypair ?? false,
 }))
@@ -468,7 +473,7 @@ function selectSection(id: SectionId) {
         <span class="sep">/</span>
         <span class="crumb active">{{ t(currentSection.labelKey) }}</span>
       </div>
-      <div class="search" style="max-width: 280px; position: relative">
+      <div ref="searchAnchorRef" class="search" style="max-width: 280px; position: relative">
         <UiIcon name="Search" :size="14" style="color: var(--fg-mute)" />
         <input
           v-model="searchQuery"
@@ -490,6 +495,7 @@ function selectSection(id: SectionId) {
         <SettingsSearchDropdown
           v-if="searchOpen"
           id="settings-search-listbox"
+          :anchor-el="searchAnchorRef"
           :results="searchResults"
           :overflow-count="searchOverflow"
           :active-index="searchActiveIndex"

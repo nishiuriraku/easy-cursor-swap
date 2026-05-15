@@ -377,6 +377,13 @@ export default {
     issuesLabel: 'Issues / bug reports',
     ossLicenseLabel: 'OSS license list',
     btnView: 'View',
+    btnReportIssue: 'Report a bug',
+    ossModalTitle: 'Open-source licenses',
+    ossModalDesc: 'Major open-source projects used by this app',
+    ossSectionFrontend: 'Frontend (Vue / Nuxt / Tauri JS)',
+    ossSectionBackend: 'Backend (Rust crates)',
+    ossModalFootnote:
+      'Full transitive license info lives in Cargo.lock / package-lock.json. Click any entry to open its repository.',
     // GitHub linking (Marketplace auto-submit)
     keys: {
       githubLinked: 'Linked as @{login}',
@@ -405,6 +412,11 @@ export default {
     submitDownloadUrl: 'Download URL (.cursorpack)',
     submitDownloadUrlPlaceholder: 'https://github.com/you/repo/releases/.../theme.cursorpack',
     submitDownloadUrlNote: 'Enter the direct URL to your cursorpack uploaded to a GitHub Release or CDN.',
+    submitTagsLabel: 'Tags (optional)',
+    submitTagsPlaceholder: 'e.g. pixel, dark, minimal',
+    submitTagsPlaceholderAdd: 'Type a tag and press Enter',
+    submitTagsNote: 'Press Enter or comma to confirm. Up to 8 tags, 24 chars each.',
+    submitTagRemoveAria: 'Remove tag {tag}',
     submitNoKeystore: 'No signing key found. Please generate one in Settings → Keys.',
     submitPreviewBtn: 'Preview submission',
     submitPreviewHint: 'Review the submission, then click "Open submission page on GitHub" to continue.',
@@ -440,6 +452,7 @@ export default {
     submitStageSyncFork: 'Syncing fork with upstream…',
     submitStageBranch: 'Creating branch…',
     submitStageUploadPack: 'Uploading .cursorpack…',
+    submitStageUploadPreviews: 'Uploading preview images…',
     submitStageUploadEntry: 'Uploading entry JSON…',
     submitStageOpenPr: 'Opening pull request…',
     submitDone: 'Pull request created',

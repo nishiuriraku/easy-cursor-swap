@@ -1,0 +1,29 @@
+name: Feature Request / 機能リクエスト
+description: Suggest a new feature / 新しい機能を提案
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Feature request, thanks. 提案ありがとうございます。
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation / 動機
+      description: なぜこの機能が必要か (どんなユーザー体験を解決したいか)
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed
+    attributes:
+      label: Proposed solution / 提案する解決策
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives / 検討した代替案

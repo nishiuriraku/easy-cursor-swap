@@ -376,6 +376,13 @@ export default {
     issuesLabel: 'Issue / バグ報告',
     ossLicenseLabel: 'OSS ライセンス一覧',
     btnView: '表示',
+    btnReportIssue: 'バグ報告を作成',
+    ossModalTitle: 'OSS ライセンス',
+    ossModalDesc: '本アプリで使用している主要なオープンソースソフトウェア',
+    ossSectionFrontend: 'フロントエンド (Vue / Nuxt / Tauri JS)',
+    ossSectionBackend: 'バックエンド (Rust crates)',
+    ossModalFootnote:
+      '推移的依存を含む全ライセンスは Cargo.lock / package-lock.json から確認できます。各エントリ名をクリックすると公式リポジトリを開きます。',
     // GitHub 連携 (Marketplace 自動提出)
     keys: {
       githubLinked: 'GitHub 連携済み: @{login}',
@@ -404,6 +411,11 @@ export default {
     submitDownloadUrl: 'ダウンロード URL (.cursorpack)',
     submitDownloadUrlPlaceholder: 'https://github.com/あなたのユーザー名/リポジトリ/releases/.../テーマ.cursorpack',
     submitDownloadUrlNote: 'cursorpack をアップロードした GitHub Release 等の直リンクを入力してください',
+    submitTagsLabel: 'タグ (任意)',
+    submitTagsPlaceholder: '例: pixel, dark, minimal',
+    submitTagsPlaceholderAdd: '追加するタグを入力 (Enter)',
+    submitTagsNote: 'Enter / カンマで確定。最大 8 個、各 24 文字以内。',
+    submitTagRemoveAria: 'タグ {tag} を削除',
     submitNoKeystore: '署名鍵が未生成です。設定 → 鍵管理で生成してください。',
     submitPreviewBtn: '申請内容を確認',
     submitPreviewHint: '申請内容を確認し「GitHub で申請ページを開く」をクリックしてください。',
@@ -439,6 +451,7 @@ export default {
     submitStageSyncFork: 'fork を upstream に同期中…',
     submitStageBranch: 'ブランチを作成中…',
     submitStageUploadPack: '.cursorpack をアップロード中…',
+    submitStageUploadPreviews: 'プレビュー画像をアップロード中…',
     submitStageUploadEntry: 'エントリ JSON をアップロード中…',
     submitStageOpenPr: 'プルリクエストを作成中…',
     submitDone: 'プルリクエストを作成しました',

@@ -166,8 +166,15 @@ pub async fn revoke_github_link(
     Ok(())
 }
 
+/// `tags` はユーザーが提出ダイアログで入力したマーケットプレイス用タグ。
+/// 空配列の場合は theme metadata 側の tags が使われる。
+/// 提出時のみ反映 (theme metadata 自体は書き換えない)。
 #[tauri::command]
-pub async fn submit_theme_auto(app: AppHandle, theme_id: String) -> Result<SubmitResult, AppError> {
+pub async fn submit_theme_auto(
+    app: AppHandle,
+    theme_id: String,
+    tags: Vec<String>,
+) -> Result<SubmitResult, AppError> {
     let parsed_id = uuid::Uuid::parse_str(&theme_id)
         .map_err(|e| AppError::Theme(format!("テーマ ID パース失敗: {}", e)))?;
 
@@ -229,12 +236,47 @@ pub async fn submit_theme_auto(app: AppHandle, theme_id: String) -> Result<Submi
     )
     .await?;
 
+    emit_progress(&app, "upload_previews");
+    // .cursorpack 内の `previews/<role>.png` を抽出し、
+    // `previews/<theme_id>/<role>.png` として upstream に置けるように fork へアップロードする。
+    // 失敗しても提出全体は止めず警告のみ (entry の preview_base_url は省略)。
+    let uploaded_previews = upload_previews_from_pack(
+        &gh,
+        &fork.owner.login,
+        &fork.name,
+        &branch,
+        &theme_id,
+        &pack_bytes,
+    )
+    .await
+    .unwrap_or_else(|e| {
+        tracing::warn!("preview アップロード失敗 (続行): {}", e);
+        false
+    });
+
     emit_progress(&app, "upload_entry");
-    let meta = load_theme_meta_for_submit(parsed_id)?;
+    let mut meta = load_theme_meta_for_submit(parsed_id)?;
+    // 提出ダイアログで入力された tags があれば metadata より優先する。
+    // 空配列の場合は metadata の tags をそのまま使う。
+    if !tags.is_empty() {
+        meta.tags = tags
+            .into_iter()
+            .map(|t| t.trim().to_string())
+            .filter(|t| !t.is_empty())
+            .collect();
+    }
     let download_url = format!(
         "https://raw.githubusercontent.com/{}/{}/main/themes/{}.cursorpack",
         UPSTREAM_OWNER, UPSTREAM_REPO, theme_id
     );
+    let preview_base_url = if uploaded_previews {
+        Some(format!(
+            "https://raw.githubusercontent.com/{}/{}/main/previews/{}",
+            UPSTREAM_OWNER, UPSTREAM_REPO, theme_id
+        ))
+    } else {
+        None
+    };
     let entry_json = build_entry_json(
         &theme_id,
         &meta,
@@ -243,6 +285,7 @@ pub async fn submit_theme_auto(app: AppHandle, theme_id: String) -> Result<Submi
         &sha256,
         &signature_b64,
         &download_url,
+        preview_base_url.as_deref(),
     )?;
     gh.put_contents(
         &fork.owner.login,
@@ -302,6 +345,7 @@ struct ThemeMetaForSubmit {
     display_name: String,
     version: String,
     included_roles: Vec<String>,
+    tags: Vec<String>,
 }
 
 fn load_theme_meta_for_submit(theme_id: uuid::Uuid) -> Result<ThemeMetaForSubmit, AppError> {
@@ -318,6 +362,7 @@ fn load_theme_meta_for_submit(theme_id: uuid::Uuid) -> Result<ThemeMetaForSubmit
         display_name,
         version: meta.version,
         included_roles: meta.cursors.keys().cloned().collect(),
+        tags: meta.tags,
     })
 }
 
@@ -341,6 +386,7 @@ fn build_cursorpack_for_submit(theme_id: uuid::Uuid) -> Result<Vec<u8>, AppError
     crate::theme::ThemeManager::write_cursorpack_to_buffer(&mut metadata, &cursors)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_entry_json(
     theme_id: &str,
     meta: &ThemeMetaForSubmit,
@@ -349,8 +395,9 @@ fn build_entry_json(
     sha256: &str,
     signature_b64: &str,
     download_url: &str,
+    preview_base_url: Option<&str>,
 ) -> Result<String, AppError> {
-    let entry = serde_json::json!({
+    let mut entry = serde_json::json!({
         "id": theme_id,
         "name": meta.display_name,
         "author": author_github,
@@ -361,9 +408,78 @@ fn build_entry_json(
         "download_url": download_url,
         "version": meta.version,
         "included_roles": meta.included_roles,
-        "tags": []
+        "tags": meta.tags.clone()
     });
+    if let Some(base) = preview_base_url {
+        entry["preview_base_url"] = serde_json::Value::String(base.to_string());
+    }
     Ok(serde_json::to_string_pretty(&entry)?)
+}
+
+/// `.cursorpack` (ZIP) から `previews/<role>.png` を抽出し、
+/// fork branch の `previews/<theme_id>/<role>.png` として upload する。
+///
+/// 戻り値は「1 件以上 PNG を upload できたか」。すべて失敗 / 該当ファイル無しの
+/// 場合は `false` を返し、呼び出し側は entry の `preview_base_url` を省略する。
+async fn upload_previews_from_pack(
+    gh: &Client,
+    owner: &str,
+    repo: &str,
+    branch: &str,
+    theme_id: &str,
+    pack_bytes: &[u8],
+) -> Result<bool, AppError> {
+    use std::io::Read;
+    let reader = std::io::Cursor::new(pack_bytes);
+    let mut archive = zip::ZipArchive::new(reader)
+        .map_err(|e| AppError::Theme(format!(".cursorpack ZIP オープン失敗: {}", e)))?;
+
+    // ZIP 内エントリ名から (role, bytes) を抽出。`previews/<role>.png` 形式のみ採用し、
+    // 役割名は ASCII 英数字 + アンダースコアに正規化されたものに限定する。
+    let mut uploads: Vec<(String, Vec<u8>)> = Vec::new();
+    for i in 0..archive.len() {
+        let mut f = archive
+            .by_index(i)
+            .map_err(|e| AppError::Theme(format!(".cursorpack エントリ取得失敗: {}", e)))?;
+        let name = f.name().to_string();
+        let role = match name
+            .strip_prefix("previews/")
+            .and_then(|s| s.strip_suffix(".png"))
+        {
+            Some(r) => r,
+            None => continue,
+        };
+        if role.is_empty()
+            || role.len() > 32
+            || !role.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+        {
+            continue;
+        }
+        let mut bytes = Vec::new();
+        f.read_to_end(&mut bytes)
+            .map_err(|e| AppError::Theme(format!("preview 読込失敗: {}", e)))?;
+        uploads.push((role.to_string(), bytes));
+    }
+
+    if uploads.is_empty() {
+        tracing::warn!("preview PNG が cursorpack に含まれていません");
+        return Ok(false);
+    }
+
+    let mut success = 0usize;
+    for (role, bytes) in &uploads {
+        let path = format!("previews/{}/{}.png", theme_id, role);
+        let msg = format!("feat: add preview {} for {}", role, theme_id);
+        if let Err(e) = gh
+            .put_contents(owner, repo, branch, &path, bytes, &msg)
+            .await
+        {
+            tracing::warn!("preview upload 失敗 ({}): {}", role, e);
+            continue;
+        }
+        success += 1;
+    }
+    Ok(success > 0)
 }
 
 fn render_pr_body(

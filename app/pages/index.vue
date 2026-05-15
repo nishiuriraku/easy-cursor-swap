@@ -523,8 +523,17 @@ function mapWindowsSchemeToCard(s: IpcWindowsScheme): ThemeCardData {
   }
 }
 
-async function loadThemes() {
-  isLoading.value = true
+/**
+ * テーマ一覧をリロードする。
+ *
+ * `silent=true` のときはスケルトン表示 (isLoading) を切り替えない。
+ * focus / visibilitychange / cursor-changed など、バックグラウンドで走る
+ * 再取得経路でスケルトンを出すとカードがちらつくため、初回ロード以外は
+ * 黙って差分更新する。
+ */
+async function loadThemes(opts: { silent?: boolean } = {}) {
+  const silent = opts.silent === true || themes.value.length > 0
+  if (!silent) isLoading.value = true
   try {
     // ローカルテーマと Windows スキームを並列取得。Windows スキーム取得はベストエフォート
     // (権限不足やキー不存在はログに残して空配列扱い) なので失敗してもライブラリ全体は表示する。
@@ -553,7 +562,7 @@ async function loadThemes() {
     console.warn('[Library] loadThemes failed:', err)
     themes.value = []
   } finally {
-    isLoading.value = false
+    if (!silent) isLoading.value = false
   }
 }
 

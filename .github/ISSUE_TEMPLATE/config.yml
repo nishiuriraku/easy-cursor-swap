@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: General questions / 一般的な質問
+    url: https://github.com/nishiuriraku/easy-cursor-swap/discussions
+    about: GitHub Discussions for general questions.

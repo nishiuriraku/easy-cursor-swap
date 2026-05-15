@@ -50,6 +50,40 @@ const deviceFlowOpen = ref(false)
 const submitter = useMarketplaceSubmit()
 const submitDone = ref<{ prUrl: string } | null>(null)
 
+// マーケットプレイス用タグ入力 (自動・手動共通)。Enter / カンマ / セミコロンで chip 化。
+const tagInput = ref('')
+const tags = ref<string[]>([])
+const MAX_TAGS = 8
+const MAX_TAG_LEN = 24
+
+function commitTag() {
+  const raw = tagInput.value.trim()
+  if (!raw) return
+  // カンマ・セミコロン区切りで複数同時投入も許可
+  const parts = raw
+    .split(/[,;]/)
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => s.length > 0 && s.length <= MAX_TAG_LEN)
+  for (const p of parts) {
+    if (tags.value.length >= MAX_TAGS) break
+    if (!tags.value.includes(p)) tags.value.push(p)
+  }
+  tagInput.value = ''
+}
+
+function onTagKeydown(e: KeyboardEvent) {
+  if (e.key === 'Enter' || e.key === ',' || e.key === ';') {
+    e.preventDefault()
+    commitTag()
+  } else if (e.key === 'Backspace' && tagInput.value === '' && tags.value.length > 0) {
+    tags.value.pop()
+  }
+}
+
+function removeTag(i: number) {
+  tags.value.splice(i, 1)
+}
+
 const STAGE_LABEL_KEY: Record<SubmitStage, string> = {
   build: 'marketplace.submitStageBuild',
   auth: 'marketplace.submitStageAuth',
@@ -57,6 +91,7 @@ const STAGE_LABEL_KEY: Record<SubmitStage, string> = {
   sync_fork: 'marketplace.submitStageSyncFork',
   branch: 'marketplace.submitStageBranch',
   upload_pack: 'marketplace.submitStageUploadPack',
+  upload_previews: 'marketplace.submitStageUploadPreviews',
   upload_entry: 'marketplace.submitStageUploadEntry',
   open_pr: 'marketplace.submitStageOpenPr',
 }
@@ -77,9 +112,11 @@ async function loadGithubAccount() {
 
 async function runAutoSubmit() {
   if (!selectedThemeId.value) return
+  // 入力中の未確定タグも自動で確定させる
+  if (tagInput.value.trim().length > 0) commitTag()
   submitDone.value = null
   try {
-    const r = await submitter.submit(selectedThemeId.value)
+    const r = await submitter.submit(selectedThemeId.value, tags.value)
     submitDone.value = { prUrl: r.prUrl }
   } catch {
     // submitter.errorMsg は composable 内でセット済み; UI でバナー表示
@@ -136,7 +173,7 @@ const entryJson = computed(() => {
       'https://github.com/YOUR_USER/YOUR_REPO/releases/download/v1.0.0/YOUR_THEME.cursorpack',
     version: th.version,
     included_roles: th.included_roles,
-    tags: [],
+    tags: tags.value,
   }
   return JSON.stringify(entry, null, 2)
 })
@@ -194,6 +231,9 @@ function close() {
   selectedThemeId.value = null
   githubUsername.value = ''
   downloadUrl.value = ''
+  // 共通のタグもリセット
+  tags.value = []
+  tagInput.value = ''
 }
 
 onMounted(async () => {
@@ -266,6 +306,38 @@ onMounted(async () => {
               />
             </div>
 
+            <div class="field">
+              <label for="submit-auto-tags">{{ t('marketplace.submitTagsLabel') }}</label>
+              <div class="tag-input-row">
+                <span v-for="(tg, i) in tags" :key="`${tg}-${i}`" class="tag-chip">
+                  {{ tg }}
+                  <button
+                    type="button"
+                    class="tag-chip-x"
+                    :aria-label="t('marketplace.submitTagRemoveAria', { tag: tg })"
+                    @click="removeTag(i)"
+                  >
+                    <UiIcon name="X" :size="10" />
+                  </button>
+                </span>
+                <input
+                  id="submit-auto-tags"
+                  v-model="tagInput"
+                  type="text"
+                  class="tag-input"
+                  :placeholder="
+                    tags.length === 0
+                      ? t('marketplace.submitTagsPlaceholder')
+                      : t('marketplace.submitTagsPlaceholderAdd')
+                  "
+                  :disabled="tags.length >= MAX_TAGS"
+                  @keydown="onTagKeydown"
+                  @blur="commitTag"
+                />
+              </div>
+              <span class="field-note">{{ t('marketplace.submitTagsNote') }}</span>
+            </div>
+
             <div v-if="githubAccount" class="hint">
               {{ t('marketplace.submitAutoLinkedAs', { login: githubAccount.login }) }}
             </div>
@@ -330,6 +402,38 @@ onMounted(async () => {
                   :placeholder="t('marketplace.submitDownloadUrlPlaceholder')"
                 />
                 <span class="field-note">{{ t('marketplace.submitDownloadUrlNote') }}</span>
+              </div>
+
+              <div class="field">
+                <label for="submit-manual-tags">{{ t('marketplace.submitTagsLabel') }}</label>
+                <div class="tag-input-row">
+                  <span v-for="(tg, i) in tags" :key="`${tg}-${i}`" class="tag-chip">
+                    {{ tg }}
+                    <button
+                      type="button"
+                      class="tag-chip-x"
+                      :aria-label="t('marketplace.submitTagRemoveAria', { tag: tg })"
+                      @click="removeTag(i)"
+                    >
+                      <UiIcon name="X" :size="10" />
+                    </button>
+                  </span>
+                  <input
+                    id="submit-manual-tags"
+                    v-model="tagInput"
+                    type="text"
+                    class="tag-input"
+                    :placeholder="
+                      tags.length === 0
+                        ? t('marketplace.submitTagsPlaceholder')
+                        : t('marketplace.submitTagsPlaceholderAdd')
+                    "
+                    :disabled="tags.length >= MAX_TAGS"
+                    @keydown="onTagKeydown"
+                    @blur="commitTag"
+                  />
+                </div>
+                <span class="field-note">{{ t('marketplace.submitTagsNote') }}</span>
               </div>
 
               <div v-if="!keystoreInfo.has_keypair" class="warn-box">
@@ -434,6 +538,37 @@ onMounted(async () => {
 
 .field-note {
   @apply text-[11px] text-fg-mute;
+}
+
+/* タグ chip + 末尾の text input を 1 行に並べる input-like ラッパ。 */
+.tag-input-row {
+  @apply flex flex-wrap items-center gap-1.5 rounded-md border border-line px-2 py-1.5;
+  background: rgba(255, 255, 255, 0.03);
+  min-height: 34px;
+}
+.tag-input-row:focus-within {
+  border-color: var(--accent-line);
+}
+:where(html.light) .tag-input-row {
+  background: rgba(15, 20, 35, 0.025);
+}
+.tag-chip {
+  @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11.5px];
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+.tag-chip-x {
+  @apply inline-flex cursor-pointer items-center justify-center border-0 bg-transparent p-0 text-current;
+  line-height: 0;
+}
+.tag-chip-x:hover {
+  opacity: 0.75;
+}
+.tag-input {
+  @apply min-w-[120px] flex-1 border-0 bg-transparent p-0 text-[12.5px] text-fg outline-none;
+}
+.tag-input::placeholder {
+  color: var(--fg-mute);
 }
 
 .hint {

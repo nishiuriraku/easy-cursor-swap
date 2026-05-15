@@ -366,10 +366,10 @@ impl RegistryManager {
             // 警告ログのみ残して成功扱いとする。
             if let Err(e) = result {
                 if e.code().is_ok() {
-                    tracing::warn!(
-                        "SystemParametersInfoW(SPI_SETCURSORS) が BOOL=FALSE を返したが \
-                         GetLastError=0。WM_SETTINGCHANGE ブロードキャストの \
-                         偽陽性として継続"
+                    // 期待される偽陽性 (無応答ウィンドウへの WM_SETTINGCHANGE
+                    // ブロードキャストタイムアウト)。レジストリ書き込みは成功している。
+                    tracing::debug!(
+                        "SystemParametersInfoW(SPI_SETCURSORS) BOOL=FALSE / GetLastError=0 (broadcast timeout, ignored)"
                     );
                 } else {
                     return Err(AppError::Registry(format!(
@@ -418,9 +418,9 @@ impl RegistryManager {
             // タイムアウトの偽陽性を許容する。
             if let Err(e) = result {
                 if e.code().is_ok() {
-                    tracing::warn!(
-                        "SystemParametersInfoW(SPI_SETCURSORSHADOW) が BOOL=FALSE を \
-                         返したが GetLastError=0。ブロードキャスト偽陽性として継続"
+                    // SPI_SETCURSORS と同じ偽陽性 (broadcast timeout)。
+                    tracing::debug!(
+                        "SystemParametersInfoW(SPI_SETCURSORSHADOW) BOOL=FALSE / GetLastError=0 (broadcast timeout, ignored)"
                     );
                 } else {
                     return Err(AppError::Registry(format!(

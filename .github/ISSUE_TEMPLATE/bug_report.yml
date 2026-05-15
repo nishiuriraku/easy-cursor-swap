@@ -1,0 +1,63 @@
+name: Bug Report / バグ報告
+description: Report a bug in EasyCursorSwap / EasyCursorSwap のバグを報告
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report.
+        バグ報告ありがとうございます。再現に必要な情報をお願いします。
+
+  - type: input
+    id: app_version
+    attributes:
+      label: App version / アプリのバージョン
+      description: 設定 → About に表示されているバージョン (例: 0.1.0)
+      placeholder: "0.1.0"
+    validations:
+      required: true
+
+  - type: input
+    id: os_version
+    attributes:
+      label: OS / Windows のバージョン
+      description: "例: Windows 11 23H2 (Build 22631.xxxx)"
+      placeholder: "Windows 11 23H2"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened? / 何が起きましたか?
+      description: 期待した動作と実際の動作を簡潔に
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce / 再現手順
+      description: 1, 2, 3... の形式で
+      placeholder: |
+        1. ライブラリを開く
+        2. ...
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / ログ
+      description: |
+        `%LOCALAPPDATA%\com.easycursorswap.app\logs\` の最新ログから関連箇所を貼ってください。
+        PII (パス / SHA-256) は伏字にして構いません。
+      render: shell
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots / スクリーンショット
+      description: あれば添付

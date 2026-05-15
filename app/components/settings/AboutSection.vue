@@ -9,12 +9,15 @@
  * Rust 側 `open_url` IPC (内部で Win32 ShellExecuteW) を経由してホスト OS の
  * ブラウザを起動する。SubmitThemeDialog / marketplace.vue と同じパターン。
  */
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useI18n } from '~/composables/useI18n'
 import { invokeTauri } from '~/composables/useTauri'
 import { useAppInfo } from '~/composables/useAppInfo'
+import OssLicenseModal from './OssLicenseModal.vue'
 
 const { t } = useI18n()
+
+const ossOpen = ref(false)
 
 // 実バージョンは Rust 側 get_app_info (= env!("CARGO_PKG_VERSION")) から取得する。
 // Tauri 未接続時は info.value が null のままなので '—' で fallback。
@@ -63,16 +66,21 @@ async function openExternal(url: string) {
           <button
             class="btn ghost"
             type="button"
-            @click="openExternal('https://github.com/nishiuriraku/easy-cursor-swap/issues')"
+            @click="
+              openExternal('https://github.com/nishiuriraku/easy-cursor-swap/issues/new/choose')
+            "
           >
-            <UiIcon name="Alert" :size="13" />Issues
+            <UiIcon name="Alert" :size="13" />{{ t('settings.btnReportIssue') }}
           </button>
         </SettingsRow>
         <SettingsRow anchor="ossLicense" :label="t('settings.ossLicenseLabel')">
-          <button class="btn">{{ t('settings.btnView') }}</button>
+          <button class="btn" type="button" @click="ossOpen = true">
+            {{ t('settings.btnView') }}
+          </button>
         </SettingsRow>
       </div>
     </div>
+    <OssLicenseModal :open="ossOpen" @close="ossOpen = false" />
   </section>
 </template>
 

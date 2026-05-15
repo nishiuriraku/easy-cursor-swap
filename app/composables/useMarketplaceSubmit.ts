@@ -13,7 +13,7 @@ export function useMarketplaceSubmit() {
   const errorMsg = ref<string | null>(null)
   const busy = ref(false)
 
-  async function submit(themeId: string): Promise<SubmitResult> {
+  async function submit(themeId: string, tags: string[] = []): Promise<SubmitResult> {
     busy.value = true
     stage.value = null
     errorMsg.value = null
@@ -23,6 +23,7 @@ export function useMarketplaceSubmit() {
     try {
       const result = await invokeTauri<SubmitResult>('submit_theme_auto', {
         themeId,
+        tags,
       })
       if (!result) {
         // Tauri 未接続環境 (dev だけ)

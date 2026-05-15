@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /**
  * クリエイターの中央エディタ下部にある 6 サイズタイル列。
- * 各サイズに画像が割り当て済みなら CursorIcon、未割り当てなら + アイコン。
+ * 各サイズに画像が割り当て済みなら、その実画像 (Blob URL) を表示する。
+ * 未割り当ては + アイコンのまま。
  */
 const props = defineProps<{
   /** 32, 48, 64, 96, 128, 256 のいずれか */
@@ -9,6 +10,8 @@ const props = defineProps<{
   filledSizes: number[]
   activeSize: number
   role: string
+  /** サイズ → 実画像 (Blob URL) のマップ。filledSizes に含まれるサイズだけキーがあれば良い。 */
+  previewMap?: Record<number, string>
 }>()
 
 defineEmits<{
@@ -28,12 +31,20 @@ function tileIconSize(s: number): number {
       :class="['size-tile', { active: s === activeSize, empty: !filledSizes.includes(s) }]"
       @click="$emit('select', s)"
     >
-      <CursorIcon
-        v-if="filledSizes.includes(s)"
-        :role="role"
-        :size="tileIconSize(s)"
-        style="color: var(--fg)"
-      />
+      <template v-if="filledSizes.includes(s)">
+        <img
+          v-if="previewMap && previewMap[s]"
+          :src="previewMap[s]"
+          alt=""
+          :style="{
+            width: tileIconSize(s) + 'px',
+            height: tileIconSize(s) + 'px',
+          }"
+          class="size-tile-img"
+          draggable="false"
+        />
+        <CursorIcon v-else :role="role" :size="tileIconSize(s)" style="color: var(--fg)" />
+      </template>
       <UiIcon v-else name="Plus" :size="14" />
       <span class="lbl">{{ s }}px</span>
     </button>
@@ -65,6 +76,10 @@ function tileIconSize(s: number): number {
 }
 .size-tile.empty {
   @apply text-fg-faint;
+}
+.size-tile-img {
+  image-rendering: pixelated;
+  object-fit: contain;
 }
 .size-tile .lbl {
   @apply absolute -right-1.5 -top-1.5 rounded border border-line bg-bg-2 px-1 py-px font-mono text-[9.5px] text-fg-mute;

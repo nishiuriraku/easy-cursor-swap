@@ -26,7 +26,7 @@ describe('useMarketplaceSubmit', () => {
     const sub = useMarketplaceSubmit()
     const result = await sub.submit('abc-123')
 
-    expect(invokeMock).toHaveBeenCalledWith('submit_theme_auto', { themeId: 'abc-123' })
+    expect(invokeMock).toHaveBeenCalledWith('submit_theme_auto', { themeId: 'abc-123', tags: [] })
     expect(result.prUrl).toBe('https://github.com/x/y/pull/1')
     expect(result.prNumber).toBe(1)
   })

@@ -7,8 +7,14 @@
  * `pages/marketplace.vue` の `.grid` 内で全エントリの描画に使う。
  * クリック / Enter / Space で showDetails を emit し、MarketplaceDetailModal
  * が「ライブラリに追加」フローを担う。
+ *
+ * 2026-05-15: サムネを `previewBaseUrl` の Arrow.png に切り替え。
+ * 取得は useMarketplacePreviews のキャッシュ越しなので、後で DetailModal を
+ * 開いたときは即座に 6 ロール分の preview がヒットする。
  */
+import { onMounted, ref, watch } from 'vue'
 import { useI18n } from '~/composables/useI18n'
+import { useMarketplacePreviews } from '~/composables/useMarketplacePreviews'
 import type { MarketplaceEntry } from '~/types/marketplace'
 
 const { t } = useI18n()
@@ -16,6 +22,24 @@ const { t } = useI18n()
 const props = defineProps<{
   entry: MarketplaceEntry
 }>()
+
+const arrowPreviewUrl = ref<string | null>(null)
+const { getMap } = useMarketplacePreviews()
+
+async function fetchArrowPreview() {
+  arrowPreviewUrl.value = null
+  if (!props.entry.previewBaseUrl) return
+  try {
+    const map = await getMap(props.entry.id, props.entry.previewBaseUrl)
+    arrowPreviewUrl.value = map.Arrow ?? null
+  } catch (err) {
+    // 画像が無い場合は SVG フォールバックに任せる
+    console.warn('[FeaturedCard] preview fetch failed:', err)
+  }
+}
+
+onMounted(fetchArrowPreview)
+watch(() => props.entry.id, fetchArrowPreview)
 
 const emit = defineEmits<{
   showDetails: [id: string]
@@ -55,7 +79,14 @@ function onCardKeydown(e: KeyboardEvent) {
     @keydown="onCardKeydown"
   >
     <div class="featured-thumb">
-      <CursorIcon role="Arrow" :size="28" style="color: var(--fg)" />
+      <img
+        v-if="arrowPreviewUrl"
+        :src="arrowPreviewUrl"
+        alt=""
+        class="featured-thumb-img"
+        draggable="false"
+      />
+      <CursorIcon v-else role="Arrow" :size="28" style="color: var(--fg)" />
     </div>
     <div class="featured-body">
       <div class="featured-row">
@@ -83,8 +114,13 @@ function onCardKeydown(e: KeyboardEvent) {
 }
 
 .featured-thumb {
-  @apply grid size-14 shrink-0 place-items-center rounded-[10px] border border-line-hi;
+  @apply grid size-14 shrink-0 place-items-center overflow-hidden rounded-[10px] border border-line-hi;
   background: linear-gradient(135deg, rgba(124, 242, 212, 0.2), rgba(139, 125, 255, 0.2));
+}
+
+.featured-thumb-img {
+  @apply size-9 object-contain;
+  image-rendering: pixelated;
 }
 
 .featured-body {

@@ -348,6 +348,42 @@ function selectSize(s: number) {
   activeSize.value = s
 }
 
+/**
+ * 現在ロールの各サイズに対する実画像 Blob URL マップ。
+ * SizeStrip の各タイルに表示する。
+ *  - sized[size] があればそれを (size 別オーバーライド)
+ *  - 無く且つ size === primarySize なら primary を
+ *
+ * Blob URL は role + size でキャッシュし、ロール切替で revoke する。
+ */
+const sizeBlobCache = new Map<string, { url: string; ref: Uint8Array }>()
+function ensureSizeBlobUrl(roleId: string, size: number, bytes: Uint8Array): string {
+  const key = `${roleId}:${size}`
+  const cached = sizeBlobCache.get(key)
+  if (cached && cached.ref === bytes) return cached.url
+  if (cached) URL.revokeObjectURL(cached.url)
+  const buf = bytes.slice().buffer
+  const url = URL.createObjectURL(new Blob([buf], { type: 'image/png' }))
+  sizeBlobCache.set(key, { url, ref: bytes })
+  return url
+}
+
+const sizePreviewMap = computed<Record<number, string>>(() => {
+  const out: Record<number, string> = {}
+  const a = assigned.value[activeRoleId.value]
+  if (!a) return out
+  const roleId = activeRoleId.value
+  for (const size of filledSizes.value) {
+    const sized = a.sized?.get(size)
+    if (sized?.png) {
+      out[size] = ensureSizeBlobUrl(roleId, size, sized.png)
+    } else if (size === a.primarySize && a.primary) {
+      out[size] = ensureSizeBlobUrl(roleId, size, a.primary)
+    }
+  }
+  return out
+})
+
 function isRequired(id: string): boolean {
   return id === 'Arrow'
 }
@@ -889,6 +925,7 @@ async function onFileChange(e: Event) {
                     :filled-sizes="filledSizes"
                     :active-size="activeSize"
                     :role="activeRole.id"
+                    :preview-map="sizePreviewMap"
                     @select="selectSize"
                   />
                 </div>

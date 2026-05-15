@@ -40,5 +40,6 @@ export type SubmitStage =
   | 'sync_fork'
   | 'branch'
   | 'upload_pack'
+  | 'upload_previews'
   | 'upload_entry'
   | 'open_pr'
