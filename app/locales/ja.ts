@@ -520,7 +520,7 @@ export default {
     metadataOverwrite: '取り込んだメタデータで上書き',
     metadataNameOnly: '名前のみ採用',
     applyCount: '{count} 件を適用',
-    emptyRole: '— 未割当 —',
+    emptyRole: '未割当',
     unassign: '割当てを解除',
     alreadyAssignedSuffix: '上書き',
     conflictOverwrite: '既存の画像を上書きします',

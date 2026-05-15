@@ -521,7 +521,7 @@ export default {
     metadataOverwrite: 'Overwrite with imported metadata',
     metadataNameOnly: 'Apply name only',
     applyCount: 'Apply {count} files',
-    emptyRole: '— Unassigned —',
+    emptyRole: 'Unassigned',
     unassign: 'Unassign',
     alreadyAssignedSuffix: 'reassign',
     conflictOverwrite: 'Will overwrite the existing image',
