@@ -84,6 +84,23 @@ describe('searchSettings', () => {
     expect(r.some((x) => x.entry.anchor === 'generate')).toBe(false)
   })
 
+  it('crash report rows are searchable from the logging section', () => {
+    // クラッシュレポート UI 配線時に CATALOG への追加漏れを検出する回帰テスト。
+    const r = searchSettings('クラッシュ', 'ja', ctxWithKey)
+    const anchors = r.filter((x) => x.entry.section === 'logging').map((x) => x.entry.anchor)
+    expect(anchors).toEqual(
+      expect.arrayContaining(['crashReporting', 'crashCount', 'submitCrash', 'clearCrash']),
+    )
+  })
+
+  it('crash report rows are reachable via the English keyword "crash" too', () => {
+    const r = searchSettings('crash', 'en', ctxWithKey)
+    const anchors = r.filter((x) => x.entry.section === 'logging').map((x) => x.entry.anchor)
+    expect(anchors).toEqual(
+      expect.arrayContaining(['crashReporting', 'crashCount', 'submitCrash', 'clearCrash']),
+    )
+  })
+
   it('result has displayLabel matching current UI locale', () => {
     const ja_r = searchSettings('language', 'ja', ctxWithKey).find(
       (x) => x.entry.anchor === 'language',

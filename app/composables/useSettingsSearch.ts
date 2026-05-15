@@ -224,6 +224,31 @@ export const CATALOG: SettingsSearchEntry[] = [
     labelKey: 'settings.openLogFolderLabel',
     descKey: 'settings.openLogFolderDesc',
   },
+  {
+    section: 'logging',
+    anchor: 'crashReporting',
+    labelKey: 'settings.crashReportingLabel',
+    descKey: 'settings.crashReportingDesc',
+  },
+  {
+    section: 'logging',
+    anchor: 'crashCount',
+    labelKey: 'settings.crashReportsCountLabel',
+    // 件数表示の desc は動的 (件数によって切り替わる) のため、空時の文言を検索対象に含める。
+    descKey: 'settings.crashReportsEmptyDesc',
+  },
+  {
+    section: 'logging',
+    anchor: 'submitCrash',
+    labelKey: 'settings.crashReportSubmitLabel',
+    descKey: 'settings.crashReportSubmitDesc',
+  },
+  {
+    section: 'logging',
+    anchor: 'clearCrash',
+    labelKey: 'settings.crashReportClearLabel',
+    descKey: 'settings.crashReportClearDesc',
+  },
 
   // ---- updates ----
   {

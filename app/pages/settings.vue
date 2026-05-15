@@ -17,6 +17,7 @@ import { useI18n } from '~/composables/useI18n'
 import { useUpdater } from '~/composables/useUpdater'
 import { useSettingsSearch, type SettingsSearchEntry } from '~/composables/useSettingsSearch'
 import type { GithubAccount } from '~/types/githubAuth'
+import type { CrashSubmitSummary } from '~/types/config'
 
 const { t, locale } = useI18n()
 
@@ -62,6 +63,7 @@ const general = ref({
   applyShadowControl: true,
   showApplyToast: true,
   hideMainOnLaunch: false,
+  crashReporting: false,
 })
 const startup = ref({
   autoStart: true,
@@ -112,7 +114,9 @@ async function onCheckUpdate() {
       version: info.version,
       current: info.currentVersion,
     })
-  } else {
+  } else if (!updaterError.value) {
+    // check() は失敗時も null を返すため、エラーが立っているケースを除外しないと
+    // 「最新版」と「フェッチ失敗」が同時表示されてしまう。
     updaterMessage.value = t('settings.updateUpToDate')
   }
 }
@@ -168,6 +172,63 @@ const updates = ref({
   channel: 'stable' as 'stable' | 'beta',
 })
 
+// クラッシュレポート (LoggingSection 用)。件数は `list_crash_reports` の
+// 戻り長、メッセージは送信/クリア後のユーザー向けトースト相当の文字列。
+const crashReportsCount = ref(0)
+const crashBusy = ref(false)
+const crashMessage = ref<string | null>(null)
+
+async function loadCrashReports() {
+  try {
+    const reports = await invokeTauri<unknown[]>('list_crash_reports')
+    crashReportsCount.value = reports?.length ?? 0
+  } catch (err) {
+    crashMessage.value = t('settings.crashLoadFailed', {
+      error: err instanceof Error ? err.message : String(err),
+    })
+  }
+}
+
+async function onSubmitCrashReports() {
+  crashBusy.value = true
+  crashMessage.value = null
+  try {
+    const summary = await invokeTauri<CrashSubmitSummary>('submit_crash_reports')
+    if (summary.sent === 0 && summary.failed === 0 && summary.skipped === 0) {
+      // 全部 0 のときは「opt-in OFF」か「ビルド時 env 未設定」のどちらかだが、
+      // フロントからは区別できないため crash_reporting フラグで判定する。
+      crashMessage.value = general.value.crashReporting
+        ? t('settings.crashSubmitNoCredentials')
+        : t('settings.crashSubmitOptedOut')
+    } else {
+      crashMessage.value = t('settings.crashSubmitResult', {
+        sent: summary.sent,
+        failed: summary.failed,
+        skipped: summary.skipped,
+      })
+    }
+    await loadCrashReports()
+  } catch (err) {
+    crashMessage.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    crashBusy.value = false
+  }
+}
+
+async function onClearCrashReports() {
+  crashBusy.value = true
+  crashMessage.value = null
+  try {
+    const removed = await invokeTauri<number>('clear_crash_reports')
+    crashMessage.value = t('settings.crashClearedCount', { count: removed })
+    await loadCrashReports()
+  } catch (err) {
+    crashMessage.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    crashBusy.value = false
+  }
+}
+
 const dirty = ref(false)
 const saving = ref(false)
 const saveError = ref<string | null>(null)
@@ -181,6 +242,7 @@ function applyConfigToLocal() {
   if (!c) return
   suppressDirty = true
   general.value.language = (c.general.language as 'ja' | 'en' | 'auto') ?? 'auto'
+  general.value.crashReporting = c.general.crash_reporting
   startup.value.autoStart = c.general.auto_start
   updates.value.autoUpdate = c.general.auto_update
 
@@ -203,6 +265,7 @@ function applyConfigToLocal() {
 function flushLocalToConfig() {
   return persistConfig((draft) => {
     draft.general.language = general.value.language
+    draft.general.crash_reporting = general.value.crashReporting
     draft.general.auto_start = startup.value.autoStart
     draft.general.auto_update = updates.value.autoUpdate
 
@@ -292,6 +355,7 @@ async function importProfile() {
 }
 
 async function onKeystoreGenerate() {
+  keystoreMessage.value = null
   await generateKeystore(false)
 }
 async function onKeystoreRegenerate() {
@@ -301,7 +365,9 @@ async function onKeystoreRegenerate() {
     title: t('settings.askRegenerateTitle'),
     kind: 'warning',
   })
-  if (proceed) await generateKeystore(true)
+  if (!proceed) return
+  keystoreMessage.value = null
+  await generateKeystore(true)
 }
 async function onPassphraseConfirm(passphrase: string) {
   const mode = passphrasePrompt.value.mode
@@ -351,7 +417,9 @@ async function onKeystoreDelete() {
     title: t('settings.askDeleteTitle'),
     kind: 'warning',
   })
-  if (proceed) await removeKeystore()
+  if (!proceed) return
+  keystoreMessage.value = null
+  await removeKeystore()
 }
 
 async function onGithubUnlink() {
@@ -444,6 +512,7 @@ onMounted(async () => {
   await loadConfig()
   applyConfigToLocal()
   await refreshKeystore()
+  await loadCrashReports()
   // 起動時の同期完了を watch で検出してローカル参照に反映
   watch(appConfig, applyConfigToLocal)
 })
@@ -586,6 +655,12 @@ function selectSection(id: SectionId) {
           v-model:log-level="logging.logLevel"
           v-model:retention-days="logging.retentionDays"
           v-model:max-size-mb="logging.maxSizeMb"
+          v-model:crash-reporting="general.crashReporting"
+          :crash-reports-count="crashReportsCount"
+          :crash-busy="crashBusy"
+          :crash-message="crashMessage"
+          @submit-crash="onSubmitCrashReports"
+          @clear-crash="onClearCrashReports"
         />
 
         <!-- アップデート -->

@@ -338,6 +338,29 @@ export default {
     openLogFolderLabel: 'Open current log folder',
     openLogFolderDesc: 'Open `%LOCALAPPDATA%\\EasyCursorSwap\\logs\\` in Explorer',
     btnOpen: 'Open',
+    // Crash reports (inside Logging section)
+    groupCrashReports: 'Crash reports',
+    crashReportsHint: '%LOCALAPPDATA%\\EasyCursorSwap\\crash\\',
+    crashReportingLabel: 'Send crash reports',
+    crashReportingDesc:
+      'POST panic info (home path redacted to ~) to an anonymous Worker. When OFF, reports stay local only (opt-in)',
+    crashReportsCountLabel: 'Pending reports',
+    crashReportsEmptyDesc: 'No crash reports',
+    crashReportsCountDesc: '{count} report(s) stored locally',
+    crashReportSubmitLabel: 'Submit pending crash reports',
+    crashReportSubmitDesc:
+      'POST pending crash reports (panic-*.json) to the build-time Worker URL — only when opt-in is ON',
+    crashReportClearLabel: 'Clear crash history',
+    crashReportClearDesc:
+      'Delete all locally stored crash reports (panic-*.json), independent of submission status',
+    btnSubmit: 'Submit',
+    btnClear: 'Clear',
+    crashSubmitResult: 'Submit done: sent {sent} / failed {failed} / skipped {skipped}',
+    crashSubmitOptedOut: 'Skipped because opt-in is OFF',
+    crashSubmitNoCredentials:
+      'No Worker URL was embedded at build time, submission disabled (normal for local builds)',
+    crashClearedCount: 'Deleted {count} report(s)',
+    crashLoadFailed: 'Failed to load crash reports: {error}',
     // Updates
     descUpdates: 'Auto-update toggle and channel. Major version jumps are always manual.',
     groupAutoUpdate: 'Auto-update',

@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- 設定 → ログ・診断セクションに **クラッシュレポート UI** を配線。`general.crash_reporting` opt-in トグル、保留中レポート件数表示、保留分を Cloudflare Worker に POST する「送信」ボタン、ローカル panic-*.json を全削除する「クリア」ボタン (4 要素)。既に登録済の IPC (`list_crash_reports` / `submit_crash_reports` / `clear_crash_reports`) を `settings.vue` 経由で利用する。送信時、opt-in OFF / ビルド時 env 未設定の両ケースをフロント側で判別してメッセージを切り替える。
+- 設定 → アップデート: 「最新版です」と「`Could not fetch a valid release JSON`」が同時表示されていた不具合に対し、`useUpdater.error` が立っているときは「最新版」メッセージを抑制するように `onCheckUpdate` を修正。
+- 設定 → 署名鍵: 鍵生成 / 再生成 / 削除 操作時に古い `keystoreMessage` (前回のエクスポート結果など) が残り続けていた問題を修正。各 handler 冒頭で `keystoreMessage` を null クリアする。
 - 設定スキーマを v1 → v2 に migrate (`AppConfig.github_account: Option<GithubAccount>` を追加)。serde(default) で v1 既存 config は透過マイグレーションされる。
 - `MarketplaceCard` と `FeaturedCard` が `install` イベントの代わりに `showDetails` イベントを emit するように変更。インストールフローは `MarketplaceDetailModal` に移動した。
 - `ThemeKind` 型に `'marketplace'` 値を追加。`useThemes` が source → kind のマッピングを更新。

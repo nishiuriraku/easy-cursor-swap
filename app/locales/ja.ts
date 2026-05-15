@@ -337,6 +337,29 @@ export default {
     openLogFolderLabel: '現在のログフォルダーを開く',
     openLogFolderDesc: 'エクスプローラーで `%LOCALAPPDATA%\\EasyCursorSwap\\logs\\` を開く',
     btnOpen: '開く',
+    // クラッシュレポート (ログ・診断セクション内)
+    groupCrashReports: 'クラッシュレポート',
+    crashReportsHint: '%LOCALAPPDATA%\\EasyCursorSwap\\crash\\',
+    crashReportingLabel: 'クラッシュレポートの送信',
+    crashReportingDesc:
+      'panic 情報 (ホームパスを ~ に伏字化済み) を匿名サーバへ送信。OFF の場合は端末内にのみ保存 (オプトイン)',
+    crashReportsCountLabel: '保留中のレポート',
+    crashReportsEmptyDesc: 'クラッシュレポートはありません',
+    crashReportsCountDesc: '{count} 件のレポートが保存されています',
+    crashReportSubmitLabel: '保留中のクラッシュレポートを送信',
+    crashReportSubmitDesc:
+      'opt-in ON の場合のみ、ビルド時に埋め込まれた Worker URL へ POST (panic-*.json をクラッシュレポートとして送信)',
+    crashReportClearLabel: 'クラッシュ履歴をクリア',
+    crashReportClearDesc:
+      '端末内に保存されたクラッシュレポート (panic-*.json) を全削除 (送信済みかどうかとは独立)',
+    btnSubmit: '送信',
+    btnClear: 'クリア',
+    crashSubmitResult: '送信完了: 成功 {sent} / 失敗 {failed} / 保留 {skipped}',
+    crashSubmitOptedOut: 'オプトイン OFF のため送信していません',
+    crashSubmitNoCredentials:
+      'ビルド時に送信先 URL が埋め込まれていないため送信できません (ローカルビルド時の通常挙動)',
+    crashClearedCount: '{count} 件のレポートを削除しました',
+    crashLoadFailed: 'クラッシュレポートの読み込みに失敗しました: {error}',
     // アップデート
     descUpdates: '自動アップデートの有効化と更新チャンネル。メジャーバージョン跨ぎは常に手動。',
     groupAutoUpdate: '自動アップデート',
