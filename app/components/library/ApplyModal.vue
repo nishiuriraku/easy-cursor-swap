@@ -237,7 +237,7 @@ function onBackdropClick(e: MouseEvent) {
 
 .mini-row {
   @apply flex flex-wrap gap-1 rounded-lg border border-line p-2;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--color-bg-3);
 }
 .mini {
   @apply grid size-[26px] place-items-center rounded-[5px] border border-line;

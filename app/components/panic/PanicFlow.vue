@@ -315,7 +315,7 @@ function logMark(s: LogEntry['status']): string {
 }
 .stage-card {
   @apply flex cursor-pointer flex-col gap-2.5 rounded-[10px] border border-line p-4 text-left text-fg;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--color-bg-3);
   transition:
     border-color 0.15s,
     background 0.15s;

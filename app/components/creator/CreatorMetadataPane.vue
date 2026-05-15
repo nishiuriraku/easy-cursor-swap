@@ -87,7 +87,7 @@ defineEmits<{
         <div class="prop-body" style="padding: 12px 16px">
           <textarea
             v-model="metaDescription"
-            class="input"
+            class="input textarea"
             rows="6"
             style="width: 100%; font-family: var(--font-body); resize: vertical"
             :placeholder="t('creator.metaDescPlaceholder')"
@@ -239,6 +239,10 @@ defineEmits<{
 
 .input.mono {
   font-family: var(--font-mono);
+}
+
+.textarea {
+  padding: 4px 16px;
 }
 
 .tag {

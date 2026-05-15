@@ -237,9 +237,6 @@ function onInstall() {
 .md-foot {
   @apply flex items-center justify-end gap-2 border-t border-line px-[22px] py-3;
 }
-.md-foot .btn {
-  @apply min-w-[120px];
-}
 
 .fade-enter-active,
 .fade-leave-active {

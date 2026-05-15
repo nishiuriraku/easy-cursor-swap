@@ -60,25 +60,18 @@ function onCardKeydown(e: KeyboardEvent) {
     <div class="featured-body">
       <div class="featured-row">
         <div class="card-name">{{ entry.name }}</div>
-        <span v-if="entry.verified" class="tag ok featured-tag">
-          <UiIcon name="Shield" :size="9" />
-        </span>
       </div>
       <div class="card-author">@{{ entry.author }}</div>
       <div class="meta-row featured-meta">
+        <span v-if="entry.verified" class="tag ok featured-tag">
+          <UiIcon name="Shield" :size="9" />
+        </span>
         <span class="m">↓ {{ fmtNumber(entry.downloadCount) }}</span>
         <span v-if="entry.highlight" class="m" style="color: var(--accent)">
           {{ highlightLabel(entry.highlight) }}
         </span>
       </div>
     </div>
-    <button
-      class="btn"
-      :aria-label="t('marketplace.openMarketplaceDetailAria', { name: entry.name })"
-      @click.stop="emit('showDetails', entry.id)"
-    >
-      <UiIcon name="Import" :size="13" />
-    </button>
   </article>
 </template>
 

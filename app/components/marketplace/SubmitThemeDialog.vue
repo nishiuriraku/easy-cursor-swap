@@ -217,12 +217,7 @@ onMounted(async () => {
           <div style="flex: 1; min-width: 0">
             <h2 id="submit-dialog-title">{{ t('marketplace.submitTitle') }}</h2>
           </div>
-          <button
-            type="button"
-            class="btn ghost btn-close"
-            :aria-label="t('common.close')"
-            @click="close"
-          >
+          <button type="button" class="btn icon" :aria-label="t('common.close')" @click="close">
             <UiIcon name="X" :size="14" />
           </button>
         </div>
@@ -427,10 +422,6 @@ onMounted(async () => {
 
 .submit-body {
   @apply flex max-h-[60vh] flex-col gap-3 overflow-y-auto;
-}
-
-.btn-close {
-  @apply size-7 shrink-0 px-0;
 }
 
 .field {
