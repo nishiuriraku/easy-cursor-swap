@@ -113,8 +113,8 @@ easy-cursor-swap/
 ├── src-tauri/                  # Tauri + Rust バックエンド
 │   ├── src/
 │   │   ├── main.rs             # エントリポイント: トレイ / ヘルスチェック
-│   │   ├── lib.rs              # モジュール宣言（20 モジュール）
-│   │   ├── commands/           # Tauri IPC コマンドハンドラー（9 サブモジュール / 53 エンドポイント）
+│   │   ├── lib.rs              # モジュール宣言（21 モジュール）
+│   │   ├── commands/           # Tauri IPC コマンドハンドラー（9 サブモジュール / 52 エンドポイント）
 │   │   ├── config.rs           # 設定マネージャー（RwLock / スキーママイグレーション / バックアップ）
 │   │   ├── cursor/             # PNG → .cur / .ani パイプライン（6 サイズ / ホットスポット / ANI 入出力）
 │   │   ├── registry/           # HKCU レジストリ読み書き / Schemes / SPI_SETCURSORS

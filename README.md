@@ -115,8 +115,8 @@ easy-cursor-swap/
 ├── src-tauri/                  # Tauri + Rust backend
 │   ├── src/
 │   │   ├── main.rs             # Entry point: tray, health check
-│   │   ├── lib.rs              # Module declarations (20 modules)
-│   │   ├── commands/           # Tauri IPC command handlers (53 endpoints across 9 sub-modules)
+│   │   ├── lib.rs              # Module declarations (21 modules)
+│   │   ├── commands/           # Tauri IPC command handlers (52 endpoints across 9 sub-modules)
 │   │   ├── config.rs           # Config manager (RwLock, schema migration, backups)
 │   │   ├── cursor/             # PNG → .cur / .ani pipeline (6 sizes, hotspot, ANI read/write)
 │   │   ├── registry/           # HKCU registry read/write, Schemes, SPI_SETCURSORS
@@ -182,7 +182,6 @@ See [docs/key_rotation.md](docs/key_rotation.md) if you need to rotate your sign
 | No `.ani` authoring            | Animated cursors can be imported but not created                 |
 | No live preview                | Changes are applied immediately to the registry; no preview mode |
 | No undo                        | Apply is intentionally one-way; use the panic button to restore  |
-| Dark mode only for auto-switch | Auto-switch is tied to the OS dark/light toggle only             |
 | UAC Secure Desktop             | Shows Windows built-in cursors during elevated dialogs           |
 | Lock screen / sign-in screen   | Shows Windows built-in cursors                                   |
 | Multi-user sessions            | Each Windows user account has independent cursor settings        |
