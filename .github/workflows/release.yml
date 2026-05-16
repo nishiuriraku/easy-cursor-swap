@@ -33,7 +33,11 @@ on:
         default: 'v0.0.0-dryrun'
 
 permissions:
-  contents: write
+  contents: write       # Draft Release 作成 + アセットアップロード用
+  actions: read         # signpath/github-action-submit-signing-request が
+                        # アップロード済み artifact を取得するのに必要
+  id-token: write       # (将来) SignPath の OIDC 認証用 — 現状は api-token 経由なので
+                        # 未使用だが、将来 keyless 認証に移行する際の準備として宣言
 
 env:
   CARGO_TERM_COLOR: always
