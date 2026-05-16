@@ -132,8 +132,8 @@ fn get_os_version() -> String {
 
 /// 設定バックアップファイルの一覧を返す。
 ///
-/// `config.bak.v*.json` (スキーマ移行バックアップ) と
-/// `config.corrupt.*.json` (破損退避ファイル) を列挙し、最終更新日時の降順で返す。
+/// `config.corrupt.*.json` (パースエラー時の退避ファイル) を列挙し、
+/// 最終更新日時の降順で返す。
 #[tauri::command]
 pub fn list_config_backups(config: State<'_, ConfigManager>) -> Result<Vec<BackupInfo>, AppError> {
     config.list_backups()

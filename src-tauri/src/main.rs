@@ -86,8 +86,8 @@ fn show_migration_failure_dialog(err: &str) {
     let body = format!(
         "EasyCursorSwap の設定ファイルを読み込めませんでした。\n\n\
         理由: {err}\n\n\
-        バックアップ:\n  {config_dir}\\config.bak.v*.json\n  {config_dir}\\config.corrupt.*.json\n\n\
-        いずれかをリネームして config.json に戻すと前回状態に復旧できます。\n\
+        バックアップ:\n  {config_dir}\\config.corrupt.*.json\n\n\
+        ファイルをリネームして config.json に戻すと前回状態に復旧できます。\n\
         詳細はドキュメントを参照してください。"
     );
     let title = HSTRING::from("EasyCursorSwap — 設定読み込みエラー");

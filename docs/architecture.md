@@ -53,7 +53,7 @@
 |---|---|---|
 | **IPC 表玄関** | `commands/` | 61 個の `#[tauri::command]` を 10 サブモジュールに分割。`mod.rs::get_command_handlers()` が `tauri::generate_handler!` にまとめて渡す。サブモジュール: `theme` / `cursor_build/` (build / cancel / dto / sign / stream の 5 ファイル分割) / `cursor_io` / `ani_export` / `keystore` / `marketplace` / `marketplace_submit` / `profile` / `system` / `windows_scheme` |
 | **GitHub API クライアント** | `github/` | OAuth Device Flow + REST API (`mod.rs` / `types.rs` / `device_flow.rs` / `client.rs`)。Marketplace 自動提出フローから利用。`client_id` は build 時に `option_env!("EASY_CURSOR_SWAP_GITHUB_OAUTH_CLIENT_ID")` で注入。 |
-| **設定 / 状態** | `config.rs` | `AppConfig` / `ConfigManager` (RwLock + 自動 schema migration + バックアップ) |
+| **設定 / 状態** | `config.rs` | `AppConfig` / `ConfigManager` (RwLock + schema_version (v1 固定) + パースエラー時 `config.corrupt.*.json` 退避) |
 | | `errors.rs` | `AppError` / `AppResult` 共通型 |
 | **カーソル生成パイプライン** | `cursor/` | 5 サブモジュール: `image` (リサイズ / hotspot / メタデータ剥離) / `cur_build` (PNG → 6 解像度 .cur) / `ico_cur` (ICO/CUR 解析) / `ani` (RIFF/ACON 解析) / `ani_write` (ANI 書き出し)。`mod.rs` で全シンボルを `pub use` 再エクスポート |
 | | `cursor_watcher.rs` | コントロールパネル等で外部に書き換えられたら `cursor-changed` を発火 |
@@ -98,7 +98,7 @@
 1. tracing logger 初期化 (フォールバック有り)
 2. **起動ヘルスチェック** (`StartupCheck::begin`) — 連続 3 回失敗ならロールバック誘導ダイアログ (`show_rollback_dialog`)
 3. AppUserModelID 登録 (`appusermodel::register_aumid`)
-4. `ConfigManager::init` (失敗時は `show_migration_failure_dialog` でバックアップ場所を案内し終了)
+4. `ConfigManager::init` (失敗時は `show_migration_failure_dialog` で `config.corrupt.*.json` の場所を案内し終了)
 5. autostart レジストリを config に追従 (`autostart::set_enabled`)
 6. 初回スナップショット保存 (`RegistryManager::save_initial_snapshot`)
 7. 孤児カーソル参照のクリーンアップ (`ThemeManager::cleanup_orphan_references`)

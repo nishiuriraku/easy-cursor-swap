@@ -384,7 +384,6 @@ export default {
     // Config recovery
     groupRecovery: 'Config recovery',
     recoveryDesc: 'Backup files found. Select one to restore your configuration.',
-    recoveryKindVersioned: 'Schema migration backup',
     recoveryKindCorrupt: 'Corrupt-file evacuation',
     recoveryBytes: '{size} bytes',
     recoveryRestoreLabel: 'Restore from this backup',

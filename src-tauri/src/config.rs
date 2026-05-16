@@ -14,18 +14,18 @@ use uuid::Uuid;
 /// バックアップファイルの情報
 #[derive(Debug, Clone, Serialize)]
 pub struct BackupInfo {
-    /// ファイル名 (例: "config.bak.v2.json", "config.corrupt.1746123456.json")
+    /// ファイル名 (例: "config.corrupt.1746123456.json")
     pub file_name: String,
     /// UTC の ISO 8601 最終更新日時
     pub modified_utc: String,
     /// ファイルサイズ (バイト)
     pub size_bytes: u64,
-    /// "versioned" | "corrupt"
+    /// "corrupt" 固定 (パースエラー時の退避ファイル)
     pub kind: String,
 }
 
 /// 設定スキーマの現在のバージョン
-const CURRENT_SCHEMA_VERSION: u32 = 2;
+const CURRENT_SCHEMA_VERSION: u32 = 1;
 
 /// アプリケーション設定（Source of Truth）
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -210,8 +210,7 @@ impl ConfigManager {
     /// 動作:
     ///  1. ファイルなし → デフォルト設定で新規作成
     ///  2. ファイルあり → パース成功 → schema_version 比較
-    ///     - 同じ → そのまま使用
-    ///     - 古い → 自動マイグレーション (現状はフィールド追加のみで透過的) + バックアップ作成
+    ///     - 同じか古い → そのまま使用 (旧フィールド欠落は `serde(default)` で透過補填)
     ///     - 新しい → アプリ更新が必要 → エラー (`Config(...)` を返し、main 側で専用画面表示)
     ///  3. ファイルあり → パース失敗 → `config.corrupt.{ts}.json` に退避してデフォルトで再作成
     pub fn init() -> AppResult<Self> {
@@ -220,7 +219,7 @@ impl ConfigManager {
         let config = if config_path.exists() {
             let content = fs::read_to_string(&config_path)?;
             match serde_json::from_str::<AppConfig>(&content) {
-                Ok(parsed) => Self::handle_versioned(parsed, &config_path)?,
+                Ok(parsed) => Self::handle_versioned(parsed)?,
                 Err(e) => {
                     // パース失敗 → 退避して新規作成
                     Self::backup_corrupt(&config_path, &content, &e.to_string())?;
@@ -250,51 +249,17 @@ impl ConfigManager {
         })
     }
 
-    /// schema_version を検査し、古ければマイグレーション + バックアップ、
-    /// 新しければエラーを返す。
-    fn handle_versioned(config: AppConfig, config_path: &PathBuf) -> AppResult<AppConfig> {
+    /// schema_version を検査し、CURRENT_SCHEMA_VERSION より新しければエラーを返す。
+    /// 古い場合 (将来 v2 を導入してから戻った場合等) は `serde(default)` による
+    /// 透過的なフィールド補填だけ行い、書き換えはしない。
+    fn handle_versioned(config: AppConfig) -> AppResult<AppConfig> {
         if config.schema_version > CURRENT_SCHEMA_VERSION {
             return Err(AppError::Config(format!(
                 "設定ファイルのバージョン ({}) はこのアプリ ({}) より新しいです。\nアプリの更新が必要です。",
                 config.schema_version, CURRENT_SCHEMA_VERSION
             )));
         }
-
-        if config.schema_version < CURRENT_SCHEMA_VERSION {
-            // 古いバージョン → バックアップ後にマイグレート
-            let from_version = config.schema_version;
-            Self::write_versioned_backup(config_path, from_version, &config)?;
-
-            // マイグレーション本体: 現状は serde の default で穴埋めされるので、
-            // schema_version を更新して書き戻すだけで OK。
-            let mut migrated = config;
-            migrated.schema_version = CURRENT_SCHEMA_VERSION;
-            fs::write(config_path, serde_json::to_string_pretty(&migrated)?)?;
-            tracing::info!(
-                "設定をマイグレーション: v{} → v{}",
-                from_version,
-                CURRENT_SCHEMA_VERSION
-            );
-            return Ok(migrated);
-        }
-
         Ok(config)
-    }
-
-    /// `config.bak.v{N}.json` 形式でバージョン番号付きバックアップを作成する。
-    /// 同じバージョンのバックアップが既存なら上書きしない (最古を保護)。
-    fn write_versioned_backup(
-        config_path: &Path,
-        from_version: u32,
-        config: &AppConfig,
-    ) -> AppResult<()> {
-        let bak = config_path.with_file_name(format!("config.bak.v{}.json", from_version));
-        if bak.exists() {
-            return Ok(());
-        }
-        fs::write(&bak, serde_json::to_string_pretty(config)?)?;
-        tracing::info!("バックアップを作成: {}", crate::logging::redact_path(&bak));
-        Ok(())
     }
 
     /// パース不可な設定ファイルを `config.corrupt.{epoch}.json` に退避する。
@@ -340,7 +305,7 @@ impl ConfigManager {
 
     /// 設定ディレクトリ内のバックアップファイル一覧を返す。
     ///
-    /// 対象: `config.bak.v*.json` (versioned) / `config.corrupt.*.json` (corrupt)
+    /// 対象: `config.corrupt.*.json` (パースエラー時の退避ファイル)
     /// 返却: 最終更新日時の降順（最新が先頭）
     pub fn list_backups(&self) -> AppResult<Vec<BackupInfo>> {
         let dir = self
@@ -356,13 +321,10 @@ impl ConfigManager {
             .filter_map(|entry| entry.ok())
             .filter_map(|entry| {
                 let name = entry.file_name().to_string_lossy().to_string();
-                let kind = if name.starts_with("config.bak.v") && name.ends_with(".json") {
-                    "versioned"
-                } else if name.starts_with("config.corrupt.") && name.ends_with(".json") {
-                    "corrupt"
-                } else {
+                if !(name.starts_with("config.corrupt.") && name.ends_with(".json")) {
                     return None;
-                };
+                }
+                let kind = "corrupt";
                 let meta = entry.metadata().ok()?;
                 let modified = meta.modified().ok()?;
                 let secs = modified
@@ -387,11 +349,10 @@ impl ConfigManager {
 
     /// 指定したバックアップファイルを `config.json` に上書きして設定を再ロードする。
     ///
-    /// セキュリティ: `file_name` は `config.bak.v*.json` / `config.corrupt.*.json` のみ許可。
+    /// セキュリティ: `file_name` は `config.corrupt.*.json` のみ許可。
     pub fn restore_backup(&self, file_name: &str) -> AppResult<()> {
         // ファイル名の簡易バリデーション (パストラバーサル防止)
-        let valid = (file_name.starts_with("config.bak.v")
-            || file_name.starts_with("config.corrupt."))
+        let valid = file_name.starts_with("config.corrupt.")
             && file_name.ends_with(".json")
             && !file_name.contains('/')
             && !file_name.contains('\\')
@@ -632,7 +593,7 @@ mod tests {
     fn default_schema_version_is_current() {
         let cfg = AppConfig::default();
         assert_eq!(cfg.schema_version, super::CURRENT_SCHEMA_VERSION);
-        assert_eq!(cfg.schema_version, 2);
+        assert_eq!(cfg.schema_version, 1);
     }
 
     #[test]

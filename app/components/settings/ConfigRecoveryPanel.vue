@@ -2,7 +2,7 @@
 /**
  * 設定復旧パネル (Phase 2-1 残: GUI 復旧フロー)
  *
- * config.bak.v*.json / config.corrupt.*.json が存在する場合のみ表示。
+ * config.corrupt.*.json が存在する場合のみ表示。
  * 選択したバックアップを config.json に上書きして設定を復旧する。
  */
 import { onMounted, ref } from 'vue'
@@ -15,7 +15,7 @@ interface BackupInfo {
   file_name: string
   modified_utc: string
   size_bytes: number
-  kind: 'versioned' | 'corrupt'
+  kind: 'corrupt'
 }
 
 const emit = defineEmits<{
@@ -68,10 +68,8 @@ function formatDate(iso: string) {
   }
 }
 
-function kindLabel(kind: string) {
-  return kind === 'versioned'
-    ? t('settings.recoveryKindVersioned')
-    : t('settings.recoveryKindCorrupt')
+function kindLabel(_kind: string) {
+  return t('settings.recoveryKindCorrupt')
 }
 
 onMounted(load)
@@ -147,10 +145,6 @@ onMounted(load)
 
 .backup-kind {
   @apply w-fit rounded-[3px] px-1.5 py-px font-mono text-[11px];
-}
-.backup-kind.versioned {
-  @apply border border-accent-line text-accent;
-  background: rgba(124, 242, 212, 0.12);
 }
 .backup-kind.corrupt {
   @apply border;

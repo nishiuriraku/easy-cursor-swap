@@ -39,7 +39,7 @@
 
 | ファイル | 機能 |
 |---|---|
-| [config.rs](../src-tauri/src/config.rs) | `AppConfig` の RwLock + schema_version + `config.bak.v{N}.json` 退避 + `config.corrupt.{epoch}.json` |
+| [config.rs](../src-tauri/src/config.rs) | `AppConfig` の RwLock + schema_version (v1 固定) + `config.corrupt.{epoch}.json` 退避 |
 | [registry/mod.rs](../src-tauri/src/registry/mod.rs) | `HKCU\Control Panel\Cursors` 読み書き、`SPI_SETCURSORS` / `SPI_SETCURSORSHADOW`、トランザクション + `_pending_apply.snapshot`、`save_initial_snapshot` / `check_pending_snapshot` / `reset_to_windows_default` |
 | [registry/roles.rs](../src-tauri/src/registry/roles.rs) | 17 役割の絶対パス書き込みロジック、`compute_apply_values` 純粋関数 |
 | [registry/scheme.rs](../src-tauri/src/registry/scheme.rs) | `Schemes` への REG_EXPAND_SZ 登録、`build_scheme_value` / `sanitize_scheme_name` |

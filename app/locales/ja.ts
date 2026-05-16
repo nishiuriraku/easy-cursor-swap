@@ -383,7 +383,6 @@ export default {
     // 設定復旧
     groupRecovery: '設定の復旧',
     recoveryDesc: '設定ファイルのバックアップが見つかりました。いずれかを選択して復旧できます。',
-    recoveryKindVersioned: 'スキーマ移行バックアップ',
     recoveryKindCorrupt: '破損退避ファイル',
     recoveryBytes: '{size} bytes',
     recoveryRestoreLabel: 'このバックアップから復元',
