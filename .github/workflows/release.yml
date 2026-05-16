@@ -70,11 +70,14 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      # dtolnay/rust-toolchain の targets: 引数だけだと aarch64 で
-      # `Target ... is not installed` が出るケースがあるため、明示的に追加。
-      # 冪等な操作なので既に追加済みでも害なし。
-      - name: Ensure Rust target is installed
+      # src-tauri/rust-toolchain.toml で `channel = "1.95.0"` にピン留めされて
+      # いるため、dtolnay/rust-toolchain の targets: は `stable` には効くが
+      # `1.95.0` には反映されない。src-tauri/ 内で `rustup target add` を実行
+      # することで、pin された 1.95.0 toolchain に対して target を追加する。
+      # `rust-toolchain.toml` 側の `targets = [...]` でも宣言済みだが、二重防御。
+      - name: Ensure Rust target is installed for pinned toolchain
         shell: pwsh
+        working-directory: src-tauri
         run: rustup target add ${{ matrix.target }}
 
       - name: Cargo cache

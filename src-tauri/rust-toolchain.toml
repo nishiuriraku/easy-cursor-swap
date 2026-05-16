@@ -2,3 +2,6 @@
 channel = "1.95.0"
 components = ["clippy", "rustfmt"]
 profile = "minimal"
+# CI で aarch64 クロスビルドを行うために必要。host x64 開発機でも install されるが
+# `profile = "minimal"` なので未使用時はディスク上 50MB 程度の追加で済む。
+targets = ["x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc"]
