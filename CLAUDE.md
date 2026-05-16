@@ -15,17 +15,17 @@ See `README.md` and the documentation map below for full context.
 
 ## Documentation map
 
-`docs/` consists of three different kinds of documents. **Living state docs (descriptions of the current code)** are authoritative; if they disagree with the code, fix the docs. `docs/legacy/` is a frozen archive of the original plans — don't reference or modify it.
+`docs/` consists of two kinds of documents: **Living state docs (descriptions of the current code)** and **Operational runbooks**. Living docs are authoritative — if they disagree with the code, fix the docs.
 
 | File | Role | Update policy |
 |---|---|---|
 | `docs/architecture.md` | **Living architecture map** — Rust/Vue module responsibilities, IPC inventory, startup sequence, Page → IPC routing, Security invariants + code references. Read this first when refactoring or onboarding. | Update when the codebase structure changes (module splits, new IPC, new security invariants, etc.). |
 | `docs/file_inventory.md` | **Living file index** — full file-by-file table for `src-tauri/src/` and `app/` with direct source links. Covers "which file holds what" at a finer grain than `architecture.md`. | Update on file creation/removal or responsibility moves. |
-| `docs/updater_signing.md` / `docs/authenticode_signing.md` / `docs/distribution.md` / `docs/key_rotation.md` / `docs/author_registration.md` | **Operational runbooks** — Tauri Updater minisign key management / Authenticode certificate procurement / MSIX distribution / key-rotation PR / new-author registration. | Update only when the procedure itself changes. |
-| `docs/superpowers/` | **Per-feature work log** — design docs, plans, and follow-up issues for individual features, accumulated chronologically (e.g. `2026-05-07-creator-bulk-import-design.md`). | Add a new dated file per feature; keep old ones as history. |
-| `docs/legacy/` | **Original plans (frozen)** — `first_plan.md` / `implementation_plan.md` / `01_specification.md` through `04_implementation_guide.md`. Historical snapshot of the start-up era requirements, the tidied chapter version, and Phase 1–9 progress. | **Do not reference or modify.** Use `architecture.md` / `file_inventory.md` for current-state descriptions. Discrepancies with the code are expected and should be ignored. |
+| `docs/updater_signing.md` / `docs/authenticode_signing.md` / `docs/distribution.md` / `docs/key_rotation.md` / `docs/author_registration.md` / `docs/code_signing_policy.md` | **Operational runbooks** — Tauri Updater minisign key management / Authenticode certificate procurement / MSIX distribution / key-rotation PR / new-author registration / code signing policy. | Update only when the procedure itself changes. |
 
-When documents disagree, **`docs/architecture.md` + `docs/file_inventory.md` are authoritative** — both are updated alongside the code. Conflicts with anything under `docs/legacy/` are intentional (legacy is a frozen historical record).
+When documents disagree, **`docs/architecture.md` + `docs/file_inventory.md` are authoritative** — both are updated alongside the code.
+
+> 内部設計記録 (旧 `docs/legacy/` の original plan 群、`docs/superpowers/` の per-feature work log) は v0.1.0 公開前に history から除去済み。引き続きローカル参照のみで運用する。
 
 ## Commands
 
@@ -153,15 +153,9 @@ Living docs must move with the code. The mapping below is the **trigger → acti
 | New / changed Vue page, composable, or component sub-directory | `docs/architecture.md` "Frontend layout" + "Page → Composable → IPC" table, and `docs/file_inventory.md` section 2. |
 | Tailwind / global CSS pattern change | `CLAUDE.md` "Coding conventions" CSS subsection (this file). |
 | Verification gate changed | Edit `scripts/verify-gate.sh` itself (canonical) — do **not** re-document the steps in CLAUDE.md or `docs/architecture.md`. |
-| Operational procedure change (Updater key issuance, Authenticode procurement, MSIX distribution, key rotation, author onboarding) | The corresponding runbook in `docs/` (`updater_signing.md` / `authenticode_signing.md` / `distribution.md` / `key_rotation.md` / `author_registration.md`). |
-| New feature design or multi-step plan | Add a new dated file under `docs/superpowers/{specs,plans,issue}/` (`YYYY-MM-DD-short-slug.md`). Never edit superpowers files retroactively — append-only. |
+| Operational procedure change (Updater key issuance, Authenticode procurement, MSIX distribution, key rotation, author onboarding, code signing policy) | The corresponding runbook in `docs/` (`updater_signing.md` / `authenticode_signing.md` / `distribution.md` / `key_rotation.md` / `author_registration.md` / `code_signing_policy.md`). |
 | User-visible behaviour, install flow, supported OS, security model, or installation step changed | Both `README.md` and `README.ja.md` in parity, and `CHANGELOG.md` under `## [Unreleased]` with the right Keep-a-Changelog sub-section (`Added` / `Changed` / `Deprecated` / `Removed` / `Fixed` / `Security`). |
 | Module count, IPC count, composable count, or any other numeric claim in any doc | Re-verify the number against the actual source (`grep -c` / `glob`) before changing it. **Numbers in docs are the most common drift signal** — don't trust them, count them. |
-
-**Do not touch:**
-
-- Anything under `docs/legacy/` (frozen original plans — see "Documentation map").
-- Past dated files under `docs/superpowers/` (append-only history — add a new file instead).
 
 **Doc-only changes** (no code touched) are fine as standalone commits — for example, fixing a stale number, clarifying a pitfall, or adding a new runbook step. Use a `docs: ...` Conventional Commit prefix.
 
