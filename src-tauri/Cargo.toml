@@ -1,10 +1,11 @@
 [package]
 name = "easy-cursor-swap"
 version = "0.1.0"
-description = "次世代マウスカーソル管理ツール (Windows専用)"
+description = "Windows 用マウスカーソルテーマ管理ツール"
 authors = ["nishiuriraku"]
 license = "MIT"
-repository = ""
+repository = "https://github.com/nishiuriraku/easy-cursor-swap"
+homepage = "https://github.com/nishiuriraku/easy-cursor-swap"
 edition = "2021"
 rust-version = "1.82.0"
 # `src/bin/sign_for_marketplace.rs` が追加されて bin ターゲットが 2 個になった結果、

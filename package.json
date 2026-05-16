@@ -1,7 +1,17 @@
 {
   "name": "easy-cursor-swap",
+  "description": "Windows 用マウスカーソルテーマ管理ツール",
   "type": "module",
   "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nishiuriraku/easy-cursor-swap.git"
+  },
+  "homepage": "https://github.com/nishiuriraku/easy-cursor-swap#readme",
+  "bugs": {
+    "url": "https://github.com/nishiuriraku/easy-cursor-swap/issues"
+  },
   "scripts": {
     "build": "nuxt build",
     "dev": "nuxt dev",
