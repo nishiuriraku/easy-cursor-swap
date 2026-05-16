@@ -15,6 +15,8 @@ import { invokeTauri } from './useTauri'
  * - `url`: PNG を Blob 化した ObjectURL (`<img>` の src に使う)
  * - `hotspot`: ratio 0.0-1.0 のホットスポット座標
  * - `width/height`: PNG のネイティブ寸法 (px)
+ * - `aniFrames`: 元ファイルが `.ani` のときのみセット。詳細ドロワーで
+ *   `<CursorPreview kind="ani">` に渡してアニメーション再生する。
  *
  * `width/height` が 0 のときはホットスポット位置を計算できないので、
  * フロント側はフォールバック (中央表示) する。
@@ -24,6 +26,12 @@ export interface RolePreviewDetail {
   hotspot: { x: number; y: number } // ratio 0.0-1.0
   width: number
   height: number
+  aniFrames?: {
+    framePngs: Uint8Array[]
+    sequence: number[]
+    durations: number[]
+    nativeSize: number
+  }
 }
 
 interface PreviewCacheEntry {
@@ -33,11 +41,20 @@ interface PreviewCacheEntry {
   details: Record<string, RolePreviewDetail>
 }
 
+interface IpcAniFrameData {
+  framePngs: number[][]
+  sequence: number[]
+  perStepDurationsMs: number[]
+  isLegacyRawDib: boolean
+}
+
 interface IpcRolePreview {
   pngBytes: number[]
   width: number
   height: number
   hotspot: { x: number; y: number }
+  /** `.ani` ロールのときのみ存在。Rust の `RolePreview.frames` (Option) を反映。 */
+  frames?: IpcAniFrameData
 }
 
 const cache = new Map<string, PreviewCacheEntry>()
@@ -90,11 +107,25 @@ async function fetchPreviews(themeId: string, roles?: string[]): Promise<Preview
         const blob = new Blob([u8], { type: 'image/png' })
         const url = URL.createObjectURL(blob)
         urls[role] = url
+        // .ani ロールは Rust 側で全フレーム PNG を詰めて返してくる。
+        // 各 number[] を Uint8Array に正規化して useAniPlayer に渡せる形にしておく。
+        const aniFrames = info.frames
+          ? {
+              framePngs: info.frames.framePngs.map((arr) => new Uint8Array(arr)),
+              sequence: info.frames.sequence,
+              durations: info.frames.perStepDurationsMs,
+              // ANI フレームの内在ピクセル幅。`<CursorPreview asset.nativeSize>` 経由で
+              // `<AniThumb width/height>` の値に渡る。ライブラリのプレビューでは正方
+              // 画像前提なので `width` のみ採用。
+              nativeSize: info.width,
+            }
+          : undefined
         details[role] = {
           url,
           hotspot: info.hotspot,
           width: info.width,
           height: info.height,
+          ...(aniFrames ? { aniFrames } : {}),
         }
       }
       const entry: PreviewCacheEntry = { urls, details }

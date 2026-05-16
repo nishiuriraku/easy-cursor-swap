@@ -47,13 +47,57 @@ pub(crate) fn set_metadata_source(
 /// 1 ロールあたりのプレビュー詳細。
 ///
 /// `CursorAssetDescriptor` を `#[serde(flatten)]` で埋め込み、JSON 上は
-/// `{ pngBytes, width, height, hotspot }` の平坦構造で返す。
+/// `{ pngBytes, width, height, hotspot, frames? }` の平坦構造で返す。
 /// (旧フィールド `png` は `pngBytes` にリネーム — Phase 3a での breaking change)
+///
+/// `frames` は `.ani` ロールのみ `Some` を持つ。テーマ詳細ドロワーがこのフィールドを
+/// 見て、存在すれば `<CursorPreview kind="ani">` で全フレーム再生に切り替える。
+/// 値は `inspect_ani_file` と同じ `AniFrameData` 形 (camelCase で
+/// `{ framePngs, sequence, perStepDurationsMs, isLegacyRawDib }`)。
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RolePreview {
     #[serde(flatten)]
     pub asset: types::CursorAssetDescriptor,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub frames: Option<types::AniFrameData>,
+}
+
+/// `parse_ani` の結果から「全フレームを PNG 化した `AniFrameData`」を構築する内部 helper。
+///
+/// `load_role_previews_with_hotspots` (ユーザーテーマ) と
+/// `render_paths_as_previews_with_hotspots` (Windows スキーム) の両方で
+/// 同じフレーム展開ロジックを共有するために抽出。先頭フレームの寸法 / ホットスポット
+/// 算出は呼び出し側で行うのは、Windows スキームではホットスポット情報を 0 で返す
+/// 既存挙動を維持したいため。
+fn build_ani_frame_data(parsed: &crate::cursor::ParsedAni) -> AppResult<types::AniFrameData> {
+    let mut frame_pngs: Vec<Vec<u8>> = Vec::with_capacity(parsed.frames.len());
+    for entry in &parsed.frames {
+        let mut png = Vec::new();
+        let encoder = image::codecs::png::PngEncoder::new(&mut png);
+        image::ImageEncoder::write_image(
+            encoder,
+            entry.image.as_raw(),
+            entry.image.width(),
+            entry.image.height(),
+            image::ExtendedColorType::Rgba8,
+        )
+        .map_err(|e| {
+            crate::errors::AppError::ImageProcessing(format!("PNG エンコード失敗: {}", e))
+        })?;
+        frame_pngs.push(png);
+    }
+    let per_step_durations_ms: Vec<u32> = parsed
+        .per_step_rate_jiffies
+        .iter()
+        .map(|j| ((*j as u64 * 1000) / 60) as u32)
+        .collect();
+    Ok(types::AniFrameData {
+        frame_pngs,
+        sequence: parsed.sequence.clone(),
+        per_step_durations_ms,
+        is_legacy_raw_dib: parsed.is_legacy_raw_dib,
+    })
 }
 
 /// テーママネージャー
@@ -292,6 +336,7 @@ impl ThemeManager {
                             height: img.height(),
                             hotspot: def.hotspot,
                         },
+                        frames: None,
                     },
                     Err(e) => {
                         tracing::warn!("{} の PNG デコード失敗: {}", role, e);
@@ -299,39 +344,30 @@ impl ThemeManager {
                     }
                 }
             } else if ext == "ani" {
-                // .ani: 先頭フレームを PNG 化。ホットスポットはフレーム内蔵の px 値を
-                // フレーム幅で比率化して採用する。
+                // .ani: 全フレームを PNG 化して frames に詰める。テーマ詳細ドロワーが
+                // この frames を見て `<CursorPreview kind="ani">` でアニメ再生する。
+                // 静止プレビュー (asset.png_bytes) は先頭フレームを使い、ホットスポットは
+                // フレーム内蔵の px 値をフレーム幅で比率化して採用する (静止表示時の
+                // hot ドット位置に使う)。
                 match parse_ani(&bytes).and_then(|parsed| {
-                    let frame = parsed.frames.into_iter().next().ok_or_else(|| {
+                    let first = parsed.frames.first().ok_or_else(|| {
                         crate::errors::AppError::ImageProcessing(
                             ".ani にフレームがありません".to_string(),
                         )
                     })?;
-                    let w = frame.image.width();
-                    let h = frame.image.height();
-                    let hotspot = types::Hotspot::from_px(frame.hotspot_x, frame.hotspot_y, w);
-                    let mut png = Vec::new();
-                    let encoder = image::codecs::png::PngEncoder::new(&mut png);
-                    image::ImageEncoder::write_image(
-                        encoder,
-                        frame.image.as_raw(),
-                        w,
-                        h,
-                        image::ExtendedColorType::Rgba8,
-                    )
-                    .map_err(|e| {
-                        crate::errors::AppError::ImageProcessing(format!(
-                            "PNG エンコード失敗: {}",
-                            e
-                        ))
-                    })?;
+                    let w = first.image.width();
+                    let h = first.image.height();
+                    let hotspot = types::Hotspot::from_px(first.hotspot_x, first.hotspot_y, w);
+                    let frames = build_ani_frame_data(&parsed)?;
+                    let first_png = frames.frame_pngs.first().cloned().unwrap_or_default();
                     Ok(RolePreview {
                         asset: types::CursorAssetDescriptor {
-                            png_bytes: png,
+                            png_bytes: first_png,
                             width: w,
                             height: h,
                             hotspot,
                         },
+                        frames: Some(frames),
                     })
                 }) {
                     Ok(p) => p,
@@ -353,6 +389,7 @@ impl ThemeManager {
                                 entry.width,
                             ),
                         },
+                        frames: None,
                     },
                     Err(e) => {
                         tracing::warn!("{} の PNG 化に失敗: {}", role, e);
@@ -518,6 +555,7 @@ impl ThemeManager {
                             height: img.height(),
                             hotspot: types::Hotspot::ZERO,
                         },
+                        frames: None,
                     },
                     Err(e) => {
                         tracing::warn!("scheme preview {} の PNG デコード失敗: {}", role, e);
@@ -525,41 +563,32 @@ impl ThemeManager {
                     }
                 }
             } else if ext == "ani" {
-                // .ani はホットスポット情報をフレームヘッダに持つが、ここでは
-                // 先頭フレームの寸法のみ取り出して中央既定として表示する。
+                // .ani: 全フレームを PNG 化して frames に詰める (テーマ詳細ドロワーで
+                // システムスキームの ANI もアニメーション再生させるため)。
+                // 静止プレビュー (asset.png_bytes) は先頭フレーム。ホットスポットは
+                // 既存挙動と互換性を保つため Hotspot::ZERO とする (スキームのカーソル
+                // パスをホットスポット情報無しで返してきた経緯がある)。
                 match parse_ani(&bytes).and_then(|parsed| {
-                    let frame = parsed.frames.into_iter().next().ok_or_else(|| {
+                    let first = parsed.frames.first().ok_or_else(|| {
                         crate::errors::AppError::ImageProcessing(
                             ".ani にフレームがありません".to_string(),
                         )
                     })?;
-                    let w = frame.image.width();
-                    let h = frame.image.height();
-                    let mut png = Vec::new();
-                    let encoder = image::codecs::png::PngEncoder::new(&mut png);
-                    image::ImageEncoder::write_image(
-                        encoder,
-                        frame.image.as_raw(),
-                        w,
-                        h,
-                        image::ExtendedColorType::Rgba8,
-                    )
-                    .map_err(|e| {
-                        crate::errors::AppError::ImageProcessing(format!(
-                            "PNG エンコード失敗: {}",
-                            e
-                        ))
-                    })?;
-                    Ok((w, h, png))
-                }) {
-                    Ok((w, h, png)) => RolePreview {
+                    let w = first.image.width();
+                    let h = first.image.height();
+                    let frames = build_ani_frame_data(&parsed)?;
+                    let first_png = frames.frame_pngs.first().cloned().unwrap_or_default();
+                    Ok(RolePreview {
                         asset: types::CursorAssetDescriptor {
-                            png_bytes: png,
+                            png_bytes: first_png,
                             width: w,
                             height: h,
                             hotspot: types::Hotspot::ZERO,
                         },
-                    },
+                        frames: Some(frames),
+                    })
+                }) {
+                    Ok(p) => p,
                     Err(e) => {
                         tracing::warn!("scheme preview {} の .ani 変換失敗: {}", role, e);
                         continue;
@@ -578,6 +607,7 @@ impl ThemeManager {
                                 entry.width,
                             ),
                         },
+                        frames: None,
                     },
                     Err(e) => {
                         tracing::warn!("scheme preview {} の .cur/.ico 変換失敗: {}", role, e);
@@ -1648,7 +1678,7 @@ mod tests {
 #[cfg(test)]
 mod role_preview_tests {
     use super::*;
-    use crate::theme::types::{CursorAssetDescriptor, Hotspot};
+    use crate::theme::types::{AniFrameData, CursorAssetDescriptor, Hotspot};
 
     #[test]
     fn role_preview_serializes_with_flat_keys() {
@@ -1659,6 +1689,7 @@ mod role_preview_tests {
                 height: 32,
                 hotspot: Hotspot::ZERO,
             },
+            frames: None,
         };
         let v = serde_json::to_value(&p).unwrap();
         // flatten 後は asset サブオブジェクトが出ず、top-level に展開される
@@ -1667,5 +1698,36 @@ mod role_preview_tests {
         assert_eq!(v["width"], 32);
         assert_eq!(v["height"], 32);
         assert!(v.get("hotspot").is_some());
+        // frames: None のときは JSON にキーが出てはいけない (後方互換)
+        assert!(
+            v.get("frames").is_none(),
+            "frames は None のとき省略されるべき: {v}"
+        );
+    }
+
+    #[test]
+    fn role_preview_serializes_frames_when_some() {
+        // .ani ロールのケース。frames は AniFrameData 形 (camelCase) でネストする。
+        let p = RolePreview {
+            asset: CursorAssetDescriptor {
+                png_bytes: vec![1, 2, 3],
+                width: 32,
+                height: 32,
+                hotspot: Hotspot::ZERO,
+            },
+            frames: Some(AniFrameData {
+                frame_pngs: vec![vec![10, 20], vec![30, 40]],
+                sequence: vec![0, 1],
+                per_step_durations_ms: vec![100, 100],
+                is_legacy_raw_dib: false,
+            }),
+        };
+        let v = serde_json::to_value(&p).unwrap();
+        // frames は flatten せずにネスト構造で出す (asset 平坦化と区別)
+        let frames = v.get("frames").expect("frames must exist");
+        assert!(frames.get("framePngs").is_some());
+        assert_eq!(frames["sequence"], serde_json::json!([0, 1]));
+        assert_eq!(frames["perStepDurationsMs"], serde_json::json!([100, 100]));
+        assert_eq!(frames["isLegacyRawDib"], false);
     }
 }

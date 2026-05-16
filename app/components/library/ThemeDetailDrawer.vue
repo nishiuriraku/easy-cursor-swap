@@ -71,10 +71,26 @@ const activePreviewDetail = computed<RolePreviewDetail | null>(
 )
 
 /**
- * `<CursorPreview>` に渡す asset。preview URL があれば static、なければ empty。
- * Drawer では ANI 描画は行わない (PNG プレビューのみ)。
+ * `<CursorPreview>` に渡す asset。
+ * - `.ani` 由来 (Rust 側で `RolePreview.frames` が Some) → 'ani' で全フレーム再生
+ * - PNG/CUR/ICO → 'static' で 1 枚画像表示
+ * - 未取得 / ロール未含有 → 'empty' (CursorIcon フォールバック)
+ *
+ * Creator 画面と同じ `<CursorPreview kind="ani">` 経路 (useAniPlayer 内蔵) に
+ * 合流させているので、AniThumb の `:key="framePngs"` でロール切替時に再マウントされ、
+ * blob URL は onScopeDispose で自動 revoke される。
  */
 const activePreviewAsset = computed<CursorPreviewAsset>(() => {
+  const ani = activePreviewDetail.value?.aniFrames
+  if (ani) {
+    return {
+      kind: 'ani',
+      framePngs: ani.framePngs,
+      sequence: ani.sequence,
+      durations: ani.durations,
+      nativeSize: ani.nativeSize,
+    }
+  }
   const url = activePreviewUrl.value
   if (url) return { kind: 'static', url, alt: activeRoleDef.value.jp }
   return { kind: 'empty' }

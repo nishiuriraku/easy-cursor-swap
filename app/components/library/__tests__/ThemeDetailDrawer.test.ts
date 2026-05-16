@@ -38,10 +38,18 @@ vi.mock('~/composables/useTauri', () => ({
   invokeTauri: vi.fn().mockResolvedValue(undefined),
 }))
 
+/**
+ * CursorPreview スタブ — `asset.kind` をテスト側から読み取れるよう data 属性に出す。
+ * 実際の描画は他テスト (CursorPreview.test.ts) でカバー済みなので、ここでは
+ * Drawer が「ANI フレームを受け取ったら kind='ani' に切り替える」分岐だけ検証する。
+ */
 const stubs = {
   UiIcon: { template: '<span data-testid="icon"></span>' },
   CursorIcon: { template: '<span data-testid="cursor-icon"></span>' },
-  CursorPreview: { template: '<div data-testid="cursor-preview"></div>' },
+  CursorPreview: {
+    props: ['asset', 'hotspot', 'roleId', 'displayPct', 'fallbackIconSize', 'hideDot'],
+    template: '<div data-testid="cursor-preview" :data-kind="asset?.kind ?? \'none\'"></div>',
+  },
 }
 
 function makeTheme(overrides: Partial<ThemeCardData> = {}): ThemeCardData {
@@ -170,5 +178,57 @@ describe('ThemeDetailDrawer — 静的要素の整理', () => {
     const deleteBtn = w.find('.td-act.danger')
     expect(deleteBtn.exists()).toBe(true)
     expect(deleteBtn.attributes('disabled')).toBeUndefined()
+  })
+})
+
+describe('ThemeDetailDrawer — ANI プレビュー', () => {
+  /**
+   * `previewDetails[activeRole]` に `aniFrames` がある場合、CursorPreview に
+   * `kind: 'ani'` の asset が渡る (= 詳細プレビューでアニメ再生される) ことを固定化する。
+   * Creator 画面と同じ経路 (useAniPlayer 経由) を Drawer でも使う回帰防止。
+   */
+  it('aniFrames がある active ロールでは CursorPreview の kind が ani になる', () => {
+    const theme = makeTheme({ includedRoles: ['Arrow'] })
+    const previewMap = { Arrow: 'blob:dummy-arrow' }
+    const previewDetails = {
+      Arrow: {
+        url: 'blob:dummy-arrow',
+        hotspot: { x: 0, y: 0 },
+        width: 32,
+        height: 32,
+        aniFrames: {
+          framePngs: [new Uint8Array([1, 2]), new Uint8Array([3, 4])],
+          sequence: [0, 1],
+          durations: [100, 100],
+          nativeSize: 32,
+        },
+      },
+    }
+    const w = mount(ThemeDetailDrawer, {
+      props: { theme, previewMap, previewDetails },
+      global: { stubs },
+    })
+    const preview = w.find('[data-testid="cursor-preview"]')
+    expect(preview.exists()).toBe(true)
+    expect(preview.attributes('data-kind')).toBe('ani')
+  })
+
+  it('aniFrames を持たない通常 PNG ロールでは kind が static に留まる', () => {
+    const theme = makeTheme({ includedRoles: ['Arrow'] })
+    const previewMap = { Arrow: 'blob:dummy-arrow' }
+    const previewDetails = {
+      Arrow: {
+        url: 'blob:dummy-arrow',
+        hotspot: { x: 0.5, y: 0.5 },
+        width: 32,
+        height: 32,
+      },
+    }
+    const w = mount(ThemeDetailDrawer, {
+      props: { theme, previewMap, previewDetails },
+      global: { stubs },
+    })
+    const preview = w.find('[data-testid="cursor-preview"]')
+    expect(preview.attributes('data-kind')).toBe('static')
   })
 })

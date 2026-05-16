@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 公式インデックス (Marketplace) のグリッドカード視覚スタイルを Library の `ThemeCard` と揃えた。プレビューを 3x2 (6 セル) のコンパクトマトリクスに縮小し、`.card-preview` の高さを 112px に詰め、カバレッジ表記を `X%` → `X/17` に変更。meta-row はダウンロード数とバージョンの 2 項目構成にし、`X/17` 重複を排除した。インポートボタン・verified バッジ・ダウンロード数などマーケットプレイス固有機能は維持。実カーソル PNG プレビューは別 issue (`docs/superpowers/issue/2026-05-12-marketplace-icon-preview.md`) のまま保留。
 - Marketplace 画面の Featured ストリップを廃止し、全エントリを横並びレイアウト (旧 `FeaturedCard`) の 1 つのグリッドに統一。Featured / 通常の視覚的区別を取り除き、ハイライトラベル (`new` / `popular`) はカード内に残す。
 - 詳細モーダル (`MarketplaceDetailModal`) から SHA-256 表示行を削除 (UX 簡素化)。バックグラウンドでの整合性検証は変更なし。
+- ライブラリのテーマ詳細プレビューで `.ani` (アニメーションカーソル) ロールを実際にアニメーション再生するようになった。Creator と同じ `<CursorPreview kind="ani">` (内部で `useAniPlayer` を駆動) 経路に統合。Rust の `RolePreview` に `frames: Option<AniFrameData>` を追加し、`get_theme_role_previews` / `get_windows_scheme_role_previews` IPC レスポンスに全フレーム + sequence + 各 step duration を載せて返す (静止 PNG プレビューしか持たなかった従来挙動から変更)。Windows システムスキーム由来の ANI もアニメ再生される。
 
 ### Deprecated
 
