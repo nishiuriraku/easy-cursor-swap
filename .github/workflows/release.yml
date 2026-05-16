@@ -70,6 +70,13 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      # dtolnay/rust-toolchain の targets: 引数だけだと aarch64 で
+      # `Target ... is not installed` が出るケースがあるため、明示的に追加。
+      # 冪等な操作なので既に追加済みでも害なし。
+      - name: Ensure Rust target is installed
+        shell: pwsh
+        run: rustup target add ${{ matrix.target }}
+
       - name: Cargo cache
         uses: Swatinem/rust-cache@v2
         with:
