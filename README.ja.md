@@ -51,7 +51,9 @@ Windows の全 17 カーソル役割 / 6 DPI サイズに対応し、Ed25519 署
 
 > **SmartScreen について:** ダウンロード数が少ない初期段階では「不明な発行元」の警告が出ることがあります。
 > **「詳細情報」→「実行」** で続行してください。
-> 本アプリは [SignPath.io Foundation](https://about.signpath.io/foundation) の OV 署名で配布されています。
+> 本アプリは [SignPath Foundation](https://signpath.org/) (OSS 向けコードサイニング) によって署名されています。
+> 署名ポリシー (チーム構成・プライバシー・ビルド再現性) は
+> [docs/code_signing_policy.md](docs/code_signing_policy.md) を参照してください。
 
 ## 開発環境セットアップ
 

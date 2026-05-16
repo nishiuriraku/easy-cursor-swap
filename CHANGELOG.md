@@ -56,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 - Marketplace テーマの読み取り専用ガード: `repackage_theme` IPC がソースを確認し、公式インデックス由来のテーマに対する編集・エクスポート要求を拒否するようになった。
+- SignPath Foundation の OSS 向け Authenticode 署名を CI に配線。`release.yml` で `tauri-action` のビルド後に未署名 `.exe` / `.msi` を ZIP 化して SignPath に submit、署名済み artifact で Draft Release のアセットを差し替える。`SIGNPATH_API_TOKEN` / `SIGNPATH_ORGANIZATION_ID` が未設定なら全ステップ skip され従来の未署名ビルドにフォールバックする。デフォルトは `test-signing` policy で、GitHub Variable `SIGNPATH_SIGNING_POLICY_SLUG=release-signing` に切り替えると本番運用へ。Foundation 申請に必要な [`docs/code_signing_policy.md`](docs/code_signing_policy.md) を新規公開し、Team / Privacy / Build Reproducibility / File Metadata を整理した。
 
 ---
 

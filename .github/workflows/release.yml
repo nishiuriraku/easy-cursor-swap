@@ -13,9 +13,11 @@ name: Release
 #   EASY_CURSOR_SWAP_CRASH_REPORT_APP_TOKEN: Worker `wrangler secret put ALLOWED_ORIGIN` した値と同一の文字列
 #   未設定でビルドした場合は送信機能ごと無効化される (config.crash_reporting=true でも skip)。
 #
-# オプション (コードサイニング):
-#   WINDOWS_SIGNING_CERT_PFX_BASE64 : PFX 証明書 (base64)
-#   WINDOWS_SIGNING_CERT_PASSWORD   : PFX パスワード
+# オプション (SignPath Authenticode 署名):
+#   SIGNPATH_API_TOKEN          : SignPath User Settings → API Tokens で発行
+#   SIGNPATH_ORGANIZATION_ID    : SignPath Organization Settings の UUID
+#   SIGNPATH_SIGNING_POLICY_SLUG: 'test-signing' (テスト) / 'release-signing' (本番)
+#   いずれかが未設定なら署名ステップは skip される。
 on:
   push:
     tags:
@@ -110,7 +112,83 @@ jobs:
           prerelease: false
           includeUpdaterJson: true
 
-  # -----------------------------------------------------------
-  # (将来) SignPath.io / Microsoft Trusted Signing による EV 署名
-  # 現状は上記 tauri-action の self-signed でビルドのみ。
-  # -----------------------------------------------------------
+      # -----------------------------------------------------------
+      # SignPath による Authenticode 署名 (test-signing / release-signing)
+      #
+      # tauri-action が生成した未署名の .exe / .msi を ZIP に詰めて
+      # SignPath に submit し、署名済み artifact を Draft Release に
+      # 上書きアップロードする。SIGNPATH_* secrets が未設定なら skip。
+      # -----------------------------------------------------------
+      - name: Check SignPath secrets
+        id: signpath-check
+        shell: pwsh
+        run: |
+          $hasToken = -not [string]::IsNullOrEmpty($env:SIGNPATH_API_TOKEN)
+          $hasOrg = -not [string]::IsNullOrEmpty($env:SIGNPATH_ORGANIZATION_ID)
+          $enabled = $hasToken -and $hasOrg
+          "enabled=$($enabled.ToString().ToLower())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "SignPath enabled: $enabled"
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+          SIGNPATH_ORGANIZATION_ID: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+
+      - name: Collect installers for signing
+        if: steps.signpath-check.outputs.enabled == 'true'
+        shell: pwsh
+        run: |
+          $bundle = "src-tauri/target/${{ matrix.target }}/release/bundle"
+          New-Item -ItemType Directory -Force -Path signing-input | Out-Null
+          Get-ChildItem -Path "$bundle/nsis/*.exe", "$bundle/msi/*.msi" -ErrorAction SilentlyContinue |
+            Copy-Item -Destination signing-input
+          if ((Get-ChildItem signing-input).Count -eq 0) {
+            Write-Error "No installers found under $bundle"
+            exit 1
+          }
+          Compress-Archive -Path signing-input/* -DestinationPath installers.zip -Force
+
+      - name: Upload unsigned installers (for SignPath)
+        if: steps.signpath-check.outputs.enabled == 'true'
+        id: upload-unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-${{ matrix.arch_label }}
+          path: installers.zip
+          retention-days: 1
+
+      - name: Submit to SignPath
+        if: steps.signpath-check.outputs.enabled == 'true'
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: 'easy-cursor-swap'
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG || 'test-signing' }}
+          artifact-configuration-slug: 'tauri-installers'
+          github-artifact-id: ${{ steps.upload-unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: 'signed'
+
+      - name: Replace bundle installers with signed copies
+        if: steps.signpath-check.outputs.enabled == 'true'
+        shell: pwsh
+        run: |
+          $bundle = "src-tauri/target/${{ matrix.target }}/release/bundle"
+          $signedFiles = Get-ChildItem signed -Recurse -Include *.exe, *.msi
+          foreach ($f in $signedFiles) {
+            if ($f.Extension -eq '.exe') {
+              Copy-Item $f.FullName -Destination "$bundle/nsis/" -Force
+            } else {
+              Copy-Item $f.FullName -Destination "$bundle/msi/" -Force
+            }
+            Write-Host "Replaced: $($f.Name)"
+          }
+
+      - name: Upload signed installers to Draft Release
+        if: steps.signpath-check.outputs.enabled == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          draft: true
+          files: |
+            src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*.exe
+            src-tauri/target/${{ matrix.target }}/release/bundle/msi/*.msi

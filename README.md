@@ -53,8 +53,9 @@ See [docs/updater_signing.md](docs/updater_signing.md) for signature verificatio
 > **SmartScreen notice:** Until the installer accumulates enough download reputation,
 > Windows SmartScreen may show an "Unknown publisher" warning.
 > Click **More info → Run anyway** to proceed.
-> The app is distributed from a verified publisher via
-> [SignPath.io Foundation](https://about.signpath.io/foundation).
+> The app is signed via [SignPath Foundation](https://signpath.org/) (OSS code
+> signing); see [docs/code_signing_policy.md](docs/code_signing_policy.md) for
+> the full signing policy (team, privacy, build reproducibility).
 
 ## Development Setup
 
