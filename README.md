@@ -93,11 +93,11 @@ in `npm run tauri:dev`, register a GitHub OAuth App at
 export its Client ID:
 
 ```powershell
-$env:GITHUB_OAUTH_CLIENT_ID = "Iv1.xxxxxxxx"
+$env:EASY_CURSOR_SWAP_GITHUB_OAUTH_CLIENT_ID = "Iv1.xxxxxxxx"
 npm run tauri:dev
 ```
 
-Without `GITHUB_OAUTH_CLIENT_ID`, the app still builds and runs — only the
+Without `EASY_CURSOR_SWAP_GITHUB_OAUTH_CLIENT_ID`, the app still builds and runs — only the
 auto-submit IPC reports "OAuth Client ID not configured" and users fall back
 to the manual submission flow.
 

@@ -52,7 +52,7 @@
 | カテゴリ | モジュール | 主な役割 |
 |---|---|---|
 | **IPC 表玄関** | `commands/` | 61 個の `#[tauri::command]` を 10 サブモジュールに分割。`mod.rs::get_command_handlers()` が `tauri::generate_handler!` にまとめて渡す。サブモジュール: `theme` / `cursor_build/` (build / cancel / dto / sign / stream の 5 ファイル分割) / `cursor_io` / `ani_export` / `keystore` / `marketplace` / `marketplace_submit` / `profile` / `system` / `windows_scheme` |
-| **GitHub API クライアント** | `github/` | OAuth Device Flow + REST API (`mod.rs` / `types.rs` / `device_flow.rs` / `client.rs`)。Marketplace 自動提出フローから利用。`client_id` は build 時に `option_env!("GITHUB_OAUTH_CLIENT_ID")` で注入。 |
+| **GitHub API クライアント** | `github/` | OAuth Device Flow + REST API (`mod.rs` / `types.rs` / `device_flow.rs` / `client.rs`)。Marketplace 自動提出フローから利用。`client_id` は build 時に `option_env!("EASY_CURSOR_SWAP_GITHUB_OAUTH_CLIENT_ID")` で注入。 |
 | **設定 / 状態** | `config.rs` | `AppConfig` / `ConfigManager` (RwLock + 自動 schema migration + バックアップ) |
 | | `errors.rs` | `AppError` / `AppResult` 共通型 |
 | **カーソル生成パイプライン** | `cursor/` | 5 サブモジュール: `image` (リサイズ / hotspot / メタデータ剥離) / `cur_build` (PNG → 6 解像度 .cur) / `ico_cur` (ICO/CUR 解析) / `ani` (RIFF/ACON 解析) / `ani_write` (ANI 書き出し)。`mod.rs` で全シンボルを `pub use` 再エクスポート |

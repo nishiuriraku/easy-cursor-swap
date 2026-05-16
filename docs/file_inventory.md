@@ -62,7 +62,7 @@
 | [github/mod.rs](../src-tauri/src/github/mod.rs) | `github` モジュール公開 API と re-export |
 | [github/types.rs](../src-tauri/src/github/types.rs) | Device Flow / PR 作成で使う Rust 型 (`DeviceFlowResponse`, `GithubPrResult` 等) |
 | [github/device_flow.rs](../src-tauri/src/github/device_flow.rs) | GitHub OAuth Device Flow 実装。`start` → ポーリング → トークン取得・DPAPI 保存。scope は `public_repo` 限定 |
-| [github/client.rs](../src-tauri/src/github/client.rs) | GitHub REST API クライアント。PR 作成 / ブランチ操作 / `.cursorpack` アップロード。`client_id` は `option_env!("GITHUB_OAUTH_CLIENT_ID")` で注入 |
+| [github/client.rs](../src-tauri/src/github/client.rs) | GitHub REST API クライアント。PR 作成 / ブランチ操作 / `.cursorpack` アップロード。`client_id` は `option_env!("EASY_CURSOR_SWAP_GITHUB_OAUTH_CLIENT_ID")` で注入 |
 | [health.rs](../src-tauri/src/health.rs) | `startup.json` の `pending_failures`、3 回連続失敗検知、バージョン変更で自動リセット |
 | [crash.rs](../src-tauri/src/crash.rs) | `install_panic_hook`、`%LOCALAPPDATA%\...\crash\panic-{epoch}.json`、`prune_old_reports`、`general.crash_reporting` 同意、送信ペイロード生成 |
 | [tray.rs](../src-tauri/src/tray.rs) | システムトレイ + `show_or_recreate_main_window` (WebView 破棄/再生成) |

@@ -4,7 +4,7 @@
 //! - [`client`][]: REST API ラッパー (fork / branch / contents / PR)
 //! - [`types`][]: 共通レスポンス型
 //!
-//! `client_id` は build 時に環境変数 `GITHUB_OAUTH_CLIENT_ID` を `option_env!` で
+//! `client_id` は build 時に環境変数 `EASY_CURSOR_SWAP_GITHUB_OAUTH_CLIENT_ID` を `option_env!` で
 //! 注入する。未設定 (CI / 開発時) は空文字列が返り、上位 IPC は AuthRequired 系の
 //! エラーで失敗する。`client_secret` は Device Flow では発行されないため不要。
 
@@ -15,7 +15,7 @@ pub mod types;
 /// build 時に注入された GitHub OAuth App の Client ID。
 /// 未設定の場合は空文字列を返す。
 pub fn client_id() -> &'static str {
-    option_env!("GITHUB_OAUTH_CLIENT_ID").unwrap_or("")
+    option_env!("EASY_CURSOR_SWAP_GITHUB_OAUTH_CLIENT_ID").unwrap_or("")
 }
 
 #[cfg(test)]

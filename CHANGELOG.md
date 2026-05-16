@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Marketplace auto-submit flow**: テーマ選択 1 つで GitHub に PR を自動作成できる新フロー。GitHub Device Flow による 1 回限りの認証、Ed25519 署名、SHA-256 ハッシュ、`.cursorpack` ホスティング (インデックスリポ同梱方式) をアプリが代行する。既存の手動入力フローは `SubmitThemeDialog` のタブ切替で温存。新規 IPC 5 個 (`start_device_flow` / `complete_device_flow` / `cancel_device_flow` / `submit_theme_auto` / `revoke_github_link`) — 54 → 59。設定 → 鍵管理ページから連携解除可能。Client ID は build 時に `GITHUB_OAUTH_CLIENT_ID` 環境変数で注入する。
+- **Marketplace auto-submit flow**: テーマ選択 1 つで GitHub に PR を自動作成できる新フロー。GitHub Device Flow による 1 回限りの認証、Ed25519 署名、SHA-256 ハッシュ、`.cursorpack` ホスティング (インデックスリポ同梱方式) をアプリが代行する。既存の手動入力フローは `SubmitThemeDialog` のタブ切替で温存。新規 IPC 5 個 (`start_device_flow` / `complete_device_flow` / `cancel_device_flow` / `submit_theme_auto` / `revoke_github_link`) — 54 → 59。設定 → 鍵管理ページから連携解除可能。Client ID は build 時に `EASY_CURSOR_SWAP_GITHUB_OAUTH_CLIENT_ID` 環境変数で注入する。
 - Marketplace プレビュー画像: `.cursorpack` アーカイブに `previews/<role>.png` (64×64 PNG, Arrow / Help / AppStarting / Wait / Crosshair / IBeam の 6 ロール) を同梱するようになった。
 - `marketplace_fetch_preview` IPC コマンド: インデックス CDN からプレビュー PNG を取得する。URL スキーム・ホスト・ロール名の検証、および 500KB 上限を実施。
 - `useMarketplacePreviews` composable: `marketplace_fetch_preview` IPC ラッパー。シングルトンキャッシュ + in-flight 重複排除でカード表示の二重リクエストを防ぐ。
@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- 設定 → ログ・診断セクションに **クラッシュレポート UI** を配線。`general.crash_reporting` opt-in トグル、保留中レポート件数表示、保留分を Cloudflare Worker に POST する「送信」ボタン、ローカル panic-*.json を全削除する「クリア」ボタン (4 要素)。既に登録済の IPC (`list_crash_reports` / `submit_crash_reports` / `clear_crash_reports`) を `settings.vue` 経由で利用する。送信時、opt-in OFF / ビルド時 env 未設定の両ケースをフロント側で判別してメッセージを切り替える。
+- 設定 → ログ・診断セクションに **クラッシュレポート UI** を配線。`general.crash_reporting` opt-in トグル、保留中レポート件数表示、保留分を Cloudflare Worker に POST する「送信」ボタン、ローカル panic-\*.json を全削除する「クリア」ボタン (4 要素)。既に登録済の IPC (`list_crash_reports` / `submit_crash_reports` / `clear_crash_reports`) を `settings.vue` 経由で利用する。送信時、opt-in OFF / ビルド時 env 未設定の両ケースをフロント側で判別してメッセージを切り替える。
 - 設定 → アップデート: 「最新版です」と「`Could not fetch a valid release JSON`」が同時表示されていた不具合に対し、`useUpdater.error` が立っているときは「最新版」メッセージを抑制するように `onCheckUpdate` を修正。
 - 設定 → 署名鍵: 鍵生成 / 再生成 / 削除 操作時に古い `keystoreMessage` (前回のエクスポート結果など) が残り続けていた問題を修正。各 handler 冒頭で `keystoreMessage` を null クリアする。
 - 設定スキーマを v1 → v2 に migrate (`AppConfig.github_account: Option<GithubAccount>` を追加)。serde(default) で v1 既存 config は透過マイグレーションされる。

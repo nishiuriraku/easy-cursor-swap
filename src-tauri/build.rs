@@ -12,11 +12,11 @@ use std::path::PathBuf;
 /// `.env` 経由 / シェル env 経由いずれかで埋め込みたい credentials の env 名。
 ///
 /// - `EASY_CURSOR_SWAP_CRASH_REPORT_*` — クラッシュレポート Worker の URL と Token
-/// - `GITHUB_OAUTH_CLIENT_ID`           — Marketplace 自動提出フローの OAuth App ID
+/// - `EASY_CURSOR_SWAP_GITHUB_OAUTH_CLIENT_ID`           — Marketplace 自動提出フローの OAuth App ID
 const EMBED_ENV_KEYS: [&str; 3] = [
     "EASY_CURSOR_SWAP_CRASH_REPORT_ENDPOINT",
     "EASY_CURSOR_SWAP_CRASH_REPORT_APP_TOKEN",
-    "GITHUB_OAUTH_CLIENT_ID",
+    "EASY_CURSOR_SWAP_GITHUB_OAUTH_CLIENT_ID",
 ];
 
 fn main() {
