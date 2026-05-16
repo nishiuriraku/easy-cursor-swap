@@ -345,6 +345,22 @@ impl RegistryManager {
         Ok(())
     }
 
+    /// `SystemParametersInfoW(SPI_SETCURSORS / SPI_SETCURSORSHADOW)` が返した
+    /// `windows::core::Error` が「レジストリ書き込みは成功しているが SPIF_SENDCHANGE の
+    /// ブロードキャストで偽陽性が出た」ケースかどうかを判定する。
+    ///
+    /// 偽陽性として扱う HRESULT:
+    ///  - `0x00000000` (S_OK / GetLastError=0): broadcast timeout (応答しないウィンドウ)
+    ///  - `0x80070578` (`HRESULT_FROM_WIN32(ERROR_INVALID_WINDOW_HANDLE=1400)`):
+    ///    HWND_BROADCAST 中に破棄/初期化途中の HWND を踏んだ場合
+    ///    (初回起動直後など、ウィンドウ生成が同時並行している環境で発生)
+    #[cfg(windows)]
+    fn is_broadcast_false_positive(err: &windows::core::Error) -> bool {
+        const HRESULT_INVALID_WINDOW_HANDLE: i32 = 0x80070578u32 as i32;
+        let code = err.code();
+        code.is_ok() || code.0 == HRESULT_INVALID_WINDOW_HANDLE
+    }
+
     /// SystemParametersInfoW を呼び出してカーソル変更を即時反映する
     #[cfg(windows)]
     fn notify_cursor_change() -> AppResult<()> {
@@ -359,17 +375,20 @@ impl RegistryManager {
                 None,
                 SPIF_UPDATEINIFILE | SPIF_SENDCHANGE,
             );
-            // BOOL=FALSE だが GetLastError=0 の場合、これは SPIF_SENDCHANGE が
-            // 内部で行う WM_SETTINGCHANGE のブロードキャストで応答しない
-            // トップレベルウィンドウがあったときに発生する偽陽性。
-            // レジストリ書き込みは完了済みでカーソル自体は反映されるため、
-            // 警告ログのみ残して成功扱いとする。
+            // BOOL=FALSE が返るが実際にはレジストリ書き込みが完了している
+            // 偽陽性のパターンが 2 つある。SPIF_SENDCHANGE が内部で行う
+            // WM_SETTINGCHANGE の HWND_BROADCAST 経路で発生する:
+            //   1. GetLastError=0 (HRESULT=0x00000000): 応答しないトップレベル
+            //      ウィンドウがあったときの broadcast timeout
+            //   2. GetLastError=1400 (HRESULT=0x80070578 ERROR_INVALID_WINDOW_HANDLE):
+            //      初回起動直後など、ブロードキャスト先に破棄中・初期化途中の
+            //      HWND があったとき
+            // どちらもカーソル自体は反映されるため、debug ログで成功扱いにする。
             if let Err(e) = result {
-                if e.code().is_ok() {
-                    // 期待される偽陽性 (無応答ウィンドウへの WM_SETTINGCHANGE
-                    // ブロードキャストタイムアウト)。レジストリ書き込みは成功している。
+                if Self::is_broadcast_false_positive(&e) {
                     tracing::debug!(
-                        "SystemParametersInfoW(SPI_SETCURSORS) BOOL=FALSE / GetLastError=0 (broadcast timeout, ignored)"
+                        "SystemParametersInfoW(SPI_SETCURSORS) broadcast 偽陽性 (HRESULT={:#010x}, ignored)",
+                        e.code().0
                     );
                 } else {
                     return Err(AppError::Registry(format!(
@@ -414,13 +433,13 @@ impl RegistryManager {
                 None,
                 SPIF_UPDATEINIFILE | SPIF_SENDCHANGE,
             );
-            // SPI_SETCURSORS と同じく WM_SETTINGCHANGE ブロードキャスト
-            // タイムアウトの偽陽性を許容する。
+            // SPI_SETCURSORS と同じく WM_SETTINGCHANGE ブロードキャスト系
+            // 偽陽性 (timeout / 無効 HWND) を許容する。詳細は notify_cursor_change を参照。
             if let Err(e) = result {
-                if e.code().is_ok() {
-                    // SPI_SETCURSORS と同じ偽陽性 (broadcast timeout)。
+                if Self::is_broadcast_false_positive(&e) {
                     tracing::debug!(
-                        "SystemParametersInfoW(SPI_SETCURSORSHADOW) BOOL=FALSE / GetLastError=0 (broadcast timeout, ignored)"
+                        "SystemParametersInfoW(SPI_SETCURSORSHADOW) broadcast 偽陽性 (HRESULT={:#010x}, ignored)",
+                        e.code().0
                     );
                 } else {
                     return Err(AppError::Registry(format!(
@@ -613,4 +632,36 @@ pub fn paths_match_current_registry(expected: &HashMap<String, String>) -> bool 
             .map(|c| c.eq_ignore_ascii_case(path))
             .unwrap_or(false)
     })
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::*;
+    use windows::core::{Error as WinError, HRESULT};
+
+    /// `is_broadcast_false_positive` は SPIF_SENDCHANGE 起因の偽陽性を
+    /// 拾い、それ以外の Win32 エラーは伝播させる必要がある。
+    #[test]
+    fn broadcast_false_positive_accepts_s_ok() {
+        // GetLastError=0 (broadcast timeout) → HRESULT 0x00000000
+        let err = WinError::new(HRESULT(0), "");
+        assert!(RegistryManager::is_broadcast_false_positive(&err));
+    }
+
+    #[test]
+    fn broadcast_false_positive_accepts_invalid_window_handle() {
+        // GetLastError=1400 → HRESULT_FROM_WIN32 = 0x80070578
+        let err = WinError::new(HRESULT(0x80070578u32 as i32), "");
+        assert!(RegistryManager::is_broadcast_false_positive(&err));
+    }
+
+    #[test]
+    fn broadcast_false_positive_rejects_other_errors() {
+        // E_FAIL (0x80004005) は本物の失敗として伝播させる
+        let err = WinError::new(HRESULT(0x80004005u32 as i32), "");
+        assert!(!RegistryManager::is_broadcast_false_positive(&err));
+        // ERROR_ACCESS_DENIED (5) のような他の Win32 系も伝播させる
+        let err = WinError::new(HRESULT(0x80070005u32 as i32), "");
+        assert!(!RegistryManager::is_broadcast_false_positive(&err));
+    }
 }

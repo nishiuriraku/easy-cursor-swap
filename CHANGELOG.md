@@ -52,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Library 画面で `get_themes` IPC が返す `source: "marketplace"` を読まず `kind: "local"` がハードコードされていたため、MARKETPLACE タグ表示と編集/エクスポートの readonly ガード UI が効いていなかった問題を修正。
 - 公式インデックスのインストール時に `JSONエラー: missing field "github_username"` が出てダウンロードできない問題を修正。Rust 側 `AuthorRecord` が server の `"github"` キーを `serde(alias)` で受け入れるようにした。
 - 適用中のテーマを Library 詳細ドロワーから削除できてしまう問題を修正。`isActive=true` のとき削除ボタンは disabled になり、IPC 経由でも `delete_theme` がレジストリ実態を照合してアクティブテーマの削除要求を拒否する。
+- インストール直後の初回起動でカーソル変更後に「Windows 既定にリセット」を実行すると `レジストリエラー: SystemParametersInfoW の呼び出しに失敗: ウィンドウ ハンドルが無効です。 (0x80070578)` が表示される問題を修正。`SPIF_SENDCHANGE` が内部で行う `WM_SETTINGCHANGE` の `HWND_BROADCAST` 経路で、ブロードキャスト先に破棄中・初期化途中の HWND があると `GetLastError=1400 (ERROR_INVALID_WINDOW_HANDLE)` が返るが、レジストリ書き込み (実際のカーソル変更) は完了している。従来は `GetLastError=0` (broadcast timeout) のみ偽陽性扱いだったため、`HRESULT_FROM_WIN32(1400) = 0x80070578` も偽陽性ホワイトリストに追加し、`notify_cursor_change` / `set_cursor_shadow` の両経路で吸収するようにした (`registry/mod.rs::is_broadcast_false_positive`)。回帰防止用にユニットテスト 3 件を追加。
 
 ### Security
 
