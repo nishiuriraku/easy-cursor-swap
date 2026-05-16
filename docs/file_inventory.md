@@ -16,18 +16,17 @@
 |---|---|
 | [main.rs](../src-tauri/src/main.rs) | Tauri アプリのエントリ。tracing 初期化、`StartupCheck::begin()`、AppUserModelID 登録、ConfigManager 初期化、孤児カーソル復旧、pending snapshot リカバリ、`tauri::Builder` 構築 (single-instance プラグイン / 各種 plugin / setup でトレイ・ホットキー) |
 | [lib.rs](../src-tauri/src/lib.rs) | 20 モジュールの `pub mod` 宣言 |
-| [commands/mod.rs](../src-tauri/src/commands/mod.rs) | 全 Tauri コマンドのハンドラ登録 (`get_command_handlers()` が 61 IPC を `tauri::generate_handler!` に渡す) |
+| [commands/mod.rs](../src-tauri/src/commands/mod.rs) | 全 Tauri コマンドのハンドラ登録 (`get_command_handlers()` が 52 IPC を `tauri::generate_handler!` に渡す) |
 | [errors.rs](../src-tauri/src/errors.rs) | `AppError` (`thiserror`、`Serialize` 派生で IPC 経由 throw 対応) |
 
-### 1-2. IPC コマンド実体 (10 サブモジュール / 61 個)
+### 1-2. IPC コマンド実体 (9 サブモジュール / 52 個)
 
 | ファイル | 主な IPC |
 |---|---|
 | [commands/cursor_build/](../src-tauri/src/commands/cursor_build/) | `mod` (公開 API + 共通ステート) / `build` (`export_cursorpack`) / `stream` (`export_cursorpack_streamed`、進捗イベント `build-progress`) / `cancel` (`cancel_build`) / `sign` (Ed25519 署名埋込) / `dto` (DTO 定義) |
-| [commands/cursor_io.rs](../src-tauri/src/commands/cursor_io.rs) | `import_cursor_file` (.cur/.ico → PNG) / `inspect_ani_file` (RIFF 解析・プレビュー) / `take_pending_cursorpack` (起動時 argv からの引き継ぎ) |
-| [commands/ani_export.rs](../src-tauri/src/commands/ani_export.rs) | `export_ani_with_hotspot` (.ani 書き出し + hotspot 埋込) |
-| [commands/theme.rs](../src-tauri/src/commands/theme.rs) | `get_cursor_roles` / `get_current_cursors` / `get_themes` / `get_theme_previews` / `get_theme_role_previews` / `apply_theme` / `set_theme_favorite` / `clear_cursor_cache` / `inspect_cursorpack` / `import_cursorpack` / `delete_theme` / `duplicate_theme` / `repackage_theme` |
-| [commands/system.rs](../src-tauri/src/commands/system.rs) | `reset_to_default` / `reset_to_initial` / `get_environment_report` / `get_config` / `update_config` / `get_autostart_status` / `get_app_info` / `list_config_backups` / `restore_config_backup` / `open_url` / `open_log_folder` / `get_accessibility_conflicts` / `check_update_is_major_jump` / `list_crash_reports` / `clear_crash_reports` / `submit_crash_reports` |
+| [commands/cursor_io.rs](../src-tauri/src/commands/cursor_io.rs) | `take_pending_cursorpack` (起動時 argv からの `.cursorpack` 引き継ぎ。 `extract_cursorpack_arg` / `stash_pending_cursorpack` / `handle_pending_cursorpack` ヘルパー含む) |
+| [commands/theme.rs](../src-tauri/src/commands/theme.rs) | `get_themes` / `get_theme_previews` / `get_theme_role_previews` / `apply_theme` / `set_theme_favorite` / `inspect_cursorpack` / `import_cursorpack` / `delete_theme` / `duplicate_theme` / `repackage_theme` |
+| [commands/system.rs](../src-tauri/src/commands/system.rs) | `reset_to_default` / `reset_to_initial` / `get_environment_report` / `get_config` / `update_config` / `get_app_info` / `list_config_backups` / `restore_config_backup` / `open_url` / `open_log_folder` / `get_accessibility_conflicts` / `check_update_is_major_jump` / `list_crash_reports` / `clear_crash_reports` / `submit_crash_reports` |
 | [commands/keystore.rs](../src-tauri/src/commands/keystore.rs) | `keystore_info` / `keystore_generate` / `keystore_delete` / `keystore_export` / `keystore_import` |
 | [commands/marketplace.rs](../src-tauri/src/commands/marketplace.rs) | `marketplace_fetch_index` / `marketplace_install` / `marketplace_fetch_preview` |
 | [commands/marketplace_submit.rs](../src-tauri/src/commands/marketplace_submit.rs) | `start_device_flow` / `complete_device_flow` / `cancel_device_flow` / `submit_theme_auto` / `revoke_github_link` |

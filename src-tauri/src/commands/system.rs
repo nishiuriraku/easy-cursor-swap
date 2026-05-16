@@ -82,14 +82,6 @@ pub fn update_config(
     Ok(saved)
 }
 
-/// 現在の自動起動 (HKCU Run) 登録状態を返す。
-///
-/// 設定 `general.auto_start` とレジストリ実態が乖離していないかの確認用。
-#[tauri::command]
-pub fn get_autostart_status() -> bool {
-    autostart::is_enabled()
-}
-
 /// アプリ情報を返す（バージョン等）
 #[derive(Debug, Serialize)]
 pub struct AppInfo {

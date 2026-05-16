@@ -9,7 +9,7 @@
 //! | モジュール | 担当領域 |
 //! |---|---|
 //! | [`cursor_build`] | `.cur` ビルド / `.cursorpack` エクスポート (同期 / ストリーミング) / 署名 |
-//! | [`cursor_io`]    | 単一 `.cur` / `.ico` / `.ani` ファイルの読み込み |
+//! | [`cursor_io`]    | `.cursorpack` ファイル関連付けハンドオフ |
 //! | [`keystore`]     | Ed25519 鍵ペア管理 (生成 / 削除 / Export / Import) |
 //! | [`marketplace`]  | 公式インデックス取得 / インストール |
 //! | [`marketplace_submit`] | Device Flow 認証 + 自動 PR 作成 |
@@ -20,7 +20,6 @@
 //!
 //! `bulk_import` 系 IPC は [`crate::bulk_import`] に直接定義されている (キャンセル可能なバックグラウンド処理を伴うため)。
 
-pub mod ani_export;
 pub mod cursor_build;
 pub mod cursor_io;
 pub mod keystore;
@@ -39,14 +38,11 @@ pub mod windows_scheme;
 pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
     tauri::generate_handler![
         // テーマ
-        theme::get_cursor_roles,
-        theme::get_current_cursors,
         theme::get_themes,
         theme::get_theme_previews,
         theme::get_theme_role_previews,
         theme::apply_theme,
         theme::set_theme_favorite,
-        theme::clear_cursor_cache,
         theme::inspect_cursorpack,
         theme::import_cursorpack,
         theme::delete_theme,
@@ -56,12 +52,8 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         cursor_build::export_cursorpack,
         cursor_build::stream::export_cursorpack_streamed,
         cursor_build::cancel::cancel_build,
-        // .cur / .ico / .ani 取り込み
-        cursor_io::import_cursor_file,
-        cursor_io::inspect_ani_file,
+        // .cursorpack ファイル関連付けハンドオフ
         cursor_io::take_pending_cursorpack,
-        // .ani 書き出し
-        ani_export::export_ani_with_hotspot,
         // 鍵管理
         keystore::keystore_info,
         keystore::keystore_generate,
@@ -100,7 +92,6 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         system::open_url,
         system::open_log_folder,
         system::get_accessibility_conflicts,
-        system::get_autostart_status,
         system::list_crash_reports,
         system::clear_crash_reports,
         system::submit_crash_reports,

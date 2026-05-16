@@ -52,22 +52,7 @@ fn build_run_command() -> AppResult<String> {
     Ok(format!("\"{}\" --autostart", exe.display()))
 }
 
-/// 自動起動レジストリの状態を確認する。
-///
-/// レジストリに値が存在し、文字列として読み取れる場合のみ `true`。
-/// 値の中身（パス）は検証しない (旧パスが残っているケースも有効扱い)。
-///
-/// MSIX 環境では Run キーは原則使用しないため、AppxManifest の startupTask 宣言
-/// (Enabled=false 初期値) に従い `false` を返す。実際の有効/無効状態の取得は
-/// `Windows.ApplicationModel.StartupTask.GetAsync` を要するが、現状はユーザーが
-/// 「設定 → スタートアップ アプリ」で切替する前提とする。
-pub fn is_enabled() -> bool {
-    if is_msix_packaged() {
-        return false;
-    }
-    is_enabled_with_name(APP_VALUE_NAME)
-}
-
+#[cfg(test)]
 fn is_enabled_with_name(name: &str) -> bool {
     #[cfg(windows)]
     {

@@ -4,51 +4,14 @@
 //! - 適用 (active_theme_id を config に永続化)
 //! - 削除 / 複製 / `.cursorpack` 再エクスポート
 //! - `.cursorpack` の inspect / import
-//! - 17 ロール定義の取得 (`get_cursor_roles`)
 //!
 //! .cur ビルドや署名フローは [`super::cursor_build`] (build / cancel / dto / sign / stream に分割済み)、
 //! Windows スキーム連携は [`super::windows_scheme`] にある。
 
 use crate::config::ConfigManager;
-use crate::cursor::clear_resize_cache;
 use crate::errors::AppError;
-use crate::registry::{CursorRole, RegistryManager};
 use crate::theme::{CursorpackInspection, RolePreview, ThemeManager, ThemeSummary};
-use serde::Serialize;
 use tauri::State;
-
-/// フロントエンドに返すカーソル役割情報
-#[derive(Debug, Serialize)]
-pub struct CursorRoleInfo {
-    /// レジストリ値名
-    pub id: String,
-    /// 日本語表示名
-    pub name_ja: String,
-    /// 英語表示名
-    pub name_en: String,
-    /// Schemes 内でのインデックス
-    pub index: usize,
-}
-
-/// 全17種のカーソル役割情報を返す
-#[tauri::command]
-pub fn get_cursor_roles() -> Vec<CursorRoleInfo> {
-    CursorRole::all()
-        .iter()
-        .map(|role| CursorRoleInfo {
-            id: role.registry_name().to_string(),
-            name_ja: role.display_name_ja().to_string(),
-            name_en: role.display_name_en().to_string(),
-            index: role.scheme_index(),
-        })
-        .collect()
-}
-
-/// 現在のカーソル設定をレジストリから読み取る
-#[tauri::command]
-pub fn get_current_cursors() -> Result<std::collections::HashMap<String, String>, AppError> {
-    RegistryManager::read_current_cursors()
-}
 
 /// テーマ一覧を取得する。
 ///
@@ -150,14 +113,6 @@ pub fn apply_theme(config: State<'_, ConfigManager>, theme_id: String) -> Result
         entry.last_applied_at = Some(now);
     })?;
     Ok(())
-}
-
-/// リサイズ結果キャッシュをクリアする。
-/// クリエイターで素材を差し替えた直後など、明示的にメモリを開放したいときに使用。
-#[tauri::command]
-pub fn clear_cursor_cache() {
-    clear_resize_cache();
-    tracing::info!("リサイズキャッシュをクリアしました");
 }
 
 /// `.cursorpack` をインポートする前のメタデータ検査。

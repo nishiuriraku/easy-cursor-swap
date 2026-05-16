@@ -98,8 +98,8 @@ Vue (UI) ──invoke()──▶ Tauri command (commands/) ──▶ Rust module
 
 | Concern | Modules |
 |---|---|
-| IPC surface | `commands/` (53 `#[tauri::command]` across 9 sub-modules: `theme` / `cursor_build/` (5 files) / `cursor_io` / `ani_export` / `keystore` / `marketplace` / `profile` / `system` / `windows_scheme`) |
-| Config / state | `config.rs` (RwLock + schema migration + backups, Source of Truth), `errors.rs` |
+| IPC surface | `commands/` (52 `#[tauri::command]` across 9 sub-modules: `theme` / `cursor_build/` (5 files) / `cursor_io` / `keystore` / `marketplace` / `marketplace_submit` / `profile` / `system` / `windows_scheme`) |
+| Config / state | `config.rs` (RwLock + schema_version v1 + `config.corrupt.*.json` 退避, Source of Truth), `errors.rs` |
 | Cursor pipeline | `cursor/` (5 files: `image` / `cur_build` / `ico_cur` / `ani` / `ani_write`), `cursor_watcher.rs` |
 | Registry | `registry/` (4 files: `mod` / `scheme` / `roles` / `env`) |
 | Theme packages | `theme/` (3 files: `mod` / `types` / `sanitize`), `bulk_import/` (3 files: `mod` / `assets` / `cursorpack`), `backup.rs` (`.cursorprofile`) |

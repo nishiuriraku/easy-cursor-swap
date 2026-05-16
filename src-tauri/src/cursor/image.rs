@@ -53,7 +53,11 @@ impl ResizeCache {
     }
 }
 
-/// リサイズ結果キャッシュをクリア。テーマ切替時などに呼ぶ。
+/// リサイズ結果キャッシュをクリアする。
+///
+/// 本体コードからは呼び出されないが、`benches/cursor_build.rs` がキャッシュの
+/// ヒット/ミスを切り替えて計測するために `app_lib::cursor::clear_resize_cache`
+/// を参照するため、public API として残している。
 pub fn clear_resize_cache() {
     if let Ok(mut guard) = RESIZE_CACHE.lock() {
         *guard = Some(ResizeCache::new());

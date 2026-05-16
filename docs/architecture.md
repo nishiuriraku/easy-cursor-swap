@@ -16,7 +16,7 @@
                         │ IPC (Tauri 2 / serde)
 ┌───────────────────────▼─────────────────────────────────────────┐
 │ Rust バックエンド  (src-tauri/src/)                              │
-│   commands/ (59 IPC 受け口を 10 サブモジュールに分割)             │
+│   commands/ (52 IPC 受け口を 9 サブモジュールに分割)             │
 │   ├─ config / theme / cursor / registry  ← Source of Truth      │
 │   ├─ marketplace / keystore / bulk_import                       │
 │   └─ tray / hotkey / health / crash                             │
@@ -51,7 +51,7 @@
 
 | カテゴリ | モジュール | 主な役割 |
 |---|---|---|
-| **IPC 表玄関** | `commands/` | 61 個の `#[tauri::command]` を 10 サブモジュールに分割。`mod.rs::get_command_handlers()` が `tauri::generate_handler!` にまとめて渡す。サブモジュール: `theme` / `cursor_build/` (build / cancel / dto / sign / stream の 5 ファイル分割) / `cursor_io` / `ani_export` / `keystore` / `marketplace` / `marketplace_submit` / `profile` / `system` / `windows_scheme` |
+| **IPC 表玄関** | `commands/` | 52 個の `#[tauri::command]` を 9 サブモジュールに分割。`mod.rs::get_command_handlers()` が `tauri::generate_handler!` にまとめて渡す。サブモジュール: `theme` / `cursor_build/` (build / cancel / dto / sign / stream の 5 ファイル分割) / `cursor_io` / `keystore` / `marketplace` / `marketplace_submit` / `profile` / `system` / `windows_scheme` |
 | **GitHub API クライアント** | `github/` | OAuth Device Flow + REST API (`mod.rs` / `types.rs` / `device_flow.rs` / `client.rs`)。Marketplace 自動提出フローから利用。`client_id` は build 時に `option_env!("EASY_CURSOR_SWAP_GITHUB_OAUTH_CLIENT_ID")` で注入。 |
 | **設定 / 状態** | `config.rs` | `AppConfig` / `ConfigManager` (RwLock + schema_version (v1 固定) + パースエラー時 `config.corrupt.*.json` 退避) |
 | | `errors.rs` | `AppError` / `AppResult` 共通型 |
@@ -75,22 +75,21 @@
 
 > 多重起動防止は `tauri_plugin_single_instance::init` プラグインに集約 (argv ハンドオーバ含む)。旧 `single_instance.rs` モジュールは削除済。
 
-### IPC 一覧 (61 commands)
+### IPC 一覧 (52 commands)
 
-`commands::get_command_handlers()` が `tauri::generate_handler!` に登録する 61 個。フロントは `app/composables/useTauri.ts::invokeTauri<T>(name, args)` で呼ぶ。
+`commands::get_command_handlers()` が `tauri::generate_handler!` に登録する 52 個。フロントは `app/composables/useTauri.ts::invokeTauri<T>(name, args)` で呼ぶ。
 
 | カテゴリ | コマンド名 |
 |---|---|
-| テーマ (13) | `get_themes`, `apply_theme`, `delete_theme`, `duplicate_theme`, `repackage_theme`, `get_theme_previews`, `get_theme_role_previews`, `get_cursor_roles`, `get_current_cursors`, `set_theme_favorite`, `clear_cursor_cache`, `inspect_cursorpack`, `import_cursorpack` |
+| テーマ (10) | `get_themes`, `apply_theme`, `delete_theme`, `duplicate_theme`, `repackage_theme`, `get_theme_previews`, `get_theme_role_previews`, `set_theme_favorite`, `inspect_cursorpack`, `import_cursorpack` |
 | .cursorpack ビルド (3) | `export_cursorpack`, `export_cursorpack_streamed`, `cancel_build` |
-| .cur/.ico/.ani 取り込み (3) | `import_cursor_file`, `inspect_ani_file`, `take_pending_cursorpack` |
-| .ani 書き出し (1) | `export_ani_with_hotspot` |
+| .cursorpack ファイル関連付け (1) | `take_pending_cursorpack` |
 | 鍵管理 (5) | `keystore_info`, `keystore_generate`, `keystore_delete`, `keystore_export`, `keystore_import` |
 | マーケットプレース (3) | `marketplace_fetch_index`, `marketplace_install`, `marketplace_fetch_preview` |
 | マーケットプレース自動提出 (5) | `start_device_flow`, `complete_device_flow`, `cancel_device_flow`, `submit_theme_auto`, `revoke_github_link` |
 | プロファイル (2) | `export_profile`, `import_profile` |
 | Windows スキーム (5) | `list_windows_schemes`, `apply_windows_scheme`, `get_windows_scheme_previews`, `get_windows_scheme_role_previews`, `export_windows_scheme_as_cursorpack` |
-| システム / 設定 / 診断 (16) | `reset_to_default`, `reset_to_initial`, `get_environment_report`, `get_config`, `update_config`, `get_app_info`, `list_config_backups`, `restore_config_backup`, `check_update_is_major_jump`, `open_url`, `open_log_folder`, `get_accessibility_conflicts`, `get_autostart_status`, `list_crash_reports`, `clear_crash_reports`, `submit_crash_reports` |
+| システム / 設定 / 診断 (15) | `reset_to_default`, `reset_to_initial`, `get_environment_report`, `get_config`, `update_config`, `get_app_info`, `list_config_backups`, `restore_config_backup`, `check_update_is_major_jump`, `open_url`, `open_log_folder`, `get_accessibility_conflicts`, `list_crash_reports`, `clear_crash_reports`, `submit_crash_reports` |
 | 一括取込 (3) | `bulk_resolve_assets`, `cancel_bulk_import`, `parse_cursorpack_for_creator` |
 
 ### 起動シーケンス (`main.rs`)
@@ -186,7 +185,7 @@ app/
 
 **Rust** (分割完了)
 
-1. ✅ `commands.rs` 1229 行 → `commands/` 10 サブモジュール (うち `cursor_build/` はさらに build / cancel / dto / sign / stream の 5 ファイル分割)
+1. ✅ `commands.rs` 1229 行 → `commands/` 9 サブモジュール (うち `cursor_build/` はさらに build / cancel / dto / sign / stream の 5 ファイル分割)
 2. ✅ `cursor.rs` 1289 行 → `cursor/` 5 サブモジュール
 3. ✅ `theme.rs` 1255 行 → `theme/` 3 ファイル
 4. ✅ `registry.rs` 1020 行 → `registry/` 4 ファイル (mod / scheme / roles / env)
