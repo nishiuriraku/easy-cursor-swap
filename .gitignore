@@ -50,9 +50,5 @@ design/
 docs/legacy/
 docs/superpowers/
 
-# Internal: architecture map visualizations (kept locally, not published)
-docs/architecture.html
-docs/architecture.json
-
 # filter-repo working file (must not be committed)
 /replacements.txt

@@ -1,0 +1,1590 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>EasyCursorSwap — アーキテクチャマップ</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #07090e;
+    --bg-grad: radial-gradient(1200px 600px at 80% -20%, #1a2543 0%, transparent 60%),
+                radial-gradient(900px 500px at 10% 0%, #15102a 0%, transparent 60%),
+                #07090e;
+    --panel: #0f131c;
+    --panel-2: #141a25;
+    --panel-3: #1a2230;
+    --border: #232b3a;
+    --border-soft: #1a212d;
+    --fg: #e6edf3;
+    --fg-dim: #cbd5e1;
+    --muted: #8a94a6;
+    --muted-2: #6b7585;
+    --accent: #7aa2f7;
+    --accent-2: #a06bf2;
+    --accent-3: #38bdf8;
+    --ok: #4ade80;
+    --warn: #f59e0b;
+    --danger: #ef4444;
+    --pink: #ec4899;
+
+    --cat-entry: #94a3b8;
+    --cat-core: #7aa2f7;
+    --cat-observability: #64748b;
+    --cat-ipc: #ec4899;
+    --cat-cursor_pipeline: #f59e0b;
+    --cat-registry: #facc15;
+    --cat-theme: #4ade80;
+    --cat-marketplace: #a06bf2;
+    --cat-security: #ef4444;
+    --cat-reliability: #fb7185;
+    --cat-os_integration: #22d3ee;
+
+    --shadow-card: 0 1px 0 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.35);
+    --shadow-glow: 0 0 0 1px rgba(122,162,247,0.18), 0 12px 40px rgba(122,162,247,0.08);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg-grad);
+    color: var(--fg);
+    font-family: ui-sans-serif, system-ui, "Segoe UI Variable", "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, kbd, .mono {
+    font-family: ui-monospace, "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+    font-size: 0.9em;
+  }
+
+  .app-shell {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr);
+    min-height: 100vh;
+  }
+  aside.toc {
+    position: sticky;
+    top: 0; align-self: start;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 22px 18px;
+    border-right: 1px solid var(--border-soft);
+    background: rgba(7,9,14,0.7);
+    backdrop-filter: blur(8px);
+  }
+  aside.toc .brand {
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 0.4px;
+    color: var(--fg);
+    margin-bottom: 4px;
+  }
+  aside.toc .brand .dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 999px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    margin-right: 7px; vertical-align: middle;
+    box-shadow: 0 0 0 3px rgba(122,162,247,0.15);
+  }
+  aside.toc .brand-sub {
+    color: var(--muted); font-size: 11px; margin-bottom: 18px;
+    letter-spacing: 0.3px;
+  }
+  aside.toc nav a {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12.5px;
+    color: var(--muted);
+    margin-bottom: 1px;
+    border-left: 2px solid transparent;
+  }
+  aside.toc nav a:hover { color: var(--fg); background: rgba(255,255,255,0.02); text-decoration: none; }
+  aside.toc nav a.active { color: var(--fg); border-left-color: var(--accent); background: rgba(122,162,247,0.08); }
+  aside.toc nav a .num {
+    color: var(--muted-2);
+    font-family: ui-monospace, monospace;
+    font-size: 10.5px;
+    width: 16px;
+  }
+  aside.toc nav a.active .num { color: var(--accent); }
+
+  main {
+    padding: 36px 44px 80px;
+    max-width: 1280px;
+    width: 100%;
+  }
+
+  .hero { margin-bottom: 24px; }
+  .hero h1 {
+    margin: 0 0 6px;
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    background: linear-gradient(135deg, #ffffff 0%, #b3c3e0 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .hero .tagline { color: var(--muted); font-size: 14px; margin-bottom: 18px; }
+  .hero .tagline b { color: var(--fg); }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 12px;
+    margin-bottom: 32px;
+  }
+  .stat {
+    background: linear-gradient(180deg, var(--panel-2) 0%, var(--panel) 100%);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    box-shadow: var(--shadow-card);
+    position: relative;
+    overflow: hidden;
+  }
+  .stat::before {
+    content: ""; position: absolute; inset: 0 auto auto 0;
+    width: 3px; height: 100%;
+    background: linear-gradient(180deg, var(--accent), transparent);
+    opacity: 0.7;
+  }
+  .stat .label {
+    font-size: 10.5px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    margin-bottom: 6px;
+  }
+  .stat .value {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--fg);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    font-family: ui-monospace, "JetBrains Mono", Consolas, monospace;
+  }
+  .stat .unit { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .stat.accent-2::before { background: linear-gradient(180deg, var(--accent-2), transparent); }
+  .stat.accent-3::before { background: linear-gradient(180deg, var(--accent-3), transparent); }
+  .stat.ok::before       { background: linear-gradient(180deg, var(--ok), transparent); }
+  .stat.warn::before     { background: linear-gradient(180deg, var(--warn), transparent); }
+  .stat.pink::before     { background: linear-gradient(180deg, var(--pink), transparent); }
+
+  section { margin-top: 40px; scroll-margin-top: 16px; }
+  section > .head {
+    display: flex; align-items: baseline; gap: 12px;
+    margin-bottom: 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  section > .head h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.1px;
+  }
+  section > .head .num {
+    font-family: ui-monospace, monospace;
+    color: var(--muted-2);
+    font-size: 13px;
+  }
+  section > .head .count {
+    color: var(--muted);
+    font-weight: 400;
+    font-size: 12.5px;
+    margin-left: 4px;
+  }
+  section > .head .hint {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .sysmap {
+    background: linear-gradient(180deg, var(--panel-2) 0%, var(--panel) 100%);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+    box-shadow: var(--shadow-card);
+  }
+  .sysmap svg { width: 100%; height: auto; display: block; }
+  .sysmap .legend {
+    margin-top: 12px;
+    display: flex; flex-wrap: wrap; gap: 8px 18px;
+    font-size: 11.5px; color: var(--muted);
+  }
+  .sysmap .legend .sw {
+    display: inline-block; width: 10px; height: 10px; border-radius: 2px;
+    margin-right: 5px; vertical-align: middle;
+  }
+
+  .inv-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 10px;
+  }
+  .inv-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    position: relative;
+  }
+  .inv-card::before {
+    content: "";
+    position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+    background: var(--warn);
+    border-radius: 10px 0 0 10px;
+  }
+  .inv-card .id {
+    color: var(--warn); font-family: ui-monospace, monospace;
+    font-size: 11.5px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+  .inv-card .rule { color: var(--fg-dim); font-size: 12.5px; margin-bottom: 6px; }
+  .inv-card .module {
+    color: var(--muted); font-family: ui-monospace, monospace;
+    font-size: 10.5px; word-break: break-all;
+  }
+
+  .filter-bar {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    margin-bottom: 14px;
+  }
+  .filter-bar input[type="search"] {
+    flex: 1; min-width: 220px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--fg);
+    padding: 9px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.12s;
+  }
+  .filter-bar input[type="search"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(122,162,247,0.12); }
+  .chip {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 5px 11px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.12s;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .chip:hover { color: var(--fg); border-color: #2f3a4a; }
+  .chip.on {
+    background: var(--accent);
+    color: #0b0d12;
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+  .chip .dot {
+    display: inline-block; width: 7px; height: 7px; border-radius: 999px;
+    background: currentColor; opacity: 0.7;
+  }
+
+  .depmap {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow-card);
+  }
+  .depmap svg { width: 100%; height: auto; display: block; }
+  .depmap-cap {
+    color: var(--muted); font-size: 11.5px;
+    margin-top: 6px;
+  }
+
+  .mod-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+    gap: 10px;
+  }
+  .mcard {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px 14px;
+    box-shadow: var(--shadow-card);
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.12s ease, border-color 0.12s ease;
+  }
+  .mcard:hover { transform: translateY(-1px); border-color: #2f3a4a; }
+  .mcard.hidden { display: none; }
+  .mcard::before {
+    content: "";
+    position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+    background: var(--cat-core);
+  }
+  .mcard h4 { margin: 0 0 4px; font-size: 14px; font-family: ui-monospace, monospace; color: var(--fg); }
+  .mcard .file {
+    color: var(--muted); font-size: 10.5px; font-family: ui-monospace, monospace;
+    margin-bottom: 8px; word-break: break-all;
+  }
+  .mcard .role { font-size: 12.5px; color: var(--fg-dim); }
+  .mcard .deps { margin-top: 8px; font-size: 11px; color: var(--muted); line-height: 1.6; }
+  .mcard .deps b { color: var(--fg-dim); font-weight: 600; }
+  .mcard .deps .pill {
+    display: inline-block; background: var(--panel-3); color: var(--fg-dim);
+    border-radius: 4px; padding: 1px 6px; margin: 1px 3px 1px 0;
+    font-family: ui-monospace, monospace; font-size: 10.5px;
+  }
+  .mcard .cat-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 9.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    background: rgba(255,255,255,0.04);
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .mcard.cat-entry::before          { background: var(--cat-entry); }
+  .mcard.cat-core::before           { background: var(--cat-core); }
+  .mcard.cat-observability::before  { background: var(--cat-observability); }
+  .mcard.cat-ipc::before            { background: var(--cat-ipc); }
+  .mcard.cat-cursor_pipeline::before{ background: var(--cat-cursor_pipeline); }
+  .mcard.cat-registry::before       { background: var(--cat-registry); }
+  .mcard.cat-theme::before          { background: var(--cat-theme); }
+  .mcard.cat-marketplace::before    { background: var(--cat-marketplace); }
+  .mcard.cat-security::before       { background: var(--cat-security); }
+  .mcard.cat-reliability::before    { background: var(--cat-reliability); }
+  .mcard.cat-os_integration::before { background: var(--cat-os_integration); }
+  .mcard.cat-entry          .cat-tag { color: var(--cat-entry); }
+  .mcard.cat-core           .cat-tag { color: var(--cat-core); }
+  .mcard.cat-observability  .cat-tag { color: var(--cat-observability); }
+  .mcard.cat-ipc            .cat-tag { color: var(--cat-ipc); }
+  .mcard.cat-cursor_pipeline .cat-tag { color: var(--cat-cursor_pipeline); }
+  .mcard.cat-registry       .cat-tag { color: var(--cat-registry); }
+  .mcard.cat-theme          .cat-tag { color: var(--cat-theme); }
+  .mcard.cat-marketplace    .cat-tag { color: var(--cat-marketplace); }
+  .mcard.cat-security       .cat-tag { color: var(--cat-security); }
+  .mcard.cat-reliability    .cat-tag { color: var(--cat-reliability); }
+  .mcard.cat-os_integration .cat-tag { color: var(--cat-os_integration); }
+
+  .ipc-bars {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+  }
+  .ipc-bar-row {
+    display: grid;
+    grid-template-columns: 140px 1fr 50px;
+    gap: 12px;
+    align-items: center;
+    padding: 5px 0;
+    font-size: 12.5px;
+  }
+  .ipc-bar-row .label {
+    color: var(--fg-dim);
+    font-family: ui-monospace, monospace;
+    font-size: 11.5px;
+  }
+  .ipc-bar-row .bar-track {
+    height: 14px;
+    background: var(--panel-3);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+  .ipc-bar-row .bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: var(--accent);
+    transition: width 0.4s ease;
+  }
+  .ipc-bar-row .count {
+    text-align: right;
+    color: var(--muted);
+    font-family: ui-monospace, monospace;
+    font-size: 11.5px;
+  }
+
+  .table-wrap {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--shadow-card);
+  }
+  table.ipc, table.comp {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  table.ipc th, table.ipc td,
+  table.comp th, table.comp td {
+    text-align: left;
+    padding: 9px 12px;
+    font-size: 12.5px;
+    border-bottom: 1px solid var(--border-soft);
+    vertical-align: top;
+  }
+  table.ipc th, table.comp th {
+    background: var(--panel-2);
+    color: var(--muted);
+    font-weight: 600;
+    letter-spacing: 0.4px;
+    font-size: 11px;
+  }
+  table.ipc tr:last-child td, table.comp tr:last-child td { border-bottom: 0; }
+  table.ipc tr.hidden, table.comp tr.hidden { display: none; }
+  table.ipc tr:hover td, table.comp tr:hover td { background: rgba(255,255,255,0.02); }
+  table.ipc .name, table.comp .name {
+    font-family: ui-monospace, monospace; color: var(--fg);
+  }
+  table.ipc .cat-cell { white-space: nowrap; }
+  table.ipc .cat-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 9.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    background: rgba(255,255,255,0.04);
+  }
+  table.ipc .file, table.comp .compfile {
+    font-family: ui-monospace, monospace;
+    color: var(--muted);
+    font-size: 10.5px;
+    word-break: break-all;
+  }
+  table.comp .compfile { font-size: 10px; margin-top: 2px; }
+  table.ipc .callers span {
+    display: inline-block;
+    border-radius: 4px;
+    padding: 1px 6px;
+    margin: 1px 3px 1px 0;
+    font-size: 10.5px;
+    background: var(--panel-3);
+    border: 1px solid var(--border);
+    color: var(--fg-dim);
+    font-family: ui-monospace, monospace;
+  }
+  table.comp .ipcs span {
+    display: inline-block;
+    border-radius: 4px;
+    padding: 1px 6px;
+    margin: 1px 3px 1px 0;
+    font-size: 10.5px;
+    background: rgba(236,72,153,0.08);
+    border: 1px solid rgba(236,72,153,0.25);
+    color: #f9c0dc;
+    font-family: ui-monospace, monospace;
+  }
+
+  .flowlanes { display: grid; grid-template-columns: 1fr; gap: 12px; }
+  .lane {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    box-shadow: var(--shadow-card);
+  }
+  .lane-head {
+    display: flex; align-items: baseline; gap: 12px;
+    margin-bottom: 10px;
+  }
+  .lane-name {
+    font-size: 16px; font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .lane-file {
+    font-family: ui-monospace, monospace; font-size: 11px; color: var(--muted);
+  }
+  .lane-role { color: var(--fg-dim); font-size: 12.5px; margin-bottom: 12px; }
+  .lane-flow {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    align-items: stretch;
+    position: relative;
+  }
+  .lane-col {
+    background: var(--panel-2);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    padding: 10px 12px;
+    min-height: 80px;
+  }
+  .lane-col .col-head {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .lane-col .col-head .count {
+    background: rgba(255,255,255,0.06);
+    color: var(--fg-dim);
+    border-radius: 999px;
+    padding: 1px 7px;
+    font-family: ui-monospace, monospace;
+    font-size: 10px;
+  }
+  .lane-col .pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin: 1px 3px 1px 0;
+    font-family: ui-monospace, monospace;
+    font-size: 10.5px;
+  }
+  .pill.composable { background: rgba(122,162,247,0.12); border: 1px solid rgba(122,162,247,0.3); color: #c7d6ff; }
+  .pill.component  { background: rgba(74,222,128,0.08);  border: 1px solid rgba(74,222,128,0.25); color: #c2efd2; }
+  .pill.ipc        { background: rgba(236,72,153,0.10); border: 1px solid rgba(236,72,153,0.3); color: #f9c0dc; }
+
+  .comp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+  .vcomp {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    box-shadow: var(--shadow-card);
+  }
+  .vcomp h4 {
+    margin: 0 0 4px; font-size: 13px; font-family: ui-monospace, monospace;
+    color: var(--ok);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .vcomp h4 .badge-n {
+    background: rgba(74,222,128,0.10);
+    color: var(--ok);
+    border: 1px solid rgba(74,222,128,0.3);
+    border-radius: 999px;
+    padding: 1px 7px;
+    font-size: 10px;
+    font-family: ui-monospace, monospace;
+    font-weight: 600;
+  }
+  .vcomp .dir { color: var(--muted); font-size: 10.5px; margin-bottom: 8px; font-family: ui-monospace, monospace; }
+  .vcomp ul { margin: 0; padding-left: 16px; font-size: 12px; color: var(--fg-dim); }
+  .vcomp li { margin: 2px 0; font-family: ui-monospace, monospace; font-size: 11.5px; }
+
+  .ops-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .panebox {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 18px;
+    box-shadow: var(--shadow-card);
+  }
+  .panebox h3 {
+    margin: 0 0 12px; font-size: 14px;
+    color: var(--accent);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .panebox h3 .num { color: var(--muted-2); font-family: ui-monospace, monospace; font-size: 11px; }
+  .panebox ul, .panebox ol { margin: 0; padding-left: 18px; font-size: 12.5px; color: var(--fg-dim); }
+  .panebox li { margin: 4px 0; }
+  .panebox code { color: var(--accent); background: var(--panel-2); padding: 1px 5px; border-radius: 3px; }
+
+  .timeline { list-style: none; padding: 0; margin: 0; }
+  .timeline li {
+    position: relative; padding: 6px 0 6px 28px;
+    font-size: 12.5px; color: var(--fg-dim);
+    border-left: 1px dashed var(--border);
+    margin-left: 6px;
+  }
+  .timeline li::before {
+    content: ""; position: absolute; left: -6px; top: 11px;
+    width: 11px; height: 11px;
+    border-radius: 999px;
+    background: var(--accent);
+    border: 2px solid var(--bg);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  .timeline li:last-child { border-left-color: transparent; }
+  .timeline li .step-num {
+    display: inline-block;
+    color: var(--accent);
+    font-family: ui-monospace, monospace;
+    font-size: 10.5px;
+    margin-right: 6px;
+    font-weight: 700;
+  }
+
+  details.drift {
+    margin-top: 16px;
+    background: linear-gradient(180deg, rgba(245,158,11,0.06) 0%, transparent 100%);
+    border: 1px solid rgba(245,158,11,0.4); border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 12px; color: var(--warn);
+  }
+  details.drift summary { cursor: pointer; font-weight: 600; }
+  details.drift ul { margin: 8px 0 0; padding-left: 20px; color: #fbcf91; }
+
+  footer.bottom {
+    margin-top: 60px; padding: 24px 0 0;
+    color: var(--muted); font-size: 12px;
+    border-top: 1px solid var(--border-soft);
+    text-align: center;
+  }
+  footer.bottom code {
+    color: var(--accent);
+    background: var(--panel-2);
+    padding: 1px 6px; border-radius: 4px;
+  }
+
+  @media (max-width: 1100px) {
+    .stats { grid-template-columns: repeat(3, 1fr); }
+  }
+  @media (max-width: 900px) {
+    .app-shell { grid-template-columns: 1fr; }
+    aside.toc { display: none; }
+    .ops-grid { grid-template-columns: 1fr; }
+    main { padding: 20px; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .lane-flow { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="app-shell">
+
+<aside class="toc">
+  <div class="brand"><span class="dot"></span>EasyCursorSwap</div>
+  <div class="brand-sub">アーキテクチャマップ · 2026-05-16</div>
+  <nav id="toc">
+    <a href="#sysmap"      data-anchor="sysmap"><span class="num">01</span> システム全体図</a>
+    <a href="#invariants"  data-anchor="invariants"><span class="num">02</span> 不変条件</a>
+    <a href="#modules"     data-anchor="modules"><span class="num">03</span> モジュール</a>
+    <a href="#ipc"         data-anchor="ipc"><span class="num">04</span> IPC</a>
+    <a href="#pages"       data-anchor="pages"><span class="num">05</span> ページフロー</a>
+    <a href="#composables" data-anchor="composables"><span class="num">06</span> Composable</a>
+    <a href="#components"  data-anchor="components"><span class="num">07</span> コンポーネント</a>
+    <a href="#ops"         data-anchor="ops"><span class="num">08</span> 運用 &amp; CI</a>
+    <a href="#meta"        data-anchor="meta"><span class="num">09</span> スタック &amp; メタ</a>
+  </nav>
+</aside>
+
+<main>
+
+<header class="hero">
+  <h1>EasyCursorSwap — アーキテクチャマップ</h1>
+  <div class="tagline">
+    Windows 専用カーソルテーママネージャー · <b>Tauri v2</b> + <b>Nuxt 4</b> + <b>Rust 1.82</b>
+    · <span id="genDate"></span>
+  </div>
+  <div class="stats" id="stats"></div>
+</header>
+
+<section id="sysmap">
+  <div class="head">
+    <span class="num">01</span><h2>システム全体図</h2>
+    <span class="hint">レイヤー構成 · データフロー</span>
+  </div>
+  <div class="sysmap">
+    <svg viewBox="0 0 1000 520" xmlns="http://www.w3.org/2000/svg" aria-label="システム全体図">
+      <defs>
+        <linearGradient id="frontGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="rgba(122,162,247,0.18)"/>
+          <stop offset="100%" stop-color="rgba(122,162,247,0.04)"/>
+        </linearGradient>
+        <linearGradient id="backGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="rgba(160,107,242,0.18)"/>
+          <stop offset="100%" stop-color="rgba(160,107,242,0.04)"/>
+        </linearGradient>
+        <linearGradient id="osGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="rgba(56,189,248,0.16)"/>
+          <stop offset="100%" stop-color="rgba(56,189,248,0.03)"/>
+        </linearGradient>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="#7aa2f7"/>
+        </marker>
+        <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="#a06bf2"/>
+        </marker>
+      </defs>
+
+      <rect x="40" y="30" width="920" height="130" rx="14" fill="url(#frontGrad)" stroke="#7aa2f7" stroke-opacity="0.5"/>
+      <text x="60" y="55" fill="#7aa2f7" font-size="13" font-weight="700" font-family="ui-monospace,Consolas,monospace">① フロントエンド — Nuxt 4 SPA · app/</text>
+
+      <g font-family="ui-monospace,Consolas,monospace" font-size="11" fill="#cbd5e1">
+        <g><rect x="70"  y="75" width="170" height="60" rx="8" fill="#0f131c" stroke="#2f3a4a"/><text x="155" y="100" text-anchor="middle" font-size="12" fill="#7aa2f7" font-weight="700">ライブラリ</text><text x="155" y="120" text-anchor="middle" font-size="10" fill="#8a94a6">pages/index.vue</text></g>
+        <g><rect x="260" y="75" width="170" height="60" rx="8" fill="#0f131c" stroke="#2f3a4a"/><text x="345" y="100" text-anchor="middle" font-size="12" fill="#7aa2f7" font-weight="700">クリエイター</text><text x="345" y="120" text-anchor="middle" font-size="10" fill="#8a94a6">pages/creator.vue</text></g>
+        <g><rect x="450" y="75" width="190" height="60" rx="8" fill="#0f131c" stroke="#2f3a4a"/><text x="545" y="100" text-anchor="middle" font-size="12" fill="#7aa2f7" font-weight="700">マーケットプレース</text><text x="545" y="120" text-anchor="middle" font-size="10" fill="#8a94a6">pages/marketplace.vue</text></g>
+        <g><rect x="660" y="75" width="170" height="60" rx="8" fill="#0f131c" stroke="#2f3a4a"/><text x="745" y="100" text-anchor="middle" font-size="12" fill="#7aa2f7" font-weight="700">設定</text><text x="745" y="120" text-anchor="middle" font-size="10" fill="#8a94a6">pages/settings.vue</text></g>
+        <g><rect x="850" y="75" width="100" height="60" rx="8" fill="#0f131c" stroke="#2f3a4a" stroke-dasharray="3 3"/><text x="900" y="100" text-anchor="middle" font-size="11" fill="#fb7185" font-weight="700">PanicFlow</text><text x="900" y="120" text-anchor="middle" font-size="9.5" fill="#8a94a6">モーダル</text></g>
+      </g>
+
+      <g>
+        <line x1="500" y1="160" x2="500" y2="200" stroke="#7aa2f7" stroke-width="2" marker-end="url(#arr)"/>
+        <rect x="380" y="180" width="240" height="36" rx="18" fill="#141a25" stroke="#7aa2f7" stroke-opacity="0.6"/>
+        <text x="500" y="204" text-anchor="middle" fill="#e6edf3" font-size="12" font-family="ui-monospace,Consolas,monospace" font-weight="700">useTauri.invokeTauri()</text>
+        <text x="500" y="234" text-anchor="middle" fill="#8a94a6" font-size="10.5" font-family="ui-monospace,Consolas,monospace">IPC 52 個 · serde · Tauri v2</text>
+        <line x1="500" y1="244" x2="500" y2="270" stroke="#a06bf2" stroke-width="2" marker-end="url(#arr2)"/>
+      </g>
+
+      <rect x="40" y="270" width="920" height="170" rx="14" fill="url(#backGrad)" stroke="#a06bf2" stroke-opacity="0.5"/>
+      <text x="60" y="295" fill="#a06bf2" font-size="13" font-weight="700" font-family="ui-monospace,Consolas,monospace">② バックエンド — Rust 21 モジュール · src-tauri/src/</text>
+
+      <g>
+        <rect x="380" y="310" width="240" height="44" rx="10" fill="#141a25" stroke="#ec4899" stroke-opacity="0.6"/>
+        <text x="500" y="330" text-anchor="middle" fill="#ec4899" font-size="11" font-weight="700" font-family="ui-monospace,Consolas,monospace">commands/ (9 サブモジュール)</text>
+        <text x="500" y="346" text-anchor="middle" fill="#f9c0dc" font-size="10" font-family="ui-monospace,Consolas,monospace">52 個の #[tauri::command]</text>
+      </g>
+
+      <g font-family="ui-monospace,Consolas,monospace" font-size="10">
+        <g><rect x="60"  y="370" width="100" height="56" rx="6" fill="#0f131c" stroke="#4ade80" stroke-opacity="0.5"/><text x="110" y="390" text-anchor="middle" fill="#4ade80" font-weight="700">テーマ</text><text x="110" y="404" text-anchor="middle" fill="#8a94a6" font-size="9">+ backup</text><text x="110" y="418" text-anchor="middle" fill="#8a94a6" font-size="9">+ bulk_import</text></g>
+        <g><rect x="170" y="370" width="100" height="56" rx="6" fill="#0f131c" stroke="#f59e0b" stroke-opacity="0.5"/><text x="220" y="390" text-anchor="middle" fill="#f59e0b" font-weight="700">カーソル</text><text x="220" y="404" text-anchor="middle" fill="#8a94a6" font-size="9">image/cur/ico</text><text x="220" y="418" text-anchor="middle" fill="#8a94a6" font-size="9">ani/ani_write</text></g>
+        <g><rect x="280" y="370" width="100" height="56" rx="6" fill="#0f131c" stroke="#facc15" stroke-opacity="0.5"/><text x="330" y="390" text-anchor="middle" fill="#facc15" font-weight="700">レジストリ</text><text x="330" y="404" text-anchor="middle" fill="#8a94a6" font-size="9">mod/roles</text><text x="330" y="418" text-anchor="middle" fill="#8a94a6" font-size="9">scheme/env</text></g>
+        <g><rect x="390" y="370" width="100" height="56" rx="6" fill="#0f131c" stroke="#a06bf2" stroke-opacity="0.5"/><text x="440" y="390" text-anchor="middle" fill="#a06bf2" font-weight="700">マーケット</text><text x="440" y="404" text-anchor="middle" fill="#8a94a6" font-size="9">+ github</text><text x="440" y="418" text-anchor="middle" fill="#8a94a6" font-size="9">(Device Flow)</text></g>
+        <g><rect x="500" y="370" width="100" height="56" rx="6" fill="#0f131c" stroke="#ef4444" stroke-opacity="0.5"/><text x="550" y="390" text-anchor="middle" fill="#ef4444" font-weight="700">鍵管理</text><text x="550" y="404" text-anchor="middle" fill="#8a94a6" font-size="9">DPAPI Ed25519</text><text x="550" y="418" text-anchor="middle" fill="#8a94a6" font-size="9">.cfkey XChaCha20</text></g>
+        <g><rect x="610" y="370" width="100" height="56" rx="6" fill="#0f131c" stroke="#fb7185" stroke-opacity="0.5"/><text x="660" y="390" text-anchor="middle" fill="#fb7185" font-weight="700">信頼性</text><text x="660" y="404" text-anchor="middle" fill="#8a94a6" font-size="9">health</text><text x="660" y="418" text-anchor="middle" fill="#8a94a6" font-size="9">crash</text></g>
+        <g><rect x="720" y="370" width="100" height="56" rx="6" fill="#0f131c" stroke="#22d3ee" stroke-opacity="0.5"/><text x="770" y="390" text-anchor="middle" fill="#22d3ee" font-weight="700">OS 統合</text><text x="770" y="404" text-anchor="middle" fill="#8a94a6" font-size="9">tray/hotkey</text><text x="770" y="418" text-anchor="middle" fill="#8a94a6" font-size="9">autostart...</text></g>
+        <g><rect x="830" y="370" width="110" height="56" rx="6" fill="#0f131c" stroke="#64748b" stroke-opacity="0.5"/><text x="885" y="390" text-anchor="middle" fill="#94a3b8" font-weight="700">コア</text><text x="885" y="404" text-anchor="middle" fill="#8a94a6" font-size="9">config / errors</text><text x="885" y="418" text-anchor="middle" fill="#8a94a6" font-size="9">logging (PII)</text></g>
+      </g>
+
+      <g stroke="#a06bf2" stroke-opacity="0.45" stroke-width="1.2" fill="none">
+        <path d="M440 354 L110 370" />
+        <path d="M460 354 L220 370" />
+        <path d="M480 354 L330 370" />
+        <path d="M500 354 L440 370" />
+        <path d="M520 354 L550 370" />
+        <path d="M540 354 L660 370" />
+        <path d="M560 354 L770 370" />
+        <path d="M580 354 L885 370" />
+      </g>
+
+      <line x1="500" y1="440" x2="500" y2="470" stroke="#38bdf8" stroke-width="2" marker-end="url(#arr)"/>
+
+      <rect x="40" y="468" width="920" height="44" rx="10" fill="url(#osGrad)" stroke="#38bdf8" stroke-opacity="0.5"/>
+      <text x="60" y="494" fill="#38bdf8" font-size="12" font-weight="700" font-family="ui-monospace,Consolas,monospace">③ Windows レイヤー</text>
+      <text x="500" y="494" text-anchor="middle" fill="#cbd5e1" font-size="11" font-family="ui-monospace,Consolas,monospace">HKCU\Control Panel\Cursors</text>
+      <text x="860" y="494" text-anchor="end" fill="#cbd5e1" font-size="11" font-family="ui-monospace,Consolas,monospace">~/.custom_cursors/</text>
+    </svg>
+
+    <div class="legend">
+      <span><span class="sw" style="background:#7aa2f7"></span>フロントエンド (Vue/Nuxt)</span>
+      <span><span class="sw" style="background:#ec4899"></span>IPC (commands/)</span>
+      <span><span class="sw" style="background:#a06bf2"></span>バックエンド (Rust)</span>
+      <span><span class="sw" style="background:#38bdf8"></span>Windows レイヤー</span>
+      <span style="margin-left:auto; color:var(--muted-2)">HKCU のみ · HKLM 不可 · UAC 不可 · _pending_apply.snapshot 経由のトランザクショナル適用</span>
+    </div>
+  </div>
+</section>
+
+<section id="invariants">
+  <div class="head">
+    <span class="num">02</span><h2>クリティカル不変条件</h2><span class="count" id="invCount"></span>
+    <span class="hint">絶対に守るルール · ルールごとの担当モジュール</span>
+  </div>
+  <div class="inv-grid" id="invGrid"></div>
+</section>
+
+<section id="modules">
+  <div class="head">
+    <span class="num">03</span><h2>バックエンドモジュール</h2><span class="count" id="modCount"></span>
+    <span class="hint">カテゴリで絞り込み · 下部に依存関係マップ</span>
+  </div>
+  <div class="depmap">
+    <svg id="depmapSvg" viewBox="0 0 1000 360" xmlns="http://www.w3.org/2000/svg" aria-label="モジュール依存マップ"></svg>
+    <div class="depmap-cap">矢印は <code>depends_on</code> (データソース: <code>backend.modules[].depends_on</code>)。ノードはカテゴリで左右にレーン配置。</div>
+  </div>
+  <div class="filter-bar">
+    <input type="search" id="modSearch" placeholder="🔍  モジュールを名前・ファイル・役割で絞り込み…">
+    <span class="chip on" data-cat="all">すべて</span>
+    <span class="chip" data-cat="entry"><span class="dot" style="background:var(--cat-entry)"></span>entry</span>
+    <span class="chip" data-cat="core"><span class="dot" style="background:var(--cat-core)"></span>core</span>
+    <span class="chip" data-cat="ipc"><span class="dot" style="background:var(--cat-ipc)"></span>ipc</span>
+    <span class="chip" data-cat="cursor_pipeline"><span class="dot" style="background:var(--cat-cursor_pipeline)"></span>cursor</span>
+    <span class="chip" data-cat="registry"><span class="dot" style="background:var(--cat-registry)"></span>registry</span>
+    <span class="chip" data-cat="theme"><span class="dot" style="background:var(--cat-theme)"></span>theme</span>
+    <span class="chip" data-cat="marketplace"><span class="dot" style="background:var(--cat-marketplace)"></span>marketplace</span>
+    <span class="chip" data-cat="security"><span class="dot" style="background:var(--cat-security)"></span>security</span>
+    <span class="chip" data-cat="reliability"><span class="dot" style="background:var(--cat-reliability)"></span>reliability</span>
+    <span class="chip" data-cat="os_integration"><span class="dot" style="background:var(--cat-os_integration)"></span>os</span>
+    <span class="chip" data-cat="observability"><span class="dot" style="background:var(--cat-observability)"></span>obs</span>
+  </div>
+  <div class="mod-grid" id="modGrid"></div>
+</section>
+
+<section id="ipc">
+  <div class="head">
+    <span class="num">04</span><h2>IPC コマンド</h2><span class="count" id="ipcCount"></span>
+    <span class="hint">commands/mod.rs が公開する 52 エンドポイント</span>
+  </div>
+  <div class="ipc-bars" id="ipcBars"></div>
+  <div class="filter-bar">
+    <input type="search" id="ipcSearch" placeholder="🔍  IPC を名前・ファイル・呼び出し元で絞り込み…">
+    <span class="chip on" data-cat="all">すべて</span>
+    <span class="chip" data-cat="theme">theme</span>
+    <span class="chip" data-cat="cursorpack_build">build</span>
+    <span class="chip" data-cat="cursorpack_assoc">assoc</span>
+    <span class="chip" data-cat="keystore">keystore</span>
+    <span class="chip" data-cat="marketplace">marketplace</span>
+    <span class="chip" data-cat="marketplace_submit">mp_submit</span>
+    <span class="chip" data-cat="profile">profile</span>
+    <span class="chip" data-cat="windows_scheme">win_scheme</span>
+    <span class="chip" data-cat="system">system</span>
+    <span class="chip" data-cat="bulk_import">bulk_import</span>
+  </div>
+  <div class="table-wrap">
+    <table class="ipc">
+      <thead><tr><th>コマンド</th><th>カテゴリ</th><th>ファイル</th><th>フロントの呼び出し元</th></tr></thead>
+      <tbody id="ipcBody"></tbody>
+    </table>
+  </div>
+</section>
+
+<section id="pages">
+  <div class="head">
+    <span class="num">05</span><h2>ページ → Composable → IPC</h2>
+    <span class="hint">ページごとの 3 カラムレーン</span>
+  </div>
+  <div class="flowlanes" id="pageList"></div>
+</section>
+
+<section id="composables">
+  <div class="head">
+    <span class="num">06</span><h2>Composable</h2><span class="count" id="compCount"></span>
+    <span class="hint">app/composables/*.ts · IPC バインディング</span>
+  </div>
+  <div class="filter-bar">
+    <input type="search" id="compSearch" placeholder="🔍  Composable を名前・役割・IPC で絞り込み…">
+  </div>
+  <div class="table-wrap">
+    <table class="comp">
+      <thead><tr><th>Composable</th><th>役割</th><th>IPC 呼び出し</th></tr></thead>
+      <tbody id="compBody"></tbody>
+    </table>
+  </div>
+</section>
+
+<section id="components">
+  <div class="head">
+    <span class="num">07</span><h2>フロントエンドコンポーネント</h2><span class="count" id="vcompCount"></span>
+    <span class="hint">app/components/{group}/ · basename で参照 (pathPrefix:false)</span>
+  </div>
+  <div class="comp-grid" id="vcompGrid"></div>
+</section>
+
+<section id="ops">
+  <div class="head">
+    <span class="num">08</span><h2>起動シーケンス · 検証 · CI</h2>
+    <span class="hint">main.rs のシーケンス · 正準ゲート · 3 ワークフロー</span>
+  </div>
+  <div class="ops-grid">
+    <div class="panebox">
+      <h3><span>🚀</span> 起動シーケンス <span class="num">main.rs</span></h3>
+      <ul class="timeline" id="startupList"></ul>
+    </div>
+    <div class="panebox">
+      <h3><span>✅</span> 検証ゲート <span class="num">scripts/verify-gate.sh</span></h3>
+      <ul id="gateList"></ul>
+      <div style="margin-top:10px; color:var(--muted); font-size:11.5px;">
+        リリース時に追加: <code id="gateRelease"></code>
+      </div>
+      <h3 style="margin-top:18px;"><span>🤖</span> CI ワークフロー <span class="num">.github/workflows/</span></h3>
+      <ul id="ciList"></ul>
+    </div>
+  </div>
+</section>
+
+<section id="meta">
+  <div class="head">
+    <span class="num">09</span><h2>技術スタック · 外部リポジトリ · 落とし穴</h2>
+  </div>
+  <div class="ops-grid">
+    <div class="panebox">
+      <h3><span>🧱</span> 技術スタック</h3>
+      <ul id="stackList"></ul>
+      <h3 style="margin-top:18px;"><span>🔗</span> 外部リポジトリ</h3>
+      <ul id="extList"></ul>
+    </div>
+    <div class="panebox">
+      <h3><span>⚠️</span> 落とし穴 (ハマりやすい箇所)</h3>
+      <ul id="pitfallList"></ul>
+      <h3 style="margin-top:18px;"><span>📁</span> ファイルシステム配置</h3>
+      <ul id="fsList" class="mono" style="font-size:11.5px;"></ul>
+    </div>
+  </div>
+  <details class="drift">
+    <summary>⚠️ Living-doc ドリフト警告 — <code>docs/</code> の数字を信用する前にこちらを読む</summary>
+    <ul id="driftList"></ul>
+  </details>
+</section>
+
+<footer class="bottom">
+  <code>docs/architecture.json</code> の単一ファイルビューア。
+  コードを変更したら両ファイルを同じコミットで更新してください (<code>CLAUDE.md</code> の「Documentation update policy」参照)。
+</footer>
+
+</main>
+</div>
+
+<script id="data" type="application/json">
+{
+  "$schema_version": "0.1.0",
+  "generated_at": "2026-05-16",
+  "meta": {
+    "name": "EasyCursorSwap",
+    "package_name": "easy-cursor-swap",
+    "description": "Windows 専用のカーソルテーマ管理デスクトップアプリ",
+    "stack": {
+      "frontend": "Nuxt 4 / Vue 3 SPA、Composition API、TypeScript、Tailwind v4",
+      "backend": "Rust 1.82+ (windows、winreg、image、tracing、ed25519-dalek)",
+      "shell": "Tauri v2 (single-instance プラグイン、updater、システムトレイ)",
+      "distribution": "SignPath 署名の NSIS / MSI インストーラ; Tauri Updater は Ed25519",
+      "test_runners": "vitest + happy-dom (フロント)、cargo test --lib + criterion (バックエンド)"
+    },
+    "measured_counts": {
+      "rust_modules_in_lib_rs": 21,
+      "tauri_ipc_commands": 52,
+      "composables": 26,
+      "pages_vue": 4,
+      "pages_ts_helpers": 2,
+      "components_total": 51,
+      "ci_workflows": 3
+    },
+    "doc_drift_warnings": [
+      "docs/file_inventory.md は composables を 25 と書いているが実測 26 (useMarketplaceSubmit 追加時に件数を更新し忘れ)。",
+      "docs/file_inventory.md は settings コンポーネントを 12 と書いているが実測 14。",
+      "docs/architecture.md は composables を 21 と書いているが実測 26 (古いスナップショット)。"
+    ],
+    "filesystem_locations": {
+      "user_themes_dir": "~/.custom_cursors/<theme-uuid>/ (アンインストール後も残存)",
+      "config_dir": "~/.custom_cursors/config.json",
+      "key_storage": "~/.custom_cursors/_keys/ (DPAPI 暗号化された Ed25519)",
+      "pending_snapshot": "~/.custom_cursors/_pending_apply.snapshot",
+      "initial_snapshot": "~/.custom_cursors/_initial_snapshot.json",
+      "crash_reports": "%LOCALAPPDATA%/easy-cursor-swap/crash/panic-{epoch}.json",
+      "registry_root": "HKCU\\Control Panel\\Cursors",
+      "registry_schemes": "HKCU\\Control Panel\\Cursors\\Schemes"
+    }
+  },
+  "critical_invariants": [
+    { "id": "hkcu_only", "rule": "HKCU のみを書き換える — HKLM を触らない、UAC を発生させない", "responsible_module": "src-tauri/src/registry/mod.rs" },
+    { "id": "transactional_apply", "rule": "適用はトランザクショナル: 変更前に _pending_apply.snapshot を書き、成功時に削除。起動時に残骸を検出したら自動巻き戻し。", "responsible_module": "src-tauri/src/registry/mod.rs" },
+    { "id": "initial_snapshot", "rule": "初回起動時のスナップショットを _initial_snapshot.json として保存。パニックボタン (Ctrl+Alt+Shift+R) は Windows 既定値またはこの初回スナップショットへ復元。", "responsible_module": "src-tauri/src/registry/mod.rs (save_initial_snapshot)" },
+    { "id": "user_themes_survive_uninstall", "rule": "カーソルファイルは ~/.custom_cursors/ に置く。アンインストール後も残す。", "responsible_module": "src-tauri/src/theme/mod.rs" },
+    { "id": "pii_redaction", "rule": "tracing ログ: パスは logging::redact_path、ハッシュは logging::short_hash (12 文字) を経由。レジストリの生値や完全な SHA-256 を出さない。", "responsible_module": "src-tauri/src/logging.rs" },
+    { "id": "archive_sanitization", "rule": ".cursorpack / .cursorprofile を展開するコードはすべて theme::sanitize_archive_path を経由。サイズガード: 50 / 200 / 10 / 1024 MB。", "responsible_module": "src-tauri/src/theme/sanitize.rs" },
+    { "id": "no_v_html", "rule": "Vue では v-html を絶対に使わない。SVG アイコンは render 関数経由。ユーザー由来の SVG は sanitizeSvg を必ず通す。", "responsible_module": "app/components/icons/* + app/composables/sanitizeSvg.ts" },
+    { "id": "spa_only_ssr_false", "rule": "nuxt.config.ts の routeRules: { '/**': { ssr: false } } は意図的 — Nuxt 4.4.4 のトップレベル ssr: false に IPC バグがあるため。変更しないこと。", "responsible_module": "nuxt.config.ts" },
+    { "id": "marketplace_readonly_themes", "rule": "マーケットプレースからインストールしたテーマは読み取り専用。repackage_theme は marketplace 由来テーマの編集・エクスポートを拒否する。", "responsible_module": "src-tauri/src/commands/theme.rs (repackage_theme)" },
+    { "id": "marketplace_verify", "rule": "マーケットプレースのパックはダウンロード後に必ず SHA-256 + Ed25519 を検証。Content-Length で三段階サイズガード。", "responsible_module": "src-tauri/src/marketplace.rs (verify_pack)" },
+    { "id": "github_oauth_scope", "rule": "マーケットプレース自動提出の GitHub OAuth トークンは DPAPI 暗号化、scope は public_repo に限定。", "responsible_module": "keystore.rs + github/device_flow.rs" },
+    { "id": "png_metadata_strip", "rule": "PNG 取り込み時に eXIf / iTXt / zTXt メタデータを剥離。", "responsible_module": "src-tauri/src/cursor/image.rs" },
+    { "id": "tls_rustls", "rule": "HTTPS は rustls-tls を使用 (OS の TLS スタックに依存しない)。Cargo.toml の reqwest features で指定。", "responsible_module": "src-tauri/Cargo.toml" },
+    { "id": "marketplace_preview_guard", "rule": "プレビュー PNG 取得は URL スキーム + ホスト + 役割名を検証。500KB を超えるレスポンスは拒否。", "responsible_module": "src-tauri/src/marketplace.rs (fetch_preview)" },
+    { "id": "key_export_passphrase", "rule": "鍵エクスポートは XChaCha20-Poly1305 + Argon2id によるパスフレーズ暗号化 (.cfkey 形式)。", "responsible_module": "src-tauri/src/keystore.rs" }
+  ],
+  "backend": {
+    "modules": [
+      { "name": "main", "file": "src-tauri/src/main.rs", "category": "entry", "role": "Tauri アプリのエントリポイント。tracing 初期化、StartupCheck::begin()、AppUserModelID 登録、ConfigManager 初期化、孤児参照の復旧、pending snapshot リカバリ、tauri::Builder 構築までを担当。", "depends_on": ["lib"] },
+      { "name": "lib", "file": "src-tauri/src/lib.rs", "category": "entry", "role": "21 個の pub mod を宣言する正準モジュールリスト。", "depends_on": [] },
+      { "name": "errors", "file": "src-tauri/src/errors.rs", "category": "core", "role": "AppError (thiserror、IPC throw 用に Serialize 派生) と AppResult 型エイリアス。", "depends_on": [] },
+      { "name": "config", "file": "src-tauri/src/config.rs", "category": "core", "role": "AppConfig を RwLock で管理。schema_version=v1。パース失敗時は corrupt ファイルを退避。アプリ状態の Source of Truth。", "depends_on": ["errors", "logging"] },
+      { "name": "logging", "file": "src-tauri/src/logging.rs", "category": "observability", "role": "tracing-appender の日次ローテーション (14 日 / 100MB 上限)。PII ヘルパー redact_path + short_hash (12 文字)。", "depends_on": [] },
+      { "name": "commands", "file": "src-tauri/src/commands/mod.rs", "category": "ipc", "role": "9 個のサブモジュール。get_command_handlers() が 52 個の #[tauri::command] を登録。", "depends_on": ["theme", "cursor", "registry", "marketplace", "keystore", "config", "bulk_import", "github", "backup", "crash", "health", "accessibility", "environment", "autostart"] },
+      { "name": "cursor", "file": "src-tauri/src/cursor/mod.rs", "category": "cursor_pipeline", "role": "5 ファイル構成のパイプライン: image (リサイズ/ホットスポット/メタデータ剥離)、cur_build (PNG → 6 サイズ .cur)、ico_cur (パーサー)、ani (RIFF/ACON パーサー)、ani_write (書き出し)。", "depends_on": ["errors"] },
+      { "name": "cursor_watcher", "file": "src-tauri/src/cursor_watcher.rs", "category": "cursor_pipeline", "role": "不可視ウィンドウで WM_SETTINGCHANGE を購読。Windows コントロールパネルが変更を加えると cursor-changed イベントを発火。", "depends_on": ["logging"] },
+      { "name": "registry", "file": "src-tauri/src/registry/mod.rs", "category": "registry", "role": "HKCU\\Control Panel\\Cursors の読み書き。SPI_SETCURSORS。_pending_apply.snapshot 経由のトランザクショナル適用。4 ファイル構成。", "depends_on": ["errors", "logging"] },
+      { "name": "theme", "file": "src-tauri/src/theme/mod.rs", "category": "theme", "role": "ThemeManager。.cursorpack の作成・取り込み・検証。Ed25519 署名埋込。3 ファイル構成。", "depends_on": ["cursor", "errors", "logging", "keystore"] },
+      { "name": "bulk_import", "file": "src-tauri/src/bulk_import/mod.rs", "category": "theme", "role": "CancelRegistry + 進捗イベント。並列アセット解決、ファジー役割マッチング、並列リサンプリング。3 ファイル構成。", "depends_on": ["theme", "cursor", "errors"] },
+      { "name": "backup", "file": "src-tauri/src/backup.rs", "category": "theme", "role": ".cursorprofile zip の入出力。ProfileEnvelope。マージ/上書きモード。", "depends_on": ["theme", "config", "errors"] },
+      { "name": "marketplace", "file": "src-tauri/src/marketplace.rs", "category": "marketplace", "role": "MarketplaceClient。reqwest(rustls) + SHA-256 + Ed25519。50MB Content-Length ガード。", "depends_on": ["keystore", "theme", "errors", "logging"] },
+      { "name": "keystore", "file": "src-tauri/src/keystore.rs", "category": "security", "role": "Ed25519 鍵ペア (DPAPI 暗号化)。.cfkey 形式は XChaCha20-Poly1305 + Argon2id。GitHub OAuth トークンも DPAPI 暗号化。", "depends_on": ["errors", "logging"] },
+      { "name": "github", "file": "src-tauri/src/github/mod.rs", "category": "marketplace", "role": "GitHub OAuth Device Flow + REST クライアント。4 ファイル構成。scope は public_repo のみ。", "depends_on": ["keystore", "errors", "logging"] },
+      { "name": "health", "file": "src-tauri/src/health.rs", "category": "reliability", "role": "startup.json で連続失敗回数をカウント。3 回連続失敗でロールバックダイアログを表示。", "depends_on": [] },
+      { "name": "crash", "file": "src-tauri/src/crash.rs", "category": "reliability", "role": "install_panic_hook。%LOCALAPPDATA%/crash/panic-{epoch}.json に書き出し。オプトインで送信。", "depends_on": ["logging"] },
+      { "name": "tray", "file": "src-tauri/src/tray.rs", "category": "os_integration", "role": "システムトレイアイコン。show_or_recreate_main_window。", "depends_on": [] },
+      { "name": "hotkey", "file": "src-tauri/src/hotkey.rs", "category": "os_integration", "role": "RegisterHotKey で Ctrl+Alt+Shift+R → panic-hotkey イベントを発火。", "depends_on": [] },
+      { "name": "autostart", "file": "src-tauri/src/autostart.rs", "category": "os_integration", "role": "HKCU\\Run の自動起動。Config が Source of Truth。MSIX は startupTask へフォールバック。", "depends_on": ["config"] },
+      { "name": "appusermodel", "file": "src-tauri/src/appusermodel.rs", "category": "os_integration", "role": "Windows トースト発信元として AppUserModelID を登録。", "depends_on": [] },
+      { "name": "accessibility", "file": "src-tauri/src/accessibility.rs", "category": "os_integration", "role": "CursorIndicator / ContrastScheme / CursorBaseSize の競合を検出。", "depends_on": [] },
+      { "name": "environment", "file": "src-tauri/src/environment.rs", "category": "os_integration", "role": "RDP / Citrix / Server を検出。動作対象外環境ではレジストリ書込を抑制する場合あり。", "depends_on": [] }
+    ],
+    "ipc_commands": [
+      { "name": "get_themes", "category": "theme", "file": "commands/theme.rs", "frontend_callers": ["useThemes", "pages/index.vue", "pages/marketplace.vue"] },
+      { "name": "apply_theme", "category": "theme", "file": "commands/theme.rs", "frontend_callers": ["useThemes", "ApplyModal.vue"] },
+      { "name": "delete_theme", "category": "theme", "file": "commands/theme.rs", "frontend_callers": ["useThemes"] },
+      { "name": "duplicate_theme", "category": "theme", "file": "commands/theme.rs", "frontend_callers": ["useThemes"] },
+      { "name": "repackage_theme", "category": "theme", "file": "commands/theme.rs", "frontend_callers": ["useThemes", "useCreatorExport"] },
+      { "name": "get_theme_previews", "category": "theme", "file": "commands/theme.rs", "frontend_callers": ["useThemePreviews"] },
+      { "name": "get_theme_role_previews", "category": "theme", "file": "commands/theme.rs", "frontend_callers": ["useThemePreviews"] },
+      { "name": "set_theme_favorite", "category": "theme", "file": "commands/theme.rs", "frontend_callers": ["useThemes"] },
+      { "name": "inspect_cursorpack", "category": "theme", "file": "commands/theme.rs", "frontend_callers": ["useThemes", "useCursorpackOpener"] },
+      { "name": "import_cursorpack", "category": "theme", "file": "commands/theme.rs", "frontend_callers": ["useThemes", "useCursorpackOpener"] },
+      { "name": "export_cursorpack", "category": "cursorpack_build", "file": "commands/cursor_build/mod.rs", "frontend_callers": ["useCreatorExport"] },
+      { "name": "export_cursorpack_streamed", "category": "cursorpack_build", "file": "commands/cursor_build/stream.rs", "frontend_callers": ["useCreatorExport"] },
+      { "name": "cancel_build", "category": "cursorpack_build", "file": "commands/cursor_build/cancel.rs", "frontend_callers": ["useCreatorExport"] },
+      { "name": "take_pending_cursorpack", "category": "cursorpack_assoc", "file": "commands/cursor_io.rs", "frontend_callers": ["useCursorpackOpener"] },
+      { "name": "keystore_info", "category": "keystore", "file": "commands/keystore.rs", "frontend_callers": ["useKeystore", "pages/creator.vue", "pages/marketplace.vue"] },
+      { "name": "keystore_generate", "category": "keystore", "file": "commands/keystore.rs", "frontend_callers": ["useKeystore"] },
+      { "name": "keystore_delete", "category": "keystore", "file": "commands/keystore.rs", "frontend_callers": ["useKeystore"] },
+      { "name": "keystore_export", "category": "keystore", "file": "commands/keystore.rs", "frontend_callers": ["useKeystore"] },
+      { "name": "keystore_import", "category": "keystore", "file": "commands/keystore.rs", "frontend_callers": ["useKeystore"] },
+      { "name": "marketplace_fetch_index", "category": "marketplace", "file": "commands/marketplace.rs", "frontend_callers": ["pages/marketplace.vue"] },
+      { "name": "marketplace_install", "category": "marketplace", "file": "commands/marketplace.rs", "frontend_callers": ["pages/marketplace.vue"] },
+      { "name": "marketplace_fetch_preview", "category": "marketplace", "file": "commands/marketplace.rs", "frontend_callers": ["useMarketplacePreviews"] },
+      { "name": "start_device_flow", "category": "marketplace_submit", "file": "commands/marketplace_submit.rs", "frontend_callers": ["useGithubAuth"] },
+      { "name": "complete_device_flow", "category": "marketplace_submit", "file": "commands/marketplace_submit.rs", "frontend_callers": ["useGithubAuth"] },
+      { "name": "cancel_device_flow", "category": "marketplace_submit", "file": "commands/marketplace_submit.rs", "frontend_callers": ["useGithubAuth"] },
+      { "name": "submit_theme_auto", "category": "marketplace_submit", "file": "commands/marketplace_submit.rs", "frontend_callers": ["useMarketplaceSubmit"] },
+      { "name": "revoke_github_link", "category": "marketplace_submit", "file": "commands/marketplace_submit.rs", "frontend_callers": ["useGithubAuth"] },
+      { "name": "export_profile", "category": "profile", "file": "commands/profile.rs", "frontend_callers": ["useAppSettings", "SecuritySection.vue"] },
+      { "name": "import_profile", "category": "profile", "file": "commands/profile.rs", "frontend_callers": ["useAppSettings"] },
+      { "name": "list_windows_schemes", "category": "windows_scheme", "file": "commands/windows_scheme.rs", "frontend_callers": ["pages/index.vue"] },
+      { "name": "apply_windows_scheme", "category": "windows_scheme", "file": "commands/windows_scheme.rs", "frontend_callers": ["pages/index.vue"] },
+      { "name": "get_windows_scheme_previews", "category": "windows_scheme", "file": "commands/windows_scheme.rs", "frontend_callers": ["pages/index.vue"] },
+      { "name": "get_windows_scheme_role_previews", "category": "windows_scheme", "file": "commands/windows_scheme.rs", "frontend_callers": ["pages/index.vue"] },
+      { "name": "export_windows_scheme_as_cursorpack", "category": "windows_scheme", "file": "commands/windows_scheme.rs", "frontend_callers": ["pages/index.vue"] },
+      { "name": "reset_to_default", "category": "system", "file": "commands/system.rs", "frontend_callers": ["PanicFlow.vue"] },
+      { "name": "reset_to_initial", "category": "system", "file": "commands/system.rs", "frontend_callers": ["PanicFlow.vue"] },
+      { "name": "get_environment_report", "category": "system", "file": "commands/system.rs", "frontend_callers": ["EnvironmentBanner.vue"] },
+      { "name": "get_config", "category": "system", "file": "commands/system.rs", "frontend_callers": ["useAppSettings"] },
+      { "name": "update_config", "category": "system", "file": "commands/system.rs", "frontend_callers": ["useAppSettings"] },
+      { "name": "get_app_info", "category": "system", "file": "commands/system.rs", "frontend_callers": ["useAppInfo"] },
+      { "name": "list_config_backups", "category": "system", "file": "commands/system.rs", "frontend_callers": ["ConfigRecoveryPanel.vue"] },
+      { "name": "restore_config_backup", "category": "system", "file": "commands/system.rs", "frontend_callers": ["ConfigRecoveryPanel.vue"] },
+      { "name": "check_update_is_major_jump", "category": "system", "file": "commands/system.rs", "frontend_callers": ["useUpdater"] },
+      { "name": "open_url", "category": "system", "file": "commands/system.rs", "frontend_callers": ["pages/marketplace.vue", "AboutSection.vue"] },
+      { "name": "open_log_folder", "category": "system", "file": "commands/system.rs", "frontend_callers": ["LoggingSection.vue"] },
+      { "name": "get_accessibility_conflicts", "category": "system", "file": "commands/system.rs", "frontend_callers": ["pages/settings.vue"] },
+      { "name": "list_crash_reports", "category": "system", "file": "commands/system.rs", "frontend_callers": ["LoggingSection.vue"] },
+      { "name": "clear_crash_reports", "category": "system", "file": "commands/system.rs", "frontend_callers": ["LoggingSection.vue"] },
+      { "name": "submit_crash_reports", "category": "system", "file": "commands/system.rs", "frontend_callers": ["LoggingSection.vue"] },
+      { "name": "bulk_resolve_assets", "category": "bulk_import", "file": "bulk_import/assets.rs", "frontend_callers": ["useBulkImport", "useCreatorBulkImportFlow"] },
+      { "name": "cancel_bulk_import", "category": "bulk_import", "file": "bulk_import/assets.rs", "frontend_callers": ["useBulkImport"] },
+      { "name": "parse_cursorpack_for_creator", "category": "bulk_import", "file": "bulk_import/cursorpack.rs", "frontend_callers": ["useCreatorBulkImportFlow"] }
+    ],
+    "startup_sequence": [
+      "tracing ロガーを初期化 (フォールバック付き)",
+      "StartupCheck::begin — 3 回連続失敗するとロールバックダイアログを表示",
+      "AppUserModelID を登録 (appusermodel::register_aumid)",
+      "ConfigManager::init — 失敗時は config.corrupt.*.json の場所を案内して終了",
+      "autostart::set_enabled で config をレジストリに反映",
+      "RegistryManager::save_initial_snapshot (初回起動のみ)",
+      "ThemeManager::cleanup_orphan_references で孤児参照を整理",
+      "RegistryManager::check_pending_snapshot — 残骸があれば前回の適用が中断したと判断し Windows 既定値へ復元",
+      "tauri::Builder + tauri_plugin_single_instance (.cursorpack の argv ハンドオフ)",
+      "setup{}: tray::setup_tray、パニックホットキー登録、カーソルウォッチャ起動",
+      "成功時: mark_healthy (失敗カウンタをリセット)"
+    ]
+  },
+  "frontend": {
+    "pages": [
+      {
+        "file": "app/pages/index.vue", "name": "ライブラリ",
+        "role": "テーマライブラリ — グリッド/リスト、タグフィルタ、インポート、ドラッグ&ドロップ。",
+        "composables": ["useThemes", "useCursorpackOpener", "useThemePreviews"],
+        "components": ["ThemeCard", "ThemeRow", "ThemeDetailModal", "ThemeDetailDrawer", "ApplyModal", "ImportConflictDialog", "ThemePickerModal", "CursorMatrix", "LibraryToolbar", "LibraryFilterBar", "LibraryEmptyState", "LibraryDropOverlay"],
+        "ipc_calls": ["get_themes", "apply_theme", "import_cursorpack", "inspect_cursorpack", "delete_theme", "duplicate_theme", "repackage_theme", "list_windows_schemes", "apply_windows_scheme", "get_windows_scheme_previews", "set_theme_favorite", "take_pending_cursorpack"]
+      },
+      {
+        "file": "app/pages/creator.vue", "name": "クリエイター",
+        "role": "テーマ作成モード (3 カラム UI) · 一括インポート · .cursorpack エクスポート。",
+        "composables": ["useCreatorAssets", "useCreatorPickers", "useCreatorImport", "useCreatorBulkImportFlow", "useCreatorExport", "useRoleMatcher", "useBulkImport", "useKeystore", "useHotspotDefaults", "useHotspotInteraction", "useAniPlayer", "sanitizeSvg"],
+        "components": ["CreatorStartScreen", "CreatorToolbar", "CreatorRoleList", "CreatorMetadataPane", "NewThemeStartModal", "SaveDestinationModal", "BulkImportButton", "BulkImportPreviewModal", "BulkImportRoleRow", "RoleListItem", "SizeStrip", "AniThumb"],
+        "ipc_calls": ["parse_cursorpack_for_creator", "bulk_resolve_assets", "cancel_bulk_import", "export_cursorpack_streamed", "cancel_build", "keystore_info"]
+      },
+      {
+        "file": "app/pages/marketplace.vue", "name": "マーケットプレース",
+        "role": "公式インデックスブラウザ · フィルタ / 検索 / Featured / 自動 PR 提出。",
+        "composables": ["useThemes", "useMarketplacePreviews", "useGithubAuth", "useMarketplaceSubmit"],
+        "components": ["MarketplaceCard", "FeaturedCard", "MarketplaceDetailModal", "SubmitThemeDialog", "SubmitDeviceFlowModal"],
+        "ipc_calls": ["marketplace_fetch_index", "marketplace_install", "marketplace_fetch_preview", "keystore_info", "start_device_flow", "complete_device_flow", "cancel_device_flow", "submit_theme_auto", "revoke_github_link"]
+      },
+      {
+        "file": "app/pages/settings.vue", "name": "設定",
+        "role": "8 セクション — 一般 / 起動 / ライブラリ / セキュリティ / 鍵 / ログ / 更新 / About。",
+        "composables": ["useAppSettings", "useKeystore", "useUpdater", "useSettingsSearch", "useAppInfo"],
+        "components": ["ConfigRecoveryPanel", "PassphrasePrompt", "SettingsSearchDropdown", "GeneralSection", "StartupSection", "LibrarySection", "SecuritySection", "KeysSection", "LoggingSection", "UpdatesSection", "AboutSection"],
+        "ipc_calls": ["get_config", "update_config", "keystore_info", "keystore_generate", "keystore_delete", "keystore_export", "keystore_import", "list_config_backups", "restore_config_backup", "export_profile", "import_profile", "list_crash_reports", "clear_crash_reports", "submit_crash_reports", "check_update_is_major_jump", "open_log_folder", "open_url", "get_accessibility_conflicts"]
+      }
+    ],
+    "composables": [
+      { "name": "useTauri", "file": "app/composables/useTauri.ts", "role": "invokeTauri<T>(name, args) の IPC ラッパー。ブラウザ専用フォールバックモック付き。", "ipc_calls": [] },
+      { "name": "useThemes", "file": "app/composables/useThemes.ts", "role": "テーマ一覧の共有リアクティブ singleton。", "ipc_calls": ["get_themes", "apply_theme", "delete_theme", "duplicate_theme", "repackage_theme", "set_theme_favorite", "import_cursorpack", "inspect_cursorpack"] },
+      { "name": "useAppSettings", "file": "app/composables/useAppSettings.ts", "role": "get_config / update_config ラッパー + dirty フラグ。", "ipc_calls": ["get_config", "update_config", "export_profile", "import_profile"] },
+      { "name": "useI18n", "file": "app/composables/useI18n.ts", "role": "t(key, params) + フォールバック + OS ロケール検出。", "ipc_calls": [] },
+      { "name": "useKeystore", "file": "app/composables/useKeystore.ts", "role": "鍵ペアのライフサイクル UI。", "ipc_calls": ["keystore_info", "keystore_generate", "keystore_delete", "keystore_export", "keystore_import"] },
+      { "name": "useUiTheme", "file": "app/composables/useUiTheme.ts", "role": "アプリ自身のライト/ダークモード切替。", "ipc_calls": [] },
+      { "name": "useRoleMatcher", "file": "app/composables/useRoleMatcher.ts", "role": "エイリアス辞書 + scoreRole + resolveCollisions。17 役割マッチング用の純粋関数群。", "ipc_calls": [] },
+      { "name": "useThemePreviews", "file": "app/composables/useThemePreviews.ts", "role": "プレビュー画像取得 (役割 × サイズ)。", "ipc_calls": ["get_theme_previews", "get_theme_role_previews"] },
+      { "name": "useBulkImport", "file": "app/composables/useBulkImport.ts", "role": "バルクインポート IPC ラッパー + 進捗購読。", "ipc_calls": ["bulk_resolve_assets", "cancel_bulk_import"] },
+      { "name": "useCreatorAssets", "file": "app/composables/useCreatorAssets.ts", "role": "役割ごとの assignedPng / Hotspot を統合管理。", "ipc_calls": [] },
+      { "name": "useCreatorPickers", "file": "app/composables/useCreatorPickers.ts", "role": "Creator のファイル/フォルダピッカー UX。", "ipc_calls": [] },
+      { "name": "useCreatorImport", "file": "app/composables/useCreatorImport.ts", "role": "Creator の単発インポート。", "ipc_calls": [] },
+      { "name": "useCreatorBulkImportFlow", "file": "app/composables/useCreatorBulkImportFlow.ts", "role": "バルクインポート preview → confirm のステートマシン。", "ipc_calls": ["parse_cursorpack_for_creator", "bulk_resolve_assets"] },
+      { "name": "useCreatorExport", "file": "app/composables/useCreatorExport.ts", "role": ".cursorpack のストリーミング出力フロー (進捗 + キャンセル)。", "ipc_calls": ["export_cursorpack", "export_cursorpack_streamed", "cancel_build", "repackage_theme"] },
+      { "name": "useHotspotDefaults", "file": "app/composables/useHotspotDefaults.ts", "role": "役割別 hotspot のデフォルト座標。", "ipc_calls": [] },
+      { "name": "useHotspotInteraction", "file": "app/composables/useHotspotInteraction.ts", "role": "Hotspot のドラッグ操作 (純粋関数群)。", "ipc_calls": [] },
+      { "name": "useAniPlayer", "file": "app/composables/useAniPlayer.ts", "role": "ANI プレビュー再生 (フレームタイマー + キャンセル)。", "ipc_calls": [] },
+      { "name": "useCursorpackOpener", "file": "app/composables/useCursorpackOpener.ts", "role": ".cursorpack のダブルクリック / argv ハンドオフフロー。", "ipc_calls": ["take_pending_cursorpack", "inspect_cursorpack", "import_cursorpack"] },
+      { "name": "useUpdater", "file": "app/composables/useUpdater.ts", "role": "check / downloadAndInstall / relaunch。", "ipc_calls": ["check_update_is_major_jump"] },
+      { "name": "useNotify", "file": "app/composables/useNotify.ts", "role": "Toast 通知 (permission をキャッシュ)。", "ipc_calls": [] },
+      { "name": "sanitizeSvg", "file": "app/composables/sanitizeSvg.ts", "role": "SVG サニタイザ。v-html は禁止なので必須。", "ipc_calls": [] },
+      { "name": "useAppInfo", "file": "app/composables/useAppInfo.ts", "role": "アプリ情報 (version、cursors_dir 等) の共有。", "ipc_calls": ["get_app_info"] },
+      { "name": "useSettingsSearch", "file": "app/composables/useSettingsSearch.ts", "role": "設定検索カタログ。ja/en 横断 substring 検索 + アンカージャンプ。", "ipc_calls": [] },
+      { "name": "useMarketplacePreviews", "file": "app/composables/useMarketplacePreviews.ts", "role": "マーケットプレースプレビューの singleton キャッシュ + in-flight 重複排除。", "ipc_calls": ["marketplace_fetch_preview"] },
+      { "name": "useGithubAuth", "file": "app/composables/useGithubAuth.ts", "role": "GitHub Device Flow 認証状態。", "ipc_calls": ["start_device_flow", "complete_device_flow", "cancel_device_flow", "revoke_github_link"] },
+      { "name": "useMarketplaceSubmit", "file": "app/composables/useMarketplaceSubmit.ts", "role": "自動マーケットプレース提出フロー。", "ipc_calls": ["submit_theme_auto"] }
+    ],
+    "components": {
+      "shell":       { "dir": "app/components/shell/",       "count": 3,  "files": ["AppTitlebar.vue", "AppSidebar.vue", "EnvironmentBanner.vue"] },
+      "library":     { "dir": "app/components/library/",     "count": 12, "files": ["ThemeCard.vue", "ThemeRow.vue", "ThemeDetailModal.vue", "ThemeDetailDrawer.vue", "ApplyModal.vue", "ImportConflictDialog.vue", "ThemePickerModal.vue", "CursorMatrix.vue", "LibraryToolbar.vue", "LibraryFilterBar.vue", "LibraryEmptyState.vue", "LibraryDropOverlay.vue"] },
+      "creator":     { "dir": "app/components/creator/",     "count": 12, "files": ["CreatorStartScreen.vue", "CreatorToolbar.vue", "CreatorRoleList.vue", "CreatorMetadataPane.vue", "NewThemeStartModal.vue", "SaveDestinationModal.vue", "BulkImportButton.vue", "BulkImportPreviewModal.vue", "BulkImportRoleRow.vue", "RoleListItem.vue", "SizeStrip.vue", "AniThumb.vue"] },
+      "marketplace": { "dir": "app/components/marketplace/", "count": 5,  "files": ["MarketplaceCard.vue", "FeaturedCard.vue", "SubmitThemeDialog.vue", "MarketplaceDetailModal.vue", "SubmitDeviceFlowModal.vue"] },
+      "settings":    { "dir": "app/components/settings/",    "count": 14, "files": ["SettingsRow.vue", "SettingsToggle.vue", "ConfigRecoveryPanel.vue", "PassphrasePrompt.vue", "SettingsSearchDropdown.vue", "GeneralSection.vue", "StartupSection.vue", "LibrarySection.vue", "SecuritySection.vue", "KeysSection.vue", "LoggingSection.vue", "UpdatesSection.vue", "AboutSection.vue"] },
+      "preview":     { "dir": "app/components/preview/",     "count": 1,  "files": ["CursorPreview.vue"] },
+      "panic":       { "dir": "app/components/panic/",       "count": 1,  "files": ["PanicFlow.vue"] },
+      "icons":       { "dir": "app/components/icons/",       "count": 2,  "files": ["UiIcon.vue", "CursorIcon.vue"] },
+      "ui":          { "dir": "app/components/ui/",          "count": 1,  "files": ["UiSelect.vue"] }
+    }
+  },
+  "verification_gate": {
+    "canonical_script": "scripts/verify-gate.sh",
+    "steps": [
+      "cargo fmt --check",
+      "cargo clippy --all-targets -- -D warnings",
+      "cargo test --lib",
+      "prettier --check",
+      "vue-tsc --noEmit",
+      "node scripts/check-i18n.mjs",
+      "vitest run"
+    ],
+    "additional_for_release": "npm run tauri:build"
+  },
+  "ci_workflows": [
+    { "file": ".github/workflows/ci.yml", "purpose": "fmt / clippy / cargo-test / vue-tsc / i18n parity" },
+    { "file": ".github/workflows/performance.yml", "purpose": "Criterion ベンチ (cursor_build, startup) · PR の性能リグレッション検知" },
+    { "file": ".github/workflows/release.yml", "purpose": "署名済みインストーラビルド" }
+  ],
+  "external_repos": [
+    { "name": "easy-cursor-swap-index", "url": "https://github.com/nishiuriraku/easy-cursor-swap-index", "role": "マーケットプレースインデックス + Ajv 検証 (schema / SHA-256 / Ed25519 / VirusTotal v3)" },
+    { "name": "easy-cursor-swap-crash-report-worker (private)", "url": "https://github.com/nishiuriraku/easy-cursor-swap-crash-report-worker", "role": "Cloudflare Workers + KV クラッシュレポート受信エンドポイント" }
+  ],
+  "pitfalls": [
+    "zip crate v2.6.x は yank 済み — バンプ時は既知の安定版にピン留めする。",
+    "easy-cursor-swap/ サブディレクトリを掘って機能を追加してはいけない — リポジトリルートは cursor-forge/ そのもの。",
+    "npm run dev (Nuxt のみ) は Tauri ランタイムを起動しないため IPC が失敗する。npm run tauri:dev を使う。",
+    "Nuxt 4.4.4 はトップレベル ssr: false に IPC バグあり。nuxt.config.ts の routeRules による回避は意図的。"
+  ]
+}
+</script>
+
+<script>
+"use strict";
+const DATA = JSON.parse(document.getElementById("data").textContent);
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+function el(tag, opts) {
+  const node = document.createElement(tag);
+  if (!opts) return node;
+  if (opts.className) node.className = opts.className;
+  if (opts.text != null) node.textContent = opts.text;
+  if (opts.attrs) for (const k in opts.attrs) node.setAttribute(k, opts.attrs[k]);
+  if (opts.data)  for (const k in opts.data)  node.dataset[k] = opts.data[k];
+  if (opts.children) for (const c of opts.children) if (c != null) node.appendChild(c);
+  return node;
+}
+function svg(tag, attrs) {
+  const node = document.createElementNS(SVG_NS, tag);
+  if (attrs) for (const k in attrs) node.setAttribute(k, attrs[k]);
+  return node;
+}
+function svgText(text, attrs) {
+  const t = svg("text", attrs || {});
+  t.textContent = text;
+  return t;
+}
+
+document.getElementById("genDate").textContent = "生成日: " + DATA.generated_at;
+
+const c = DATA.meta.measured_counts;
+const stats = [
+  { label: "Rust モジュール", value: c.rust_modules_in_lib_rs, unit: "lib.rs pub mod",      tone: "" },
+  { label: "IPC コマンド",     value: c.tauri_ipc_commands,     unit: "tauri::generate_handler!", tone: "accent-2" },
+  { label: "Composable",       value: c.composables,            unit: "app/composables/",    tone: "accent-3" },
+  { label: "ページ",           value: c.pages_vue,              unit: "+ ヘルパー " + c.pages_ts_helpers, tone: "ok" },
+  { label: "コンポーネント",   value: c.components_total,       unit: "サブディレクトリ 9 個", tone: "pink" },
+  { label: "不変条件",         value: DATA.critical_invariants.length, unit: "厳格ルール",   tone: "warn" },
+];
+const statsEl = document.getElementById("stats");
+for (const s of stats) {
+  const card = el("div", { className: "stat " + (s.tone || "") });
+  card.appendChild(el("div", { className: "label", text: s.label }));
+  card.appendChild(el("div", { className: "value", text: String(s.value) }));
+  card.appendChild(el("div", { className: "unit", text: s.unit }));
+  statsEl.appendChild(card);
+}
+
+const invGrid = document.getElementById("invGrid");
+for (const inv of DATA.critical_invariants) {
+  const card = el("div", { className: "inv-card" });
+  card.appendChild(el("div", { className: "id", text: inv.id }));
+  card.appendChild(el("div", { className: "rule", text: inv.rule }));
+  card.appendChild(el("div", { className: "module", text: inv.responsible_module }));
+  invGrid.appendChild(card);
+}
+document.getElementById("invCount").textContent = "(" + DATA.critical_invariants.length + " 件)";
+
+const modules = DATA.backend.modules;
+document.getElementById("modCount").textContent = "(" + modules.length + " 件)";
+
+const CATS = ["entry", "core", "ipc", "cursor_pipeline", "registry", "theme", "marketplace", "security", "reliability", "os_integration", "observability"];
+const catColor = {
+  entry: "#94a3b8", core: "#7aa2f7", ipc: "#ec4899",
+  cursor_pipeline: "#f59e0b", registry: "#facc15",
+  theme: "#4ade80", marketplace: "#a06bf2",
+  security: "#ef4444", reliability: "#fb7185",
+  os_integration: "#22d3ee", observability: "#64748b",
+};
+const SVG_W = 1000, SVG_H = 360;
+const catLanes = {};
+{
+  const used = CATS.filter(cat => modules.some(m => m.category === cat));
+  const laneCount = used.length;
+  const padX = 60;
+  const stepX = (SVG_W - padX*2) / Math.max(1, laneCount - 1);
+  used.forEach((cat, i) => { catLanes[cat] = padX + i*stepX; });
+}
+const nodePos = {};
+{
+  const byCat = {};
+  for (const m of modules) {
+    if (!byCat[m.category]) byCat[m.category] = [];
+    byCat[m.category].push(m);
+  }
+  for (const cat in byCat) {
+    const list = byCat[cat];
+    const x = catLanes[cat];
+    const topY = 60, bottomY = SVG_H - 30;
+    const stepY = (bottomY - topY) / Math.max(1, list.length);
+    list.forEach((m, i) => {
+      nodePos[m.name] = { x: x, y: topY + i*stepY + stepY/2 };
+    });
+  }
+}
+
+const depmapSvg = document.getElementById("depmapSvg");
+const defs = svg("defs");
+const marker = svg("marker", { id: "depArr", viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "6", markerHeight: "6", orient: "auto" });
+marker.appendChild(svg("path", { d: "M0,0 L10,5 L0,10 z", fill: "#5a6478" }));
+defs.appendChild(marker);
+depmapSvg.appendChild(defs);
+
+for (const cat of Object.keys(catLanes)) {
+  const x = catLanes[cat];
+  const label = svgText(cat.replace("_", " "), {
+    x: x, y: 24, "text-anchor": "middle",
+    "font-family": "ui-monospace,Consolas,monospace", "font-size": "9.5",
+    fill: catColor[cat], "font-weight": "700",
+    "letter-spacing": "0.6"
+  });
+  depmapSvg.appendChild(label);
+}
+
+for (const m of modules) {
+  if (!m.depends_on) continue;
+  for (const dep of m.depends_on) {
+    if (!nodePos[dep] || !nodePos[m.name]) continue;
+    const a = nodePos[m.name], b = nodePos[dep];
+    const dx = b.x - a.x;
+    const cx1 = a.x + dx * 0.35, cy1 = a.y;
+    const cx2 = b.x - dx * 0.35, cy2 = b.y;
+    const path = svg("path", {
+      d: `M${a.x},${a.y} C${cx1},${cy1} ${cx2},${cy2} ${b.x},${b.y}`,
+      fill: "none",
+      stroke: "#3a4456",
+      "stroke-width": "1",
+      "stroke-opacity": "0.7",
+      "marker-end": "url(#depArr)",
+    });
+    depmapSvg.appendChild(path);
+  }
+}
+
+for (const m of modules) {
+  const p = nodePos[m.name];
+  const color = catColor[m.category] || "#7aa2f7";
+  const g = svg("g");
+  g.appendChild(svg("circle", { cx: p.x, cy: p.y, r: 10, fill: color, "fill-opacity": "0.15" }));
+  g.appendChild(svg("circle", { cx: p.x, cy: p.y, r: 4.5, fill: color, stroke: "#07090e", "stroke-width": "1.5" }));
+  const label = svgText(m.name, {
+    x: p.x, y: p.y - 8, "text-anchor": "middle",
+    "font-family": "ui-monospace,Consolas,monospace", "font-size": "9.5",
+    fill: "#e6edf3", "pointer-events": "none",
+  });
+  g.appendChild(label);
+  const title = svg("title");
+  title.textContent = m.name + " (" + m.category + ") · " + m.file +
+    (m.depends_on && m.depends_on.length ? "\n→ " + m.depends_on.join(", ") : "");
+  g.appendChild(title);
+  depmapSvg.appendChild(g);
+}
+
+const modGrid = document.getElementById("modGrid");
+for (const m of modules) {
+  const card = el("div", {
+    className: "mcard cat-" + m.category,
+    data: { category: m.category, search: (m.name + " " + m.file + " " + m.role).toLowerCase() },
+  });
+  card.appendChild(el("div", { className: "cat-tag", text: m.category }));
+  card.appendChild(el("h4", { text: m.name }));
+  card.appendChild(el("div", { className: "file", text: m.file }));
+  card.appendChild(el("div", { className: "role", text: m.role }));
+  if (m.depends_on && m.depends_on.length) {
+    const deps = el("div", { className: "deps" });
+    deps.appendChild(el("b", { text: "依存先: " }));
+    for (const d of m.depends_on) deps.appendChild(el("span", { className: "pill", text: d }));
+    card.appendChild(deps);
+  }
+  modGrid.appendChild(card);
+}
+
+const modSearch = document.getElementById("modSearch");
+let modCatFilter = "all";
+function applyModFilter() {
+  const q = modSearch.value.trim().toLowerCase();
+  for (const card of modGrid.querySelectorAll(".mcard")) {
+    const matchesCat = modCatFilter === "all" || card.dataset.category === modCatFilter;
+    const matchesQ = !q || card.dataset.search.includes(q);
+    card.classList.toggle("hidden", !(matchesCat && matchesQ));
+  }
+}
+modSearch.addEventListener("input", applyModFilter);
+for (const chip of document.querySelectorAll("#modules .chip")) {
+  chip.addEventListener("click", () => {
+    for (const x of document.querySelectorAll("#modules .chip")) x.classList.remove("on");
+    chip.classList.add("on");
+    modCatFilter = chip.dataset.cat;
+    applyModFilter();
+  });
+}
+
+const ipcs = DATA.backend.ipc_commands;
+document.getElementById("ipcCount").textContent = "(" + ipcs.length + " 件)";
+
+const ipcCatCount = {};
+for (const i of ipcs) ipcCatCount[i.category] = (ipcCatCount[i.category] || 0) + 1;
+const ipcCatColor = {
+  theme: "#4ade80", cursorpack_build: "#f59e0b", cursorpack_assoc: "#f59e0b",
+  keystore: "#ef4444", marketplace: "#a06bf2", marketplace_submit: "#a06bf2",
+  profile: "#22d3ee", windows_scheme: "#facc15", system: "#7aa2f7", bulk_import: "#fb7185",
+};
+const maxIpc = Math.max(...Object.values(ipcCatCount));
+const ipcBars = document.getElementById("ipcBars");
+const ipcCats = Object.entries(ipcCatCount).sort((a, b) => b[1] - a[1]);
+for (const [cat, count] of ipcCats) {
+  const row = el("div", { className: "ipc-bar-row" });
+  row.appendChild(el("div", { className: "label", text: cat }));
+  const track = el("div", { className: "bar-track" });
+  const fill = el("div", { className: "bar-fill" });
+  fill.style.width = ((count / maxIpc) * 100) + "%";
+  fill.style.background = ipcCatColor[cat] || "var(--accent)";
+  track.appendChild(fill);
+  row.appendChild(track);
+  row.appendChild(el("div", { className: "count", text: count + " / " + ipcs.length }));
+  ipcBars.appendChild(row);
+}
+
+const ipcBody = document.getElementById("ipcBody");
+for (const i of ipcs) {
+  const tr = el("tr", {
+    data: { category: i.category, search: (i.name + " " + i.file + " " + (i.frontend_callers || []).join(" ")).toLowerCase() },
+  });
+  tr.appendChild(el("td", { className: "name", text: i.name }));
+  const catTd = el("td", { className: "cat-cell" });
+  const catTag = el("span", { className: "cat-tag", text: i.category });
+  catTag.style.color = ipcCatColor[i.category] || "var(--accent)";
+  catTag.style.borderLeft = "2px solid " + (ipcCatColor[i.category] || "var(--accent)");
+  catTd.appendChild(catTag);
+  tr.appendChild(catTd);
+  tr.appendChild(el("td", { className: "file", text: i.file }));
+  const callersTd = el("td", { className: "callers" });
+  for (const caller of i.frontend_callers || []) callersTd.appendChild(el("span", { text: caller }));
+  tr.appendChild(callersTd);
+  ipcBody.appendChild(tr);
+}
+const ipcSearch = document.getElementById("ipcSearch");
+let ipcCatFilter = "all";
+function applyIpcFilter() {
+  const q = ipcSearch.value.trim().toLowerCase();
+  for (const row of ipcBody.querySelectorAll("tr")) {
+    const matchesCat = ipcCatFilter === "all" || row.dataset.category === ipcCatFilter;
+    const matchesQ = !q || row.dataset.search.includes(q);
+    row.classList.toggle("hidden", !(matchesCat && matchesQ));
+  }
+}
+ipcSearch.addEventListener("input", applyIpcFilter);
+for (const chip of document.querySelectorAll("#ipc .chip")) {
+  chip.addEventListener("click", () => {
+    for (const x of document.querySelectorAll("#ipc .chip")) x.classList.remove("on");
+    chip.classList.add("on");
+    ipcCatFilter = chip.dataset.cat;
+    applyIpcFilter();
+  });
+}
+
+const pageList = document.getElementById("pageList");
+for (const p of DATA.frontend.pages) {
+  const lane = el("div", { className: "lane" });
+  const head = el("div", { className: "lane-head" });
+  head.appendChild(el("span", { className: "lane-name", text: p.name }));
+  head.appendChild(el("span", { className: "lane-file", text: p.file }));
+  lane.appendChild(head);
+  lane.appendChild(el("div", { className: "lane-role", text: p.role }));
+
+  const flow = el("div", { className: "lane-flow" });
+  function makeCol(title, items, pillClass) {
+    const col = el("div", { className: "lane-col" });
+    const head = el("div", { className: "col-head" });
+    head.appendChild(el("span", { text: title }));
+    head.appendChild(el("span", { className: "count", text: String(items.length) }));
+    col.appendChild(head);
+    for (const v of items) col.appendChild(el("span", { className: "pill " + pillClass, text: v }));
+    return col;
+  }
+  flow.appendChild(makeCol("Composable", p.composables, "composable"));
+  flow.appendChild(makeCol("コンポーネント",  p.components,  "component"));
+  flow.appendChild(makeCol("IPC 呼び出し",   p.ipc_calls,   "ipc"));
+  lane.appendChild(flow);
+  pageList.appendChild(lane);
+}
+
+const compBody = document.getElementById("compBody");
+const composables = DATA.frontend.composables;
+document.getElementById("compCount").textContent = "(" + composables.length + " 件)";
+for (const cp of composables) {
+  const tr = el("tr", {
+    data: { search: (cp.name + " " + cp.role + " " + (cp.ipc_calls || []).join(" ")).toLowerCase() },
+  });
+  const nameTd = el("td", { className: "name" });
+  nameTd.appendChild(document.createTextNode(cp.name));
+  nameTd.appendChild(el("div", { className: "compfile", text: cp.file }));
+  tr.appendChild(nameTd);
+  tr.appendChild(el("td", { className: "role", text: cp.role }));
+  const ipcsTd = el("td", { className: "ipcs" });
+  if (cp.ipc_calls && cp.ipc_calls.length) {
+    for (const ipc of cp.ipc_calls) ipcsTd.appendChild(el("span", { text: ipc }));
+  } else {
+    ipcsTd.appendChild(el("span", { text: "—", attrs: { style: "opacity:0.35;background:transparent;border:0" } }));
+  }
+  tr.appendChild(ipcsTd);
+  compBody.appendChild(tr);
+}
+document.getElementById("compSearch").addEventListener("input", (ev) => {
+  const q = ev.target.value.trim().toLowerCase();
+  for (const row of compBody.querySelectorAll("tr")) {
+    row.classList.toggle("hidden", !!q && !row.dataset.search.includes(q));
+  }
+});
+
+const vcompGrid = document.getElementById("vcompGrid");
+const componentsObj = DATA.frontend.components;
+let totalComp = 0;
+for (const [group, info] of Object.entries(componentsObj)) {
+  totalComp += info.count;
+  const card = el("div", { className: "vcomp" });
+  const h = el("h4");
+  h.appendChild(document.createTextNode(group + "/"));
+  h.appendChild(el("span", { className: "badge-n", text: String(info.count) }));
+  card.appendChild(h);
+  card.appendChild(el("div", { className: "dir", text: info.dir }));
+  const ul = el("ul");
+  for (const f of info.files) ul.appendChild(el("li", { text: f }));
+  card.appendChild(ul);
+  vcompGrid.appendChild(card);
+}
+document.getElementById("vcompCount").textContent = "(計 " + totalComp + " 件)";
+
+const startupList = document.getElementById("startupList");
+DATA.backend.startup_sequence.forEach((s, i) => {
+  const li = el("li");
+  li.appendChild(el("span", { className: "step-num", text: String(i + 1).padStart(2, "0") }));
+  li.appendChild(document.createTextNode(s));
+  startupList.appendChild(li);
+});
+
+const gateList = document.getElementById("gateList");
+for (const s of DATA.verification_gate.steps) {
+  const li = el("li");
+  li.appendChild(el("code", { text: s }));
+  gateList.appendChild(li);
+}
+document.getElementById("gateRelease").textContent = DATA.verification_gate.additional_for_release;
+
+const ciList = document.getElementById("ciList");
+for (const w of DATA.ci_workflows) {
+  const li = el("li");
+  li.appendChild(el("code", { text: w.file }));
+  li.appendChild(document.createTextNode(" — " + w.purpose));
+  ciList.appendChild(li);
+}
+
+const stackList = document.getElementById("stackList");
+const stackLabels = { frontend: "フロント", backend: "バックエンド", shell: "シェル", distribution: "配布", test_runners: "テストランナー" };
+for (const [k, v] of Object.entries(DATA.meta.stack)) {
+  const li = el("li");
+  li.appendChild(el("b", { text: (stackLabels[k] || k) + ":" }));
+  li.appendChild(document.createTextNode(" " + v));
+  stackList.appendChild(li);
+}
+const extList = document.getElementById("extList");
+for (const r of DATA.external_repos) {
+  const li = el("li");
+  const a = el("a", { text: r.name, attrs: { href: r.url, target: "_blank", rel: "noopener" } });
+  li.appendChild(a);
+  li.appendChild(document.createTextNode(" — " + r.role));
+  extList.appendChild(li);
+}
+const pitfallList = document.getElementById("pitfallList");
+for (const p of DATA.pitfalls) pitfallList.appendChild(el("li", { text: p }));
+
+const fsList = document.getElementById("fsList");
+const fsLabels = {
+  user_themes_dir: "ユーザーテーマ",
+  config_dir: "設定ファイル",
+  key_storage: "鍵ストア",
+  pending_snapshot: "保留中スナップショット",
+  initial_snapshot: "初回スナップショット",
+  crash_reports: "クラッシュレポート",
+  registry_root: "レジストリルート",
+  registry_schemes: "レジストリ Schemes",
+};
+for (const [k, v] of Object.entries(DATA.meta.filesystem_locations)) {
+  const li = el("li");
+  li.appendChild(el("b", { text: (fsLabels[k] || k) + ": " }));
+  li.appendChild(document.createTextNode(v));
+  fsList.appendChild(li);
+}
+const driftList = document.getElementById("driftList");
+for (const d of DATA.meta.doc_drift_warnings) driftList.appendChild(el("li", { text: d }));
+
+const tocLinks = Array.from(document.querySelectorAll("#toc a"));
+const sectionEls = tocLinks.map(a => document.querySelector(a.getAttribute("href")));
+function updateActiveTOC() {
+  let activeIdx = 0;
+  const y = window.scrollY + 120;
+  for (let i = 0; i < sectionEls.length; i++) {
+    if (sectionEls[i] && sectionEls[i].offsetTop <= y) activeIdx = i;
+  }
+  tocLinks.forEach((a, i) => a.classList.toggle("active", i === activeIdx));
+}
+window.addEventListener("scroll", updateActiveTOC, { passive: true });
+updateActiveTOC();
+</script>
+</body>
+</html>
