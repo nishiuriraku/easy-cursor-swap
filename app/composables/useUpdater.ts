@@ -60,6 +60,9 @@ async function check(): Promise<UpdateInfo | null> {
   if (!api) return null
   checking.value = true
   error.value = null
+  // 前回 DL の残量がリーク表示されるのを防ぐ (シングルトン ref のため)
+  progressBytes.value = 0
+  totalBytes.value = 0
   try {
     const result = await api.check()
     if (result?.available) {
