@@ -369,6 +369,10 @@ export default {
     updaterErrSignature: '署名検証に失敗しました。鍵が更新された可能性があります ({message})',
     updaterErrPlugin: 'Updater プラグインが利用できません (開発モード?: {message})',
     updaterErrUnknown: '予期せぬエラー: {message}',
+    autoCheckStatus: '自動チェックの状態',
+    autoCheckHintHours: '次回チェック: 残り約 {hours} 時間',
+    autoCheckHintReady: '次回起動時にチェックします',
+    btnForceRecheck: '次回起動でチェック',
     // 設定復旧
     groupRecovery: '設定の復旧',
     recoveryDesc: '設定ファイルのバックアップが見つかりました。いずれかを選択して復旧できます。',

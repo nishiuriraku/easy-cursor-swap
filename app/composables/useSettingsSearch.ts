@@ -257,6 +257,7 @@ export const CATALOG: SettingsSearchEntry[] = [
     labelKey: 'settings.autoUpdateLabel',
     descKey: 'settings.autoUpdateDesc',
   },
+  { section: 'updates', anchor: 'autoCheckStatus', labelKey: 'settings.autoCheckStatus' },
   { section: 'updates', anchor: 'checkNow', labelKey: 'settings.checkNowLabel' },
 
   // ---- about ----

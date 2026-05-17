@@ -370,6 +370,10 @@ export default {
     updaterErrSignature: 'Signature verification failed. The signing key may have rotated ({message})',
     updaterErrPlugin: 'Updater plugin not available (dev mode?: {message})',
     updaterErrUnknown: 'Unexpected error: {message}',
+    autoCheckStatus: 'Auto-check status',
+    autoCheckHintHours: 'Next check: ~{hours}h remaining',
+    autoCheckHintReady: 'Will check on next launch',
+    btnForceRecheck: 'Check on next launch',
     // Config recovery
     groupRecovery: 'Config recovery',
     recoveryDesc: 'Backup files found. Select one to restore your configuration.',

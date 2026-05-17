@@ -2,9 +2,10 @@
 /**
  * 設定 → アップデート セクション。
  *
- * 自動更新トグル + チャンネル選択 + 確認ボタン + ダウンロード進捗。
+ * 自動更新トグル + 自動チェック状態 + 確認ボタン + ダウンロード進捗。
  * 状態 (checking / downloading / available / error / progress) は親が `useUpdater()`
- * から受け取って渡す。子は表示と emit 通知のみ。
+ * から受け取って渡す。autoCheckHint は親側で localStorage の last_check_at を見て計算した
+ * 表示文字列。子は表示と emit 通知のみ。
  */
 import { useI18n } from '~/composables/useI18n'
 
@@ -25,11 +26,13 @@ defineProps<{
   updaterError: string | null
   updaterProgress: number
   updaterTotal: number
+  autoCheckHint: string
 }>()
 
 defineEmits<{
   (e: 'check-update'): void
   (e: 'download-update'): void
+  (e: 'force-recheck'): void
 }>()
 </script>
 
@@ -48,6 +51,16 @@ defineEmits<{
           :desc="t('settings.autoUpdateDesc')"
         >
           <SettingsToggle v-model="autoUpdate" />
+        </SettingsRow>
+        <SettingsRow
+          anchor="autoCheckStatus"
+          :label="t('settings.autoCheckStatus')"
+          :desc="autoCheckHint"
+        >
+          <button class="btn" @click="$emit('force-recheck')">
+            <UiIcon name="Refresh" :size="13" />
+            {{ t('settings.btnForceRecheck') }}
+          </button>
         </SettingsRow>
         <SettingsRow anchor="checkNow" :label="t('settings.checkNowLabel')">
           <button

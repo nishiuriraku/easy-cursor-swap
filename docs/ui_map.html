@@ -814,7 +814,7 @@
         "icons": 2,
         "ui": 1
       },
-      "interactions_total": 196,
+      "interactions_total": 197,
       "ipc_unique_targets": 49,
       "global_hotkeys": 1,
       "drag_drop_zones": 2,
@@ -2424,6 +2424,13 @@
               "ui": "[自動アップデート] SettingsToggle",
               "action": "autoUpdate を切替 (起動時の useUpdaterBootstrap に作用)",
               "ipc": ["update_config (Save 時)"]
+            },
+            {
+              "id": "updates-force-recheck",
+              "trigger": "click",
+              "ui": "[次回起動でチェック] ボタン (自動チェックの状態セクション)",
+              "action": "localStorage の last_check_at を 0 にリセット (24h クールダウンを破る)。即時 check は走らせず、次回起動時の bootstrapUpdaterCheck が拾う",
+              "ipc": []
             },
             {
               "id": "updates-check",

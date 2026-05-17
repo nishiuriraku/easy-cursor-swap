@@ -111,6 +111,30 @@ const updaterErrorDisplay = computed(() => {
   return t(key, { message })
 })
 
+// useUpdaterBootstrap.ts と同じ localStorage キー / クールダウン定義を持つ。
+// 共有定数化はまだ 2 箇所重複だけなので YAGNI で保留する (3 箇所目が出たら集約)。
+const LAST_CHECK_KEY = 'ecs.updater.last_check_at'
+const CHECK_COOLDOWN_MS = 24 * 60 * 60 * 1000
+
+/** 次回自動チェック (= 起動時 bootstrap が走るタイミング) までの残り時間を文字列で返す。 */
+const autoCheckHint = computed(() => {
+  if (typeof localStorage === 'undefined') return t('settings.autoCheckHintReady')
+  const raw = Number(localStorage.getItem(LAST_CHECK_KEY) ?? '0')
+  if (!Number.isFinite(raw) || raw === 0) return t('settings.autoCheckHintReady')
+  const remainingMs = raw + CHECK_COOLDOWN_MS - Date.now()
+  if (remainingMs <= 0) return t('settings.autoCheckHintReady')
+  const hours = Math.max(1, Math.ceil(remainingMs / (60 * 60 * 1000)))
+  return t('settings.autoCheckHintHours', { hours })
+})
+
+/** クールダウンを破って次回起動時に再チェックさせる。即時 check はしない (UX 上シンプル化)。 */
+function onForceRecheck() {
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(LAST_CHECK_KEY, '0')
+  }
+  updaterMessage.value = t('settings.autoCheckHintReady')
+}
+
 // 利用可能なアップデート情報 (メジャー跨ぎ判定に使用)
 const pendingUpdateVersion = ref<string | null>(null)
 
@@ -676,6 +700,7 @@ function selectSection(id: SectionId) {
         <UpdatesSection
           v-else-if="section === 'updates'"
           v-model:auto-update="updates.autoUpdate"
+          :auto-check-hint="autoCheckHint"
           :updater-checking="updaterChecking"
           :updater-downloading="updaterDownloading"
           :updater-available="updaterAvailable"
@@ -685,6 +710,7 @@ function selectSection(id: SectionId) {
           :updater-total="updaterTotal"
           @check-update="onCheckUpdate"
           @download-update="onDownloadUpdate"
+          @force-recheck="onForceRecheck"
         />
 
         <!-- About -->
