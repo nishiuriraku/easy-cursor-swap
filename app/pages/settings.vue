@@ -107,9 +107,7 @@ const pendingUpdateVersion = ref<string | null>(null)
 async function onCheckUpdate() {
   updaterMessage.value = null
   pendingUpdateVersion.value = null
-  // 設定中のチャンネルを check() に渡して endpoint を切り替える
-  // (stable は JS plugin の default endpoint、beta は Rust IPC 経由で別 endpoint)
-  const info = await checkForUpdate(updates.value.channel)
+  const info = await checkForUpdate()
   if (info) {
     pendingUpdateVersion.value = info.version
     updaterMessage.value = t('settings.updateNewVersion', {
@@ -171,7 +169,6 @@ const logging = ref({
 })
 const updates = ref({
   autoUpdate: true,
-  channel: 'stable' as 'stable' | 'beta',
 })
 
 // クラッシュレポート (LoggingSection 用)。件数は `list_crash_reports` の
@@ -254,12 +251,6 @@ function applyConfigToLocal() {
   logging.value.retentionDays = c.logging.retention_days
   logging.value.maxSizeMb = c.logging.max_total_size / BYTES_PER_MB
 
-  // 更新チャンネル: Rust 側スキーマで update_channel が optional のため、
-  // 欠落時は "stable" にフォールバック。UI の channel ref は 'stable'|'beta' のみ
-  // 受け付けるので、不正値は安全側 stable に落とす。
-  const ch = c.general.update_channel
-  updates.value.channel = ch === 'beta' ? 'beta' : 'stable'
-
   githubAccount.value = c.github_account ?? null
 
   dirty.value = false
@@ -276,7 +267,6 @@ function flushLocalToConfig() {
     draft.general.crash_reporting = general.value.crashReporting
     draft.general.auto_start = startup.value.autoStart
     draft.general.auto_update = updates.value.autoUpdate
-    draft.general.update_channel = updates.value.channel
 
     draft.security.storage_warning_threshold = Math.round(
       library.value.totalLimitWarnGb * BYTES_PER_GB,
@@ -676,7 +666,6 @@ function selectSection(id: SectionId) {
         <UpdatesSection
           v-else-if="section === 'updates'"
           v-model:auto-update="updates.autoUpdate"
-          v-model:channel="updates.channel"
           :updater-checking="updaterChecking"
           :updater-downloading="updaterDownloading"
           :updater-available="updaterAvailable"

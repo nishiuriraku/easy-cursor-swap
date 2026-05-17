@@ -11,7 +11,6 @@ import { useI18n } from '~/composables/useI18n'
 const { t } = useI18n()
 
 const autoUpdate = defineModel<boolean>('autoUpdate', { required: true })
-const channel = defineModel<string>('channel', { required: true })
 
 interface AvailableInfo {
   version: string
@@ -49,20 +48,6 @@ defineEmits<{
           :desc="t('settings.autoUpdateDesc')"
         >
           <SettingsToggle v-model="autoUpdate" />
-        </SettingsRow>
-        <SettingsRow
-          anchor="channel"
-          :label="t('settings.channelLabel')"
-          :desc="t('settings.channelDesc')"
-        >
-          <UiSelect
-            v-model="channel"
-            width="140px"
-            :options="[
-              { value: 'stable', label: 'stable' },
-              { value: 'beta', label: 'beta' },
-            ]"
-          />
         </SettingsRow>
         <SettingsRow anchor="checkNow" :label="t('settings.checkNowLabel')">
           <button

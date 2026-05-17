@@ -352,8 +352,6 @@ export default {
     groupAutoUpdate: '自動アップデート',
     autoUpdateLabel: 'バックグラウンド更新を有効化',
     autoUpdateDesc: 'Tauri Updater で署名検証付きの差分更新を取得',
-    channelLabel: 'チャンネル',
-    channelDesc: 'beta は実験機能を含む可能性があります',
     checkNowLabel: '今すぐ確認',
     btnChecking: '確認中...',
     btnCheckUpdate: '更新を確認',

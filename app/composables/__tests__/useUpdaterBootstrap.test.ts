@@ -7,7 +7,7 @@ vi.mock('../useAppSettings', () => ({
   useAppSettings: () => ({ load: loadMock, config: configRef }),
 }))
 
-const checkMock = vi.fn<(channel?: 'stable' | 'beta') => Promise<unknown>>()
+const checkMock = vi.fn<() => Promise<unknown>>()
 vi.mock('../useUpdater', () => ({
   useUpdater: () => ({ check: checkMock }),
 }))
@@ -21,13 +21,12 @@ import { bootstrapUpdaterCheck } from '../useUpdaterBootstrap'
 
 const LAST_CHECK_KEY = 'ecs.updater.last_check_at'
 
-function mkConfig(auto_update: boolean, channel = 'stable') {
+function mkConfig(auto_update: boolean) {
   return {
     schema_version: 1,
     general: {
       auto_start: true,
       auto_update,
-      update_channel: channel,
       language: 'ja',
       active_theme_id: null,
       panic_hotkey: 'Ctrl+Alt+Shift+R',
@@ -112,27 +111,5 @@ describe('useUpdaterBootstrap', () => {
     expect(checkMock).toHaveBeenCalled()
     expect(notifyMock).not.toHaveBeenCalled()
     expect(Number(localStorage.getItem(LAST_CHECK_KEY))).toBeGreaterThan(0)
-  })
-
-  it('config の update_channel=beta なら check に beta を渡す', async () => {
-    configRef.value = mkConfig(true, 'beta')
-    localStorage.setItem(LAST_CHECK_KEY, '0')
-    checkMock.mockResolvedValue(null)
-
-    bootstrapUpdaterCheck()
-    await flush()
-
-    expect(checkMock).toHaveBeenCalledWith('beta')
-  })
-
-  it('config の update_channel が不正値なら stable に落とす', async () => {
-    configRef.value = mkConfig(true, 'nightly') // 未知値
-    localStorage.setItem(LAST_CHECK_KEY, '0')
-    checkMock.mockResolvedValue(null)
-
-    bootstrapUpdaterCheck()
-    await flush()
-
-    expect(checkMock).toHaveBeenCalledWith('stable')
   })
 })

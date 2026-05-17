@@ -27,12 +27,6 @@ pub struct BackupInfo {
 /// 設定スキーマの現在のバージョン
 const CURRENT_SCHEMA_VERSION: u32 = 1;
 
-/// `update_channel` の serde(default) 用ヘルパ。
-/// 旧 schema (フィールド欠落) は安全側の "stable" にフォールバックする。
-fn default_update_channel() -> String {
-    "stable".to_string()
-}
-
 /// アプリケーション設定（Source of Truth）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
@@ -62,14 +56,6 @@ pub struct GeneralConfig {
     pub auto_start: bool,
     /// 自動アップデート有効/無効
     pub auto_update: bool,
-    /// 更新チャンネル ("stable" | "beta")。
-    ///
-    /// `tauri-plugin-updater` の endpoints はビルド時に固定されるため、
-    /// チャンネル変更は **アプリ再起動後に反映** される (`main.rs` の起動シーケンスで
-    /// この値を読んで Builder::endpoints を上書き)。
-    /// 旧スキーマ互換のため `serde(default = "default_update_channel")` で "stable" にフォールバック。
-    #[serde(default = "default_update_channel")]
-    pub update_channel: String,
     /// 表示言語 ("ja" / "en" / "auto")
     pub language: String,
     /// 現在適用中のテーマID
@@ -149,7 +135,6 @@ impl Default for AppConfig {
             general: GeneralConfig {
                 auto_start: true,
                 auto_update: true,
-                update_channel: default_update_channel(),
                 language: "auto".to_string(),
                 active_theme_id: None,
                 panic_hotkey: "Ctrl+Alt+Shift+R".to_string(),
@@ -609,42 +594,6 @@ mod tests {
         let cfg = AppConfig::default();
         assert_eq!(cfg.schema_version, super::CURRENT_SCHEMA_VERSION);
         assert_eq!(cfg.schema_version, 1);
-    }
-
-    #[test]
-    fn default_update_channel_is_stable() {
-        // 新規ユーザーは stable チャンネルから始まる (安全側)。
-        let cfg = AppConfig::default();
-        assert_eq!(cfg.general.update_channel, "stable");
-    }
-
-    #[test]
-    fn deserialize_accepts_missing_update_channel() {
-        // 旧 schema (update_channel 欠落) → serde(default) で "stable" にフォールバック。
-        let json = r#"{
-            "schema_version": 1,
-            "general": {
-                "auto_start": true,
-                "auto_update": true,
-                "language": "ja",
-                "active_theme_id": null,
-                "panic_hotkey": "Ctrl+Alt+Shift+R",
-                "crash_reporting": false
-            },
-            "security": {
-                "max_pack_compressed_size": 52428800,
-                "max_pack_uncompressed_size": 209715200,
-                "max_image_file_size": 10485760,
-                "storage_warning_threshold": 1073741824
-            },
-            "logging": {
-                "level": "INFO",
-                "retention_days": 14,
-                "max_total_size": 104857600
-            }
-        }"#;
-        let cfg: AppConfig = serde_json::from_str(json).expect("legacy schema should parse");
-        assert_eq!(cfg.general.update_channel, "stable");
     }
 
     #[test]

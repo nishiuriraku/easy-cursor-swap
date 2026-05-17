@@ -353,8 +353,6 @@ export default {
     groupAutoUpdate: 'Auto-update',
     autoUpdateLabel: 'Enable background updates',
     autoUpdateDesc: 'Tauri Updater fetches signed delta updates',
-    channelLabel: 'Channel',
-    channelDesc: 'beta may include experimental features',
     checkNowLabel: 'Check now',
     btnChecking: 'Checking...',
     btnCheckUpdate: 'Check for updates',

@@ -16,10 +16,10 @@
 |---|---|
 | [main.rs](../src-tauri/src/main.rs) | Tauri アプリのエントリ。tracing 初期化、`StartupCheck::begin()`、AppUserModelID 登録、ConfigManager 初期化、孤児カーソル復旧、pending snapshot リカバリ、`tauri::Builder` 構築 (single-instance プラグイン / 各種 plugin / setup でトレイ・ホットキー) |
 | [lib.rs](../src-tauri/src/lib.rs) | 21 モジュールの `pub mod` 宣言 |
-| [commands/mod.rs](../src-tauri/src/commands/mod.rs) | 全 Tauri コマンドのハンドラ登録 (`get_command_handlers()` が 53 IPC を `tauri::generate_handler!` に渡す) |
+| [commands/mod.rs](../src-tauri/src/commands/mod.rs) | 全 Tauri コマンドのハンドラ登録 (`get_command_handlers()` が 52 IPC を `tauri::generate_handler!` に渡す) |
 | [errors.rs](../src-tauri/src/errors.rs) | `AppError` (`thiserror`、`Serialize` 派生で IPC 経由 throw 対応) |
 
-### 1-2. IPC コマンド実体 (10 サブモジュール / 53 個)
+### 1-2. IPC コマンド実体 (9 サブモジュール / 52 個)
 
 | ファイル | 主な IPC |
 |---|---|
@@ -32,7 +32,6 @@
 | [commands/marketplace_submit.rs](../src-tauri/src/commands/marketplace_submit.rs) | `start_device_flow` / `complete_device_flow` / `cancel_device_flow` / `submit_theme_auto` / `revoke_github_link` |
 | [commands/profile.rs](../src-tauri/src/commands/profile.rs) | `export_profile` / `import_profile` |
 | [commands/windows_scheme.rs](../src-tauri/src/commands/windows_scheme.rs) | `list_windows_schemes` / `apply_windows_scheme` / `get_windows_scheme_previews` / `get_windows_scheme_role_previews` / `export_windows_scheme_as_cursorpack` |
-| [commands/updater.rs](../src-tauri/src/commands/updater.rs) | `check_for_update_on_channel` (`UpdaterExt::updater_builder()` を使い、channel='beta' のとき runtime で endpoint を override。Plugin Builder には endpoints() が無いため必須) |
 | [bulk_import/](../src-tauri/src/bulk_import/) | `bulk_resolve_assets` / `cancel_bulk_import` / `parse_cursorpack_for_creator` (実体は `bulk_import` モジュール側、`tauri::command` 属性付きの関数を `commands/mod.rs` から再エクスポート) |
 
 ### 1-3. ドメイン / 機能モジュール
@@ -133,7 +132,7 @@
 | [useHotspotInteraction.ts](../app/composables/useHotspotInteraction.ts) | hotspot ドラッグ操作の純粋関数群 |
 | [useAniPlayer.ts](../app/composables/useAniPlayer.ts) | ANI プレビュー再生 (frame タイマー + cancel) |
 | [useCursorpackOpener.ts](../app/composables/useCursorpackOpener.ts) | `.cursorpack` ダブルクリック / argv 開封フロー |
-| [useUpdater.ts](../app/composables/useUpdater.ts) | check / downloadAndInstall / relaunch。channel='beta' は Rust IPC `check_for_update_on_channel` 経由で別 endpoint を引く |
+| [useUpdater.ts](../app/composables/useUpdater.ts) | check / downloadAndInstall / relaunch |
 | [useUpdaterBootstrap.ts](../app/composables/useUpdaterBootstrap.ts) | 起動時 1 回だけ `auto_update + 24h クールダウン` で check し、ヒット時 Toast 通知 (`app.vue` から呼び出し) |
 | [useNotify.ts](../app/composables/useNotify.ts) | Toast 通知 (permission キャッシュ) |
 | [sanitizeSvg.ts](../app/composables/sanitizeSvg.ts) | SVG サニタイズ (`<script>`/`href`/`on*`/`javascript:` 除去) |

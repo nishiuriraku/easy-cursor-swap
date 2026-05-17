@@ -6,11 +6,6 @@
 export interface GeneralConfig {
   auto_start: boolean
   auto_update: boolean
-  /**
-   * 更新チャンネル ("stable" | "beta")。Rust 側 `tauri-plugin-updater::Builder` は
-   * 起動時にこの値で endpoint を確定するため、UI で切替えても **再起動するまで反映されない**。
-   */
-  update_channel?: string
   language: string
   active_theme_id: string | null
   panic_hotkey: string

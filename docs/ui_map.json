@@ -42,8 +42,8 @@
         "icons": 2,
         "ui": 1
       },
-      "interactions_total": 197,
-      "ipc_unique_targets": 50,
+      "interactions_total": 196,
+      "ipc_unique_targets": 49,
       "global_hotkeys": 1,
       "drag_drop_zones": 2,
       "modals": 14
@@ -51,7 +51,7 @@
     "drift_notes": [
       "現時点では既知のドリフトなし (2026-05-17 architecture.json + file_inventory.md + architecture.md + CLAUDE.md と完全同期)。前回監査で見つかったドリフト群 (MarketplaceCard.vue 不在 / dead frontend_callers 3 件 / phantom IPC 3 件 / 統計数値 6 件) は同コミット内で全て解消済み。",
       "本ファイルの数字 (interactions_total / ipc_unique_targets) は ui_map.html を開いた瞬間に live check が再計上して宣言値とミスマッチを検出する canonical counter として機能する。新規ハンドラ・モーダル・キーボードショートカット追加と同じコミットで本 JSON を更新すること。",
-      "backend.ipc_commands 53 件のうち 3 件 (export_cursorpack / get_theme_previews / get_windows_scheme_previews) は Rust に登録されているが現行フロントから呼ばれない legacy_unused。本 ui_map では参照しない (= ipc_unique_targets は 50 のまま)。Rust 側で削除するか維持するかの決定は別 PR で。"
+      "backend.ipc_commands 52 件のうち 3 件 (export_cursorpack / get_theme_previews / get_windows_scheme_previews) は Rust に登録されているが現行フロントから呼ばれない legacy_unused。本 ui_map では参照しない (= ipc_unique_targets は 49 のまま)。Rust 側で削除するか維持するかの決定は別 PR で。"
     ]
   },
   "legend": {
@@ -124,8 +124,8 @@
         "id": "updater-bootstrap",
         "source": "app/composables/useUpdaterBootstrap.ts (Library/Settings/Creator/Marketplace いずれかが起動した時点で 1 回)",
         "trigger": "lifecycle: 起動時 + 24h クールダウン",
-        "action": "auto_update が ON のとき check_for_update_on_channel を呼び、新版があれば Toast 通知",
-        "ipc": ["check_for_update_on_channel"]
+        "action": "auto_update が ON のとき @tauri-apps/plugin-updater の check() を呼び、新版があれば Toast 通知",
+        "ipc": []
       }
     ],
     "shell_components": [
@@ -1654,18 +1654,11 @@
               "ipc": ["update_config (Save 時)"]
             },
             {
-              "id": "updates-channel",
-              "trigger": "change",
-              "ui": "[チャンネル] <UiSelect> (stable / beta)",
-              "action": "アップデートチャンネルを切替 (beta は Rust IPC で endpoint を override)",
-              "ipc": ["update_config (Save 時)"]
-            },
-            {
               "id": "updates-check",
               "trigger": "click",
               "ui": "[今すぐ確認] ボタン",
-              "action": "選択チャンネルでアップデート存在チェック",
-              "ipc": ["check_for_update_on_channel"]
+              "action": "@tauri-apps/plugin-updater 経由でアップデート存在チェック",
+              "ipc": []
             },
             {
               "id": "updates-download",

@@ -257,12 +257,6 @@ export const CATALOG: SettingsSearchEntry[] = [
     labelKey: 'settings.autoUpdateLabel',
     descKey: 'settings.autoUpdateDesc',
   },
-  {
-    section: 'updates',
-    anchor: 'channel',
-    labelKey: 'settings.channelLabel',
-    descKey: 'settings.channelDesc',
-  },
   { section: 'updates', anchor: 'checkNow', labelKey: 'settings.checkNowLabel' },
 
   // ---- about ----
