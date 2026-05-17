@@ -28,5 +28,6 @@ pub mod keystore;
 pub mod logging;
 pub mod marketplace;
 pub mod registry;
+pub mod rollback;
 pub mod theme;
 pub mod tray;

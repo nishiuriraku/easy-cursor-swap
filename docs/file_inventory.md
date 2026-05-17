@@ -15,7 +15,7 @@
 | ファイル | 機能 |
 |---|---|
 | [main.rs](../src-tauri/src/main.rs) | Tauri アプリのエントリ。tracing 初期化、`StartupCheck::begin()`、AppUserModelID 登録、ConfigManager 初期化、孤児カーソル復旧、pending snapshot リカバリ、`tauri::Builder` 構築 (single-instance プラグイン / 各種 plugin / setup でトレイ・ホットキー) |
-| [lib.rs](../src-tauri/src/lib.rs) | 21 モジュールの `pub mod` 宣言 |
+| [lib.rs](../src-tauri/src/lib.rs) | 22 モジュールの `pub mod` 宣言 |
 | [commands/mod.rs](../src-tauri/src/commands/mod.rs) | 全 Tauri コマンドのハンドラ登録 (`get_command_handlers()` が 52 IPC を `tauri::generate_handler!` に渡す) |
 | [errors.rs](../src-tauri/src/errors.rs) | `AppError` (`thiserror`、`Serialize` 派生で IPC 経由 throw 対応) |
 
@@ -63,6 +63,7 @@
 | [github/device_flow.rs](../src-tauri/src/github/device_flow.rs) | GitHub OAuth Device Flow 実装。`start` → ポーリング → トークン取得・DPAPI 保存。scope は `public_repo` 限定 |
 | [github/client.rs](../src-tauri/src/github/client.rs) | GitHub REST API クライアント。PR 作成 / ブランチ操作 / `.cursorpack` アップロード。`client_id` は `option_env!("EASY_CURSOR_SWAP_GITHUB_OAUTH_CLIENT_ID")` で注入 |
 | [health.rs](../src-tauri/src/health.rs) | `startup.json` の `pending_failures`、3 回連続失敗検知、バージョン変更で自動リセット |
+| [rollback.rs](../src-tauri/src/rollback.rs) | 自動ロールバック (`download_to_temp` / `verify_minisign` / `launch_silent_installer`)。pre-main フェーズで `main.rs::show_rollback_dialog` の Yes 経路から呼ばれる。`tauri-plugin-updater` と同じ `minisign-verify` crate で署名互換 |
 | [crash.rs](../src-tauri/src/crash.rs) | `install_panic_hook`、`%LOCALAPPDATA%\...\crash\panic-{epoch}.json`、`prune_old_reports`、`general.crash_reporting` 同意、送信ペイロード生成 |
 | [tray.rs](../src-tauri/src/tray.rs) | システムトレイ + `show_or_recreate_main_window` (WebView 破棄/再生成) |
 | [hotkey.rs](../src-tauri/src/hotkey.rs) | `RegisterHotKey` で `Ctrl+Alt+Shift+R` → `panic-hotkey` イベント |

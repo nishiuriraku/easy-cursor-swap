@@ -76,7 +76,7 @@ tokio = { version = "1", features = ["full"] }
 
 # --- Phase 9: Marketplace / セキュリティ ---
 # rustls 経由で OS のネイティブ TLS スタックを回避し、依存ツリーを軽量化。
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "blocking"] }
 sha2 = "0.10"
 hex = "0.4"
 ed25519-dalek = "2"
@@ -84,6 +84,10 @@ base64 = "0.22"
 rand = "0.9"
 argon2 = "0.5"
 chacha20poly1305 = "0.10"
+# 自動ロールバックの DL 後検証で使う。tauri-plugin-updater も内部で同じ crate を
+# 使っており、Tauri Updater と完全に互換な signature 検証を行えるため自前で
+# ed25519-dalek + base64 をハンドルする実装より安全。
+minisign-verify = "0.2"
 
 [dev-dependencies]
 criterion = { version = "0.5", default-features = false, features = ["html_reports"] }

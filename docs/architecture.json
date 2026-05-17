@@ -31,7 +31,7 @@
       "policy": "コード変更と同じコミットで更新する。数字はドリフトの最大シグナル — 信用する前に grep で実測する。"
     },
     "measured_counts": {
-      "rust_modules_in_lib_rs": 21,
+      "rust_modules_in_lib_rs": 22,
       "tauri_ipc_commands": 52,
       "composables": 27,
       "pages_vue": 4,
@@ -287,6 +287,12 @@
         "file": "src-tauri/src/health.rs",
         "category": "reliability",
         "role": "startup.json で連続失敗回数 (pending_failures) をカウント。3 回連続失敗を検知してロールバックダイアログを表示。バージョン変更で自動リセット。"
+      },
+      {
+        "name": "rollback",
+        "file": "src-tauri/src/rollback.rs",
+        "category": "reliability",
+        "role": "自動ロールバック (download_to_temp / verify_minisign / launch_silent_installer)。pre-main フェーズで main.rs::show_rollback_dialog の Yes 経路から呼ばれる。tauri-plugin-updater と同じ minisign-verify crate で署名互換。"
       },
       {
         "name": "crash",

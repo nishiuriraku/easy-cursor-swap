@@ -22,7 +22,8 @@ use app_lib::registry::RegistryManager;
 use app_lib::tray;
 
 /// 連続起動失敗 3 回検出時のロールバック案内ダイアログ。
-/// ユーザーが「はい」を選んだ場合に前バージョンのリリースページを開く。
+/// ユーザーが「はい」を選んだ場合、自動で旧版インストーラを DL → 検証 →
+/// サイレント再インストールする。失敗時はブラウザ fallback。
 #[cfg(windows)]
 fn show_rollback_dialog(target: &RollbackTarget) {
     use windows::core::HSTRING;
@@ -32,9 +33,9 @@ fn show_rollback_dialog(target: &RollbackTarget) {
 
     let body = format!(
         "EasyCursorSwap が 3 回連続して正常に起動できませんでした。\n\n\
-        前バージョン v{} にロールバックしますか?\n\n\
-        「はい」をクリックするとリリースページをブラウザで開きます。\n\
-        インストーラをダウンロードして再インストールしてください。",
+        前バージョン v{} に自動でロールバックしますか?\n\n\
+        「はい」を選択すると旧版インストーラを自動でダウンロードして再インストールします。\n\
+        ダウンロード後の検証 (Ed25519) に失敗した場合はブラウザでリリースページを開いて手動回復に切り替えます。",
         target.version
     );
     let title = HSTRING::from("EasyCursorSwap — 起動失敗を検出");
@@ -48,24 +49,67 @@ fn show_rollback_dialog(target: &RollbackTarget) {
             MB_YESNO | MB_ICONWARNING | MB_TOPMOST,
         )
     };
-    if result == IDYES {
-        // ShellExecute でブラウザを開く
-        use windows::core::PCWSTR;
-        use windows::Win32::UI::Shell::ShellExecuteW;
-        use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+    if result != IDYES {
+        return;
+    }
 
-        let url = HSTRING::from(target.releases_page_url.as_str());
-        unsafe {
-            ShellExecuteW(
-                None,
-                PCWSTR(HSTRING::from("open").as_ptr()),
-                PCWSTR(url.as_ptr()),
-                PCWSTR::null(),
-                PCWSTR::null(),
-                SW_SHOWNORMAL,
-            );
+    match auto_rollback_install(target) {
+        Ok(()) => {
+            tracing::info!("rollback installer 起動成功。プロセスを終了します");
+            std::process::exit(0);
+        }
+        Err(e) => {
+            tracing::warn!("自動ロールバック失敗: {} → ブラウザ fallback", e);
+            open_release_page_in_browser(&target.releases_page_url);
         }
     }
+}
+
+/// 旧版インストーラを DL → minisign 検証 → サイレント起動。
+#[cfg(windows)]
+fn auto_rollback_install(target: &RollbackTarget) -> Result<(), app_lib::rollback::RollbackError> {
+    use app_lib::rollback;
+    tracing::info!("rollback: {} の DL を開始", target.installer_url);
+    let installer = rollback::download_to_temp(
+        &target.installer_url,
+        &installer_filename_from_url(&target.installer_url),
+    )?;
+    tracing::info!("rollback: 署名検証中 (.sig DL)");
+    let sig_url = format!("{}.sig", target.installer_url);
+    let sig_path = rollback::download_to_temp(&sig_url, "rollback-installer.sig")?;
+    let installer_bytes = std::fs::read(&installer)?;
+    let sig_text = std::fs::read_to_string(&sig_path)?;
+    rollback::verify_minisign(&installer_bytes, &sig_text, rollback::EMBEDDED_PUBKEY)?;
+    tracing::info!("rollback: 検証 OK、サイレントインストール起動");
+    rollback::launch_silent_installer(&installer)?;
+    Ok(())
+}
+
+#[cfg(windows)]
+fn open_release_page_in_browser(url: &str) {
+    use windows::core::{HSTRING, PCWSTR};
+    use windows::Win32::UI::Shell::ShellExecuteW;
+    use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+    let url_h = HSTRING::from(url);
+    let verb = HSTRING::from("open");
+    unsafe {
+        ShellExecuteW(
+            None,
+            PCWSTR(verb.as_ptr()),
+            PCWSTR(url_h.as_ptr()),
+            PCWSTR::null(),
+            PCWSTR::null(),
+            SW_SHOWNORMAL,
+        );
+    }
+}
+
+/// `https://.../EasyCursorSwap_0.1.0_x64-setup.exe` → `EasyCursorSwap_0.1.0_x64-setup.exe`
+fn installer_filename_from_url(url: &str) -> String {
+    url.rsplit('/')
+        .next()
+        .unwrap_or("rollback-installer.exe")
+        .to_string()
 }
 
 #[cfg(not(windows))]

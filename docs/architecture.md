@@ -44,7 +44,7 @@
 
 ## Rust 側モジュール (`src-tauri/src/`)
 
-`lib.rs` は 21 個のモジュールを `pub mod` で公開し、`main.rs` から `tauri::Builder` に組み込む。
+`lib.rs` は 22 個のモジュールを `pub mod` で公開し、`main.rs` から `tauri::Builder` に組み込む。
 直近のリファクタで `commands` / `cursor` / `theme` / `bulk_import` / `registry` を **ディレクトリ + サブモジュール構成** に分割済み。多重起動防止は自前 `single_instance.rs` を廃止し `tauri_plugin_single_instance` プラグインに移行。
 
 ### 責務マップ
@@ -64,6 +64,7 @@
 | **マーケットプレース** | `marketplace.rs` | HTTP インデックス取得 (rustls-tls)、SHA-256 + Ed25519 検証、ダウンロードサイズ上限。プレビュー PNG 取得 (`fetch_preview`: URL バリデーション + ロール名バリデーション + 500KB 上限) |
 | | `keystore.rs` | クリエイター用 Ed25519 鍵ペア (DPAPI 暗号化), `.cfkey` import/export (XChaCha20-Poly1305 + Argon2id), key_id 計算 (SHA-256[:16]) |
 | **信頼性 / 復旧** | `health.rs` | 起動連続失敗カウンタ + ロールバック対象バージョン算出 |
+| | `rollback.rs` | 自動ロールバック (DL + `minisign-verify` で検証 + サイレントインストール)。`main.rs::show_rollback_dialog` の Yes 経路から pre-main で呼ばれる |
 | | `crash.rs` | panic フック + `crash-reports/` ディレクトリの retention + 投稿ペイロード生成 |
 | **OS 統合** | `tray.rs` | システムトレイ常駐 / メインウィンドウ再生成 |
 | | `hotkey.rs` | グローバルホットキー (Ctrl+Alt+Shift+R 等) |
