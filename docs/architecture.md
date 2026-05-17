@@ -44,7 +44,7 @@
 
 ## Rust 側モジュール (`src-tauri/src/`)
 
-`lib.rs` は 20 個のモジュールを `pub mod` で公開し、`main.rs` から `tauri::Builder` に組み込む。
+`lib.rs` は 21 個のモジュールを `pub mod` で公開し、`main.rs` から `tauri::Builder` に組み込む。
 直近のリファクタで `commands` / `cursor` / `theme` / `bulk_import` / `registry` を **ディレクトリ + サブモジュール構成** に分割済み。多重起動防止は自前 `single_instance.rs` を廃止し `tauri_plugin_single_instance` プラグインに移行。
 
 ### 責務マップ
@@ -186,7 +186,7 @@ app/
 
 **Rust** (分割完了)
 
-1. ✅ `commands.rs` 1229 行 → `commands/` 9 サブモジュール (うち `cursor_build/` はさらに build / cancel / dto / sign / stream の 5 ファイル分割)
+1. ✅ `commands.rs` 1229 行 → `commands/` 10 サブモジュール (うち `cursor_build/` はさらに build / cancel / dto / sign / stream の 5 ファイル分割。`commands/updater` はチャンネル切替 endpoint override を担当)
 2. ✅ `cursor.rs` 1289 行 → `cursor/` 5 サブモジュール
 3. ✅ `theme.rs` 1255 行 → `theme/` 3 ファイル
 4. ✅ `registry.rs` 1020 行 → `registry/` 4 ファイル (mod / scheme / roles / env)
@@ -225,9 +225,9 @@ pure function を中心に層が薄い。主要モジュール:
 
 ### Frontend (vitest)
 
-`app/composables/__tests__/` に 14 ファイル:
+`app/composables/__tests__/` に 15 ファイル:
 
-- `sanitizeSvg.test.ts`, `settingsSearch.test.ts`, `useAniPlayer.test.ts`, `useCreatorAssets.test.ts`, `useCreatorBulkImportFlow.test.ts`, `useCursorpackOpener.test.ts`, `useGithubAuth.test.ts`, `useHotspotDefaults.test.ts`, `useHotspotInteraction.test.ts`, `useI18n.test.ts`, `useMarketplacePreviews.test.ts`, `useMarketplaceSubmit.test.ts`, `useRoleMatcher.test.ts`, `useThemes.test.ts`
+- `sanitizeSvg.test.ts`, `settingsSearch.test.ts`, `useAniPlayer.test.ts`, `useCreatorAssets.test.ts`, `useCreatorBulkImportFlow.test.ts`, `useCursorpackOpener.test.ts`, `useGithubAuth.test.ts`, `useHotspotDefaults.test.ts`, `useHotspotInteraction.test.ts`, `useI18n.test.ts`, `useMarketplacePreviews.test.ts`, `useMarketplaceSubmit.test.ts`, `useRoleMatcher.test.ts`, `useThemes.test.ts`, `useUpdaterBootstrap.test.ts`
 - コンポーネントは `app/components/creator/__tests__/BulkImportPreviewModal.test.ts`
 
 ### CI (`.github/workflows/`)

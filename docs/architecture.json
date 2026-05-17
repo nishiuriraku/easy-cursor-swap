@@ -1,6 +1,6 @@
 {
   "$schema_version": "0.1.0",
-  "generated_at": "2026-05-16",
+  "generated_at": "2026-05-17",
   "generated_from": [
     "docs/architecture.md",
     "docs/file_inventory.md",
@@ -40,9 +40,7 @@
       "ci_workflows": 3
     },
     "doc_drift_warnings": [
-      "docs/file_inventory.md は composables を 25 と書いているが実測 26 (useMarketplaceSubmit 追加時に件数を更新し忘れ)。",
-      "docs/file_inventory.md は settings コンポーネントを 12 と書いているが実測 14。",
-      "docs/architecture.md は composables を 21 と書いているが実測 26 (古いスナップショット)。",
+      "現時点では既知のドリフトなし (2026-05-17 再測定)。新たに食い違いを見つけたら『docs/<file> は X と書いているが実測 Y』の形で追記し、修正コミットと同じ PR で解消する。",
       "数字が docs と食い違ったら grep を信用する。"
     ]
   },
@@ -176,7 +174,7 @@
         "name": "commands",
         "file": "src-tauri/src/commands/mod.rs",
         "category": "ipc",
-        "role": "9 サブモジュールの IPC 表玄関。get_command_handlers() が 52 個の #[tauri::command] を tauri::generate_handler! 経由で登録。",
+        "role": "10 サブモジュールの IPC 表玄関。get_command_handlers() が 53 個の handler を tauri::generate_handler! 経由で登録 (うち 3 つは crate::bulk_import::{assets,cursorpack} から再エクスポート)。",
         "submodules": [
           "commands/cursor_build/ (mod, build, stream, cancel, sign, dto)",
           "commands/cursor_io",
@@ -186,6 +184,7 @@
           "commands/profile",
           "commands/system",
           "commands/theme",
+          "commands/updater",
           "commands/windows_scheme"
         ],
         "depends_on": ["theme", "cursor", "registry", "marketplace", "keystore", "config", "bulk_import", "github", "backup", "crash", "health", "accessibility", "environment", "autostart"]
@@ -494,7 +493,7 @@
       "settings": {
         "dir": "app/components/settings/",
         "count": 14,
-        "files": ["SettingsRow.vue", "SettingsToggle.vue", "ConfigRecoveryPanel.vue", "PassphrasePrompt.vue", "SettingsSearchDropdown.vue", "GeneralSection.vue", "StartupSection.vue", "LibrarySection.vue", "SecuritySection.vue", "KeysSection.vue", "LoggingSection.vue", "UpdatesSection.vue", "AboutSection.vue"]
+        "files": ["SettingsRow.vue", "SettingsToggle.vue", "ConfigRecoveryPanel.vue", "PassphrasePrompt.vue", "SettingsSearchDropdown.vue", "GeneralSection.vue", "StartupSection.vue", "LibrarySection.vue", "SecuritySection.vue", "KeysSection.vue", "LoggingSection.vue", "UpdatesSection.vue", "AboutSection.vue", "OssLicenseModal.vue"]
       },
       "preview": {
         "dir": "app/components/preview/",
