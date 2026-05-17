@@ -61,7 +61,7 @@ See [docs/updater_signing.md](docs/updater_signing.md) for signature verificatio
 
 ### Prerequisites
 
-- [Rust](https://rustup.rs/) (stable, 1.77.2+)
+- [Rust](https://rustup.rs/) (stable, 1.82+; pinned via `src-tauri/Cargo.toml` `rust-version`)
 - [Node.js](https://nodejs.org/) 20+
 - [WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) (Windows 11 includes this)
 
@@ -116,7 +116,7 @@ easy-cursor-swap/
 │   ├── src/
 │   │   ├── main.rs             # Entry point: tray, health check
 │   │   ├── lib.rs              # Module declarations (21 modules)
-│   │   ├── commands/           # Tauri IPC command handlers (52 endpoints across 9 sub-modules)
+│   │   ├── commands/           # Tauri IPC command handlers (53 endpoints across 10 sub-modules)
 │   │   ├── config.rs           # Config manager (RwLock, schema migration, backups)
 │   │   ├── cursor/             # PNG → .cur / .ani pipeline (6 sizes, hotspot, ANI read/write)
 │   │   ├── registry/           # HKCU registry read/write, Schemes, SPI_SETCURSORS

@@ -21,7 +21,7 @@ See `README.md` and the documentation map below for full context.
 |---|---|---|
 | `docs/architecture.md` | **Living architecture map** — Rust/Vue module responsibilities, IPC inventory, startup sequence, Page → IPC routing, Security invariants + code references. Read this first when refactoring or onboarding. | Update when the codebase structure changes (module splits, new IPC, new security invariants, etc.). |
 | `docs/file_inventory.md` | **Living file index** — full file-by-file table for `src-tauri/src/` and `app/` with direct source links. Covers "which file holds what" at a finer grain than `architecture.md`. | Update on file creation/removal or responsibility moves. |
-| `docs/architecture.json` + `docs/architecture.html` | **Living architecture map (machine-readable + visual viewer)** — Structured JSON of all 21 Rust modules, 52 IPC commands, 26 composables, 51 components, 15 security invariants, startup sequence, and Page → Composable → IPC routing, all with `file` pointers to real sources. The JSON is a **structured mirror** of `architecture.md` + `file_inventory.md` + actually-measured counts. **Read this JSON first** when investigating the codebase or onboarding — one file gives the whole map and lets you drill into real sources without grep. `architecture.html` is the human-readable viewer (embeds the same JSON). | Update whenever `architecture.md` or `file_inventory.md` is updated. The three files share the same triggers; never update one without the others. Re-measure numbers against the source (`grep -c` / `glob`) before bumping. |
+| `docs/architecture.json` + `docs/architecture.html` | **Living architecture map (machine-readable + visual viewer)** — Structured JSON of all 21 Rust modules, 53 IPC commands, 27 composables, 51 components, 15 security invariants, startup sequence, and Page → Composable → IPC routing, all with `file` pointers to real sources. The JSON is a **structured mirror** of `architecture.md` + `file_inventory.md` + actually-measured counts. **Read this JSON first** when investigating the codebase or onboarding — one file gives the whole map and lets you drill into real sources without grep. `architecture.html` is the human-readable viewer (embeds the same JSON). | Update whenever `architecture.md` or `file_inventory.md` is updated. The three files share the same triggers; never update one without the others. Re-measure numbers against the source (`grep -c` / `glob`) before bumping. |
 | `docs/updater_signing.md` / `docs/authenticode_signing.md` / `docs/distribution.md` / `docs/key_rotation.md` / `docs/author_registration.md` / `docs/code_signing_policy.md` | **Operational runbooks** — Tauri Updater minisign key management / Authenticode certificate procurement / MSIX distribution / key-rotation PR / new-author registration / code signing policy. | Update only when the procedure itself changes. |
 
 When documents disagree, **`docs/architecture.md` + `docs/file_inventory.md` are authoritative** (they are written prose with code references); `docs/architecture.json` is the structured mirror agents consume — keep all three in sync, and let prose disagreements be resolved by reading the actual source.
@@ -85,11 +85,11 @@ Vue (UI) ──invoke()──▶ Tauri command (commands/) ──▶ Rust module
 
 ### Frontend layout (`app/`)
 
-- `pages/` — `index.vue` (Library), `creator.vue`, `marketplace.vue`, `settings.vue`, `appearance.vue`
+- `pages/` — `index.vue` (Library), `creator.vue`, `marketplace.vue`, `settings.vue` (4 pages; helpers in `index.helpers.ts` / `marketplace.helpers.ts`).
 - `components/{shell,library,creator,marketplace,settings,preview,panic,icons,ui}/` — domain-grouped SFCs. `nuxt.config.ts` sets `pathPrefix: false`, so reference components by file name (`<ThemeCard>`, not `<LibraryThemeCard>`).
-- `composables/` — 21 in total. IPC wrapper (`useTauri`), domain state (`useThemes`, `useAppSettings`, `useKeystore`, `useUpdater`, `useNotify`, `useUiTheme`), Creator helpers (`useCreatorAssets`, `useCreatorPickers`, `useCreatorImport`, `useCreatorBulkImportFlow`, `useCreatorExport`, `useHotspotDefaults`, `useHotspotInteraction`, `useAniPlayer`, `useBulkImport`, `useRoleMatcher`, `useThemePreviews`), and UI utilities (`useCursorpackOpener`, `useI18n`, `sanitizeSvg`). Vitest specs live in `app/composables/__tests__/` (10 files). See section 2-3 of `docs/file_inventory.md` for details.
+- `composables/` — 27 in total. IPC wrapper (`useTauri`), domain state (`useThemes`, `useAppSettings`, `useAppInfo`, `useKeystore`, `useUpdater`, `useUpdaterBootstrap`, `useNotify`, `useUiTheme`), Creator helpers (`useCreatorAssets`, `useCreatorPickers`, `useCreatorImport`, `useCreatorBulkImportFlow`, `useCreatorExport`, `useHotspotDefaults`, `useHotspotInteraction`, `useAniPlayer`, `useBulkImport`, `useRoleMatcher`, `useThemePreviews`), marketplace (`useMarketplacePreviews`, `useGithubAuth`, `useMarketplaceSubmit`), and UI utilities (`useCursorpackOpener`, `useI18n`, `useSettingsSearch`, `sanitizeSvg`). Vitest specs live in `app/composables/__tests__/` (15 files). See section 2-3 of `docs/file_inventory.md` for details.
 - `locales/{ja,en}.ts` — keys typed `as const`; **must stay in parity** (CI gate via `scripts/check-i18n.mjs`).
-- `types/` — IPC payload types (`config.ts`, `theme.ts`, `marketplace.ts`).
+- `types/` — IPC payload types (`config.ts`, `theme.ts`, `marketplace.ts`, `githubAuth.ts`).
 - `assets/css/tailwind.css` — Tailwind v4 entry + `@theme` block (exposes design tokens as utilities) + cross-cutting shared utilities (`.btn` / `.card` / `.chip` / `.input` / `.tag` / `.toolbar` / `.tabs` / `.prop-section` / `.lib-table` / `.lib-row` / `.lt-*` / `.modal*` / `.content` / `.page-head` / `.grid`, etc.).
 - `assets/css/global.css` — `:root` + `html.light` design tokens, CSS reset, scrollbar customisation, `:focus-visible`, `prefers-reduced-motion`, and shared `@keyframes` (pulse / fade-in / slide-in-right / spin) only. Do **not** add component-specific styles here.
 
@@ -99,14 +99,14 @@ Vue (UI) ──invoke()──▶ Tauri command (commands/) ──▶ Rust module
 
 | Concern | Modules |
 |---|---|
-| IPC surface | `commands/` (52 `#[tauri::command]` across 9 sub-modules: `theme` / `cursor_build/` (5 files) / `cursor_io` / `keystore` / `marketplace` / `marketplace_submit` / `profile` / `system` / `windows_scheme`) |
+| IPC surface | `commands/` (53 `#[tauri::command]` across 10 sub-modules: `theme` / `cursor_build/` (5 files) / `cursor_io` / `keystore` / `marketplace` / `marketplace_submit` / `profile` / `system` / `updater` / `windows_scheme`) |
 | Config / state | `config.rs` (RwLock + schema_version v1 + `config.corrupt.*.json` 退避, Source of Truth), `errors.rs` |
 | Cursor pipeline | `cursor/` (5 files: `image` / `cur_build` / `ico_cur` / `ani` / `ani_write`), `cursor_watcher.rs` |
 | Registry | `registry/` (4 files: `mod` / `scheme` / `roles` / `env`) |
 | Theme packages | `theme/` (3 files: `mod` / `types` / `sanitize`), `bulk_import/` (3 files: `mod` / `assets` / `cursorpack`), `backup.rs` (`.cursorprofile`) |
 | Marketplace | `marketplace.rs` (HTTP index fetch, SHA-256 + Ed25519 verify), `keystore.rs` (Ed25519 + DPAPI + `.cfkey` XChaCha20-Poly1305 + Argon2id) |
 | Reliability | `health.rs` (startup-failure counter + rollback), `crash.rs` |
-| OS integration | `tray.rs`, `darkmode.rs`, `hotkey.rs`, `autostart.rs`, `appusermodel.rs`, `accessibility.rs`, `environment.rs` (RDP/Citrix detection). Multi-instance lock is `tauri_plugin_single_instance` (no custom module). |
+| OS integration | `tray.rs`, `hotkey.rs`, `autostart.rs`, `appusermodel.rs`, `accessibility.rs`, `environment.rs` (RDP/Citrix detection). Multi-instance lock is `tauri_plugin_single_instance` (no custom module). Dark mode is handled on the frontend (`useUiTheme` composable). |
 | Observability | `logging.rs` (with `redact_path` / `short_hash` PII helpers) |
 
 ### Critical invariants
@@ -136,7 +136,7 @@ Vue (UI) ──invoke()──▶ Tauri command (commands/) ──▶ Rust module
 When starting any new feature, refactor, or bug fix, **always** follow these steps in order:
 
 1. **Invoke the relevant skill.** If there is even a 1% chance a skill applies to the task, launch it via the `Skill` tool (e.g. `superpowers:brainstorming` for ideation, `superpowers:test-driven-development` for TDD, `superpowers:systematic-debugging` for debugging, `rust-skills:m01-ownership` for Rust ownership/concurrency errors, and the matching skill for Cloudflare / Tauri / Nuxt-specific work). When in doubt, launch it and discard if it doesn't fit.
-2. **Read existing code before writing.** Start by reading **`docs/architecture.json`** — it indexes all 21 Rust modules, 52 IPC commands, 26 composables, and Page → IPC routing in a single structured file, so you can answer "which module owns X" or "which IPC does Y call" without grep. Then drill into the actual source paths the JSON points to (`app/` / `src-tauri/src/` / `composables/` / `commands/`) and match the prior naming, types, and IPC conventions. Update both `locales/{ja,en}.ts` so `scripts/check-i18n.mjs` stays green. Prefer extending an existing composable / module over introducing duplicate code.
+2. **Read existing code before writing.** Start by reading **`docs/architecture.json`** — it indexes all 21 Rust modules, 53 IPC commands, 27 composables, and Page → IPC routing in a single structured file, so you can answer "which module owns X" or "which IPC does Y call" without grep. Then drill into the actual source paths the JSON points to (`app/` / `src-tauri/src/` / `composables/` / `commands/`) and match the prior naming, types, and IPC conventions. Update both `locales/{ja,en}.ts` so `scripts/check-i18n.mjs` stays green. Prefer extending an existing composable / module over introducing duplicate code.
 3. **Use `scripts/verify-gate.sh` as the verification gate.** Run `bash scripts/verify-gate.sh` right before committing and confirm it passes green. Do not use the inline sequence (`cargo fmt` … `npm run tauri:build`) — the script is canonical.
 4. **Update docs in the same commit.** See "Documentation update policy" below. Code-only commits that move the source-of-truth without touching the living docs are the main cause of doc rot in this repo — do not create them.
 
@@ -176,5 +176,5 @@ Marketplace submission validation (`.cursorpack` SHA-256 / Ed25519 / size / malw
 ## Pitfalls
 
 - The `zip` crate v2.6.x is yanked — pin a known-good version when bumping.
-- Do **not** scaffold new features under an `easy-cursor-swap/` subdirectory; the workspace `CLAUDE.md` (`<USER_HOME>\Workspace\CLAUDE.md`) lists the project that way for historical reasons, but the actual repo root is `cursor-forge/`.
+- Do **not** scaffold new features under an `easy-cursor-swap/` subdirectory; the repo root is `easy-cursor-swap/` itself (matches the git remote name). The workspace `CLAUDE.md` (`<USER_HOME>\Workspace\CLAUDE.md`) and some legacy references mention `cursor-forge/` for historical reasons — ignore those.
 - `npm run dev` (Nuxt only) is fine in isolation, but Tauri commands will fail because there's no Tauri runtime. Use `npm run tauri:dev` to exercise IPC.

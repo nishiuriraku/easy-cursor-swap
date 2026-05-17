@@ -59,7 +59,7 @@ Windows の全 17 カーソル役割 / 6 DPI サイズに対応し、Ed25519 署
 
 ### 前提条件
 
-- [Rust](https://rustup.rs/)（stable、1.77.2 以降）
+- [Rust](https://rustup.rs/)（stable、1.82 以降。`src-tauri/Cargo.toml` の `rust-version` で固定）
 - [Node.js](https://nodejs.org/) 20 以降
 - [WebView2](https://developer.microsoft.com/ja-jp/microsoft-edge/webview2/)（Windows 11 は標準搭載）
 
@@ -114,7 +114,7 @@ easy-cursor-swap/
 │   ├── src/
 │   │   ├── main.rs             # エントリポイント: トレイ / ヘルスチェック
 │   │   ├── lib.rs              # モジュール宣言（21 モジュール）
-│   │   ├── commands/           # Tauri IPC コマンドハンドラー（9 サブモジュール / 52 エンドポイント）
+│   │   ├── commands/           # Tauri IPC コマンドハンドラー（10 サブモジュール / 53 エンドポイント）
 │   │   ├── config.rs           # 設定マネージャー（RwLock / スキーママイグレーション / バックアップ）
 │   │   ├── cursor/             # PNG → .cur / .ani パイプライン（6 サイズ / ホットスポット / ANI 入出力）
 │   │   ├── registry/           # HKCU レジストリ読み書き / Schemes / SPI_SETCURSORS

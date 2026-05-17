@@ -1177,7 +1177,7 @@
   ],
   "pitfalls": [
     "zip crate v2.6.x は yank 済み — バンプ時は既知の安定版にピン留めする。",
-    "easy-cursor-swap/ サブディレクトリを掘って機能を追加してはいけない — リポジトリルートは cursor-forge/ そのもの。",
+    "リポジトリルートは easy-cursor-swap/ そのもの (git remote 名と一致)。easy-cursor-swap/ や cursor-forge/ のサブディレクトリを掘って機能を追加しない。",
     "npm run dev (Nuxt のみ) は Tauri ランタイムを起動しないため IPC が失敗する。npm run tauri:dev を使う。",
     "Nuxt 4.4.4 はトップレベル ssr: false に IPC バグあり。nuxt.config.ts の routeRules による回避は意図的。"
   ]
