@@ -33,7 +33,7 @@
     "measured_counts": {
       "rust_modules_in_lib_rs": 21,
       "tauri_ipc_commands": 53,
-      "composables": 26,
+      "composables": 27,
       "pages_vue": 4,
       "pages_ts_helpers": 2,
       "components_total": 51,
@@ -461,6 +461,7 @@
       { "file": "app/composables/useAniPlayer.ts", "name": "useAniPlayer", "role": "ANI プレビュー再生 (フレームタイマー + キャンセル)。" },
       { "file": "app/composables/useCursorpackOpener.ts", "name": "useCursorpackOpener", "role": ".cursorpack のダブルクリック / argv ハンドオフフロー。", "ipc_calls": ["take_pending_cursorpack", "inspect_cursorpack", "import_cursorpack"] },
       { "file": "app/composables/useUpdater.ts", "name": "useUpdater", "role": "check / downloadAndInstall / relaunch。channel='beta' のときは Rust IPC で endpoint を runtime override。", "ipc_calls": ["check_update_is_major_jump", "check_for_update_on_channel"] },
+      { "file": "app/composables/useUpdaterBootstrap.ts", "name": "useUpdaterBootstrap", "role": "起動時 1 回だけ auto_update + 24h クールダウンで check し、ヒット時に Toast 通知。", "ipc_calls": [] },
       { "file": "app/composables/useNotify.ts", "name": "useNotify", "role": "Toast 通知 (permission をキャッシュ)。" },
       { "file": "app/composables/sanitizeSvg.ts", "name": "sanitizeSvg", "role": "SVG サニタイズ (<script> / href / on* / javascript: を除去)。v-html 禁止のため必須。" },
       { "file": "app/composables/useAppInfo.ts", "name": "useAppInfo", "role": "get_app_info IPC で取得したアプリ情報 (version、cursors_dir 等) の共有。", "ipc_calls": ["get_app_info"] },

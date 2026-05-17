@@ -134,6 +134,7 @@
 | [useAniPlayer.ts](../app/composables/useAniPlayer.ts) | ANI プレビュー再生 (frame タイマー + cancel) |
 | [useCursorpackOpener.ts](../app/composables/useCursorpackOpener.ts) | `.cursorpack` ダブルクリック / argv 開封フロー |
 | [useUpdater.ts](../app/composables/useUpdater.ts) | check / downloadAndInstall / relaunch。channel='beta' は Rust IPC `check_for_update_on_channel` 経由で別 endpoint を引く |
+| [useUpdaterBootstrap.ts](../app/composables/useUpdaterBootstrap.ts) | 起動時 1 回だけ `auto_update + 24h クールダウン` で check し、ヒット時 Toast 通知 (`app.vue` から呼び出し) |
 | [useNotify.ts](../app/composables/useNotify.ts) | Toast 通知 (permission キャッシュ) |
 | [sanitizeSvg.ts](../app/composables/sanitizeSvg.ts) | SVG サニタイズ (`<script>`/`href`/`on*`/`javascript:` 除去) |
 | [useAppInfo.ts](../app/composables/useAppInfo.ts) | `get_app_info` IPC で取得したアプリ情報 (version, cursors_dir 等) の共有 |
