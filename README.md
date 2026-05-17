@@ -57,6 +57,25 @@ See [docs/updater_signing.md](docs/updater_signing.md) for signature verificatio
 > signing); see [docs/code_signing_policy.md](docs/code_signing_policy.md) for
 > the full signing policy (team, privacy, build reproducibility).
 
+### Auto Updates
+
+EasyCursorSwap checks for updates on app startup if **auto-update is enabled**
+in Settings → Updates. To respect GitHub's rate limits the check runs at most
+**once every 24 hours**; subsequent launches within that window skip silently.
+
+When a new release is found, a Windows Toast notification appears. Major
+version bumps (e.g. v1.x → v2.0) are **suppressed** from the toast — they
+require explicit user action through Settings → Updates so that breaking
+changes are reviewed before installing.
+
+All update payloads are Ed25519-signed (minisign) and verified against the
+public key embedded in the app at build time before installation.
+
+If the app fails to start 3 consecutive times, a Windows MessageBox offers
+to **automatically download and reinstall the previous version**. The
+fallback installer is signature-verified the same way before being launched
+silently.
+
 ## Development Setup
 
 ### Prerequisites
