@@ -16,6 +16,7 @@
 //! | [`profile`]      | `.cursorprofile` (config + 全テーマ) の export / import |
 //! | [`system`]       | アプリ設定 / OS 状態 / クラッシュ / 自動起動など雑多な情報系 |
 //! | [`theme`]        | テーマ単体の CRUD と `.cursorpack` の inspect / import |
+//! | [`updater`]      | チャンネル切替対応の Tauri Updater (`UpdaterExt` の runtime endpoint 上書き) |
 //! | [`windows_scheme`] | Windows カーソルスキーム (HKCU\Cursors\Schemes) 連携 |
 //!
 //! `bulk_import` 系 IPC は [`crate::bulk_import`] に直接定義されている (キャンセル可能なバックグラウンド処理を伴うため)。
@@ -28,6 +29,7 @@ pub mod marketplace_submit;
 pub mod profile;
 pub mod system;
 pub mod theme;
+pub mod updater;
 pub mod windows_scheme;
 
 /// Tauri Builder に全コマンドを登録するためのヘルパー。
@@ -95,6 +97,8 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         system::list_crash_reports,
         system::clear_crash_reports,
         system::submit_crash_reports,
+        // Tauri Updater (runtime endpoint = channel 切替)
+        updater::check_for_update_on_channel,
         // 一括取り込み (実装本体は crate::bulk_import::{assets,cursorpack} 側)
         crate::bulk_import::assets::bulk_resolve_assets,
         crate::bulk_import::assets::cancel_bulk_import,

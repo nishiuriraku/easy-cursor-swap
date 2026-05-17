@@ -227,6 +227,11 @@ fn main() {
         .map(|c| c.general.panic_hotkey.clone())
         .unwrap_or_else(|_| "Ctrl+Alt+Shift+R".to_string());
 
+    // NOTE: 更新チャンネル切替は runtime IPC (commands::updater::*) 経由で行う。
+    // tauri-plugin-updater@2.10 系の plugin Builder には endpoints() メソッドが無く、
+    // 切替には `UpdaterExt::updater_builder().endpoints(...)` を runtime で呼ぶ必要があるため、
+    // ここでは default 設定 (tauri.conf.json) のみで plugin を登録する。
+
     // Tauri アプリケーションビルド
     // release ビルドでは debug_assertions ブロックが消えて再代入が無くなるため
     // `mut` が unused 扱いになる。条件付きで allow する。
