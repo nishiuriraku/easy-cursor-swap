@@ -16,6 +16,7 @@
 import { useAppSettings } from './useAppSettings'
 import { useUpdater } from './useUpdater'
 import { notify } from './useNotify'
+import { invokeTauri } from './useTauri'
 
 /** クールダウン期間 (ms)。24 時間。 */
 const CHECK_COOLDOWN_MS = 24 * 60 * 60 * 1000
@@ -67,15 +68,31 @@ async function run(): Promise<void> {
     return
   }
 
-  const channel = (c.general.update_channel === 'beta' ? 'beta' : 'stable') as 'stable' | 'beta'
   const { check } = useUpdater()
-  const info = await check(channel)
+  const info = await check()
 
   // 成功・失敗にかかわらずタイムスタンプは進める
   // (失敗時に毎回再試行すると Toast permission ダイアログが頻発する)
   writeLastCheckedAt(now)
 
   if (!info) return
+
+  // メジャー跨ぎは startup auto-check では通知しない (UX: 大きな変更はユーザー意思で
+  // 設定 → 更新 から DL してもらう)。
+  // check_update_is_major_jump IPC が失敗 (Tauri 未接続 / dev モード等) した場合は
+  // 安全側で通知を出す既定挙動にフォールバックする。
+  try {
+    const isMajor = await invokeTauri<boolean>('check_update_is_major_jump', {
+      currentVersion: info.currentVersion,
+      newVersion: info.version,
+    })
+    if (isMajor) {
+      console.info('[updater-bootstrap] major bump detected, suppressing toast')
+      return
+    }
+  } catch (e) {
+    console.warn('[updater-bootstrap] major bump check failed, falling through to notify:', e)
+  }
 
   await notify({
     title: 'EasyCursorSwap',
