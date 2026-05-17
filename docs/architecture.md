@@ -138,7 +138,7 @@ Nuxt 4 SPA。`pathPrefix: false` のため component はファイル名 (basenam
 
 ```
 app/
-├─ pages/          ← トップレベル画面 (Library / Creator / Marketplace / Settings / Appearance)
+├─ pages/          ← トップレベル画面 (Library / Creator / Marketplace / Settings)
 ├─ layouts/        ← default.vue (シェル: AppTitlebar + AppSidebar + slot)
 ├─ components/
 │  ├─ shell/       ← AppTitlebar, AppSidebar, EnvironmentBanner
@@ -148,7 +148,7 @@ app/
 │  ├─ creator/     ← CreatorStartScreen, CreatorToolbar, CreatorRoleList, CreatorMetadataPane,
 │  │                NewThemeStartModal, SaveDestinationModal, BulkImportButton,
 │  │                BulkImportPreviewModal, BulkImportRoleRow, RoleListItem, SizeStrip, AniThumb
-│  ├─ marketplace/ ← MarketplaceCard, FeaturedCard, SubmitThemeDialog, MarketplaceDetailModal, SubmitDeviceFlowModal
+│  ├─ marketplace/ ← FeaturedCard, SubmitThemeDialog, MarketplaceDetailModal, SubmitDeviceFlowModal
 │  ├─ settings/    ← SettingsRow, SettingsToggle, ConfigRecoveryPanel, PassphrasePrompt,
 │  │                SettingsSearchDropdown, GeneralSection, StartupSection,
 │  │                LibrarySection, SecuritySection, KeysSection, LoggingSection,
@@ -164,8 +164,9 @@ app/
 │                    useHotspotInteraction, useAniPlayer, useCursorpackOpener,
 │                    useAppInfo, useSettingsSearch, useMarketplacePreviews,
 │                    useGithubAuth (GitHub Device Flow 認証・トークン管理),
-│                    useMarketplaceSubmit (自動 PR 提出フロー) (合計 25)
-├─ types/          ← config.ts, theme.ts, marketplace.ts (Rust struct と 1:1)
+│                    useMarketplaceSubmit (自動 PR 提出フロー),
+│                    useUpdaterBootstrap (起動時 1 回の auto_update チェック) (合計 27)
+├─ types/          ← config.ts, theme.ts, marketplace.ts, githubAuth.ts (Rust struct と 1:1)
 ├─ locales/        ← ja.ts, en.ts (CI で parity チェック)
 ├─ assets/css/     ← tailwind.css (Tailwind v4 entry + @theme + 横断 shared utility) +
 │                    global.css (デザイントークン / CSS リセット / @keyframes)
@@ -176,9 +177,9 @@ app/
 
 | Page | 主な composable / Component | 主な IPC |
 |---|---|---|
-| `index.vue` (Library) | useThemes, useCursorpackOpener, ThemeCard / ThemeRow, ApplyModal, ImportConflictDialog, ThemePickerModal | `get_themes`, `apply_theme`, `import_cursorpack`, `inspect_cursorpack`, `delete_theme`, `duplicate_theme`, `repackage_theme`, `list_windows_schemes`, `apply_windows_scheme`, `get_windows_scheme_previews`, `set_theme_favorite`, `take_pending_cursorpack` |
-| `creator.vue` | useCreatorAssets, useCreatorPickers, useCreatorImport, useCreatorBulkImportFlow, useCreatorExport, useRoleMatcher, useBulkImport, useKeystore, useHotspotDefaults, useHotspotInteraction, useAniPlayer, sanitizeSvg, NewThemeStartModal, BulkImportPreviewModal | `import_cursor_file`, `inspect_ani_file`, `parse_cursorpack_for_creator`, `bulk_resolve_assets`, `cancel_bulk_import`, `export_cursorpack_streamed`, `cancel_build`, `export_ani_with_hotspot`, `keystore_info` |
-| `marketplace.vue` | useThemes, useMarketplacePreviews, useGithubAuth, useMarketplaceSubmit, MarketplaceCard, FeaturedCard, MarketplaceDetailModal, SubmitThemeDialog, SubmitDeviceFlowModal | `marketplace_fetch_index`, `marketplace_install`, `marketplace_fetch_preview`, `keystore_info`, `start_device_flow`, `complete_device_flow`, `cancel_device_flow`, `submit_theme_auto`, `revoke_github_link` |
+| `index.vue` (Library) | useThemes, useCursorpackOpener, useThemePreviews, ThemeCard / ThemeRow, ApplyModal, ImportConflictDialog, ThemePickerModal | `get_themes`, `apply_theme`, `import_cursorpack`, `inspect_cursorpack`, `delete_theme`, `duplicate_theme`, `repackage_theme`, `list_windows_schemes`, `apply_windows_scheme`, `get_windows_scheme_role_previews`, `export_windows_scheme_as_cursorpack`, `set_theme_favorite`, `take_pending_cursorpack` |
+| `creator.vue` | useCreatorAssets, useCreatorPickers, useCreatorImport, useCreatorBulkImportFlow, useCreatorExport, useRoleMatcher, useBulkImport, useKeystore, useHotspotDefaults, useHotspotInteraction, useAniPlayer, sanitizeSvg, NewThemeStartModal, BulkImportPreviewModal | `parse_cursorpack_for_creator`, `bulk_resolve_assets`, `cancel_bulk_import`, `export_cursorpack_streamed`, `cancel_build`, `repackage_theme`, `apply_theme`, `keystore_info` |
+| `marketplace.vue` | useThemes, useMarketplacePreviews, useGithubAuth, useMarketplaceSubmit, FeaturedCard, MarketplaceDetailModal, SubmitThemeDialog, SubmitDeviceFlowModal | `marketplace_fetch_index`, `marketplace_install`, `marketplace_fetch_preview`, `keystore_info`, `start_device_flow`, `complete_device_flow`, `cancel_device_flow`, `submit_theme_auto`, `revoke_github_link`, `open_url` |
 | `settings.vue` | useAppSettings, useKeystore, useUpdater, useSettingsSearch, ConfigRecoveryPanel, PassphrasePrompt, SettingsSearchDropdown, GeneralSection 〜 AboutSection の 8 セクション | `get_config`, `update_config`, `keystore_*`, `list_config_backups`, `restore_config_backup`, `export_profile`, `import_profile`, `list_crash_reports`, `clear_crash_reports`, `submit_crash_reports`, `check_update_is_major_jump` |
 | `PanicFlow.vue` (modal) | useNotify | `reset_to_default`, `reset_to_initial` |
 

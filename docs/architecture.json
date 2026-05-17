@@ -36,12 +36,13 @@
       "composables": 27,
       "pages_vue": 4,
       "pages_ts_helpers": 2,
-      "components_total": 51,
+      "components_total": 50,
       "ci_workflows": 3
     },
     "doc_drift_warnings": [
-      "現時点では既知のドリフトなし (2026-05-17 再測定)。新たに食い違いを見つけたら『docs/<file> は X と書いているが実測 Y』の形で追記し、修正コミットと同じ PR で解消する。",
-      "数字が docs と食い違ったら grep を信用する。"
+      "現時点では既知のドリフトなし (2026-05-17 再監査 + 修正完了)。ui_map.json と相互整合済み: backend.ipc_commands 53 件のうち 3 件 (export_cursorpack / get_theme_previews / get_windows_scheme_previews) は Rust に登録だけされた legacy_unused 状態で、それぞれ status と replaced_by を明示。次の PR で Rust 側からも削除するか、frontend で再利用する決定をすること。",
+      "新たに食い違いを見つけたら『docs/<file> は X と書いているが実測 Y』の形で追記し、修正コミットと同じ PR で解消する。",
+      "数字が docs と食い違ったら grep を信用する。frontend の数字は ui_map.html の live check (末尾) が canonical counter。"
     ]
   },
   "architecture_layers": {
@@ -336,12 +337,12 @@
       { "name": "delete_theme", "category": "theme", "file": "src-tauri/src/commands/theme.rs", "frontend_callers": ["useThemes"] },
       { "name": "duplicate_theme", "category": "theme", "file": "src-tauri/src/commands/theme.rs", "frontend_callers": ["useThemes"] },
       { "name": "repackage_theme", "category": "theme", "file": "src-tauri/src/commands/theme.rs", "frontend_callers": ["useThemes", "useCreatorExport"] },
-      { "name": "get_theme_previews", "category": "theme", "file": "src-tauri/src/commands/theme.rs", "frontend_callers": ["useThemePreviews"] },
+      { "name": "get_theme_previews", "category": "theme", "file": "src-tauri/src/commands/theme.rs", "frontend_callers": [], "status": "legacy_unused", "replaced_by": "get_theme_role_previews" },
       { "name": "get_theme_role_previews", "category": "theme", "file": "src-tauri/src/commands/theme.rs", "frontend_callers": ["useThemePreviews"] },
       { "name": "set_theme_favorite", "category": "theme", "file": "src-tauri/src/commands/theme.rs", "frontend_callers": ["useThemes"] },
       { "name": "inspect_cursorpack", "category": "theme", "file": "src-tauri/src/commands/theme.rs", "frontend_callers": ["useThemes", "useCursorpackOpener"] },
       { "name": "import_cursorpack", "category": "theme", "file": "src-tauri/src/commands/theme.rs", "frontend_callers": ["useThemes", "useCursorpackOpener"] },
-      { "name": "export_cursorpack", "category": "cursorpack_build", "file": "src-tauri/src/commands/cursor_build/mod.rs", "frontend_callers": ["useCreatorExport"] },
+      { "name": "export_cursorpack", "category": "cursorpack_build", "file": "src-tauri/src/commands/cursor_build/mod.rs", "frontend_callers": [], "status": "legacy_unused", "replaced_by": "export_cursorpack_streamed" },
       { "name": "export_cursorpack_streamed", "category": "cursorpack_build", "file": "src-tauri/src/commands/cursor_build/stream.rs", "frontend_callers": ["useCreatorExport"] },
       { "name": "cancel_build", "category": "cursorpack_build", "file": "src-tauri/src/commands/cursor_build/cancel.rs", "frontend_callers": ["useCreatorExport"] },
       { "name": "take_pending_cursorpack", "category": "cursorpack_assoc", "file": "src-tauri/src/commands/cursor_io.rs", "frontend_callers": ["useCursorpackOpener"] },
@@ -362,7 +363,7 @@
       { "name": "import_profile", "category": "profile", "file": "src-tauri/src/commands/profile.rs", "frontend_callers": ["useAppSettings"] },
       { "name": "list_windows_schemes", "category": "windows_scheme", "file": "src-tauri/src/commands/windows_scheme.rs", "frontend_callers": ["pages/index.vue"] },
       { "name": "apply_windows_scheme", "category": "windows_scheme", "file": "src-tauri/src/commands/windows_scheme.rs", "frontend_callers": ["pages/index.vue"] },
-      { "name": "get_windows_scheme_previews", "category": "windows_scheme", "file": "src-tauri/src/commands/windows_scheme.rs", "frontend_callers": ["pages/index.vue"] },
+      { "name": "get_windows_scheme_previews", "category": "windows_scheme", "file": "src-tauri/src/commands/windows_scheme.rs", "frontend_callers": [], "status": "legacy_unused", "replaced_by": "get_windows_scheme_role_previews" },
       { "name": "get_windows_scheme_role_previews", "category": "windows_scheme", "file": "src-tauri/src/commands/windows_scheme.rs", "frontend_callers": ["pages/index.vue"] },
       { "name": "export_windows_scheme_as_cursorpack", "category": "windows_scheme", "file": "src-tauri/src/commands/windows_scheme.rs", "frontend_callers": ["pages/index.vue"] },
       { "name": "reset_to_default", "category": "system", "file": "src-tauri/src/commands/system.rs", "frontend_callers": ["components/panic/PanicFlow.vue"] },
@@ -412,7 +413,7 @@
         "helpers": ["app/pages/index.helpers.ts (IpcThemeSummary、mapLocalSummaryToCard)"],
         "composables": ["useThemes", "useCursorpackOpener", "useThemePreviews"],
         "components": ["ThemeCard", "ThemeRow", "ThemeDetailModal", "ThemeDetailDrawer", "ApplyModal", "ImportConflictDialog", "ThemePickerModal", "CursorMatrix", "LibraryToolbar", "LibraryFilterBar", "LibraryEmptyState", "LibraryDropOverlay"],
-        "ipc_calls": ["get_themes", "apply_theme", "import_cursorpack", "inspect_cursorpack", "delete_theme", "duplicate_theme", "repackage_theme", "list_windows_schemes", "apply_windows_scheme", "get_windows_scheme_previews", "set_theme_favorite", "take_pending_cursorpack"]
+        "ipc_calls": ["get_themes", "apply_theme", "import_cursorpack", "inspect_cursorpack", "delete_theme", "duplicate_theme", "repackage_theme", "list_windows_schemes", "apply_windows_scheme", "get_windows_scheme_role_previews", "set_theme_favorite", "take_pending_cursorpack", "export_windows_scheme_as_cursorpack"]
       },
       {
         "file": "app/pages/creator.vue",
@@ -428,7 +429,7 @@
         "role": "公式インデックスブラウザ (フィルタ / 検索 / Featured / PR 自動提出)",
         "helpers": ["app/pages/marketplace.helpers.ts (computeFilteredGrid)"],
         "composables": ["useThemes", "useMarketplacePreviews", "useGithubAuth", "useMarketplaceSubmit"],
-        "components": ["MarketplaceCard", "FeaturedCard", "MarketplaceDetailModal", "SubmitThemeDialog", "SubmitDeviceFlowModal"],
+        "components": ["FeaturedCard", "MarketplaceDetailModal", "SubmitThemeDialog", "SubmitDeviceFlowModal"],
         "ipc_calls": ["marketplace_fetch_index", "marketplace_install", "marketplace_fetch_preview", "keystore_info", "start_device_flow", "complete_device_flow", "cancel_device_flow", "submit_theme_auto", "revoke_github_link"]
       },
       {
@@ -448,13 +449,13 @@
       { "file": "app/composables/useKeystore.ts", "name": "useKeystore", "role": "鍵生成 / 削除 / エクスポート / インポート + key_id 表示。", "ipc_calls": ["keystore_info", "keystore_generate", "keystore_delete", "keystore_export", "keystore_import"] },
       { "file": "app/composables/useUiTheme.ts", "name": "useUiTheme", "role": "アプリ自身のライト / ダークモード切替 (デフォルトは Windows 追従、config に永続化)。" },
       { "file": "app/composables/useRoleMatcher.ts", "name": "useRoleMatcher", "role": "エイリアス辞書 + scoreRole + resolveCollisions。17 役割マッチング用の純粋関数群。" },
-      { "file": "app/composables/useThemePreviews.ts", "name": "useThemePreviews", "role": "プレビュー画像取得 (役割 × サイズ)。", "ipc_calls": ["get_theme_previews", "get_theme_role_previews"] },
+      { "file": "app/composables/useThemePreviews.ts", "name": "useThemePreviews", "role": "プレビュー画像取得 (役割 × サイズ + ホットスポット + ANI フレーム)。UUID 形式はローカルテーマ、`windows:` プレフィックスはシステムスキームへ分岐。", "ipc_calls": ["get_theme_role_previews", "get_windows_scheme_role_previews"] },
       { "file": "app/composables/useBulkImport.ts", "name": "useBulkImport", "role": "バルクインポート IPC ラッパー + 進捗購読。", "ipc_calls": ["bulk_resolve_assets", "cancel_bulk_import"] },
       { "file": "app/composables/useCreatorAssets.ts", "name": "useCreatorAssets", "role": "役割ごとの assignedPng / Hotspot を統合管理。" },
       { "file": "app/composables/useCreatorPickers.ts", "name": "useCreatorPickers", "role": "Creator のファイル / フォルダピッカー UX。" },
       { "file": "app/composables/useCreatorImport.ts", "name": "useCreatorImport", "role": "Creator の単発インポート (import_cursor_file / inspect_ani_file)。" },
       { "file": "app/composables/useCreatorBulkImportFlow.ts", "name": "useCreatorBulkImportFlow", "role": "バルクインポート preview → confirm のステートマシン。", "ipc_calls": ["parse_cursorpack_for_creator", "bulk_resolve_assets"] },
-      { "file": "app/composables/useCreatorExport.ts", "name": "useCreatorExport", "role": ".cursorpack のストリーミング出力フロー (進捗 + キャンセル)。", "ipc_calls": ["export_cursorpack", "export_cursorpack_streamed", "cancel_build", "repackage_theme"] },
+      { "file": "app/composables/useCreatorExport.ts", "name": "useCreatorExport", "role": ".cursorpack のストリーミング出力フロー (進捗 + キャンセル) + library/libraryAndApply 経路では完了後の apply_theme まで自走する。", "ipc_calls": ["export_cursorpack_streamed", "cancel_build", "apply_theme"] },
       { "file": "app/composables/useHotspotDefaults.ts", "name": "useHotspotDefaults", "role": "役割別 hotspot のデフォルト座標。" },
       { "file": "app/composables/useHotspotInteraction.ts", "name": "useHotspotInteraction", "role": "Hotspot のドラッグ操作 (純粋関数群)。" },
       { "file": "app/composables/useAniPlayer.ts", "name": "useAniPlayer", "role": "ANI プレビュー再生 (フレームタイマー + キャンセル)。" },
@@ -487,8 +488,8 @@
       },
       "marketplace": {
         "dir": "app/components/marketplace/",
-        "count": 5,
-        "files": ["MarketplaceCard.vue", "FeaturedCard.vue", "SubmitThemeDialog.vue", "MarketplaceDetailModal.vue", "SubmitDeviceFlowModal.vue"]
+        "count": 4,
+        "files": ["FeaturedCard.vue", "SubmitThemeDialog.vue", "MarketplaceDetailModal.vue", "SubmitDeviceFlowModal.vue"]
       },
       "settings": {
         "dir": "app/components/settings/",

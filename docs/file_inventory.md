@@ -86,7 +86,7 @@
 
 ## 2. フロントエンド (`app/`)
 
-### 2-1. ページ (5 画面)
+### 2-1. ページ (4 画面 + 2 helpers)
 
 | ファイル | 役割 |
 |---|---|
@@ -104,14 +104,14 @@
 | [shell/](../app/components/shell/) | `AppTitlebar` / `AppSidebar` / `EnvironmentBanner` |
 | [library/](../app/components/library/) | `ThemeCard` / `ThemeRow` / `ThemeDetailModal` / `ThemeDetailDrawer` / `ApplyModal` / `ImportConflictDialog` / `ThemePickerModal` / `CursorMatrix` / `LibraryToolbar` / `LibraryFilterBar` / `LibraryEmptyState` / `LibraryDropOverlay` |
 | [creator/](../app/components/creator/) | `CreatorStartScreen` / `CreatorToolbar` / `CreatorRoleList` / `CreatorMetadataPane` (Hotspot 節を内包) / `NewThemeStartModal` / `SaveDestinationModal` / `BulkImportButton` / `BulkImportPreviewModal` / `BulkImportRoleRow` / `RoleListItem` / `SizeStrip` / `AniThumb` |
-| [marketplace/](../app/components/marketplace/) | `FeaturedCard` / `MarketplaceCard` / `SubmitThemeDialog` (Auto/Manual タブ切替) / `MarketplaceDetailModal` / `SubmitDeviceFlowModal` (Device Flow 認証 UI) |
+| [marketplace/](../app/components/marketplace/) | `FeaturedCard` / `SubmitThemeDialog` (Auto/Manual タブ切替) / `MarketplaceDetailModal` / `SubmitDeviceFlowModal` (Device Flow 認証 UI) |
 | [settings/](../app/components/settings/) | `GeneralSection` / `StartupSection` / `LibrarySection` / `SecuritySection` / `KeysSection` / `LoggingSection` (ログ出力設定 + クラッシュレポート opt-in トグル / 件数表示 / 送信・クリアボタン) / `UpdatesSection` / `AboutSection` / `SettingsRow` (anchor prop で検索ジャンプ対応) / `SettingsToggle` / `PassphrasePrompt` / `ConfigRecoveryPanel` / `SettingsSearchDropdown` (ja/en 両言語の横断検索ドロップダウン) |
 | [preview/](../app/components/preview/) | `CursorPreview` (theme detail で使うプレビュー) |
 | [panic/](../app/components/panic/) | `PanicFlow` (ステージ選択 + ライブログ + 17 ロールグリッド) |
 | [icons/](../app/components/icons/) | `UiIcon` + `UI_ICONS`、`CursorIcon` + `CURSOR_ICONS` — render 関数で v-html 回避 |
 | [ui/](../app/components/ui/) | `UiSelect` (ネイティブ select の白背景を回避) |
 
-### 2-3. Composables (25 個)
+### 2-3. Composables (27 個)
 
 | ファイル | 役割 |
 |---|---|
@@ -171,10 +171,10 @@
 
 | 指標 | 値 |
 |---|---|
-| Rust モジュール数 (lib.rs `pub mod`) | 20 + ベンチ 2 |
-| Tauri IPC コマンド数 | 61 |
+| Rust モジュール数 (lib.rs `pub mod`) | 21 + ベンチ 2 |
+| Tauri IPC コマンド数 | 53 |
 | Vue ページ数 | 4 (+2 helpers) |
-| Vue コンポーネント (subdir 別) | shell 3 / library 12 / creator 12 / marketplace 5 / settings 12 / preview 1 / panic 1 / icons 2 / ui 1 |
-| Composables 数 | 25 |
-| Vitest テストファイル数 | 14 (composables) + 4 (pages) + 5 (components/creator) + 7 (components/library) + 8 (components/settings) + 2 (components/marketplace) + 1 (components/preview) = 41 |
+| Vue コンポーネント (subdir 別) | shell 3 / library 12 / creator 12 / marketplace 4 / settings 14 / preview 1 / panic 1 / icons 2 / ui 1 |
+| Composables 数 | 27 |
+| Vitest テストファイル数 | 15 (composables) + 4 (pages) + 5 (components/creator) + 7 (components/library) + 8 (components/settings) + 2 (components/marketplace) + 1 (components/preview) = 42 |
 | CI ワークフロー数 | 3 (ci / performance / release) |
