@@ -208,6 +208,51 @@ jobs:
             Write-Host "Replaced: $($f.Name)"
           }
 
+      # -----------------------------------------------------------
+      # SignPath Authenticode 署名後に Tauri Updater 用の minisign 署名を再生成。
+      # tauri-action が最初に作った .sig は SignPath 前のバイナリに対するもので、
+      # 上書き後はハッシュが変わって Updater 側の verify が失敗する。
+      # この step で .exe / .msi に対して .sig を作り直し、latest.json も更新する。
+      # -----------------------------------------------------------
+      - name: Re-sign installers with minisign after Authenticode
+        if: steps.signpath-check.outputs.enabled == 'true'
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          $bundle = "src-tauri/target/${{ matrix.target }}/release/bundle"
+          $files = Get-ChildItem -Path "$bundle/nsis/*.exe", "$bundle/msi/*.msi" -ErrorAction SilentlyContinue
+          if (-not $files) { Write-Error "No installers found under $bundle for re-signing"; exit 1 }
+          foreach ($f in $files) {
+            Write-Host "Re-signing: $($f.FullName)"
+            # tauri signer sign は鍵を TAURI_SIGNING_PRIVATE_KEY env から拾う。
+            # --sign-file の生成物は <file>.sig (上書き)。
+            npx --yes @tauri-apps/cli signer sign --sign-file $f.FullName
+            if ($LASTEXITCODE -ne 0) { Write-Error "tauri signer sign failed for $($f.FullName)"; exit 1 }
+          }
+          # latest.json の signature を新 .sig 内容で上書き
+          node scripts/release/patch-latest-json.mjs $bundle
+          if ($LASTEXITCODE -ne 0) { Write-Error "patch-latest-json.mjs failed"; exit 1 }
+
+      - name: Verify updater metadata integrity (post-resign)
+        if: steps.signpath-check.outputs.enabled == 'true'
+        shell: pwsh
+        run: |
+          $bundle = "src-tauri/target/${{ matrix.target }}/release/bundle"
+          $candidates = @("$bundle/latest.json", "$bundle/updater/latest.json")
+          $json = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $json) { Write-Error "latest.json not found"; exit 1 }
+          $data = Get-Content $json -Raw | ConvertFrom-Json
+          foreach ($name in $data.platforms.PSObject.Properties.Name) {
+            $sig = $data.platforms.$name.signature
+            if (-not $sig -or -not $sig.Contains('untrusted comment')) {
+              Write-Error "Platform '$name' has malformed signature"
+              exit 1
+            }
+          }
+          Write-Host "All platform signatures look valid"
+
       - name: Upload signed installers to Draft Release
         if: steps.signpath-check.outputs.enabled == 'true'
         uses: softprops/action-gh-release@v2
