@@ -366,6 +366,10 @@ export default {
     updateAvailableLabel: 'Update to v{version}',
     updateMajorJumpTitle: 'Major version update',
     updateMajorJumpWarning: 'v{version} is a major version update. It may contain breaking changes. Do you want to continue?',
+    updaterErrNetwork: 'Check your network connection ({message})',
+    updaterErrSignature: 'Signature verification failed. The signing key may have rotated ({message})',
+    updaterErrPlugin: 'Updater plugin not available (dev mode?: {message})',
+    updaterErrUnknown: 'Unexpected error: {message}',
     // Config recovery
     groupRecovery: 'Config recovery',
     recoveryDesc: 'Backup files found. Select one to restore your configuration.',

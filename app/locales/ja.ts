@@ -365,6 +365,10 @@ export default {
     updateAvailableLabel: 'v{version} へ更新',
     updateMajorJumpTitle: 'メジャーバージョンアップ',
     updateMajorJumpWarning: 'v{version} はメジャーバージョンアップです。互換性のない変更が含まれる場合があります。続行しますか？',
+    updaterErrNetwork: 'ネットワーク接続を確認してください ({message})',
+    updaterErrSignature: '署名検証に失敗しました。鍵が更新された可能性があります ({message})',
+    updaterErrPlugin: 'Updater プラグインが利用できません (開発モード?: {message})',
+    updaterErrUnknown: '予期せぬエラー: {message}',
     // 設定復旧
     groupRecovery: '設定の復旧',
     recoveryDesc: '設定ファイルのバックアップが見つかりました。いずれかを選択して復旧できます。',

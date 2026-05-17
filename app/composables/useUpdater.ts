@@ -18,6 +18,25 @@ export interface UpdateInfo {
   body?: string
 }
 
+/**
+ * Updater のエラー文字列をカテゴリに振り分けて i18n キーを返す。
+ * UI 側は returned key を t() に通して表示する。
+ * 同じ生メッセージから 2 回呼び出しても同じ key/message を返す純粋関数。
+ */
+export function classifyUpdaterError(err: unknown): { key: string; message: string } {
+  const msg = err instanceof Error ? err.message : String(err)
+  if (/network|fetch|timeout|ENOTFOUND|ECONNREFUSED|aborted/i.test(msg)) {
+    return { key: 'settings.updaterErrNetwork', message: msg }
+  }
+  if (/signature|verify|pubkey|untrusted|minisign/i.test(msg)) {
+    return { key: 'settings.updaterErrSignature', message: msg }
+  }
+  if (/plugin|module|@tauri-apps|not.?available/i.test(msg)) {
+    return { key: 'settings.updaterErrPlugin', message: msg }
+  }
+  return { key: 'settings.updaterErrUnknown', message: msg }
+}
+
 const checking = ref(false)
 const downloading = ref(false)
 const installed = ref(false)

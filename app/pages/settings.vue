@@ -14,7 +14,7 @@ import { useAppSettings } from '~/composables/useAppSettings'
 import { useKeystore } from '~/composables/useKeystore'
 import { invokeTauri } from '~/composables/useTauri'
 import { useI18n } from '~/composables/useI18n'
-import { useUpdater } from '~/composables/useUpdater'
+import { useUpdater, classifyUpdaterError } from '~/composables/useUpdater'
 import { useSettingsSearch, type SettingsSearchEntry } from '~/composables/useSettingsSearch'
 import type { GithubAccount } from '~/types/githubAuth'
 import type { CrashSubmitSummary } from '~/types/config'
@@ -100,6 +100,16 @@ const {
   relaunch: relaunchApp,
 } = useUpdater()
 const updaterMessage = ref<string | null>(null)
+
+/**
+ * Updater のエラーをカテゴリ分類して i18n キー経由で表示文字列にする。
+ * `error.value` には生 message を残しているので、ここで毎回 classify する。
+ */
+const updaterErrorDisplay = computed(() => {
+  if (!updaterError.value) return null
+  const { key, message } = classifyUpdaterError(updaterError.value)
+  return t(key, { message })
+})
 
 // 利用可能なアップデート情報 (メジャー跨ぎ判定に使用)
 const pendingUpdateVersion = ref<string | null>(null)
@@ -670,7 +680,7 @@ function selectSection(id: SectionId) {
           :updater-downloading="updaterDownloading"
           :updater-available="updaterAvailable"
           :updater-message="updaterMessage"
-          :updater-error="updaterError"
+          :updater-error="updaterErrorDisplay"
           :updater-progress="updaterProgress"
           :updater-total="updaterTotal"
           @check-update="onCheckUpdate"
