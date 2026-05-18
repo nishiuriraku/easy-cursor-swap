@@ -32,6 +32,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": ["msi", "nsis"],
     "publisher": "EasyCursorSwap",
     "homepage": "https://github.com/nishiuriraku/easy-cursor-swap",
