@@ -49,10 +49,16 @@ pub struct MarketplaceIndex {
 }
 
 /// 個別テーマのメタデータ。
+///
+/// `name` は後方互換のため `LocalizedString` で受ける。これにより既存の
+/// `"name": "EasyCursorSwap Mint"` (plain string) と将来の
+/// `"name": {"ja": "ミント", "en": "Mint", "default": "EasyCursorSwap Mint"}`
+/// (ロケールマップ) の両方を 1 つの struct で deserialize できる。
+/// フロントへ JSON で渡す際は serde が自動で適切な形に serialize する。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MarketplaceEntry {
     pub id: uuid::Uuid,
-    pub name: String,
+    pub name: crate::theme::LocalizedString,
     pub author: String,
     #[serde(rename = "author_github")]
     pub author_github: String,
@@ -527,6 +533,49 @@ mod tests {
             entry.preview_base_url.as_deref(),
             Some("https://raw.githubusercontent.com/x/y/main/previews/6d364941")
         );
+    }
+
+    #[test]
+    fn entry_deserializes_localized_name_object() {
+        // 新スキーマ: name がロケールマップで来た場合。LocalizedString::Localized で受ける。
+        // フロント側はこの形式が来たら useI18n().locale に応じて表示を切り替える。
+        let json = r#"{
+            "id": "6d364941-c605-4def-801a-14ebb401936f",
+            "name": {"ja": "ミント", "en": "Mint", "default": "EasyCursorSwap Mint"},
+            "author": "x",
+            "author_github": "x",
+            "author_pubkey_id": "abcd",
+            "sha256": "00",
+            "signature": "AA==",
+            "download_url": "https://example.com/pack",
+            "version": "1.0.0"
+        }"#;
+        let entry: MarketplaceEntry = serde_json::from_str(json).unwrap();
+        // LocalizedString::get で fallback chain (locale → default → en → first) が効くこと
+        assert_eq!(entry.name.get("ja"), "ミント");
+        assert_eq!(entry.name.get("en"), "Mint");
+        // 未知ロケールは default にフォールバック
+        assert_eq!(entry.name.get("zh"), "EasyCursorSwap Mint");
+    }
+
+    #[test]
+    fn entry_deserializes_plain_string_name_for_backward_compat() {
+        // 既存スキーマ: name が文字列のままの場合。LocalizedString::Simple で受け、
+        // どのロケールを問い合わせても同じ値を返す (既存挙動を維持)。
+        let json = r#"{
+            "id": "6d364941-c605-4def-801a-14ebb401936f",
+            "name": "EasyCursorSwap Mint",
+            "author": "x",
+            "author_github": "x",
+            "author_pubkey_id": "abcd",
+            "sha256": "00",
+            "signature": "AA==",
+            "download_url": "https://example.com/pack",
+            "version": "1.0.0"
+        }"#;
+        let entry: MarketplaceEntry = serde_json::from_str(json).unwrap();
+        assert_eq!(entry.name.get("ja"), "EasyCursorSwap Mint");
+        assert_eq!(entry.name.get("en"), "EasyCursorSwap Mint");
     }
 
     #[test]

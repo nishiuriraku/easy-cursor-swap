@@ -33,14 +33,15 @@
     "measured_counts": {
       "rust_modules_in_lib_rs": 22,
       "tauri_ipc_commands": 52,
-      "composables": 35,
+      "composables": 36,
       "pages_vue": 4,
       "pages_ts_helpers": 2,
       "components_total": 56,
       "ci_workflows": 3
     },
     "doc_drift_warnings": [
-      "現時点では既知のドリフトなし (2026-05-17 再監査 + 修正完了)。ui_map.json と相互整合済み: backend.ipc_commands 53 件のうち 3 件 (export_cursorpack / get_theme_previews / get_windows_scheme_previews) は Rust に登録だけされた legacy_unused 状態で、それぞれ status と replaced_by を明示。次の PR で Rust 側からも削除するか、frontend で再利用する決定をすること。",
+      "docs/file_inventory.md および CLAUDE.md は『Composables 数 = 28』(2026-05-18 時点) と記述しているが、実測は 36 (architecture.json の measured_counts が canonical)。8 件の差分は pickLocalizedName 以前から prose docs に未掲載: useBulkImportPreviewState / useCreatorMetaState / useExternalUrl / useListbox / useModalLifecycle / usePngBlobCache / useTagChipInput / useThemeCardState。次の docs-only コミット (verify-gate 適用外) で prose docs を実測に同期する予定。",
+      "ui_map.json と相互整合済み: backend.ipc_commands 53 件のうち 3 件 (export_cursorpack / get_theme_previews / get_windows_scheme_previews) は Rust に登録だけされた legacy_unused 状態で、それぞれ status と replaced_by を明示。次の PR で Rust 側からも削除するか、frontend で再利用する決定をすること。",
       "新たに食い違いを見つけたら『docs/<file> は X と書いているが実測 Y』の形で追記し、修正コミットと同じ PR で解消する。",
       "数字が docs と食い違ったら grep を信用する。frontend の数字は ui_map.html の live check (末尾) が canonical counter。"
     ]
@@ -481,7 +482,8 @@
       { "file": "app/composables/useSettingsSearch.ts", "name": "useSettingsSearch", "role": "設定検索カタログ + ja/en 横断 substring 検索 + アンカージャンプ。" },
       { "file": "app/composables/useMarketplacePreviews.ts", "name": "useMarketplacePreviews", "role": "マーケットプレースプレビュー PNG の singleton キャッシュ + in-flight 重複排除 (marketplace_fetch_preview IPC ラッパー)。", "ipc_calls": ["marketplace_fetch_preview"] },
       { "file": "app/composables/useGithubAuth.ts", "name": "useGithubAuth", "role": "GitHub Device Flow 認証状態の管理。start_device_flow / complete_device_flow / cancel_device_flow / revoke_github_link の IPC ラッパー + 接続済み GitHub アカウント情報のリアクティブ保持。", "ipc_calls": ["start_device_flow", "complete_device_flow", "cancel_device_flow", "revoke_github_link"] },
-      { "file": "app/composables/useMarketplaceSubmit.ts", "name": "useMarketplaceSubmit", "role": "自動マーケットプレース提出フロー。submit_theme_auto IPC ラッパー + 提出進捗・エラー状態の管理。", "ipc_calls": ["submit_theme_auto"] }
+      { "file": "app/composables/useMarketplaceSubmit.ts", "name": "useMarketplaceSubmit", "role": "自動マーケットプレース提出フロー。submit_theme_auto IPC ラッパー + 提出進捗・エラー状態の管理。", "ipc_calls": ["submit_theme_auto"] },
+      { "file": "app/composables/pickLocalizedName.ts", "name": "pickLocalizedName", "role": "MarketplaceEntry.name (LocalizedString: string | locale map) を現 locale で 1 つの表示文字列に解決する純関数。Rust crate::theme::LocalizedString::get と 1:1 同期し、Marketplace カード / 詳細モーダル / 検索 / トーストで共有。" }
     ],
     "components": {
       "shell": {

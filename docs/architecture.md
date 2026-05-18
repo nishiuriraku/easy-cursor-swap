@@ -61,7 +61,7 @@
 | **テーマパッケージ** | `theme/` | 3 ファイル: `types` (DTO + 内部 helper) / `sanitize` (path traversal 対策) / `mod` (`ThemeManager` impl 本体)。`.cursorpack` の作成・解凍・バリデーション、theme.json 管理、孤児カーソル復旧 |
 | | `bulk_import/` | 3 ファイル: `mod` (CancelRegistry / 公開 API) / `assets` (ファイル・フォルダ並列解決) / `cursorpack` (パック解析の Creator 向けエントリ) |
 | | `backup.rs` | `.cursorprofile` (config + 全テーマの ZIP) の export/import |
-| **マーケットプレース** | `marketplace.rs` | HTTP インデックス取得 (rustls-tls)、SHA-256 + Ed25519 検証、ダウンロードサイズ上限。プレビュー PNG 取得 (`fetch_preview`: URL バリデーション + ロール名バリデーション + 500KB 上限) |
+| **マーケットプレース** | `marketplace.rs` | HTTP インデックス取得 (rustls-tls)、SHA-256 + Ed25519 検証、ダウンロードサイズ上限。プレビュー PNG 取得 (`fetch_preview`: URL バリデーション + ロール名バリデーション + 500KB 上限)。`MarketplaceEntry.name` は `theme::LocalizedString` (`#[serde(untagged)]`) で受け、`"name": "Foo"` と `"name": {"ja": "...", "en": "..."}` の両形式に後方互換。表示は frontend の `composables/pickLocalizedName` で現 locale に解決する。 |
 | | `keystore.rs` | クリエイター用 Ed25519 鍵ペア (DPAPI 暗号化), `.cfkey` import/export (XChaCha20-Poly1305 + Argon2id), key_id 計算 (SHA-256[:16]) |
 | **信頼性 / 復旧** | `health.rs` | 起動連続失敗カウンタ + ロールバック対象バージョン算出 |
 | | `rollback.rs` | 自動ロールバック (DL + `minisign-verify` で検証 + サイレントインストール)。`main.rs::show_rollback_dialog` の Yes 経路から pre-main で呼ばれる |
@@ -165,7 +165,8 @@ app/
 │                    useAppInfo, useSettingsSearch, useMarketplacePreviews,
 │                    useGithubAuth (GitHub Device Flow 認証・トークン管理),
 │                    useMarketplaceSubmit (自動 PR 提出フロー),
-│                    useUpdaterBootstrap (起動時 1 回の auto_update チェック) (合計 27)
+│                    useUpdaterBootstrap (起動時 1 回の auto_update チェック),
+│                    pickLocalizedName (Marketplace name の locale 解決) (合計 28)
 ├─ types/          ← config.ts, theme.ts, marketplace.ts, githubAuth.ts (Rust struct と 1:1)
 ├─ locales/        ← ja.ts, en.ts (CI で parity チェック)
 ├─ assets/css/     ← tailwind.css (Tailwind v4 entry + @theme + 横断 shared utility) +

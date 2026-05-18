@@ -3,10 +3,25 @@
  * `nishiuriraku/easy-cursor-swap-index` リポジトリの `index.json` スキーマに準拠。
  */
 
+/**
+ * Marketplace エントリの name 表現。
+ *
+ * Rust 側の `crate::theme::LocalizedString` (`#[serde(untagged)]`) と対称。
+ * 後方互換のため 2 形式を許容する:
+ *  - **plain string**: 既存の curated index と同じ。全ロケールで同じ値。
+ *  - **localized map**: `{ ja: '...', en: '...', default: '...' }` のキー → 値マップ。
+ *    UI 側で `useI18n().locale` に応じて表示を切り替える。
+ *
+ * 表示するときは `composables/pickLocalizedName.ts` の `pickLocalizedName()` を通すこと。
+ * 生で `entry.name` を描画すると plain string ケースしか動かず、localized エントリで
+ * `[object Object]` が表示されるので注意。
+ */
+export type MarketplaceName = string | Record<string, string>
+
 export interface MarketplaceEntry {
   /** UUID */
   id: string
-  name: string
+  name: MarketplaceName
   author: string
   /** GitHub username (公開鍵照合に使用) */
   authorGithub: string

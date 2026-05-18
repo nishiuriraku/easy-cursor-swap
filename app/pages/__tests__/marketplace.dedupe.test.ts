@@ -54,4 +54,19 @@ describe('computeFilteredGrid', () => {
     const grid = computeFilteredGrid(baseEntries, 'all', '  c  ')
     expect(grid.map((e) => e.id)).toEqual(['c'])
   })
+
+  it('LocalizedString な name の全 locale 値が検索対象になる', () => {
+    // 「JA モードで Mint と打っても、JA キーが ミント のエントリにマッチして欲しい」
+    // 「JA モードで ミント と打っても、JA キーが Mint のエントリにマッチして欲しい」
+    // どちらの方向にもヒットさせるため、name の全 value を haystack に連結する。
+    const entries: MarketplaceEntry[] = [
+      entry({ id: 'mint', name: { ja: 'ミント', en: 'Mint', default: 'EasyCursorSwap Mint' } }),
+      entry({ id: 'sakura', name: { ja: '桜', en: 'Sakura' } }),
+    ]
+    expect(computeFilteredGrid(entries, 'all', 'Mint').map((e) => e.id)).toEqual(['mint'])
+    expect(computeFilteredGrid(entries, 'all', 'ミント').map((e) => e.id)).toEqual(['mint'])
+    expect(computeFilteredGrid(entries, 'all', '桜').map((e) => e.id)).toEqual(['sakura'])
+    // 部分一致: "asy" は default 値の "EasyCursorSwap Mint" に含まれる
+    expect(computeFilteredGrid(entries, 'all', 'asy').map((e) => e.id)).toEqual(['mint'])
+  })
 })

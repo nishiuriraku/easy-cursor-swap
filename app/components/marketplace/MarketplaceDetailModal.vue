@@ -15,13 +15,21 @@ import { useI18n } from '~/composables/useI18n'
 import { useMarketplacePreviews } from '~/composables/useMarketplacePreviews'
 import { useModalLifecycle } from '~/composables/useModalLifecycle'
 import { useThemes } from '~/composables/useThemes'
+import { pickLocalizedName } from '~/composables/pickLocalizedName'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const props = defineProps<{
   entry: MarketplaceEntry | null
   installing: boolean
 }>()
+
+// MarketplaceEntry.name は LocalizedString (string | { ja, en, default, ... })。
+// 現 locale でピックして見出し / aria-label に流す。
+// entry は null のことがあるので空文字列でガード。
+const displayName = computed(() =>
+  props.entry ? pickLocalizedName(props.entry.name, locale.value) : '',
+)
 
 const emit = defineEmits<{
   close: []
@@ -75,14 +83,14 @@ function onInstall() {
         class="md-backdrop"
         role="dialog"
         aria-modal="true"
-        :aria-label="t('marketplace.openMarketplaceDetailAria', { name: entry.name })"
+        :aria-label="t('marketplace.openMarketplaceDetailAria', { name: displayName })"
         @click.self="close"
       >
         <div class="md-shell" @click.stop>
           <div class="md-head">
             <div>
               <div class="md-eyebrow">{{ t('marketplace.detailEyebrow') }}</div>
-              <h2>{{ entry.name }}</h2>
+              <h2>{{ displayName }}</h2>
               <div class="md-sub">
                 @{{ entry.author }} · v{{ entry.version }}
                 <span v-if="entry.verified" class="tag ok md-verified">

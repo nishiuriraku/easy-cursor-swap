@@ -12,16 +12,22 @@
  * 取得は useMarketplacePreviews のキャッシュ越しなので、後で DetailModal を
  * 開いたときは即座に 6 ロール分の preview がヒットする。
  */
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from '~/composables/useI18n'
 import { useMarketplacePreviews } from '~/composables/useMarketplacePreviews'
+import { pickLocalizedName } from '~/composables/pickLocalizedName'
 import type { MarketplaceEntry } from '~/types/marketplace'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const props = defineProps<{
   entry: MarketplaceEntry
 }>()
+
+// index.json の name は LocalizedString (string | { ja, en, default, ... }) で来る。
+// 現在の locale でピックして表示する。locale を切替えると computed が再評価されるので
+// 「設定で日本語 ↔ 英語を切替えるとカードの名前も追従する」が成り立つ。
+const displayName = computed(() => pickLocalizedName(props.entry.name, locale.value))
 
 const arrowPreviewUrl = ref<string | null>(null)
 const { getMap } = useMarketplacePreviews()
@@ -74,7 +80,7 @@ function onCardKeydown(e: KeyboardEvent) {
     class="card featured-card interactive"
     tabindex="0"
     role="button"
-    :aria-label="t('marketplace.openMarketplaceDetailAria', { name: entry.name })"
+    :aria-label="t('marketplace.openMarketplaceDetailAria', { name: displayName })"
     @click="onCardActivate"
     @keydown="onCardKeydown"
   >
@@ -90,7 +96,7 @@ function onCardKeydown(e: KeyboardEvent) {
     </div>
     <div class="featured-body">
       <div class="featured-row">
-        <div class="card-name">{{ entry.name }}</div>
+        <div class="card-name">{{ displayName }}</div>
       </div>
       <div class="card-author">@{{ entry.author }}</div>
       <div class="meta-row featured-meta">

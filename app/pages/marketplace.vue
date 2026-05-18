@@ -11,14 +11,15 @@
  * - インポートは Rust 側の `import_from_marketplace` (将来実装) に委譲
  */
 import { computed, onMounted, ref, watch } from 'vue'
-import type { MarketplaceEntry, MarketplaceTag } from '~/types/marketplace'
+import type { MarketplaceEntry, MarketplaceName, MarketplaceTag } from '~/types/marketplace'
 import { computeFilteredGrid } from '~/pages/marketplace.helpers'
 import { invokeTauri } from '~/composables/useTauri'
 import { openExternalUrl } from '~/composables/useExternalUrl'
 import { useI18n } from '~/composables/useI18n'
 import { useThemes } from '~/composables/useThemes'
+import { pickLocalizedName } from '~/composables/pickLocalizedName'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const submitOpen = ref(false)
 
@@ -89,7 +90,8 @@ async function installFromDetail(id: string) {
 // --- IPC 経由で受け取る Rust 側スキーマ (snake_case) ---
 interface RustMarketplaceEntry {
   id: string
-  name: string
+  // Rust 側は LocalizedString (untagged) なので JSON 上は string | { [locale]: string } のどちらも来る。
+  name: MarketplaceName
   author: string
   author_github: string
   author_pubkey_id: string
@@ -175,14 +177,19 @@ async function installEntry(id: string) {
         authorPubkeyId: e.authorPubkeyId,
       },
     })
-    installStatus.value = { kind: 'ok', name: e.name }
+    // トースト / ログは displayName (現 locale でピックした文字列) を使う。
+    // e.name は LocalizedString の生形 (string | map) なので、{{ name }} 補間に
+    // そのまま渡すと map のとき "[object Object]" になる。
+    const displayName = pickLocalizedName(e.name, locale.value)
+    installStatus.value = { kind: 'ok', name: displayName }
     // インストール直後にライブラリの一覧をリフレッシュ。
     // useThemes はシングルトンなので Library / サイドバーバッジに即反映される。
     void refreshThemes()
-    console.info('[Marketplace] installed', e.name)
+    console.info('[Marketplace] installed', displayName)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    installStatus.value = { kind: 'err', name: e.name, message }
+    const displayName = pickLocalizedName(e.name, locale.value)
+    installStatus.value = { kind: 'err', name: displayName, message }
     console.error('[Marketplace] install failed:', err)
   } finally {
     installingId.value = null

@@ -111,7 +111,7 @@
 | [icons/](../app/components/icons/) | `UiIcon` + `UI_ICONS`、`CursorIcon` + `CURSOR_ICONS` — render 関数で v-html 回避 |
 | [ui/](../app/components/ui/) | `UiSelect` (ネイティブ select の白背景を回避) |
 
-### 2-3. Composables (27 個)
+### 2-3. Composables (28 個)
 
 | ファイル | 役割 |
 |---|---|
@@ -142,6 +142,7 @@
 | [useMarketplacePreviews.ts](../app/composables/useMarketplacePreviews.ts) | マーケットプレース プレビュー PNG のシングルトンキャッシュ + in-flight 重複排除 (`marketplace_fetch_preview` IPC ラッパー) |
 | [useGithubAuth.ts](../app/composables/useGithubAuth.ts) | GitHub Device Flow 認証状態管理。`start_device_flow` / `complete_device_flow` / `cancel_device_flow` / `revoke_github_link` IPC ラッパー + 接続済み GitHub アカウント情報のリアクティブ保持 |
 | [useMarketplaceSubmit.ts](../app/composables/useMarketplaceSubmit.ts) | 自動 Marketplace 提出フロー。`submit_theme_auto` IPC ラッパー + 提出進捗・エラー状態管理 |
+| [pickLocalizedName.ts](../app/composables/pickLocalizedName.ts) | `MarketplaceEntry.name` (`LocalizedString`: string \| locale マップ) を現 locale で 1 つの表示文字列に解決する純関数。Rust `crate::theme::LocalizedString::get` と 1:1 同期し、`FeaturedCard` / `MarketplaceDetailModal` / 検索 / トーストで共有 |
 
 ### 2-4. その他
 
@@ -175,6 +176,6 @@
 | Tauri IPC コマンド数 | 53 |
 | Vue ページ数 | 4 (+2 helpers) |
 | Vue コンポーネント (subdir 別) | shell 3 / library 12 / creator 12 / marketplace 4 / settings 14 / preview 1 / panic 1 / icons 2 / ui 1 |
-| Composables 数 | 27 |
+| Composables 数 | 28 |
 | Vitest テストファイル数 | 15 (composables) + 4 (pages) + 5 (components/creator) + 7 (components/library) + 8 (components/settings) + 2 (components/marketplace) + 1 (components/preview) = 42 |
 | CI ワークフロー数 | 3 (ci / performance / release) |

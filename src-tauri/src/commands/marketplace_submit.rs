@@ -342,6 +342,12 @@ fn sha256_hex(bytes: &[u8]) -> String {
 }
 
 struct ThemeMetaForSubmit {
+    /// `theme.json` の name をそのまま (LocalizedString のまま) 保持。
+    /// `build_entry_json` で `index.json` に出力する際は serde untagged で
+    /// plain string またはロケールマップとして書き出される。
+    name: crate::theme::LocalizedString,
+    /// PR タイトル / ログ等の単一文字列が必要な箇所用の表示名。
+    /// fallback: en → ja → "default" → first → "Untitled"。
     display_name: String,
     version: String,
     included_roles: Vec<String>,
@@ -355,10 +361,13 @@ fn load_theme_meta_for_submit(theme_id: uuid::Uuid) -> Result<ThemeMetaForSubmit
         crate::theme::LocalizedString::Localized(m) => m
             .get("en")
             .or_else(|| m.get("ja"))
+            .or_else(|| m.get("default"))
             .cloned()
+            .or_else(|| m.values().next().cloned())
             .unwrap_or_else(|| "Untitled".to_string()),
     };
     Ok(ThemeMetaForSubmit {
+        name: meta.name,
         display_name,
         version: meta.version,
         included_roles: meta.cursors.keys().cloned().collect(),
@@ -397,9 +406,15 @@ fn build_entry_json(
     download_url: &str,
     preview_base_url: Option<&str>,
 ) -> Result<String, AppError> {
+    // name は LocalizedString のまま untagged で書き出す。
+    // - Simple("Foo") なら "name": "Foo"
+    // - Localized({"ja": "ミント", "en": "Mint"}) なら "name": {"ja": "ミント", "en": "Mint"}
+    // これにより `index.json` 取得側 (`MarketplaceEntry::name: LocalizedString`) が
+    // どちらの形式も受けられ、UI 側で locale に応じた表示切替が可能になる。
+    let name_value = serde_json::to_value(&meta.name)?;
     let mut entry = serde_json::json!({
         "id": theme_id,
-        "name": meta.display_name,
+        "name": name_value,
         "author": author_github,
         "author_github": author_github,
         "author_pubkey_id": author_pubkey_id,
@@ -540,6 +555,70 @@ mod tests {
         assert!(body.contains("SIGNATURE_B64"));
         assert!(body.contains("octocat"));
         assert!(body.contains("Auto-submitted"));
+    }
+
+    #[test]
+    fn build_entry_json_preserves_localized_name() {
+        // theme.json が LocalizedString::Localized を持っている場合、
+        // index.json にも同じロケールマップが書き出されることを固定する。
+        // この挙動が「JA モードでも EN 名が表示される」バグの根治パスになる。
+        use std::collections::HashMap;
+        let mut map = HashMap::new();
+        map.insert("ja".to_string(), "ミント".to_string());
+        map.insert("en".to_string(), "Mint".to_string());
+        map.insert("default".to_string(), "EasyCursorSwap Mint".to_string());
+
+        let meta = ThemeMetaForSubmit {
+            name: crate::theme::LocalizedString::Localized(map),
+            display_name: "Mint".to_string(),
+            version: "1.0.0".to_string(),
+            included_roles: vec!["Arrow".to_string()],
+            tags: vec!["minimal".to_string()],
+        };
+        let json = build_entry_json(
+            "00000000-0000-0000-0000-000000000000",
+            &meta,
+            "octocat",
+            "deadbeef",
+            "00",
+            "AA==",
+            "https://example.com/pack",
+            None,
+        )
+        .unwrap();
+        // 出力 JSON を parse して name フィールドがオブジェクトかつ ja キーを持つことを確認
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let name = &v["name"];
+        assert!(name.is_object(), "name should be an object, got: {name}");
+        assert_eq!(name["ja"], "ミント");
+        assert_eq!(name["en"], "Mint");
+        assert_eq!(name["default"], "EasyCursorSwap Mint");
+    }
+
+    #[test]
+    fn build_entry_json_keeps_plain_name_when_simple() {
+        // theme.json が LocalizedString::Simple ("Foo") の場合は index.json も
+        // 文字列のまま出力される (既存の curated index と完全互換)。
+        let meta = ThemeMetaForSubmit {
+            name: crate::theme::LocalizedString::Simple("Plain Name".to_string()),
+            display_name: "Plain Name".to_string(),
+            version: "1.0.0".to_string(),
+            included_roles: vec![],
+            tags: vec![],
+        };
+        let json = build_entry_json(
+            "00000000-0000-0000-0000-000000000000",
+            &meta,
+            "octocat",
+            "deadbeef",
+            "00",
+            "AA==",
+            "https://example.com/pack",
+            None,
+        )
+        .unwrap();
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(v["name"], "Plain Name");
     }
 
     #[test]
