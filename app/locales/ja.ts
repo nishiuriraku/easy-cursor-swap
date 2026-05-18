@@ -259,7 +259,7 @@ export default {
     groupAutoStart: '自動起動',
     autoStartHint: 'HKCU\\…\\Run',
     autoStartLabel: 'OS 起動時にサイレントで起動',
-    autoStartDesc: 'メイン画面は出さず、トレイのみで常駐 (ダークモード自動切替を有効化)',
+    autoStartDesc: 'メイン画面は出さず、トレイのみで常駐',
     startMinimizedLabel: 'メイン画面を最小化で起動',
     startMinimizedDesc: 'ユーザー起動時もウィンドウを表示せずトレイへ',
     // ライブラリ

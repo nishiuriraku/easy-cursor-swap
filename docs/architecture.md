@@ -106,6 +106,7 @@
 9. `tauri::Builder` を組み立て、`tauri_plugin_single_instance::init` で多重起動防止 + argv ハンドオーバ
 10. `setup` 内でトレイ起動 (`tray::setup_tray`)、パニックホットキー登録、カーソルウォッチャ起動
 11. 全部成功 → `mark_healthy` (失敗カウンタをリセット)
+12. `Builder::build()` で `App` を生成 → `App::run(|app, event| ...)` に渡したコールバックで `RunEvent::ExitRequested { code: None, .. }` (= ユーザー操作起点: close ボタン等) のみ `api.prevent_exit()` 呼び出し。`code: Some(_)` (= `AppHandle::exit(_)` / `AppHandle::restart()`) は素通しさせる。これにより close ボタン → `window.destroy()` 後もプロセスをトレイ常駐させ、tray メニュー「終了」と `AppHandle::restart` は通常通り終了できるように両立する
 
 ## Security
 

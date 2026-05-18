@@ -415,6 +415,23 @@ fn main() {
             tracing::info!("EasyCursorSwap が正常に起動しました");
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("EasyCursorSwap の実行中にエラーが発生しました");
+        .build(tauri::generate_context!())
+        .expect("EasyCursorSwap の実行中にエラーが発生しました")
+        .run(|_app_handle, event| {
+            // 閉じるボタンで `window.destroy()` した後もトレイ常駐させるための gatekeeper。
+            // Tauri v2 はデフォルトで「最後のウィンドウ消滅 → プロセス終了」だが、
+            // 本アプリは tray + global hotkey + cursor_watcher + auto_start silent boot を
+            // 抱えているのでウィンドウが無くてもプロセスは生かす必要がある。
+            //
+            // `code: None` はユーザー操作 (ウィンドウ閉じる) 起点のリクエスト、
+            // `code: Some(_)` は `AppHandle::exit(_)` / `AppHandle::restart()` などの
+            // プログラム要求。tray メニューの「終了」は app.exit(0) を呼ぶので Some(0) で来る。
+            // 前者だけ prevent_exit して、後者はそのまま終了させる。
+            if let tauri::RunEvent::ExitRequested {
+                code: None, api, ..
+            } = event
+            {
+                api.prevent_exit();
+            }
+        });
 }

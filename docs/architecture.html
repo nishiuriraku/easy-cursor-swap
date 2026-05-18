@@ -1337,7 +1337,8 @@
       "8. RegistryManager::check_pending_snapshot — 残骸があれば前回の適用が中断したと判断し Windows 既定値へ復元",
       "9. tauri::Builder + tauri_plugin_single_instance::init (.cursorpack 関連付けの argv ハンドオフ含む)",
       "10. setup{}: tray::setup_tray、パニックホットキー登録、カーソルウォッチャ起動",
-      "11. 成功時: mark_healthy (失敗カウンタをリセット)"
+      "11. 成功時: mark_healthy (失敗カウンタをリセット)",
+      "12. Builder::build() + App::run(callback) — callback で RunEvent::ExitRequested { code: None } (ユーザー操作起点) のみ api.prevent_exit() し、close ボタン → window.destroy() 後もプロセスをトレイ常駐させる。code: Some(_) (AppHandle::exit / restart) は素通しさせて tray メニュー「終了」と updater の自動再起動を両立"
     ],
     "benches": [
       { "file": "src-tauri/benches/cursor_build.rs", "purpose": "Lanczos / Nearest + 6 サイズ .cur ビルドの計測 (cold / warm キャッシュ)" },

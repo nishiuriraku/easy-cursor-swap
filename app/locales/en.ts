@@ -260,7 +260,7 @@ export default {
     groupAutoStart: 'Auto-start',
     autoStartHint: 'HKCU\\…\\Run',
     autoStartLabel: 'Silent launch on OS startup',
-    autoStartDesc: 'Skip main window, only tray (enables dark-mode auto-switch)',
+    autoStartDesc: 'Skip main window, only tray',
     startMinimizedLabel: 'Start with main window minimized',
     startMinimizedDesc: 'Even on user launch, go to tray instead of showing the window',
     // Library

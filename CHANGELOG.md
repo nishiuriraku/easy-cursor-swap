@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `get_app_info` IPC が常に `os_version: "Windows 0.0"` を返していたバグを修正 (`OSVERSIONINFOW::default()` のフィールドゼロのままだった)。`ntdll!RtlGetVersion` 経由でクランプされない真の OS バージョンを返す。
 - `export_cursorpack_streamed` の sign / package 段階でビルドを中断したとき `build-progress` イベントに `stage: "cancelled"` が発火されず、Creator の進捗バーが固まる問題を修正。
+- メインウィンドウの閉じるボタン押下時に Tauri ランタイムがそのままプロセス終了してしまい、トレイ常駐が機能していなかった問題を修正。`tauri::Builder::build()` + `App::run()` に切り替え、`RunEvent::ExitRequested { code: None, .. }` (ユーザー操作起点) のみ `api.prevent_exit()` で抑止することで、tray メニュー「終了」(`AppHandle::exit(0)` 経由 = `code: Some(0)`) と `AppHandle::restart` の終了経路は素通ししつつ、close ボタンでは WebView 破棄 + トレイ常駐 (Phase 4-1 メモリ最適化の設計意図) を回復。グローバルパニックホットキー (`Ctrl+Alt+Shift+R`) と `cursor_watcher`、`auto_start` のサイレント常駐モードが GUI クローズ後も継続して機能する。あわせて設定画面の自動起動説明文に残っていた dark-mode 連動の文言 (`(ダークモード自動切替を有効化)` / `(enables dark-mode auto-switch)`) を削除。
 
 ### Changed
 
