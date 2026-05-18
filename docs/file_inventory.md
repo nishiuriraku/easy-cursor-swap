@@ -52,7 +52,8 @@
 | [theme/mod.rs](../src-tauri/src/theme/mod.rs) | `ThemeManager`：`.cursorpack` 入出力、`apply_theme`、`cleanup_orphan_references`、Ed25519 署名埋込 |
 | [theme/sanitize.rs](../src-tauri/src/theme/sanitize.rs) | `sanitize_archive_path` + Zip 爆弾対策 (50/200/10 MB 三段階) + `S_IFLNK` 拒否 |
 | [theme/types.rs](../src-tauri/src/theme/types.rs) | `ThemeMeta` / `ThemeSummary` / `LocalizedString` 等 |
-| [bulk_import/mod.rs](../src-tauri/src/bulk_import/mod.rs) | `CancelRegistry` + 公開 API + 進捗イベント |
+| [bulk_import/mod.rs](../src-tauri/src/bulk_import/mod.rs) | 公開 API + 進捗イベント + DTO 集約 (`CancelRegistry` は `cancel_registry.rs` に切り出して cursor_build と共有) |
+| [cancel_registry.rs](../src-tauri/src/cancel_registry.rs) | 長時間ジョブのキャンセルレジストリ。Tauri App state として `manage()` する per-instance struct (HashMap<String, bool>)。`register` / `cancel` / `is_active` / `is_cancelled` / `drop_job` API |
 | [bulk_import/assets.rs](../src-tauri/src/bulk_import/assets.rs) | 複数ファイル/フォルダ走査 → `ResolvedAsset` 変換、ファジーマッチ、リサンプル並列化 |
 | [bulk_import/cursorpack.rs](../src-tauri/src/bulk_import/cursorpack.rs) | `.cursorpack` 読込 (ライブラリ非依存、creator 直挿入用) |
 | [backup.rs](../src-tauri/src/backup.rs) | `.cursorprofile` Zip 入出力、`ProfileEnvelope`、merge/overwrite |

@@ -7,7 +7,7 @@
 
 use app_lib::appusermodel;
 use app_lib::autostart;
-use app_lib::bulk_import;
+use app_lib::cancel_registry;
 use app_lib::commands;
 use app_lib::commands::cursor_io::{
     handle_pending_cursorpack, stash_pending_cursorpack, PendingCursorpack,
@@ -302,7 +302,7 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .manage(config_manager)
-        .manage(bulk_import::CancelRegistry::default())
+        .manage(cancel_registry::CancelRegistry::default())
         .manage(PendingCursorpack::default())
         .manage(crate::commands::marketplace_submit::DeviceFlowState::default())
         // 閉じるボタン → WebView を破棄してメモリ解放 (Phase 4-1)

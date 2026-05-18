@@ -55,11 +55,12 @@
 | **GitHub API クライアント** | `github/` | OAuth Device Flow + REST API (`mod.rs` / `types.rs` / `device_flow.rs` / `client.rs`)。Marketplace 自動提出フローから利用。`client_id` は build 時に `option_env!("EASY_CURSOR_SWAP_GITHUB_OAUTH_CLIENT_ID")` で注入。 |
 | **設定 / 状態** | `config.rs` | `AppConfig` / `ConfigManager` (RwLock + schema_version (v1 固定) + パースエラー時 `config.corrupt.*.json` 退避) |
 | | `errors.rs` | `AppError` / `AppResult` 共通型 |
+| | `cancel_registry.rs` | 長時間ジョブ (cursorpack ビルド / bulk-import) 用の共通キャンセルレジストリ。App state として `manage()` され、cursor_build と bulk_import 両方が `State<CancelRegistry>` で参照 |
 | **カーソル生成パイプライン** | `cursor/` | 5 サブモジュール: `image` (リサイズ / hotspot / メタデータ剥離) / `cur_build` (PNG → 6 解像度 .cur) / `ico_cur` (ICO/CUR 解析) / `ani` (RIFF/ACON 解析) / `ani_write` (ANI 書き出し)。`mod.rs` で全シンボルを `pub use` 再エクスポート |
 | | `cursor_watcher.rs` | コントロールパネル等で外部に書き換えられたら `cursor-changed` を発火 |
 | **レジストリ操作** | `registry/` | 4 ファイル: `mod` (適用 / 復元 / pending snapshot / SPI 通知) / `scheme` (`HKCU\...\Schemes` の列挙と書込) / `roles` (17 ロール↔レジストリ値名マッピング) / `env` (RDP / Citrix / 環境検出ヘルパ) |
 | **テーマパッケージ** | `theme/` | 3 ファイル: `types` (DTO + 内部 helper) / `sanitize` (path traversal 対策) / `mod` (`ThemeManager` impl 本体)。`.cursorpack` の作成・解凍・バリデーション、theme.json 管理、孤児カーソル復旧 |
-| | `bulk_import/` | 3 ファイル: `mod` (CancelRegistry / 公開 API) / `assets` (ファイル・フォルダ並列解決) / `cursorpack` (パック解析の Creator 向けエントリ) |
+| | `bulk_import/` | 3 ファイル: `mod` (公開 API / DTO 集約; `CancelRegistry` は `cancel_registry.rs` に切り出して cursor_build と共有) / `assets` (ファイル・フォルダ並列解決) / `cursorpack` (パック解析の Creator 向けエントリ) |
 | | `backup.rs` | `.cursorprofile` (config + 全テーマの ZIP) の export/import |
 | **マーケットプレース** | `marketplace.rs` | HTTP インデックス取得 (rustls-tls)、SHA-256 + Ed25519 検証、ダウンロードサイズ上限。プレビュー PNG 取得 (`fetch_preview`: URL バリデーション + ロール名バリデーション + 500KB 上限)。`MarketplaceEntry.name` は `theme::LocalizedString` (`#[serde(untagged)]`) で受け、`"name": "Foo"` と `"name": {"ja": "...", "en": "..."}` の両形式に後方互換。表示は frontend の `composables/pickLocalizedName` で現 locale に解決する。 |
 | | `keystore.rs` | クリエイター用 Ed25519 鍵ペア (DPAPI 暗号化), `.cfkey` import/export (XChaCha20-Poly1305 + Argon2id), key_id 計算 (SHA-256[:16]) |

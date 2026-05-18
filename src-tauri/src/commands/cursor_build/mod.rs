@@ -7,20 +7,26 @@
 //! - [`export_cursorpack_streamed`] — 進捗イベント付きビルド (UI からの主流ルート)
 //! - [`cancel_build`] — `export_cursorpack_streamed` を中止
 //!
-//! キャンセルは `OnceLock<Mutex<HashSet<String>>>` 上の build_id 集合で管理する。
+//! キャンセルは `crate::cancel_registry::CancelRegistry` (App state) で管理する
+//! — bulk_import と同じ仕組みに統一済み。
 
 pub mod dto;
 pub use dto::*;
-
-pub mod cancel;
-pub use cancel::cancel_build;
 
 mod build;
 mod sign;
 pub mod stream;
 
+use crate::cancel_registry::CancelRegistry;
 use crate::errors::AppError;
 use crate::theme::{CursorDefinition, LocalizedString, ThemeManager, ThemeMetadata};
+
+/// 進行中の build を中止する。実際の中止は次のチェックポイントで行われる。
+#[tauri::command]
+pub fn cancel_build(registry: tauri::State<'_, CancelRegistry>, build_id: String) {
+    registry.cancel(&build_id);
+    tracing::info!("ビルド中止要求: {}", build_id);
+}
 
 #[tauri::command]
 pub fn export_cursorpack(req: ExportCursorpackRequest) -> Result<ExportResult, AppError> {
@@ -116,28 +122,30 @@ pub fn export_cursorpack(req: ExportCursorpackRequest) -> Result<ExportResult, A
 
 #[cfg(test)]
 mod tests {
-    use super::cancel::{clear_cancel, is_cancelled, mark_cancelled};
+    use super::CancelRegistry;
     use super::SizedOverridePayload;
 
     #[test]
     fn cancel_flag_lifecycle() {
+        let registry = CancelRegistry::default();
         let id = "test-build-cancel-lifecycle-xyz";
-        // ユニーク ID なので前提状態は false
-        assert!(!is_cancelled(id));
-        mark_cancelled(id);
-        assert!(is_cancelled(id));
-        clear_cancel(id);
-        assert!(!is_cancelled(id));
+        // 新規 instance なので前提状態は false
+        assert!(!registry.is_cancelled(id));
+        registry.cancel(id);
+        assert!(registry.is_cancelled(id));
+        registry.drop_job(id);
+        assert!(!registry.is_cancelled(id));
     }
 
     #[test]
     fn cancel_flags_are_independent_per_build_id() {
+        let registry = CancelRegistry::default();
         let id_a = "test-build-independent-a-xyz";
         let id_b = "test-build-independent-b-xyz";
-        mark_cancelled(id_a);
-        assert!(is_cancelled(id_a));
-        assert!(!is_cancelled(id_b));
-        clear_cancel(id_a);
+        registry.cancel(id_a);
+        assert!(registry.is_cancelled(id_a));
+        assert!(!registry.is_cancelled(id_b));
+        registry.drop_job(id_a);
     }
 
     #[test]

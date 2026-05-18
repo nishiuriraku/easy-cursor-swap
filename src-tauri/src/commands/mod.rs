@@ -51,7 +51,7 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         // .cur / .cursorpack ビルド
         cursor_build::export_cursorpack,
         cursor_build::stream::export_cursorpack_streamed,
-        cursor_build::cancel::cancel_build,
+        cursor_build::cancel_build,
         // .cursorpack ファイル関連付けハンドオフ
         cursor_io::take_pending_cursorpack,
         // 鍵管理

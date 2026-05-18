@@ -12,17 +12,18 @@
 //! | [`assets`] | ファイル/フォルダ走査 + 単一ファイル → `ResolvedAsset` 変換 + `bulk_resolve_assets` IPC |
 //! | [`cursorpack`] | `.cursorpack` を Creator 用に解凍して各ロールの PNG / sized 情報を取り出す |
 //!
-//! 共有型 (DTO + `CancelRegistry`) はこのファイルに集約し、サブモジュールから `pub use` する。
+//! 共有 DTO はこのファイルに集約し、サブモジュールから `pub use` する。
+//! `CancelRegistry` は `crate::cancel_registry` に切り出し済 (cursor_build と共有)。
 
 pub mod assets;
 pub mod cursorpack;
 
+pub use crate::cancel_registry::CancelRegistry;
 pub use assets::{bulk_resolve_assets, cancel_bulk_import};
 pub use cursorpack::parse_cursorpack_for_creator;
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::Mutex;
 
 /// 一括解決対象の最大ファイルサイズ。これを超えるファイルは failures 行きにする。
 pub const MAX_FILE_BYTES: u64 = 10 * 1024 * 1024;
@@ -88,31 +89,6 @@ pub struct BulkImportProgress {
     pub current: u32,
     pub total: u32,
     pub message: Option<String>,
-}
-
-/// 進行中の job_id 集合。キャンセル時は false に下げる。
-#[derive(Default)]
-pub struct CancelRegistry {
-    inner: Mutex<HashMap<String, bool>>,
-}
-
-impl CancelRegistry {
-    pub fn register(&self, job_id: &str) {
-        self.inner.lock().unwrap().insert(job_id.to_string(), true);
-    }
-    pub fn cancel(&self, job_id: &str) {
-        if let Some(v) = self.inner.lock().unwrap().get_mut(job_id) {
-            *v = false;
-        }
-    }
-    /// 指定 job_id が登録済みかつキャンセルされていなければ true。未登録の job_id は false を返す（不明 = 非アクティブ扱い）。
-    /// ワーカーが poll する前に必ず `register` を先行させること。
-    pub fn is_active(&self, job_id: &str) -> bool {
-        *self.inner.lock().unwrap().get(job_id).unwrap_or(&false)
-    }
-    pub fn drop_job(&self, job_id: &str) {
-        self.inner.lock().unwrap().remove(job_id);
-    }
 }
 
 #[derive(Debug, Deserialize)]

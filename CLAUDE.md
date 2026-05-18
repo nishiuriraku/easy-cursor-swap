@@ -110,12 +110,12 @@ Vue (UI) ──invoke()──▶ Tauri command (commands/) ──▶ Rust module
 
 ### Backend layout (`src-tauri/src/`)
 
-21 modules registered in `lib.rs`. Grouped by responsibility:
+23 modules registered in `lib.rs`. Grouped by responsibility:
 
 | Concern | Modules |
 |---|---|
 | IPC surface | `commands/` (53 `#[tauri::command]` across 10 sub-modules: `theme` / `cursor_build/` (5 files) / `cursor_io` / `keystore` / `marketplace` / `marketplace_submit` / `profile` / `system` / `updater` / `windows_scheme`) |
-| Config / state | `config.rs` (RwLock + schema_version v1 + `config.corrupt.*.json` quarantine on parse failure, Source of Truth), `errors.rs` |
+| Config / state | `config.rs` (RwLock + schema_version v1 + `config.corrupt.*.json` quarantine on parse failure, Source of Truth), `errors.rs`, `cancel_registry.rs` (cursorpack ビルド / bulk-import 共有のキャンセルレジストリ App state) |
 | Cursor pipeline | `cursor/` (5 files: `image` / `cur_build` / `ico_cur` / `ani` / `ani_write`), `cursor_watcher.rs` |
 | Registry | `registry/` (4 files: `mod` / `scheme` / `roles` / `env`) |
 | Theme packages | `theme/` (3 files: `mod` / `types` / `sanitize`), `bulk_import/` (3 files: `mod` / `assets` / `cursorpack`), `backup.rs` (`.cursorprofile`) |
