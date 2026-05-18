@@ -354,6 +354,40 @@ struct ThemeMetaForSubmit {
     tags: Vec<String>,
 }
 
+/// `LocalizedString` を index.json 用に JSON Value 化する。
+///
+/// 公式インデックスのスキーマ (`schemas/index-entry.json`) は name について
+/// `oneOf: [string, { required: ["ja", "en"] }]` を要求している。
+/// したがって object 形式は **ja と en の両方が必須**。Creator UI では en は
+/// 任意なので、ユーザーが ja だけ入力したテーマは object 形式のままだと
+/// validate を通らない。
+///
+/// 解決策: `Localized(map)` でキーが 1 個以下なら、その値を plain string として
+/// 書き出す (schema の string 分岐で通過する)。これにより:
+///   - 「ja のみ」「en のみ」のテーマも提出が通る
+///   - 表示側 (`pickLocalizedName`) は plain string なら全ロケールで同じ値を返すので
+///     データロスゼロ
+///   - 「ja=en と同値で重複入力した」ケースは object のまま残す (UI で明示的に
+///     2 ロケール指定したと判断)
+fn name_value_for_index(
+    name: &crate::theme::LocalizedString,
+) -> Result<serde_json::Value, AppError> {
+    use crate::theme::LocalizedString;
+    match name {
+        LocalizedString::Simple(s) => Ok(serde_json::Value::String(s.clone())),
+        LocalizedString::Localized(map) => {
+            // 0 個 (異常系: hand-edited theme.json) も 1 個も plain string に潰す。
+            // 0 個のときは空文字列 — schema は minLength を課していないので形式上は通る。
+            if map.len() <= 1 {
+                return Ok(serde_json::Value::String(
+                    map.values().next().cloned().unwrap_or_default(),
+                ));
+            }
+            Ok(serde_json::to_value(name)?)
+        }
+    }
+}
+
 fn load_theme_meta_for_submit(theme_id: uuid::Uuid) -> Result<ThemeMetaForSubmit, AppError> {
     let meta = crate::theme::ThemeManager::load_metadata(theme_id)?;
     let display_name = match &meta.name {
@@ -409,9 +443,10 @@ fn build_entry_json(
     // name は LocalizedString のまま untagged で書き出す。
     // - Simple("Foo") なら "name": "Foo"
     // - Localized({"ja": "ミント", "en": "Mint"}) なら "name": {"ja": "ミント", "en": "Mint"}
-    // これにより `index.json` 取得側 (`MarketplaceEntry::name: LocalizedString`) が
-    // どちらの形式も受けられ、UI 側で locale に応じた表示切替が可能になる。
-    let name_value = serde_json::to_value(&meta.name)?;
+    // - Localized({"ja": "X"}) のように 1 ロケールしか無い場合は plain string に降格して
+    //   "name": "X" として出力 (index 側 schemas/index-entry.json は object 形式の場合
+    //   `required: ["ja", "en"]` を要求するため、片方欠落の object は validate を通らない)。
+    let name_value = name_value_for_index(&meta.name)?;
     let mut entry = serde_json::json!({
         "id": theme_id,
         "name": name_value,
@@ -593,6 +628,72 @@ mod tests {
         assert_eq!(name["ja"], "ミント");
         assert_eq!(name["en"], "Mint");
         assert_eq!(name["default"], "EasyCursorSwap Mint");
+    }
+
+    #[test]
+    fn build_entry_json_downgrades_localized_with_single_locale_to_plain_string() {
+        // Creator UI で「名前 (英語)」を空のまま提出した場合、theme.json は
+        // Localized({"ja": "ハムチマウスカーソル"}) になる。このままだと
+        // index schema は required: ["ja", "en"] で弾くので、plain string に
+        // 降格させて schema の string 分岐で通すのが正しい。
+        use std::collections::HashMap;
+        let mut map = HashMap::new();
+        map.insert("ja".to_string(), "ハムチマウスカーソル".to_string());
+
+        let meta = ThemeMetaForSubmit {
+            name: crate::theme::LocalizedString::Localized(map),
+            display_name: "ハムチマウスカーソル".to_string(),
+            version: "1.0.0".to_string(),
+            included_roles: vec!["Arrow".to_string()],
+            tags: vec![],
+        };
+        let json = build_entry_json(
+            "00000000-0000-0000-0000-000000000000",
+            &meta,
+            "octocat",
+            "deadbeef",
+            "00",
+            "AA==",
+            "https://example.com/pack",
+            None,
+        )
+        .unwrap();
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        // 期待: plain string に降格
+        assert_eq!(v["name"], "ハムチマウスカーソル");
+        assert!(
+            v["name"].is_string(),
+            "single-locale name should downgrade to plain string"
+        );
+    }
+
+    #[test]
+    fn build_entry_json_downgrades_en_only_to_plain_string() {
+        // 対称ケース: en だけのテーマも plain string に降格。
+        use std::collections::HashMap;
+        let mut map = HashMap::new();
+        map.insert("en".to_string(), "EnglishOnly".to_string());
+
+        let meta = ThemeMetaForSubmit {
+            name: crate::theme::LocalizedString::Localized(map),
+            display_name: "EnglishOnly".to_string(),
+            version: "1.0.0".to_string(),
+            included_roles: vec![],
+            tags: vec![],
+        };
+        let json = build_entry_json(
+            "00000000-0000-0000-0000-000000000000",
+            &meta,
+            "octocat",
+            "deadbeef",
+            "00",
+            "AA==",
+            "https://example.com/pack",
+            None,
+        )
+        .unwrap();
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(v["name"], "EnglishOnly");
     }
 
     #[test]
