@@ -26,10 +26,12 @@ import { useCreatorImport } from '~/composables/useCreatorImport'
 import { useCreatorExport } from '~/composables/useCreatorExport'
 import { useCreatorBulkImportFlow } from '~/composables/useCreatorBulkImportFlow'
 import { useCreatorPickers } from '~/composables/useCreatorPickers'
+import { useCreatorMetaState } from '~/composables/useCreatorMetaState'
 import type { CursorPreviewAsset } from '~/components/preview/CursorPreview.vue'
 import BulkImportPreviewModal from '~/components/creator/BulkImportPreviewModal.vue'
 import NewThemeStartModal from '~/components/creator/NewThemeStartModal.vue'
 import SaveDestinationModal from '~/components/creator/SaveDestinationModal.vue'
+import CreatorEditorCanvas from '~/components/creator/CreatorEditorCanvas.vue'
 import ThemePickerModal from '~/components/library/ThemePickerModal.vue'
 import { useThemes } from '~/composables/useThemes'
 
@@ -110,7 +112,6 @@ const sourceThemeId = ref<string | null>(null)
 /** SaveDestinationModal の開閉と初期 destination 制御 */
 const saveModalOpen = ref(false)
 const saveModalDefault = ref<'file' | 'library' | 'libraryAndApply'>('file')
-const shadowEnabled = ref(false)
 
 /**
  * 役割ごとのインポート済みアセットを `useCreatorAssets` 経由で集約管理する。
@@ -119,12 +120,18 @@ const shadowEnabled = ref(false)
 const creatorAssets = useCreatorAssets()
 const { assigned, setAsset, assignedRoleCount, arrowAssigned, toExportPayload } = creatorAssets
 
-// メタデータタブの入力
-const metaName = ref<string>(t('creator.untitledThemeName'))
-const metaNameEn = ref<string>('')
-const metaAuthor = ref<string>('')
-const metaVersion = ref<string>('1.0.0')
-const metaDescription = ref<string>('')
+// メタデータ入力欄の state はまとめて composable に寄せる (Phase: file-splits)。
+// 個別 ref alias を export しているのは、`<CreatorMetadataPane v-model:meta-*>` と
+// useCreatorExport / useCreatorBulkImportFlow が個別の ref を期待しているため。
+const metaState = useCreatorMetaState()
+const {
+  name: metaName,
+  nameEn: metaNameEn,
+  author: metaAuthor,
+  version: metaVersion,
+  description: metaDescription,
+  shadowEnabled,
+} = metaState
 
 // --- 一括インポート ---
 const bulkImport = useBulkImport()
@@ -423,8 +430,6 @@ onMounted(async () => {
 // --- 画像インポート / エクスポート / 一括インポートのフロー制御 ---
 // 詳細は composable に分離 (Phase 3c)。creator.vue は組み立てだけを担当する。
 
-const fileInput = ref<HTMLInputElement | null>(null)
-
 /** sanitized SVG 文字列 → 指定サイズの PNG バイト列 (Canvas 経由)。Canvas API 依存なのでここに残す。 */
 async function rasterizeSvgToPng(svgString: string, size: number): Promise<Uint8Array> {
   const blob = new Blob([svgString], { type: 'image/svg+xml' })
@@ -594,12 +599,7 @@ function resetCreator() {
   saveModalDefault.value = 'file'
   saveModalOpen.value = false
   activeSize.value = 64
-  metaName.value = t('creator.untitledThemeName')
-  metaNameEn.value = ''
-  metaAuthor.value = ''
-  metaVersion.value = '1.0.0'
-  metaDescription.value = ''
-  shadowEnabled.value = false
+  metaState.reset()
   importMessage.value = null
   exportMessage.value = null
   exportProgress.value = null
@@ -755,7 +755,10 @@ async function onFileChange(e: Event) {
     })
   } finally {
     importBusy.value = false
-    if (fileInput.value) fileInput.value.value = ''
+    // 同一ファイル再選択を許すため、change イベントの元 input をクリア。
+    // input 要素は子コンポーネント (CreatorEditorCanvas) に移ったので、
+    // e.target 経由で参照する (親の ref は持たない)。
+    input.value = ''
   }
 }
 </script>
@@ -822,129 +825,23 @@ async function onFileChange(e: Event) {
           @keydown="onRoleListKeydown"
         />
 
-        <!-- 中央: エディタ -->
-        <div class="editor">
-          <div class="editor-head">
-            <div>
-              <h2>
-                {{ activeRole.jp }}
-                <span class="role-key">{{ activeRole.id }}</span>
-              </h2>
-              <div class="desc">
-                <template v-if="isRequired(activeRole.id)">
-                  {{ t('creator.requiredRoleNote').split('{required}')[0]
-                  }}<b style="color: var(--accent)">{{ t('creator.requiredMark') }}</b
-                  >{{ t('creator.requiredRoleNote').split('{required}')[1] }}
-                </template>
-                <template v-else>
-                  {{ t('creator.optionalRoleNote', { en: activeRole.en }) }}
-                </template>
-              </div>
-            </div>
-            <div style="display: flex; gap: 6px">
-              <input
-                ref="fileInput"
-                type="file"
-                accept=".png,.svg,image/png,image/svg+xml"
-                hidden
-                @change="onFileChange"
-              />
-            </div>
-          </div>
-
-          <div class="canvas-area">
-            <div class="canvas-stage">
-              <!-- ビッグプレビュー (CursorPreview に委譲、メタコーナーは外側でオーバーレイ) -->
-              <div class="bigpreview-wrapper" :title="t('creator.hotspotHint')">
-                <CursorPreview
-                  :asset="activePreviewAsset"
-                  :hotspot="activeHotspot"
-                  :display-pct="70"
-                  editable
-                  :reference-px="assigned[activeRoleId]?.primarySize || activeSize"
-                  :hide-dot="activePreviewAsset.kind === 'empty'"
-                  class="bigpreview"
-                  @update:hotspot="(h) => writeActiveHotspot(h)"
-                />
-                <div class="preview-meta tl">{{ activeSize }} × {{ activeSize }}</div>
-                <button
-                  class="hotspot-center-btn"
-                  :title="t('creator.centerHotspot')"
-                  @pointerdown.stop
-                  @click.stop="centerHotspot"
-                >
-                  <UiIcon name="Crosshair" :size="11" />
-                </button>
-                <div class="preview-meta tr">
-                  hotspot {{ activeHotspot.x.toFixed(3) }},{{ activeHotspot.y.toFixed(3) }}
-                </div>
-              </div>
-
-              <!-- 詳細設定トグル: 解像度別ワークフローを ON/OFF -->
-              <div class="advanced-toggle-row">
-                <button
-                  class="advanced-toggle"
-                  :aria-expanded="showAdvancedResolutions"
-                  @click="showAdvancedResolutions = !showAdvancedResolutions"
-                >
-                  <UiIcon
-                    name="ChevD"
-                    :size="11"
-                    :style="{
-                      transform: showAdvancedResolutions ? 'rotate(0deg)' : 'rotate(-90deg)',
-                      transition: 'transform 160ms',
-                    }"
-                  />
-                  {{ t('creator.advancedSection') }}
-                  <span class="advanced-hint">{{ t('creator.advancedHint') }}</span>
-                </button>
-
-                <!-- リサンプル切替 (基本フローでも見せておく) -->
-                <div class="resample-row">
-                  <span>RESAMPLE</span>
-                  <div class="btn-group">
-                    <button
-                      v-for="mode in ['lanczos', 'nearest', 'auto'] as ResampleMode[]"
-                      :key="mode"
-                      :class="['btn', { active: resample === mode }]"
-                      style="height: 26px; font-size: 11px"
-                      @click="resample = mode"
-                    >
-                      {{ mode === 'lanczos' ? 'Lanczos' : mode === 'nearest' ? 'Nearest' : 'Auto' }}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 詳細設定: 解像度別の上書きワークフロー -->
-              <Transition name="fade">
-                <div v-if="showAdvancedResolutions" class="advanced-panel">
-                  <div class="advanced-label">{{ t('creator.perResolutionLabel') }}</div>
-                  <SizeStrip
-                    :sizes="[...SIZES]"
-                    :filled-sizes="filledSizes"
-                    :active-size="activeSize"
-                    :role="activeRole.id"
-                    :preview-map="sizePreviewMap"
-                    @select="selectSize"
-                  />
-                </div>
-              </Transition>
-
-              <div class="next-step-row">
-                <button
-                  class="btn primary"
-                  :disabled="!arrowAssigned"
-                  :title="!arrowAssigned ? t('creator.requiredMark') : ''"
-                  @click="activeTab = 'metadata'"
-                >
-                  {{ t('creator.nextToMetadata') }}
-                  <UiIcon name="ChevD" :size="13" :style="{ transform: 'rotate(-90deg)' }" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <CreatorEditorCanvas
+          :active-role="activeRole"
+          :active-size="activeSize"
+          :preview-asset="activePreviewAsset"
+          :hotspot="activeHotspot"
+          :reference-size="assigned[activeRoleId]?.primarySize || activeSize"
+          :filled-sizes="filledSizes"
+          :size-preview-map="sizePreviewMap"
+          :arrow-assigned="arrowAssigned"
+          :is-required-role="isRequired(activeRole.id)"
+          v-model:show-advanced-resolutions="showAdvancedResolutions"
+          v-model:resample="resample"
+          @update:hotspot="writeActiveHotspot"
+          @select-size="selectSize"
+          @file-selected="onFileChange"
+          @next-tab="activeTab = 'metadata'"
+        />
       </div>
 
       <BulkImportPreviewModal
@@ -1055,55 +952,6 @@ async function onFileChange(e: Event) {
   @apply m-0 font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-fg-mute;
 }
 
-.role-key {
-  @apply ml-2 font-mono text-[12px] font-normal text-fg-mute;
-}
-
-.preview-meta {
-  @apply absolute bottom-2.5 font-mono text-[10px];
-}
-.preview-meta.tl {
-  @apply left-3 text-fg-mute;
-}
-.preview-meta.tr {
-  @apply right-3 text-accent;
-}
-
-.hotspot-center-btn {
-  /* preview-meta.tl / preview-meta.tr は名前に反して両方とも bottom 配置なので、
-     中央ボタンは反対側の右上に置けばどのチップとも衝突しない。 */
-  @apply absolute right-2 top-2 inline-flex size-[22px] cursor-pointer items-center justify-center rounded-full border border-accent-line p-0 text-accent;
-  background: rgba(0, 0, 0, 0.4);
-  transition:
-    background 120ms ease,
-    transform 120ms ease;
-}
-:where(html.light) .hotspot-center-btn {
-  /* ライトテーマでは黒地が浮くため、accent (#0fa885) の極淡背景に切替える。 */
-  background: rgba(15, 168, 133, 0.08);
-}
-.hotspot-center-btn:hover {
-  background: rgba(124, 242, 212, 0.15);
-  transform: scale(1.08);
-}
-:where(html.light) .hotspot-center-btn:hover {
-  background: rgba(15, 168, 133, 0.18);
-}
-
-.next-step-row {
-  /* NOTE: var(--border) は未定義 (元コード leftover) — 結果として border 無し。
-   * 視覚的現状維持のためそのまま literal で残置。 */
-  @apply mt-4 flex justify-end pt-4;
-  border-top: 1px solid var(--border);
-}
-.next-step-row .btn.primary {
-  @apply h-9 px-[18px] text-[13px];
-}
-
-.resample-row {
-  @apply flex items-center gap-2 font-mono text-[10.5px] tracking-[0.04em] text-fg-mute;
-}
-
 .color-chips {
   @apply flex gap-1;
 }
@@ -1162,56 +1010,6 @@ async function onFileChange(e: Event) {
   @apply mx-auto flex max-w-[760px] flex-col gap-[18px];
 }
 
-.advanced-toggle-row {
-  @apply flex flex-wrap items-center justify-between gap-4;
-}
-.advanced-toggle {
-  @apply inline-flex cursor-pointer items-center gap-1.5 rounded-[8px] border border-dashed border-line bg-transparent px-2.5 py-1.5 font-mono text-[11.5px] tracking-[0.04em] text-fg-mute;
-  transition:
-    color 160ms ease,
-    border-color 160ms ease;
-}
-.advanced-toggle:hover {
-  @apply border-accent-line text-fg;
-}
-.advanced-toggle[aria-expanded='true'] {
-  @apply border-accent-line text-accent;
-}
-.advanced-hint {
-  @apply ml-1 font-body text-[10.5px] text-fg-dim;
-}
-
-.advanced-panel {
-  @apply mt-2 rounded-[8px] border border-line px-3 py-2.5;
-  background: rgba(124, 242, 212, 0.02);
-}
-.advanced-label {
-  @apply mb-2 font-mono text-[10px] uppercase tracking-[0.16em] text-fg-mute;
-}
-
-.editor {
-  @apply flex min-w-0 flex-col;
-  background: radial-gradient(800px 600px at 50% 0%, rgba(124, 242, 212, 0.04), transparent 60%);
-}
-.editor-head {
-  @apply flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line px-[18px] py-3.5;
-}
-.editor-head h2 {
-  @apply m-0 font-display text-[18px] font-semibold tracking-[-0.01em];
-}
-.editor-head .desc {
-  @apply mt-0.5 text-[12px] text-fg-dim;
-}
-.canvas-area {
-  @apply grid min-h-0 flex-1 overflow-auto p-6;
-  grid-template-columns: 1fr;
-}
-.canvas-stage {
-  @apply flex flex-col items-center gap-[18px];
-  align-self: center;
-  justify-self: center;
-}
-
 .creator-grid {
   @apply grid min-h-0 flex-1 border-t border-line;
   grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
@@ -1221,17 +1019,6 @@ async function onFileChange(e: Event) {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
   }
-}
-
-.bigpreview-wrapper {
-  @apply relative grid size-[220px] min-h-0 place-items-center rounded-2xl border border-line-hi;
-  background:
-    repeating-conic-gradient(rgba(255, 255, 255, 0.025) 0% 25%, transparent 0% 50%) 0 / 18px 18px,
-    var(--bg-1);
-  box-shadow: var(--shadow-2);
-}
-.bigpreview {
-  @apply size-full;
 }
 
 /* Tauri DnD オーバーレイ。LibraryDropOverlay と同じ表現を Creator 用に inline 化。

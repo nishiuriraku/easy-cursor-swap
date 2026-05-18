@@ -34,8 +34,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `useExternalUrl` (`openExternalUrl`) — `open_url` IPC + `window.open` フォールバックの 6 callsite 重複を 1 行 await に圧縮 (AboutSection / OssLicenseModal / SubmitDeviceFlowModal / marketplace.vue / SubmitThemeDialog ×2 / ThemeDetailDrawer)。
   - `useTagChipInput` — `SubmitThemeDialog` Auto/Manual タブ間の tag chip 入力ロジック重複を解消 (D29 部分)。
 - `useThemes` に theme mutation IPC 7 件 (`apply_theme` / `delete_theme` / `duplicate_theme` / `repackage_theme` / `set_theme_favorite` / `inspect_cursorpack` / `import_cursorpack`) のラッパーメソッドを追加。`pages/index.vue` から直接 `invokeTauri` していた経路を composable 経由に集約し、`docs/architecture.json` の `useThemes.ipc_calls` 宣言と実態を一致させた (B8-SIZE-001)。
-- composable 総数: 27 → 33 (新規 6 件)。`docs/architecture.json` の `meta.measured_counts.composables` と composable リストを再測定。
-- 監査 🔴 のうち `B10-SIZE-001` (ThemeDetailDrawer 649 行 → 4 file split) / `D29-SIZE-001` (SubmitThemeDialog 3 component split) / `C20-SIZE-001` (creator.vue 1269 行) の **構造的 file split そのものは deferred**。代わりに、それぞれから cross-cutting な composable (`useExternalUrl` / `useTagChipInput` / i18n untitledThemeName) を取り出すアプローチで対応した。残る純粋な template 肥大は cross-cutting でないため、引き続き個別 PR で対処予定。
+- composable 総数: 27 → 34 (新規 7 件)。`docs/architecture.json` の `meta.measured_counts.composables` と composable リストを再測定。
+- 監査 🔴 のうち `B10-SIZE-001` / `D29-SIZE-001` / `C20-SIZE-001` の純粋な file split を完遂:
+  - `SubmitThemeDialog.vue` (576 行) を `SubmitThemeAutoForm.vue` / `SubmitThemeManualForm.vue` の 2 子コンポーネントに分離 (D29-SIZE-001)。`useMarketplaceSubmit` が singleton ではないため submitter は親で保持し、reactive な値を props で子に渡す設計。
+  - `ThemeDetailDrawer.vue` (645 行) を `ThemeDetailDrawerHero.vue` / `Strip.vue` / `Footer.vue` の 3 子コンポーネントに分離 (B10-SIZE-001)。activeRole 内部状態は Hero に閉じ、emit はコンテナを通して props down 単方向。
+  - `creator.vue` (1269 → 1056 行 / -17%) から `useCreatorMetaState` (メタデータ 6 ref + reset) を抽出、Assign タブ中央エディタを `CreatorEditorCanvas.vue` (~290 行) に切り出し (C20-SIZE-001 部分)。BulkImportPreviewModal の `useBulkImportPreviewState` 抽出は yield が低いため deferred のまま。
+- component 総数: 50 → 56 (library +3 / marketplace +2 / creator +1)。`docs/architecture.json` / `docs/ui_map.json` の `measured_counts.components_total` を再測定し、HTML viewer に再埋め込み。
 
 ## [0.1.0] - 2026-05-16
 

@@ -5,6 +5,10 @@
  * タブ構成:
  *   - 自動 (Auto): useMarketplaceSubmit + useGithubAuth Device Flow を使って PR を自動作成
  *   - 手動 (Manual): GitHub ユーザー名 + ダウンロード URL → JSON 生成 → GitHub Web Editor
+ *
+ * このコンテナはモーダル骨格 + タブ切替 + 共有 state (テーマ一覧 / keystore / タグ) を保持し、
+ * Auto/Manual タブの本文は子コンポーネント (SubmitThemeAutoForm / SubmitThemeManualForm) に委譲する。
+ * フッターは step / submitDone の状態を見て切り替えるため親に残す。
  */
 import { computed, onMounted, ref } from 'vue'
 import { invokeTauri } from '~/composables/useTauri'
@@ -13,6 +17,8 @@ import { useKeystore } from '~/composables/useKeystore'
 import { useI18n } from '~/composables/useI18n'
 import { useMarketplaceSubmit } from '~/composables/useMarketplaceSubmit'
 import { useTagChipInput } from '~/composables/useTagChipInput'
+import SubmitThemeAutoForm from './SubmitThemeAutoForm.vue'
+import SubmitThemeManualForm from './SubmitThemeManualForm.vue'
 import SubmitDeviceFlowModal from './SubmitDeviceFlowModal.vue'
 import type { GithubAccount, SubmitStage } from '~/types/githubAuth'
 
@@ -53,7 +59,6 @@ const submitter = useMarketplaceSubmit()
 const submitDone = ref<{ prUrl: string } | null>(null)
 
 // マーケットプレイス用タグ入力 (自動・手動共通)。Enter / カンマ / セミコロンで chip 化。
-// ロジックは useTagChipInput composable に集約済み (将来別 form でも再利用可能)。
 const {
   tagInput,
   tags,
@@ -76,10 +81,10 @@ const STAGE_LABEL_KEY: Record<SubmitStage, string> = {
   open_pr: 'marketplace.submitStageOpenPr',
 }
 
-function stageLabel(s: SubmitStage | null): string {
-  if (!s) return ''
-  return t(STAGE_LABEL_KEY[s])
-}
+const submitterStageLabel = computed(() => {
+  const s = submitter.stage.value
+  return s ? t(STAGE_LABEL_KEY[s]) : ''
+})
 
 async function loadGithubAccount() {
   try {
@@ -92,7 +97,6 @@ async function loadGithubAccount() {
 
 async function runAutoSubmit() {
   if (!selectedThemeId.value) return
-  // 入力中の未確定タグも自動で確定させる
   if (tagInput.value.trim().length > 0) commitTag()
   submitDone.value = null
   try {
@@ -132,7 +136,6 @@ const selectedTheme = computed(
   () => themes.value.find((th) => th.id === selectedThemeId.value) ?? null,
 )
 
-// GitHub インデックスリポジトリのベース URL
 const INDEX_REPO = 'https://github.com/nishiuriraku/easy-cursor-swap-index'
 
 const entryJson = computed(() => {
@@ -258,171 +261,46 @@ onMounted(async () => {
             </button>
           </div>
 
-          <!-- 自動タブ -->
-          <template v-if="tab === 'auto'">
-            <p class="hint">{{ t('marketplace.submitAutoIntro') }}</p>
+          <SubmitThemeAutoForm
+            v-if="tab === 'auto'"
+            :themes="themes"
+            :selected-theme-id="selectedThemeId"
+            :tags="tags"
+            :tag-input="tagInput"
+            :has-keystore="keystoreInfo.has_keypair"
+            :max-tags="MAX_TAGS"
+            :github-account="githubAccount"
+            :submitter-busy="submitter.busy.value"
+            :submitter-stage-label="submitterStageLabel"
+            :submitter-error-msg="submitter.errorMsg.value"
+            :submit-done="submitDone !== null"
+            @update:selected-theme-id="(v) => (selectedThemeId = v)"
+            @update:tag-input="(v) => (tagInput = v)"
+            @commit-tag="commitTag"
+            @remove-tag="removeTag"
+            @tag-keydown="onTagKeydown"
+          />
 
-            <div class="field">
-              <label for="submit-auto-theme">{{ t('marketplace.submitSelectTheme') }}</label>
-              <UiSelect
-                id="submit-auto-theme"
-                v-model="selectedThemeId"
-                width="100%"
-                :placeholder="t('marketplace.submitSelectPlaceholder')"
-                :options="
-                  themes.map((th) => ({
-                    value: th.id,
-                    label: `${th.name} (v${th.version})`,
-                  }))
-                "
-              />
-            </div>
-
-            <div class="field">
-              <label for="submit-auto-tags">{{ t('marketplace.submitTagsLabel') }}</label>
-              <div class="tag-input-row">
-                <span v-for="(tg, i) in tags" :key="`${tg}-${i}`" class="tag-chip">
-                  {{ tg }}
-                  <button
-                    type="button"
-                    class="tag-chip-x"
-                    :aria-label="t('marketplace.submitTagRemoveAria', { tag: tg })"
-                    @click="removeTag(i)"
-                  >
-                    <UiIcon name="X" :size="10" />
-                  </button>
-                </span>
-                <input
-                  id="submit-auto-tags"
-                  v-model="tagInput"
-                  type="text"
-                  class="tag-input"
-                  :placeholder="
-                    tags.length === 0
-                      ? t('marketplace.submitTagsPlaceholder')
-                      : t('marketplace.submitTagsPlaceholderAdd')
-                  "
-                  :disabled="tags.length >= MAX_TAGS"
-                  @keydown="onTagKeydown"
-                  @blur="commitTag"
-                />
-              </div>
-              <span class="field-note">{{ t('marketplace.submitTagsNote') }}</span>
-            </div>
-
-            <div v-if="githubAccount" class="hint">
-              {{ t('marketplace.submitAutoLinkedAs', { login: githubAccount.login }) }}
-            </div>
-            <div v-else class="hint">{{ t('marketplace.submitAutoNeedsLink') }}</div>
-
-            <div v-if="submitter.busy.value" class="hint" aria-live="polite">
-              {{ stageLabel(submitter.stage.value) }}
-            </div>
-            <div v-if="submitter.errorMsg.value" class="warn-box">
-              <UiIcon name="AlertTriangle" :size="14" />
-              {{ submitter.errorMsg.value }}
-            </div>
-            <div v-if="submitDone" class="hint">
-              {{ t('marketplace.submitDone') }}
-            </div>
-
-            <div v-if="!keystoreInfo.has_keypair" class="warn-box">
-              <UiIcon name="AlertTriangle" :size="14" />
-              {{ t('marketplace.submitNoKeystore') }}
-            </div>
-          </template>
-
-          <!-- 手動タブ -->
-          <template v-else>
-            <!-- Step 1: テーマ選択 + GitHub ユーザー名 -->
-            <template v-if="step === 'select'">
-              <p class="hint">{{ t('marketplace.submitHint') }}</p>
-
-              <div class="field">
-                <label for="submit-theme">{{ t('marketplace.submitSelectTheme') }}</label>
-                <UiSelect
-                  v-model="selectedThemeId"
-                  width="100%"
-                  :placeholder="t('marketplace.submitSelectPlaceholder')"
-                  :options="
-                    themes.map((th) => ({
-                      value: th.id,
-                      label: `${th.name} (v${th.version})`,
-                    }))
-                  "
-                />
-              </div>
-
-              <div class="field">
-                <label for="submit-github">{{ t('marketplace.submitGithubUser') }}</label>
-                <input
-                  id="submit-github"
-                  v-model="githubUsername"
-                  type="text"
-                  class="input"
-                  :placeholder="t('marketplace.submitGithubUserPlaceholder')"
-                />
-              </div>
-
-              <div class="field">
-                <label for="submit-dl-url">{{ t('marketplace.submitDownloadUrl') }}</label>
-                <input
-                  id="submit-dl-url"
-                  v-model="downloadUrl"
-                  type="url"
-                  class="input"
-                  :placeholder="t('marketplace.submitDownloadUrlPlaceholder')"
-                />
-                <span class="field-note">{{ t('marketplace.submitDownloadUrlNote') }}</span>
-              </div>
-
-              <div class="field">
-                <label for="submit-manual-tags">{{ t('marketplace.submitTagsLabel') }}</label>
-                <div class="tag-input-row">
-                  <span v-for="(tg, i) in tags" :key="`${tg}-${i}`" class="tag-chip">
-                    {{ tg }}
-                    <button
-                      type="button"
-                      class="tag-chip-x"
-                      :aria-label="t('marketplace.submitTagRemoveAria', { tag: tg })"
-                      @click="removeTag(i)"
-                    >
-                      <UiIcon name="X" :size="10" />
-                    </button>
-                  </span>
-                  <input
-                    id="submit-manual-tags"
-                    v-model="tagInput"
-                    type="text"
-                    class="tag-input"
-                    :placeholder="
-                      tags.length === 0
-                        ? t('marketplace.submitTagsPlaceholder')
-                        : t('marketplace.submitTagsPlaceholderAdd')
-                    "
-                    :disabled="tags.length >= MAX_TAGS"
-                    @keydown="onTagKeydown"
-                    @blur="commitTag"
-                  />
-                </div>
-                <span class="field-note">{{ t('marketplace.submitTagsNote') }}</span>
-              </div>
-
-              <div v-if="!keystoreInfo.has_keypair" class="warn-box">
-                <UiIcon name="AlertTriangle" :size="14" />
-                {{ t('marketplace.submitNoKeystore') }}
-              </div>
-            </template>
-
-            <!-- Step 2: JSON プレビュー -->
-            <template v-else>
-              <p class="hint">{{ t('marketplace.submitPreviewHint') }}</p>
-              <div class="json-preview">
-                <pre>{{ entryJson }}</pre>
-              </div>
-              <p class="hint small">{{ t('marketplace.submitFillInNote') }}</p>
-            </template>
-          </template>
+          <SubmitThemeManualForm
+            v-else
+            :themes="themes"
+            :selected-theme-id="selectedThemeId"
+            :tags="tags"
+            :tag-input="tagInput"
+            :has-keystore="keystoreInfo.has_keypair"
+            :max-tags="MAX_TAGS"
+            :step="step"
+            :github-username="githubUsername"
+            :download-url="downloadUrl"
+            :entry-json="entryJson"
+            @update:selected-theme-id="(v) => (selectedThemeId = v)"
+            @update:tag-input="(v) => (tagInput = v)"
+            @update:github-username="(v) => (githubUsername = v)"
+            @update:download-url="(v) => (downloadUrl = v)"
+            @commit-tag="commitTag"
+            @remove-tag="removeTag"
+            @tag-keydown="onTagKeydown"
+          />
         </div>
 
         <div class="modal-foot">
@@ -489,7 +367,7 @@ onMounted(async () => {
 
 /* 共有 modal 系 (.modal-page / .modal / .modal-head / .modal-body / .modal-foot) と
  * .input / .btn は tailwind.css の top-level shared utility に集約済み。
- * 本コンポーネントは独自フィールドレイアウト + JSON プレビュー枠のみ scoped で持つ。 */
+ * フィールドレイアウト + タグ chip + JSON プレビュー枠は子コンポーネントの scoped style に移譲。 */
 
 .submit-modal {
   @apply flex w-[640px] max-w-[92vw] flex-col;
@@ -500,77 +378,7 @@ onMounted(async () => {
   @apply flex max-h-[60vh] flex-col gap-3 overflow-y-auto;
 }
 
-.field {
-  @apply flex flex-col gap-1;
-}
-
-.field label {
-  @apply text-[12px] font-medium text-fg-mute;
-}
-
-.field-note {
-  @apply text-[11px] text-fg-mute;
-}
-
-/* タグ chip + 末尾の text input を 1 行に並べる input-like ラッパ。 */
-.tag-input-row {
-  @apply flex flex-wrap items-center gap-1.5 rounded-md border border-line px-2 py-1.5;
-  background: rgba(255, 255, 255, 0.03);
-  min-height: 34px;
-}
-.tag-input-row:focus-within {
-  border-color: var(--accent-line);
-}
-:where(html.light) .tag-input-row {
-  background: rgba(15, 20, 35, 0.025);
-}
-.tag-chip {
-  @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11.5px];
-  background: var(--accent-dim);
-  color: var(--accent);
-}
-.tag-chip-x {
-  @apply inline-flex cursor-pointer items-center justify-center border-0 bg-transparent p-0 text-current;
-  line-height: 0;
-}
-.tag-chip-x:hover {
-  opacity: 0.75;
-}
-.tag-input {
-  @apply min-w-[120px] flex-1 border-0 bg-transparent p-0 text-[12.5px] text-fg outline-none;
-}
-.tag-input::placeholder {
-  color: var(--fg-mute);
-}
-
-.hint {
-  @apply m-0 text-[13px] text-fg-dim;
-}
-
-.hint.small {
-  @apply text-[11px] text-fg-mute;
-}
-
-.json-preview {
-  @apply max-h-[300px] overflow-auto rounded-[8px] border border-line bg-black/30;
-}
-
-.json-preview pre {
-  @apply m-0 whitespace-pre p-3 font-mono text-[12px] leading-[1.5] text-fg;
-}
-
-:where(html.light) .json-preview {
-  background: rgba(15, 20, 35, 0.04);
-}
-
 .submit-mode-label {
   @apply text-[11px] font-medium uppercase tracking-wide text-fg-mute;
-}
-
-.warn-box {
-  @apply flex items-center gap-1.5 rounded-[8px] border px-2.5 py-2 text-[12px];
-  background: rgba(245, 194, 107, 0.1);
-  border-color: rgba(245, 194, 107, 0.3);
-  color: var(--amber);
 }
 </style>
