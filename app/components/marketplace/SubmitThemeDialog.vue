@@ -12,6 +12,7 @@ import { openExternalUrl } from '~/composables/useExternalUrl'
 import { useKeystore } from '~/composables/useKeystore'
 import { useI18n } from '~/composables/useI18n'
 import { useMarketplaceSubmit } from '~/composables/useMarketplaceSubmit'
+import { useTagChipInput } from '~/composables/useTagChipInput'
 import SubmitDeviceFlowModal from './SubmitDeviceFlowModal.vue'
 import type { GithubAccount, SubmitStage } from '~/types/githubAuth'
 
@@ -52,38 +53,16 @@ const submitter = useMarketplaceSubmit()
 const submitDone = ref<{ prUrl: string } | null>(null)
 
 // マーケットプレイス用タグ入力 (自動・手動共通)。Enter / カンマ / セミコロンで chip 化。
-const tagInput = ref('')
-const tags = ref<string[]>([])
-const MAX_TAGS = 8
-const MAX_TAG_LEN = 24
-
-function commitTag() {
-  const raw = tagInput.value.trim()
-  if (!raw) return
-  // カンマ・セミコロン区切りで複数同時投入も許可
-  const parts = raw
-    .split(/[,;]/)
-    .map((s) => s.trim().toLowerCase())
-    .filter((s) => s.length > 0 && s.length <= MAX_TAG_LEN)
-  for (const p of parts) {
-    if (tags.value.length >= MAX_TAGS) break
-    if (!tags.value.includes(p)) tags.value.push(p)
-  }
-  tagInput.value = ''
-}
-
-function onTagKeydown(e: KeyboardEvent) {
-  if (e.key === 'Enter' || e.key === ',' || e.key === ';') {
-    e.preventDefault()
-    commitTag()
-  } else if (e.key === 'Backspace' && tagInput.value === '' && tags.value.length > 0) {
-    tags.value.pop()
-  }
-}
-
-function removeTag(i: number) {
-  tags.value.splice(i, 1)
-}
+// ロジックは useTagChipInput composable に集約済み (将来別 form でも再利用可能)。
+const {
+  tagInput,
+  tags,
+  commitTag,
+  onTagKeydown,
+  removeTag,
+  reset: resetTags,
+  maxTags: MAX_TAGS,
+} = useTagChipInput()
 
 const STAGE_LABEL_KEY: Record<SubmitStage, string> = {
   build: 'marketplace.submitStageBuild',
@@ -226,8 +205,7 @@ function close() {
   githubUsername.value = ''
   downloadUrl.value = ''
   // 共通のタグもリセット
-  tags.value = []
-  tagInput.value = ''
+  resetTags()
 }
 
 onMounted(async () => {
