@@ -110,15 +110,15 @@ Vue (UI) ──invoke()──▶ Tauri command (commands/) ──▶ Rust module
 
 ### Backend layout (`src-tauri/src/`)
 
-21 modules registered in `lib.rs`. Grouped by responsibility:
+23 modules registered in `lib.rs`. Grouped by responsibility:
 
 | Concern | Modules |
 |---|---|
 | IPC surface | `commands/` (53 `#[tauri::command]` across 10 sub-modules: `theme` / `cursor_build/` (5 files) / `cursor_io` / `keystore` / `marketplace` / `marketplace_submit` / `profile` / `system` / `updater` / `windows_scheme`) |
-| Config / state | `config.rs` (RwLock + schema_version v1 + `config.corrupt.*.json` quarantine on parse failure, Source of Truth), `errors.rs` |
+| Config / state | `config.rs` (RwLock + schema_version v1 + `config.corrupt.*.json` quarantine on parse failure, Source of Truth), `errors.rs`, `cancel_registry.rs` (cursorpack ビルド / bulk-import 共有のキャンセルレジストリ App state) |
 | Cursor pipeline | `cursor/` (5 files: `image` / `cur_build` / `ico_cur` / `ani` / `ani_write`), `cursor_watcher.rs` |
 | Registry | `registry/` (4 files: `mod` / `scheme` / `roles` / `env`) |
-| Theme packages | `theme/` (3 files: `mod` / `types` / `sanitize`), `bulk_import/` (3 files: `mod` / `assets` / `cursorpack`), `backup.rs` (`.cursorprofile`) |
+| Theme packages | `theme/` (7 files: `mod` (entry + `ThemeManager` 定義 + 公開 re-export) / `types` / `sanitize` / `listing` (一覧 / metadata / 孤児復旧 / `set_metadata_source` helper) / `preview` (PNG プレビュー生成 + `RolePreview` + `PREVIEW_ROLES`) / `apply` (`apply_theme` + `theme_active_in_registry`) / `package` (`.cursorpack` zip 入出力 / 削除 / 複製 / 再パッケージ / スキーム書出)), `bulk_import/` (3 files: `mod` / `assets` / `cursorpack`), `backup.rs` (`.cursorprofile`) |
 | Marketplace | `marketplace.rs` (HTTP index fetch, SHA-256 + Ed25519 verify), `keystore.rs` (Ed25519 + DPAPI + `.cfkey` XChaCha20-Poly1305 + Argon2id) |
 | Reliability | `health.rs` (startup-failure counter + rollback), `crash.rs` |
 | OS integration | `tray.rs`, `hotkey.rs`, `autostart.rs`, `appusermodel.rs`, `accessibility.rs`, `environment.rs` (RDP/Citrix detection). Multi-instance lock is `tauri_plugin_single_instance` (no custom module). Dark mode is handled on the frontend (`useUiTheme` composable). |

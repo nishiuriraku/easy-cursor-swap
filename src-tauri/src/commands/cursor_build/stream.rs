@@ -1,15 +1,16 @@
 //! `export_cursorpack_streamed` 本体: 17 役割 × 6 サイズ = 最大 102 枚の .cur 生成を
 //! 1 回の IPC で実行しつつ Tauri イベントで進捗配信する重量関数。
 //!
-//! - キャンセルは `cancel::is_cancelled(build_id)` を主要ステップ前にチェック
+//! - キャンセルは `registry.is_cancelled(build_id)` を主要ステップ前にチェック
+//!   (App state の `CancelRegistry`)
 //! - 役割ループは `build::build_role` に委譲
 //! - 署名は `sign::sign_theme_metadata` に委譲
 //! - destination 分岐 (File / Library) は本ファイル内で処理
 
 use super::build;
-use super::cancel;
 use super::dto::*;
 use super::sign;
+use crate::cancel_registry::CancelRegistry;
 use crate::errors::AppError;
 use crate::theme::{CursorDefinition, LocalizedString, ThemeManager, ThemeMetadata};
 use std::collections::HashMap;
@@ -34,6 +35,7 @@ fn emit_progress(app: &tauri::AppHandle, payload: BuildProgress) {
 #[tauri::command]
 pub fn export_cursorpack_streamed(
     app: tauri::AppHandle,
+    registry: tauri::State<'_, CancelRegistry>,
     req: StreamedExportRequest,
 ) -> Result<ExportResult, AppError> {
     let total_roles = req.roles.len() as u32;
@@ -55,8 +57,8 @@ pub fn export_cursorpack_streamed(
     let mut cursor_bytes: HashMap<String, Vec<u8>> = HashMap::new();
     let mut cursors_meta: HashMap<String, CursorDefinition> = HashMap::new();
     for (idx, entry) in req.roles.iter().enumerate() {
-        if cancel::is_cancelled(&req.build_id) {
-            cancel::clear_cancel(&req.build_id);
+        if registry.is_cancelled(&req.build_id) {
+            registry.drop_job(&req.build_id);
             emit_progress(
                 &app,
                 BuildProgress {
@@ -120,8 +122,8 @@ pub fn export_cursorpack_streamed(
 
     // 3) 署名。sign.rs に共通化済み (export_cursorpack と同じロジック)。
     let signed_key_id: Option<String> = if req.sign {
-        if cancel::is_cancelled(&req.build_id) {
-            cancel::clear_cancel(&req.build_id);
+        if registry.is_cancelled(&req.build_id) {
+            registry.drop_job(&req.build_id);
             // role 段階と同様に cancelled イベントを発火し、UI 進捗バーを解放する。
             emit_progress(
                 &app,
@@ -151,8 +153,8 @@ pub fn export_cursorpack_streamed(
     };
 
     // 4) Zip 出力
-    if cancel::is_cancelled(&req.build_id) {
-        cancel::clear_cancel(&req.build_id);
+    if registry.is_cancelled(&req.build_id) {
+        registry.drop_job(&req.build_id);
         // 同上: package 段階キャンセル時も UI へ通知する。
         emit_progress(
             &app,
@@ -239,7 +241,7 @@ pub fn export_cursorpack_streamed(
             message: Some(metadata.id.to_string()),
         },
     );
-    cancel::clear_cancel(&req.build_id);
+    registry.drop_job(&req.build_id);
 
     Ok(ExportResult {
         theme_id: metadata.id.to_string(),

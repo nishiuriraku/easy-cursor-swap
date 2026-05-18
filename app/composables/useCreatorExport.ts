@@ -11,6 +11,7 @@
  */
 import { ref, watch, type Ref } from 'vue'
 import { invokeTauri } from './useTauri'
+import { useThemes } from './useThemes'
 import { useThemePreviews } from './useThemePreviews'
 
 /** ストリームエクスポート時の進捗状態 */
@@ -219,7 +220,7 @@ export function useCreatorExport(deps: CreatorExportDeps) {
     const themeId = failedApplyThemeId.value
     failedApplyThemeId.value = null
     try {
-      await invokeTauri<void>('apply_theme', { themeId })
+      await useThemes().applyTheme(themeId)
       exportMessage.value = t('saveModal.toastSavedAndApplied')
     } catch (err) {
       exportMessage.value = `再試行失敗: ${err instanceof Error ? err.message : String(err)}`

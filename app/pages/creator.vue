@@ -14,7 +14,6 @@
  */
 import { computed, onBeforeUnmount, onUnmounted, ref } from 'vue'
 import { CURSOR_ROLES, type CursorRoleDef } from '~/components/icons/CursorIcons'
-import { invokeTauri } from '~/composables/useTauri'
 import { sanitizeSvg } from '~/composables/sanitizeSvg'
 import { useKeystore } from '~/composables/useKeystore'
 import { useI18n } from '~/composables/useI18n'
@@ -673,7 +672,7 @@ async function onThemePickerSelect(id: string | null) {
     const { tempDir, sep } = await import('@tauri-apps/api/path')
     const dir = await tempDir()
     const tempPath = `${dir}${sep()}_easycursorswap_dup_${Date.now()}.cursorpack`
-    await invokeTauri<number>('repackage_theme', { themeId: id, outputPath: tempPath })
+    await useThemes().repackageTheme(id, tempPath)
     await dispatchBulkPaths([tempPath])
     if (bulkModalOpen.value) {
       stage.value = 'editing'

@@ -49,10 +49,15 @@
 | [cursor/ani_write.rs](../src-tauri/src/cursor/ani_write.rs) | ANI 書き出し (.cur frame の連結 + RIFF header + hotspot 埋込) |
 | [cursor/ico_cur.rs](../src-tauri/src/cursor/ico_cur.rs) | .ico/.cur 解析 (ICONDIRENTRY + PNG/BMP DIB) + `pick_largest_as_png` |
 | [cursor_watcher.rs](../src-tauri/src/cursor_watcher.rs) | `WM_SETTINGCHANGE` 購読 (不可視ウィンドウ) → `cursor-changed` イベント |
-| [theme/mod.rs](../src-tauri/src/theme/mod.rs) | `ThemeManager`：`.cursorpack` 入出力、`apply_theme`、`cleanup_orphan_references`、Ed25519 署名埋込 |
+| [theme/mod.rs](../src-tauri/src/theme/mod.rs) | エントリポイント。`ThemeManager` (ZST) 定義 + 公開 re-export。実体メソッドは下 4 サブモジュール (listing / preview / apply / package) の `impl ThemeManager` に分散 |
+| [theme/listing.rs](../src-tauri/src/theme/listing.rs) | `list_themes` / `load_metadata` / `theme_exists` / `cleanup_orphan_references` / `dir_size_bytes`、および `set_metadata_source` 共有 helper |
+| [theme/preview.rs](../src-tauri/src/theme/preview.rs) | `load_role_previews` / `load_role_previews_with_hotspots` / `render_paths_as_previews(_with_hotspots)` / `render_cursor_file_as_png` / `build_preview_pngs`、`RolePreview` DTO + `PREVIEW_ROLES` / `PREVIEW_SIZE` const |
+| [theme/apply.rs](../src-tauri/src/theme/apply.rs) | `apply_theme` (レジストリ書込 + SPI_SETCURSORS + Schemes 登録) / `theme_active_in_registry` |
+| [theme/package.rs](../src-tauri/src/theme/package.rs) | `.cursorpack` zip 入出力: `import_cursorpack_*` / `inspect_cursorpack_*` / `write_cursorpack_to_buffer` / `export_cursorpack` / `delete_theme` / `duplicate_theme` / `repackage_theme` / `export_scheme_as_cursorpack` |
 | [theme/sanitize.rs](../src-tauri/src/theme/sanitize.rs) | `sanitize_archive_path` + Zip 爆弾対策 (50/200/10 MB 三段階) + `S_IFLNK` 拒否 |
 | [theme/types.rs](../src-tauri/src/theme/types.rs) | `ThemeMeta` / `ThemeSummary` / `LocalizedString` 等 |
-| [bulk_import/mod.rs](../src-tauri/src/bulk_import/mod.rs) | `CancelRegistry` + 公開 API + 進捗イベント |
+| [bulk_import/mod.rs](../src-tauri/src/bulk_import/mod.rs) | 公開 API + 進捗イベント + DTO 集約 (`CancelRegistry` は `cancel_registry.rs` に切り出して cursor_build と共有) |
+| [cancel_registry.rs](../src-tauri/src/cancel_registry.rs) | 長時間ジョブのキャンセルレジストリ。Tauri App state として `manage()` する per-instance struct (HashMap<String, bool>)。`register` / `cancel` / `is_active` / `is_cancelled` / `drop_job` API |
 | [bulk_import/assets.rs](../src-tauri/src/bulk_import/assets.rs) | 複数ファイル/フォルダ走査 → `ResolvedAsset` 変換、ファジーマッチ、リサンプル並列化 |
 | [bulk_import/cursorpack.rs](../src-tauri/src/bulk_import/cursorpack.rs) | `.cursorpack` 読込 (ライブラリ非依存、creator 直挿入用) |
 | [backup.rs](../src-tauri/src/backup.rs) | `.cursorprofile` Zip 入出力、`ProfileEnvelope`、merge/overwrite |

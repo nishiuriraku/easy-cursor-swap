@@ -31,7 +31,7 @@
       "policy": "コード変更と同じコミットで更新する。数字はドリフトの最大シグナル — 信用する前に grep で実測する。"
     },
     "measured_counts": {
-      "rust_modules_in_lib_rs": 22,
+      "rust_modules_in_lib_rs": 23,
       "tauri_ipc_commands": 52,
       "composables": 36,
       "pages_vue": 4,
@@ -229,11 +229,15 @@
         "name": "theme",
         "file": "src-tauri/src/theme/mod.rs",
         "category": "theme",
-        "role": "ThemeManager。.cursorpack の作成・取り込み・検証。theme.json。孤児カーソルの復旧。Ed25519 署名埋込。",
+        "role": "ThemeManager (ZST + 機能別 impl 分散)。.cursorpack の作成・取り込み・検証、theme.json 管理、孤児カーソルの復旧、Ed25519 署名埋込。2026-05-18 で listing / preview / apply / package の 4 サブモジュールに分割 (それぞれが追加の `impl ThemeManager` ブロックを提供)。",
         "files": [
           "src-tauri/src/theme/mod.rs",
           "src-tauri/src/theme/types.rs",
-          "src-tauri/src/theme/sanitize.rs"
+          "src-tauri/src/theme/sanitize.rs",
+          "src-tauri/src/theme/listing.rs",
+          "src-tauri/src/theme/preview.rs",
+          "src-tauri/src/theme/apply.rs",
+          "src-tauri/src/theme/package.rs"
         ],
         "depends_on": ["cursor", "errors", "logging", "keystore"]
       },
@@ -241,13 +245,20 @@
         "name": "bulk_import",
         "file": "src-tauri/src/bulk_import/mod.rs",
         "category": "theme",
-        "role": "CancelRegistry + 公開 API + 進捗イベント。並列アセット解決 (ファイル / フォルダ)、ファジー役割マッチング、並列リサンプリング。",
+        "role": "公開 API + 進捗イベント + DTO 集約。並列アセット解決 (ファイル / フォルダ)、ファジー役割マッチング、並列リサンプリング。CancelRegistry は cancel_registry モジュールに切り出して cursor_build と共有。",
         "files": [
           "src-tauri/src/bulk_import/mod.rs",
           "src-tauri/src/bulk_import/assets.rs",
           "src-tauri/src/bulk_import/cursorpack.rs"
         ],
-        "depends_on": ["theme", "cursor", "errors"]
+        "depends_on": ["theme", "cursor", "errors", "cancel_registry"]
+      },
+      {
+        "name": "cancel_registry",
+        "file": "src-tauri/src/cancel_registry.rs",
+        "category": "state",
+        "role": "長時間ジョブ (cursorpack ビルド / bulk-import アセット解決) 用の共通キャンセルレジストリ。Tauri App state として manage() される per-instance struct (HashMap<String, bool>)。register / cancel / is_active / is_cancelled / drop_job API を提供し、bulk_import の register-first パターンと cursor_build の cancel-only パターン両方をカバーする。",
+        "depends_on": []
       },
       {
         "name": "backup",
@@ -351,7 +362,7 @@
       { "name": "import_cursorpack", "category": "theme", "file": "src-tauri/src/commands/theme.rs", "frontend_callers": ["useThemes", "useCursorpackOpener"] },
       { "name": "export_cursorpack", "category": "cursorpack_build", "file": "src-tauri/src/commands/cursor_build/mod.rs", "frontend_callers": [], "status": "legacy_unused", "replaced_by": "export_cursorpack_streamed" },
       { "name": "export_cursorpack_streamed", "category": "cursorpack_build", "file": "src-tauri/src/commands/cursor_build/stream.rs", "frontend_callers": ["useCreatorExport"] },
-      { "name": "cancel_build", "category": "cursorpack_build", "file": "src-tauri/src/commands/cursor_build/cancel.rs", "frontend_callers": ["useCreatorExport"] },
+      { "name": "cancel_build", "category": "cursorpack_build", "file": "src-tauri/src/commands/cursor_build/mod.rs", "frontend_callers": ["useCreatorExport"] },
       { "name": "take_pending_cursorpack", "category": "cursorpack_assoc", "file": "src-tauri/src/commands/cursor_io.rs", "frontend_callers": ["useCursorpackOpener"] },
       { "name": "keystore_info", "category": "keystore", "file": "src-tauri/src/commands/keystore.rs", "frontend_callers": ["useKeystore", "pages/creator.vue", "pages/marketplace.vue"] },
       { "name": "keystore_generate", "category": "keystore", "file": "src-tauri/src/commands/keystore.rs", "frontend_callers": ["useKeystore"] },

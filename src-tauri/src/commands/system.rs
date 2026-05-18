@@ -13,26 +13,45 @@ use crate::registry::RegistryManager;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
 
-/// Windows 既定カーソルにリセットする（パニックボタン）
+/// reset 系 IPC の共通後処理。
 ///
-/// 副作用:
-///  - レジストリ `HKCU\Control Panel\Cursors` を Windows 既定に戻す
-///  - config の `active_theme_id` を `None` にクリア (アクティブテーマ解除)
-///  - `cursor-changed` イベントを発火 (UI 側で `is_active` バッジを再評価させる)
+/// レジストリ操作 (`RegistryManager::reset_to_windows_default` 等) を closure で
+/// 受け、成功した場合のみ `active_theme_id` クリアと `cursor-changed` 発火を
+/// 走らせる。 `action_label` はログ出力時の prefix。
 ///
 /// `cursor-changed` を明示発火する理由: cursor_watcher は `HWND_MESSAGE` で
 /// 作られた message-only window で WM_SETTINGCHANGE のブロードキャストを
 /// 受け取れない。SPI_SETCURSORS による即時反映だけでは UI に伝わらない。
-#[tauri::command]
-pub fn reset_to_default(app: AppHandle, config: State<'_, ConfigManager>) -> Result<(), AppError> {
-    RegistryManager::reset_to_windows_default()?;
+fn reset_with_cleanup<F>(
+    app: AppHandle,
+    config: State<'_, ConfigManager>,
+    action_label: &str,
+    registry_action: F,
+) -> Result<(), AppError>
+where
+    F: FnOnce() -> Result<(), AppError>,
+{
+    registry_action()?;
     if let Err(err) = config.update(|c| c.general.active_theme_id = None) {
-        tracing::warn!("reset_to_default: active_theme_id クリア失敗: {}", err);
+        tracing::warn!("{}: active_theme_id クリア失敗: {}", action_label, err);
     }
     if let Err(err) = app.emit("cursor-changed", ()) {
-        tracing::warn!("reset_to_default: cursor-changed emit 失敗: {}", err);
+        tracing::warn!("{}: cursor-changed emit 失敗: {}", action_label, err);
     }
     Ok(())
+}
+
+/// Windows 既定カーソルにリセットする（パニックボタン）。
+///
+/// 副作用:
+///  - レジストリ `HKCU\Control Panel\Cursors` を Windows 既定に戻す
+///  - config の `active_theme_id` を `None` にクリア
+///  - `cursor-changed` イベントを発火
+#[tauri::command]
+pub fn reset_to_default(app: AppHandle, config: State<'_, ConfigManager>) -> Result<(), AppError> {
+    reset_with_cleanup(app, config, "reset_to_default", || {
+        RegistryManager::reset_to_windows_default()
+    })
 }
 
 /// インストール前の状態にリセットする。
@@ -40,14 +59,9 @@ pub fn reset_to_default(app: AppHandle, config: State<'_, ConfigManager>) -> Res
 /// `reset_to_default` と同じく `active_theme_id` クリア + `cursor-changed` 発火を行う。
 #[tauri::command]
 pub fn reset_to_initial(app: AppHandle, config: State<'_, ConfigManager>) -> Result<(), AppError> {
-    RegistryManager::restore_from_initial_snapshot()?;
-    if let Err(err) = config.update(|c| c.general.active_theme_id = None) {
-        tracing::warn!("reset_to_initial: active_theme_id クリア失敗: {}", err);
-    }
-    if let Err(err) = app.emit("cursor-changed", ()) {
-        tracing::warn!("reset_to_initial: cursor-changed emit 失敗: {}", err);
-    }
-    Ok(())
+    reset_with_cleanup(app, config, "reset_to_initial", || {
+        RegistryManager::restore_from_initial_snapshot()
+    })
 }
 
 /// 動作環境レポートを返す (RDP / Server SKU 検出)。
@@ -185,12 +199,52 @@ pub fn restore_config_backup(
     config.restore_backup(&file_name)
 }
 
+/// Windows shell 経由でファイル / URL を開く共通 helper。
+///
+/// `verb` を `Some("open")` で渡すと URL の関連付け起動、`None` でフォルダや
+/// ファイルの既定アクション起動。失敗時の HINSTANCE 値が 32 以下なら失敗。
+///
+/// HSTRING を let-binding で受けてから PCWSTR を取得することで、以前の
+/// `open_url` 実装にあった temporary HSTRING パターンの潜在 UB を解消する。
+#[cfg(windows)]
+fn shell_execute_w(verb: Option<&str>, path: &str) -> Result<(), AppError> {
+    use windows::core::{HSTRING, PCWSTR};
+    use windows::Win32::UI::Shell::ShellExecuteW;
+    use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+
+    let path_h = HSTRING::from(path);
+    let verb_h = verb.map(HSTRING::from);
+    let verb_ptr = verb_h
+        .as_ref()
+        .map(|h| PCWSTR(h.as_ptr()))
+        .unwrap_or(PCWSTR::null());
+
+    let result = unsafe {
+        ShellExecuteW(
+            None,
+            verb_ptr,
+            PCWSTR(path_h.as_ptr()),
+            PCWSTR::null(),
+            PCWSTR::null(),
+            SW_SHOWNORMAL,
+        )
+    };
+    // ShellExecuteW は HINSTANCE を返す; ポインタ値が 32 より大きければ成功
+    if (result.0 as usize) <= 32 {
+        return Err(AppError::Other(format!(
+            "ShellExecuteW が失敗しました (path={:?})",
+            path
+        )));
+    }
+    Ok(())
+}
+
 /// 指定 URL をシステムのデフォルトブラウザで開く。
 ///
 /// URL は `https://` または `http://` で始まる必要がある。
 /// それ以外は `AppError::InvalidInput` を返す。
 ///
-/// Windows 専用実装: Win32 ShellExecuteW を直接呼ぶ。
+/// Windows 専用実装: [`shell_execute_w`] 経由。
 #[tauri::command]
 pub fn open_url(url: String) -> Result<(), AppError> {
     if !url.starts_with("https://") && !url.starts_with("http://") {
@@ -201,28 +255,11 @@ pub fn open_url(url: String) -> Result<(), AppError> {
     }
     #[cfg(windows)]
     {
-        use windows::core::{HSTRING, PCWSTR};
-        use windows::Win32::UI::Shell::ShellExecuteW;
-        use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
-
-        let url_h = HSTRING::from(url.as_str());
-        let result = unsafe {
-            ShellExecuteW(
-                None,
-                PCWSTR(HSTRING::from("open").as_ptr()),
-                PCWSTR(url_h.as_ptr()),
-                PCWSTR::null(),
-                PCWSTR::null(),
-                SW_SHOWNORMAL,
-            )
-        };
-        // ShellExecuteW は HINSTANCE を返す; ポインタ値が 32 より大きければ成功
-        if (result.0 as usize) <= 32 {
-            return Err(AppError::Other("ShellExecuteW が失敗しました".to_string()));
-        }
+        shell_execute_w(Some("open"), &url)?;
     }
     #[cfg(not(windows))]
     {
+        let _ = url;
         return Err(AppError::Other("open_url は Windows 専用です".to_string()));
     }
     Ok(())
@@ -290,8 +327,8 @@ pub async fn submit_crash_reports(
 /// 現在のログ出力ディレクトリを Windows Explorer で開く。
 ///
 /// `logging::log_dir()` が返すパス (= `%LOCALAPPDATA%\EasyCursorSwap\logs\`) を
-/// ShellExecuteW で Explorer に渡す。`open_url` と異なり verb を NULL にすると
-/// 「ディレクトリの既定動作 = Explorer で開く」となる (Win32 仕様)。
+/// [`shell_execute_w`] で Explorer に渡す。`open_url` と異なり verb を NULL に
+/// すると「ディレクトリの既定動作 = Explorer で開く」となる (Win32 仕様)。
 ///
 /// ログ出力が一度も走っていない起動直後でもボタンを押して開けるよう、
 /// 存在しない場合は `create_dir_all` で先に作る。
@@ -305,30 +342,11 @@ pub fn open_log_folder() -> Result<(), AppError> {
     }
     #[cfg(windows)]
     {
-        use windows::core::{HSTRING, PCWSTR};
-        use windows::Win32::UI::Shell::ShellExecuteW;
-        use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
-
-        let path_h = HSTRING::from(dir.as_os_str());
-        let result = unsafe {
-            ShellExecuteW(
-                None,
-                PCWSTR::null(),
-                PCWSTR(path_h.as_ptr()),
-                PCWSTR::null(),
-                PCWSTR::null(),
-                SW_SHOWNORMAL,
-            )
-        };
-        // ShellExecuteW は HINSTANCE を返す; ポインタ値が 32 より大きければ成功
-        if (result.0 as usize) <= 32 {
-            return Err(AppError::Other(
-                "ShellExecuteW (ログフォルダ) が失敗しました".to_string(),
-            ));
-        }
+        shell_execute_w(None, &dir.to_string_lossy())?;
     }
     #[cfg(not(windows))]
     {
+        let _ = dir;
         return Err(AppError::Other(
             "open_log_folder は Windows 専用です".to_string(),
         ));
