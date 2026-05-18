@@ -33,10 +33,10 @@
     "measured_counts": {
       "rust_modules_in_lib_rs": 22,
       "tauri_ipc_commands": 52,
-      "composables": 33,
+      "composables": 34,
       "pages_vue": 4,
       "pages_ts_helpers": 2,
-      "components_total": 50,
+      "components_total": 56,
       "ci_workflows": 3
     },
     "doc_drift_warnings": [
@@ -471,6 +471,7 @@
       { "file": "app/composables/useThemeCardState.ts", "name": "useThemeCardState", "role": "ThemeCard / ThemeRow の 5 ブロック並行重複 (preview fetch / kind 判定 / displayDate / 詳細遷移 / お気に入り) を共通化 (audit B9-DUP-001)。" },
       { "file": "app/composables/useExternalUrl.ts", "name": "useExternalUrl", "role": "open_url IPC + window.open フォールバックの 1 行 API。6 callsite で重複していた try/catch を集約。", "ipc_calls": ["open_url"] },
       { "file": "app/composables/useTagChipInput.ts", "name": "useTagChipInput", "role": "Tag chip 入力 UI (Enter/カンマで chip 化 + Backspace 削除 + 上限 / 重複ガード)。SubmitThemeDialog の Auto/Manual タブで共有 (audit D29 部分)。" },
+      { "file": "app/composables/useCreatorMetaState.ts", "name": "useCreatorMetaState", "role": "Creator メタデータ入力欄 (name / nameEn / author / version / description / shadowEnabled) の 6 ref と reset() を集約。resetCreator() の一行リセットを支える (audit C20-SIZE-001 部分)。" },
       { "file": "app/composables/useUpdater.ts", "name": "useUpdater", "role": "check / downloadAndInstall / relaunch。", "ipc_calls": ["check_update_is_major_jump"] },
       { "file": "app/composables/useUpdaterBootstrap.ts", "name": "useUpdaterBootstrap", "role": "起動時 1 回だけ auto_update + 24h クールダウンで check し、ヒット時に Toast 通知。", "ipc_calls": [] },
       { "file": "app/composables/useNotify.ts", "name": "useNotify", "role": "Toast 通知 (permission をキャッシュ)。" },
@@ -489,18 +490,18 @@
       },
       "library": {
         "dir": "app/components/library/",
-        "count": 12,
-        "files": ["ThemeCard.vue", "ThemeRow.vue", "ThemeDetailModal.vue", "ThemeDetailDrawer.vue", "ApplyModal.vue", "ImportConflictDialog.vue", "ThemePickerModal.vue", "CursorMatrix.vue", "LibraryToolbar.vue", "LibraryFilterBar.vue", "LibraryEmptyState.vue", "LibraryDropOverlay.vue"]
+        "count": 15,
+        "files": ["ThemeCard.vue", "ThemeRow.vue", "ThemeDetailModal.vue", "ThemeDetailDrawer.vue", "ThemeDetailDrawerHero.vue", "ThemeDetailDrawerStrip.vue", "ThemeDetailDrawerFooter.vue", "ApplyModal.vue", "ImportConflictDialog.vue", "ThemePickerModal.vue", "CursorMatrix.vue", "LibraryToolbar.vue", "LibraryFilterBar.vue", "LibraryEmptyState.vue", "LibraryDropOverlay.vue"]
       },
       "creator": {
         "dir": "app/components/creator/",
-        "count": 12,
-        "files": ["CreatorStartScreen.vue", "CreatorToolbar.vue", "CreatorRoleList.vue", "CreatorMetadataPane.vue", "NewThemeStartModal.vue", "SaveDestinationModal.vue", "BulkImportButton.vue", "BulkImportPreviewModal.vue", "BulkImportRoleRow.vue", "RoleListItem.vue", "SizeStrip.vue", "AniThumb.vue"]
+        "count": 13,
+        "files": ["CreatorStartScreen.vue", "CreatorToolbar.vue", "CreatorRoleList.vue", "CreatorMetadataPane.vue", "CreatorEditorCanvas.vue", "NewThemeStartModal.vue", "SaveDestinationModal.vue", "BulkImportButton.vue", "BulkImportPreviewModal.vue", "BulkImportRoleRow.vue", "RoleListItem.vue", "SizeStrip.vue", "AniThumb.vue"]
       },
       "marketplace": {
         "dir": "app/components/marketplace/",
-        "count": 4,
-        "files": ["FeaturedCard.vue", "SubmitThemeDialog.vue", "MarketplaceDetailModal.vue", "SubmitDeviceFlowModal.vue"]
+        "count": 6,
+        "files": ["FeaturedCard.vue", "SubmitThemeDialog.vue", "SubmitThemeAutoForm.vue", "SubmitThemeManualForm.vue", "MarketplaceDetailModal.vue", "SubmitDeviceFlowModal.vue"]
       },
       "settings": {
         "dir": "app/components/settings/",
