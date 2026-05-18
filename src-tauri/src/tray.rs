@@ -129,15 +129,18 @@ pub fn show_or_recreate_main_window(app: &AppHandle) {
         return;
     }
 
-    // 破棄済み → tauri.conf.json の "main" 定義から再生成
+    // 破棄済み → tauri.conf.json の "main" 定義から再生成。
+    // 値は tauri.conf.json の app.windows[0] と一致させること。
+    // decorations は false (= フレームレス) が必須: AppTitlebar.vue が独自タイトルバーを
+    // 描画しているため、true にすると Windows ネイティブのタイトルバーが上に重なる。
     use tauri::{WebviewUrl, WebviewWindowBuilder};
     match WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
         .title("EasyCursorSwap")
-        .inner_size(1100.0, 750.0)
-        .min_inner_size(900.0, 600.0)
+        .inner_size(1280.0, 820.0)
+        .min_inner_size(1100.0, 760.0)
         .resizable(true)
         .center()
-        .decorations(true)
+        .decorations(false)
         .build()
     {
         Ok(w) => {
