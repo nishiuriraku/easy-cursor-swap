@@ -146,9 +146,7 @@ export function useThemePreviews() {
    * ホットスポット情報込みのプレビュー詳細を返す。
    * テーマ詳細ドロワーで `<img>` の上に hot ドットを正しい位置に置くために使う。
    */
-  async function getDetails(
-    themeId: string,
-  ): Promise<Record<string, RolePreviewDetail> | null> {
+  async function getDetails(themeId: string): Promise<Record<string, RolePreviewDetail> | null> {
     const entry = await previewCache.get(themeId)
     return entry?.details ?? null
   }

@@ -24,8 +24,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Internal
 
-- マーケットプレースのフィルタチップ (`All` / `Pixel` / `Minimal` / `Animated` / `Dark`) とレイアウトのスキップナビゲーション (「メインコンテンツへスキップ」) を i18n 化。
+- マーケットプレースのフィルタチップ (`All` / `Pixel` / `Minimal` / `Animated` / `Dark`) とレイアウトのスキップナビゲーション (「メインコンテンツへスキップ」) を i18n 化。Creator のデフォルトテーマ名 `'Untitled Theme'` も `creator.untitledThemeName` 経由に。
 - `docs/architecture.json` の `useUiTheme` 役割記述、および `docs/ui_map.json` の `titlebar-theme-cycle` インタラクションが「`update_config` IPC を呼ぶ / config に永続化する」と宣言していたが、実際には localStorage のみ操作する設計であるため記述を修正。生成済み HTML (`docs/architecture.html` / `docs/ui_map.html`) も再埋め込み。
+- 構造的負債リファクタ (UI 軸監査 Phase 2 + 3 由来) — 6 つの新規 composable に共通パターンを集約:
+  - `usePngBlobCache<K, V>` — Map + in-flight Promise + dispose の汎用パターン。`useThemePreviews` / `useMarketplacePreviews` の重複機構を統合 (C20-DUP-001)。
+  - `useModalLifecycle` — Teleport modal の body scroll lock (重ね合わせ対応 counter 方式) + Esc 購読 + cleanup を統合。`ThemeDetailModal` / `MarketplaceDetailModal` / `OssLicenseModal` で重複していた ~30 行を解消 (D28-DUP-001)。
+  - `useListbox<V>` — `UiSelect.vue` の listbox 状態機械 + キーボードナビ + Teleport 位置計算を分離 (F43-SIZE-001: 528 → 263 行)。
+  - `useThemeCardState` — `ThemeCard.vue` / `ThemeRow.vue` の 5 ブロック並行重複を解消 (B9-DUP-001)。
+  - `useExternalUrl` (`openExternalUrl`) — `open_url` IPC + `window.open` フォールバックの 6 callsite 重複を 1 行 await に圧縮 (AboutSection / OssLicenseModal / SubmitDeviceFlowModal / marketplace.vue / SubmitThemeDialog ×2 / ThemeDetailDrawer)。
+  - `useTagChipInput` — `SubmitThemeDialog` Auto/Manual タブ間の tag chip 入力ロジック重複を解消 (D29 部分)。
+- `useThemes` に theme mutation IPC 7 件 (`apply_theme` / `delete_theme` / `duplicate_theme` / `repackage_theme` / `set_theme_favorite` / `inspect_cursorpack` / `import_cursorpack`) のラッパーメソッドを追加。`pages/index.vue` から直接 `invokeTauri` していた経路を composable 経由に集約し、`docs/architecture.json` の `useThemes.ipc_calls` 宣言と実態を一致させた (B8-SIZE-001)。
+- composable 総数: 27 → 33 (新規 6 件)。`docs/architecture.json` の `meta.measured_counts.composables` と composable リストを再測定。
+- 監査 🔴 のうち `B10-SIZE-001` (ThemeDetailDrawer 649 行 → 4 file split) / `D29-SIZE-001` (SubmitThemeDialog 3 component split) / `C20-SIZE-001` (creator.vue 1269 行) の **構造的 file split そのものは deferred**。代わりに、それぞれから cross-cutting な composable (`useExternalUrl` / `useTagChipInput` / i18n untitledThemeName) を取り出すアプローチで対応した。残る純粋な template 肥大は cross-cutting でないため、引き続き個別 PR で対処予定。
 
 ## [0.1.0] - 2026-05-16
 
