@@ -1,15 +1,19 @@
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted } from 'vue'
-import {
-  CURSOR_ROLE_IDS,
-  matchAssetWithContext,
-  resolveCollisions,
-  type MatchCandidate,
-} from '~/composables/useRoleMatcher'
+/**
+ * バルクインポート / .cursorpack 取り込みのプレビュー & ロール割当モーダル。
+ *
+ * 割当ライフサイクル (matches / unmatched の三方移動, watch による初期化, apply payload
+ * 組立) は `useBulkImportPreviewState` composable に分離済み。本 SFC は presentation
+ * (テンプレート + 派生 computed + apply emit) に専念する。
+ */
+import { computed } from 'vue'
+import { CURSOR_ROLE_IDS } from '~/composables/useRoleMatcher'
 import { CURSOR_ROLES } from '~/components/icons/CursorIcons'
+import {
+  useBulkImportPreviewState,
+  type ApplyPayload,
+} from '~/composables/useBulkImportPreviewState'
 import type { ResolvedAsset, ParsedCursorpack } from '~/composables/useBulkImport'
-import type { RoleAsset } from '~/composables/useCreatorAssets'
-import { initialHotspotFor } from '~/composables/useHotspotDefaults'
 import { useI18n } from '~/composables/useI18n'
 import BulkImportRoleRow from './BulkImportRoleRow.vue'
 import AniThumb from './AniThumb.vue'
@@ -32,220 +36,20 @@ const emit = defineEmits<{
   (e: 'cancel'): void
 }>()
 
-export interface ApplyPayload {
-  /** 確定したロール → アセット。useCreatorAssets.setAsset() で書き込む。 */
-  roleAssets: Array<{ roleId: string; asset: RoleAsset }>
-  metadataChoice: 'keep' | 'overwrite' | 'name-only'
-  metadata: ParsedCursorpack['metadata'] | null
-}
-
-/**
- * 1 ロールに割当て済みのアセット。
- *
- * 確信度パーセントと採用/スキップトグルは廃止。`matches` に入っているもの = apply 対象。
- * 「適用したくない」場合は ✕ ボタンで未マッチプールへ戻すと、apply 時に無視される。
- */
-interface PendingMatch {
-  role: string
-  asset: ResolvedAsset
-  conflict: 'none' | 'overwrite-existing' | 'collision-with-other-pending'
-  previewUrl: string
-  /**
-   * `.ani` 用の Uint8Array 化済みフレーム列。Vue 3 のテンプレートは Uint8Array を
-   * グローバル名として認識しないため、`new Uint8Array(...)` をテンプレート式で書くと
-   * 「Property "Uint8Array" was accessed during render but is not defined on instance」
-   * の warn を出す。スクリプト側で 1 度だけ変換しておいて子コンポーネントへ渡す。
-   */
-  aniFramesU8: readonly Uint8Array[] | null
-}
-
-/**
- * まだロールに割当てられていないファイル (未マッチプール)。
- *
- * ドロップダウンでロール選択された瞬間に `matches` へ移動する eager モデルなので、
- * 「選択された未マッチ」という中間状態は持たない。誤マッチで未マッチに戻された
- * ファイルも同じ構造で再利用する。
- */
-interface UnmatchedFile {
-  asset: ResolvedAsset
-  previewUrl: string
-  aniFramesU8: readonly Uint8Array[] | null
-}
-
-function toAniFramesU8(asset: ResolvedAsset): readonly Uint8Array[] | null {
-  return asset.ani ? asset.ani.framePngs.map((b) => new Uint8Array(b)) : null
-}
-
-const matches = ref<PendingMatch[]>([])
-const unmatched = ref<UnmatchedFile[]>([])
-const metadataChoice = ref<'keep' | 'overwrite' | 'name-only'>('overwrite')
-
-const previewUrls: string[] = []
-
-function makePreview(asset: ResolvedAsset): string {
-  if (asset.kind === 'svg' && asset.svgText) {
-    const url = URL.createObjectURL(new Blob([asset.svgText], { type: 'image/svg+xml' }))
-    previewUrls.push(url)
-    return url
-  }
-  const url = URL.createObjectURL(new Blob([new Uint8Array(asset.pngBytes)], { type: 'image/png' }))
-  previewUrls.push(url)
-  return url
-}
-
-function resetState() {
-  for (const u of previewUrls) URL.revokeObjectURL(u)
-  previewUrls.length = 0
-  matches.value = []
-  unmatched.value = []
-}
-
-watch(
-  () => props.open,
-  (open) => {
-    if (!open) {
-      resetState()
-      return
-    }
-    resetState()
-
-    if (props.cursorpack) {
-      // .cursorpack 経路: ロール ID は既に確定済み。全ロールを matches に詰める。
-      for (const [role, parsed] of Object.entries(props.cursorpack.roles)) {
-        const isAni = parsed.ani !== null
-        const fakeAsset: ResolvedAsset = {
-          sourceFile: isAni ? `${role}.ani` : `${role}.cur`,
-          // `.ani` の場合は展開先絶対パスを sourcePath に入れる
-          // (export 時に Rust が rewrite_ani_with_hotspot のソースとして使う)
-          sourcePath: parsed.aniSourcePath ?? '',
-          kind: isAni ? 'ani' : 'cur',
-          pngBytes: parsed.pngBytes,
-          width: parsed.width,
-          height: parsed.height,
-          hotspot: parsed.hotspot,
-          svgText: null,
-          availableSizes: isAni ? [parsed.width] : Object.keys(parsed.sizedPngBytes).map(Number),
-          ani: parsed.ani,
-        }
-        const conflict = props.existingRoles.has(role) ? 'overwrite-existing' : 'none'
-        matches.value.push({
-          role,
-          asset: fakeAsset,
-          conflict,
-          previewUrl: makePreview(fakeAsset),
-          aniFramesU8: toAniFramesU8(fakeAsset),
-        })
-      }
-      return
-    }
-
-    // 通常経路: ファイル名 + フォルダ名のファジーマッチ → 衝突解決 → 既存衝突判定。
-    // sourcePath を渡すことで `arrow/64.png` `通常/256.png` のように
-    // フォルダー名にロール名が含まれるケースもマッチさせる。
-    const candidates: Array<MatchCandidate & { asset: ResolvedAsset }> = []
-    for (const a of props.resolved ?? []) {
-      const m = matchAssetWithContext(a.sourceFile, a.sourcePath)
-      if (m) {
-        candidates.push({ sourceFile: a.sourceFile, nativeSize: a.width, match: m, asset: a })
-      } else {
-        unmatched.value.push({
-          asset: a,
-          previewUrl: makePreview(a),
-          aniFramesU8: toAniFramesU8(a),
-        })
-      }
-    }
-    const { winners, demoted } = resolveCollisions(candidates)
-    for (const c of demoted as Array<(typeof candidates)[0]>) {
-      unmatched.value.push({
-        asset: c.asset,
-        previewUrl: makePreview(c.asset),
-        aniFramesU8: toAniFramesU8(c.asset),
-      })
-    }
-    for (const w of winners as Array<(typeof candidates)[0]>) {
-      const conflict = props.existingRoles.has(w.match.role) ? 'overwrite-existing' : 'none'
-      matches.value.push({
-        role: w.match.role,
-        asset: w.asset,
-        conflict,
-        previewUrl: makePreview(w.asset),
-        aniFramesU8: toAniFramesU8(w.asset),
-      })
-    }
-  },
-  { immediate: true },
-)
-
-/**
- * 割当解除: matches から該当ロールのファイルを未マッチプールへ戻す。
- *
- * ファジーマッチが誤った場合や、ユーザーが別ロールに付け直したい場合に呼ばれる。
- * previewUrl / aniFramesU8 はそのまま再利用する (revoke しない)。
- */
-function unassignRole(roleId: string): void {
-  const idx = matches.value.findIndex((m) => m.role === roleId)
-  if (idx < 0) return
-  const m = matches.value[idx]!
-  matches.value.splice(idx, 1)
-  unmatched.value.push({
-    asset: m.asset,
-    previewUrl: m.previewUrl,
-    aniFramesU8: m.aniFramesU8,
-  })
-}
-
-/**
- * 未マッチプールからロールへ割当: 既存の割当があれば未マッチプールへ追い出してから入替。
- *
- * UiSelect の v-model 変更ハンドラから呼ぶ。これにより未マッチドロップダウンで
- * 「すでに別ファイルが入っているロール」を選ぶと、その既存ファイルが未マッチに
- * 戻って入替わる (誤マッチの修正がワンアクションで完了する)。
- */
-function pickRoleFromUnmatched(item: UnmatchedFile, roleId: string): void {
-  const itemIdx = unmatched.value.indexOf(item)
-  if (itemIdx < 0) return
-
-  // 既存割当があれば先に未マッチへ戻す (順序: 自分を抜く → 既存を戻す → 新規割当)
-  unmatched.value.splice(itemIdx, 1)
-  const existingIdx = matches.value.findIndex((m) => m.role === roleId)
-  if (existingIdx >= 0) {
-    const existing = matches.value[existingIdx]!
-    matches.value.splice(existingIdx, 1)
-    unmatched.value.push({
-      asset: existing.asset,
-      previewUrl: existing.previewUrl,
-      aniFramesU8: existing.aniFramesU8,
-    })
-  }
-
-  const conflict = props.existingRoles.has(roleId) ? 'overwrite-existing' : 'none'
-  matches.value.push({
-    role: roleId,
-    asset: item.asset,
-    conflict,
-    previewUrl: item.previewUrl,
-    aniFramesU8: item.aniFramesU8,
-  })
-}
-
-/**
- * 全解除: 現在割当済の全ファイルを未マッチプールへ戻す。
- *
- * 「ファジーマッチの結果をまるごとリセットして最初から手動で割り直したい」用途。
- * `.cursorpack` 経路 (全ロールが自動で matches に埋まる) でも、ユーザーが
- * 1 つずつロールを選び直す体験へ切り替えるためのエスケープハッチ。
- */
-function unassignAll(): void {
-  for (const m of matches.value) {
-    unmatched.value.push({
-      asset: m.asset,
-      previewUrl: m.previewUrl,
-      aniFramesU8: m.aniFramesU8,
-    })
-  }
-  matches.value = []
-}
+const {
+  matches,
+  unmatched,
+  metadataChoice,
+  unassignRole,
+  pickRoleFromUnmatched,
+  unassignAll,
+  buildApplyPayload,
+} = useBulkImportPreviewState({
+  open: () => props.open,
+  resolved: () => props.resolved,
+  cursorpack: () => props.cursorpack,
+  existingRoles: () => props.existingRoles,
+})
 
 const summaryLine = computed(() => {
   const auto = matches.value.length
@@ -300,95 +104,9 @@ const unmatchedRoleOptions = computed(() => {
   return [placeholder, ...empty, ...taken]
 })
 
-function toRoleAsset(
-  roleId: string,
-  asset: ResolvedAsset,
-  source: RoleAsset['source'],
-  isNewRole: boolean,
-): RoleAsset {
-  // 「元ファイルに hotspot 情報がない」を kind で判定する。
-  // PNG / SVG は仕様上 hotspot を持たない (Rust 側 bulk_resolve は (0,0) を返す)。
-  // CUR / ICO は header に hotspot があるが、未指定の場合 (0,0) で来る — そのときも
-  // 中央既定が望ましい。`(4, 4)` で判定すると Rust の sentinel (= 0) と噛み合わず
-  // 中央化が一切発火しないバグになる。
-  // .ani は自前の埋め込みホットスポットを使う (中央既定を適用しない)。
-  const isAni = asset.kind === 'ani' && asset.ani !== null
-  const noEmbeddedHotspot =
-    asset.kind === 'png' || asset.kind === 'svg' || (asset.hotspot.x === 0 && asset.hotspot.y === 0)
-  const finalHotspot =
-    isNewRole && noEmbeddedHotspot && !isAni
-      ? initialHotspotFor(roleId, asset.width)
-      : asset.hotspot
-  const base: RoleAsset = {
-    primary: new Uint8Array(asset.pngBytes),
-    primarySize: asset.width,
-    hotspot: finalHotspot,
-    sized: undefined,
-    source,
-  }
-  if (isAni && asset.ani) {
-    base.aniSourcePath = asset.sourcePath
-    base.aniFrames = {
-      framePngs: asset.ani.framePngs.map((b) => new Uint8Array(b)),
-      sequence: asset.ani.sequence,
-      perStepDurationsMs: asset.ani.perStepDurationsMs,
-    }
-  }
-  return base
-}
-
 function apply() {
-  const roleAssets: Array<{ roleId: string; asset: RoleAsset }> = []
-
-  if (props.cursorpack) {
-    for (const m of matches.value) {
-      const parsed = props.cursorpack.roles[m.role]
-      if (!parsed) continue
-      // SizedAsset 形式で構築 (per-size hotspot は cursorpack 内では未サポートなので undefined)
-      const sized = new Map<number, import('~/composables/useCreatorAssets').SizedAsset>()
-      for (const [k, v] of Object.entries(parsed.sizedPngBytes)) {
-        sized.set(Number(k), { png: new Uint8Array(v) })
-      }
-      const asset: RoleAsset = {
-        primary: new Uint8Array(parsed.pngBytes),
-        primarySize: parsed.width,
-        hotspot: parsed.hotspot,
-        sized: sized.size > 0 ? sized : undefined,
-        source: 'cursorpack',
-      }
-      // `.ani` ロールはアニメーション情報を保持して export 時に動的カーソルとして再構築する
-      if (parsed.ani && parsed.aniSourcePath) {
-        asset.aniSourcePath = parsed.aniSourcePath
-        asset.aniFrames = {
-          framePngs: parsed.ani.framePngs.map((b) => new Uint8Array(b)),
-          sequence: parsed.ani.sequence,
-          perStepDurationsMs: parsed.ani.perStepDurationsMs,
-        }
-      }
-      roleAssets.push({ roleId: m.role, asset })
-    }
-  } else {
-    // unmatched は eager に matches へ移動するモデルなので、apply 時点では
-    // ロール確定済みの matches だけを走査すればよい。未マッチに残ったまま
-    // apply された場合はそのファイルは破棄される (UI 側でも未マッチ件数として可視化)。
-    const sourceTag: RoleAsset['source'] =
-      (props.resolved?.length ?? 0) > 1 ? 'bulk-folder' : 'bulk-file'
-    for (const m of matches.value) {
-      roleAssets.push({
-        roleId: m.role,
-        asset: toRoleAsset(m.role, m.asset, sourceTag, !props.existingRoles.has(m.role)),
-      })
-    }
-  }
-
-  emit('apply', {
-    roleAssets,
-    metadataChoice: metadataChoice.value,
-    metadata: props.cursorpack?.metadata ?? null,
-  })
+  emit('apply', buildApplyPayload())
 }
-
-onUnmounted(resetState)
 
 /**
  * テスト用に内部状態と操作を露出する。本番 UI は emit / v-model 経由でしか触らないので
