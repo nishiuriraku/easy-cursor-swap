@@ -448,7 +448,7 @@
     ],
     "composables": [
       { "file": "app/composables/useTauri.ts", "name": "useTauri", "role": "invokeTauri<T>(name, args) の IPC ラッパー。ブラウザ専用フォールバックモック付き。" },
-      { "file": "app/composables/useThemes.ts", "name": "useThemes", "role": "テーマ一覧の共有リアクティブ singleton。", "ipc_calls": ["get_themes", "apply_theme", "delete_theme", "duplicate_theme", "repackage_theme", "set_theme_favorite", "import_cursorpack", "inspect_cursorpack"] },
+      { "file": "app/composables/useThemes.ts", "name": "useThemes", "role": "テーマ一覧の共有リアクティブ singleton + 操作系 IPC (apply/delete/duplicate/repackage/set_theme_favorite/inspect/import) の集約ラッパー。pages/index.vue がもともと直接 invokeTauri していた 7 IPC を本 composable に移譲して page を slim 化 (audit B8-SIZE-001)。", "ipc_calls": ["get_themes", "apply_theme", "delete_theme", "duplicate_theme", "repackage_theme", "set_theme_favorite", "import_cursorpack", "inspect_cursorpack"] },
       { "file": "app/composables/useAppSettings.ts", "name": "useAppSettings", "role": "get_config / update_config ラッパー + dirty フラグ。", "ipc_calls": ["get_config", "update_config", "export_profile", "import_profile"] },
       { "file": "app/composables/useI18n.ts", "name": "useI18n", "role": "t(key, params) + フォールバック + OS ロケール検出。app/locales/{ja,en}.ts をバックエンドとする。" },
       { "file": "app/composables/useKeystore.ts", "name": "useKeystore", "role": "鍵生成 / 削除 / エクスポート / インポート + key_id 表示。", "ipc_calls": ["keystore_info", "keystore_generate", "keystore_delete", "keystore_export", "keystore_import"] },
