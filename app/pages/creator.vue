@@ -120,7 +120,7 @@ const creatorAssets = useCreatorAssets()
 const { assigned, setAsset, assignedRoleCount, arrowAssigned, toExportPayload } = creatorAssets
 
 // メタデータタブの入力
-const metaName = ref<string>('Untitled Theme')
+const metaName = ref<string>(t('creator.untitledThemeName'))
 const metaNameEn = ref<string>('')
 const metaAuthor = ref<string>('')
 const metaVersion = ref<string>('1.0.0')
@@ -594,7 +594,7 @@ function resetCreator() {
   saveModalDefault.value = 'file'
   saveModalOpen.value = false
   activeSize.value = 64
-  metaName.value = 'Untitled Theme'
+  metaName.value = t('creator.untitledThemeName')
   metaNameEn.value = ''
   metaAuthor.value = ''
   metaVersion.value = '1.0.0'
