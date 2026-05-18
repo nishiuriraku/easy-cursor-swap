@@ -10,9 +10,10 @@
  * - スクロールロック (body に overflow: hidden を一時的に付与)
  * - Teleport で `<body>` 直下にレンダリングして z-index 戦争を回避
  */
-import { computed, onBeforeUnmount, watch } from 'vue'
+import { computed } from 'vue'
 import type { ThemeCardData } from '~/types/theme'
 import { useI18n } from '~/composables/useI18n'
+import { useModalLifecycle } from '~/composables/useModalLifecycle'
 import type { RolePreviewDetail } from '~/composables/useThemePreviews'
 
 const { t } = useI18n()
@@ -41,39 +42,9 @@ function close() {
   emit('close')
 }
 
-function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape') {
-    e.preventDefault()
-    close()
-  }
-}
-
-// モーダル開閉に追従して body スクロールをロック / 解除する。
-// `<Teleport>` 配下なので Vue の lifecycle と body の状態が乖離しないよう
-// watch で同期する。
-let prevOverflow: string | null = null
-watch(isOpen, (open) => {
-  if (typeof document === 'undefined') return
-  if (open) {
-    prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    document.addEventListener('keydown', onKeydown)
-  } else {
-    if (prevOverflow !== null) {
-      document.body.style.overflow = prevOverflow
-      prevOverflow = null
-    }
-    document.removeEventListener('keydown', onKeydown)
-  }
-})
-
-onBeforeUnmount(() => {
-  if (typeof document === 'undefined') return
-  if (prevOverflow !== null) {
-    document.body.style.overflow = prevOverflow
-  }
-  document.removeEventListener('keydown', onKeydown)
-})
+// Body scroll lock / Esc 購読 / cleanup は useModalLifecycle に委譲。
+// `<Teleport to="body">` 配下のレンダリング階層制御だけ template 側に残す。
+useModalLifecycle({ open: isOpen, onClose: close })
 </script>
 
 <template>
