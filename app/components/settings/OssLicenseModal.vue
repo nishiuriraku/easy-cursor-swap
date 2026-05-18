@@ -9,8 +9,8 @@
  */
 import { toRef } from 'vue'
 import { useI18n } from '~/composables/useI18n'
+import { openExternalUrl } from '~/composables/useExternalUrl'
 import { useModalLifecycle } from '~/composables/useModalLifecycle'
-import { invokeTauri } from '~/composables/useTauri'
 
 const { t } = useI18n()
 
@@ -100,15 +100,7 @@ const BACKEND_DEPS: OssEntry[] = [
   { name: 'thiserror', license: 'MIT / Apache-2.0', url: 'https://github.com/dtolnay/thiserror' },
 ]
 
-async function openExternal(url: string) {
-  try {
-    await invokeTauri<void>('open_url', { url })
-  } catch {
-    if (typeof window !== 'undefined') {
-      window.open(url, '_blank', 'noopener,noreferrer')
-    }
-  }
-}
+const openExternal = openExternalUrl
 
 function close() {
   emit('close')

@@ -19,7 +19,7 @@ import { computed, ref } from 'vue'
 import type { ThemeCardData } from '~/types/theme'
 import { CURSOR_ROLES } from '~/components/icons/CursorIcons'
 import { useI18n } from '~/composables/useI18n'
-import { invokeTauri } from '~/composables/useTauri'
+import { openExternalUrl } from '~/composables/useExternalUrl'
 import type { RolePreviewDetail } from '~/composables/useThemePreviews'
 import type { CursorPreviewAsset } from '~/components/preview/CursorPreview.vue'
 
@@ -151,11 +151,7 @@ const lastAppliedDate = computed<string | null>(() => {
 async function openHomepage() {
   const url = props.theme.homepage
   if (!url) return
-  try {
-    await invokeTauri<void>('open_url', { url })
-  } catch {
-    window.open(url, '_blank', 'noopener,noreferrer')
-  }
+  await openExternalUrl(url)
 }
 </script>
 

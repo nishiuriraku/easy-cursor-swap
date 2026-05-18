@@ -8,6 +8,7 @@
  */
 import { computed, onMounted, ref } from 'vue'
 import { invokeTauri } from '~/composables/useTauri'
+import { openExternalUrl } from '~/composables/useExternalUrl'
 import { useKeystore } from '~/composables/useKeystore'
 import { useI18n } from '~/composables/useI18n'
 import { useMarketplaceSubmit } from '~/composables/useMarketplaceSubmit'
@@ -139,9 +140,7 @@ async function onDeviceFlowReady() {
 
 function openPr() {
   if (!submitDone.value) return
-  void invokeTauri<void>('open_url', { url: submitDone.value.prUrl }).catch(() => {
-    window.open(submitDone.value!.prUrl, '_blank', 'noopener,noreferrer')
-  })
+  void openExternalUrl(submitDone.value.prUrl)
 }
 
 // ── 手動タブ ──────────────────────────────────────────
@@ -192,12 +191,7 @@ const canProceed = computed(
 async function openGitHub() {
   const url = githubNewFileUrl.value
   if (!url) return
-  try {
-    await invokeTauri<void>('open_url', { url })
-  } catch {
-    // Tauri コンテキスト外 (nuxt dev) のフォールバック
-    window.open(url, '_blank', 'noopener,noreferrer')
-  }
+  await openExternalUrl(url)
 }
 
 async function copyJson() {

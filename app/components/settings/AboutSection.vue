@@ -11,8 +11,8 @@
  */
 import { onMounted, ref } from 'vue'
 import { useI18n } from '~/composables/useI18n'
-import { invokeTauri } from '~/composables/useTauri'
 import { useAppInfo } from '~/composables/useAppInfo'
+import { openExternalUrl } from '~/composables/useExternalUrl'
 import OssLicenseModal from './OssLicenseModal.vue'
 
 const { t } = useI18n()
@@ -26,17 +26,8 @@ onMounted(() => {
   void loadAppInfo()
 })
 
-async function openExternal(url: string) {
-  try {
-    await invokeTauri<void>('open_url', { url })
-  } catch (e) {
-    // Tauri コンテキスト外 (nuxt dev) のフォールバック
-    if (typeof window !== 'undefined') {
-      window.open(url, '_blank', 'noopener,noreferrer')
-    }
-    console.error('openExternal failed:', e)
-  }
-}
+// 外部 URL は openExternalUrl が open_url IPC + window.open フォールバックを担う。
+const openExternal = openExternalUrl
 </script>
 
 <template>

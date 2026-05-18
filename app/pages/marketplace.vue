@@ -14,6 +14,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import type { MarketplaceEntry, MarketplaceTag } from '~/types/marketplace'
 import { computeFilteredGrid } from '~/pages/marketplace.helpers'
 import { invokeTauri } from '~/composables/useTauri'
+import { openExternalUrl } from '~/composables/useExternalUrl'
 import { useI18n } from '~/composables/useI18n'
 import { useThemes } from '~/composables/useThemes'
 
@@ -189,19 +190,7 @@ async function installEntry(id: string) {
 }
 
 async function openGithub() {
-  // Tauri 2 webview は window.open() を許さないので、Rust 側 `open_url` IPC を経由する
-  // (内部で Win32 ShellExecuteW を叩いてホスト OS のブラウザを起動)。
-  // SubmitThemeDialog と同じパターン。
-  const url = 'https://github.com/nishiuriraku/easy-cursor-swap-index'
-  try {
-    await invokeTauri<void>('open_url', { url })
-  } catch (e) {
-    // Tauri コンテキスト外 (nuxt dev) のフォールバック
-    if (typeof window !== 'undefined') {
-      window.open(url, '_blank', 'noopener,noreferrer')
-    }
-    console.error('openGithub failed:', e)
-  }
+  await openExternalUrl('https://github.com/nishiuriraku/easy-cursor-swap-index')
 }
 
 // computed にする理由: useI18n の t() は言語切替時に reactive 評価される。
