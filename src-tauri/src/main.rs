@@ -274,6 +274,8 @@ fn main() {
     // Tauri アプリケーションビルド
     // release ビルドでは debug_assertions ブロックが消えて再代入が無くなるため
     // `mut` が unused 扱いになる。条件付きで allow する。
+    // (MCP プラグインの crate は常にリンクされるが、release では init() を呼ばないので
+    // プラグインは起動せず、IPC コマンドも公開されない。)
     #[cfg_attr(not(debug_assertions), allow(unused_mut))]
     let mut builder = tauri::Builder::default();
     #[cfg(debug_assertions)]

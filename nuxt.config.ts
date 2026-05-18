@@ -12,7 +12,9 @@ export default defineNuxtConfig({
     '/**': { ssr: false },
   },
 
-  devtools: { enabled: true },
+  // production ビルドでは Nuxt DevTools の UI フックを完全に閉じる。
+  // 既定でも production には注入されないが、リリース漏れを防ぐため明示的に gate する。
+  devtools: { enabled: process.env.NODE_ENV !== 'production' },
 
   // ディレクトリ名のプレフィックスを付けず、`<UiIcon>` や `<ThemeCard>` のように
   // ファイル名そのままで参照できるようにする (デザイン仕様の命名規則と整合)

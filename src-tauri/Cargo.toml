@@ -28,6 +28,10 @@ dotenvy = "0.15"
 [dependencies]
 # --- Tauri コア ---
 tauri = { version = "2.11.0", features = ["tray-icon"] }
+# MCP テスト用プラグイン。crate は常にリンクされるが、main.rs で `cfg(debug_assertions)` で
+# 初期化を gate しているので release バイナリでは起動しない (capabilities の permission 解決
+# は build 時に行われるため、crate を optional 化すると default features ビルドで permission
+# 未解決エラーになる)。
 tauri-plugin-mcp-bridge = "0.11"
 tauri-plugin-log = "2"
 tauri-plugin-dialog = "2"
