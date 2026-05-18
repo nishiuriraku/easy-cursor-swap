@@ -25,7 +25,13 @@ export interface UpdateInfo {
  */
 export function classifyUpdaterError(err: unknown): { key: string; message: string } {
   const msg = err instanceof Error ? err.message : String(err)
-  if (/network|fetch|timeout|ENOTFOUND|ECONNREFUSED|aborted/i.test(msg)) {
+  // reqwest::Error は canonical に "error sending request for url (...)" を投げる
+  // ため "sending request" / "tcp connect" / "dns" を network カテゴリに含める
+  if (
+    /network|fetch|timeout|ENOTFOUND|ECONNREFUSED|aborted|sending request|tcp connect|dns/i.test(
+      msg,
+    )
+  ) {
     return { key: 'settings.updaterErrNetwork', message: msg }
   }
   if (/signature|verify|pubkey|untrusted|minisign/i.test(msg)) {
