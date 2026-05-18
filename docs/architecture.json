@@ -33,7 +33,7 @@
     "measured_counts": {
       "rust_modules_in_lib_rs": 22,
       "tauri_ipc_commands": 52,
-      "composables": 34,
+      "composables": 35,
       "pages_vue": 4,
       "pages_ts_helpers": 2,
       "components_total": 56,
@@ -472,6 +472,7 @@
       { "file": "app/composables/useExternalUrl.ts", "name": "useExternalUrl", "role": "open_url IPC + window.open フォールバックの 1 行 API。6 callsite で重複していた try/catch を集約。", "ipc_calls": ["open_url"] },
       { "file": "app/composables/useTagChipInput.ts", "name": "useTagChipInput", "role": "Tag chip 入力 UI (Enter/カンマで chip 化 + Backspace 削除 + 上限 / 重複ガード)。SubmitThemeDialog の Auto/Manual タブで共有 (audit D29 部分)。" },
       { "file": "app/composables/useCreatorMetaState.ts", "name": "useCreatorMetaState", "role": "Creator メタデータ入力欄 (name / nameEn / author / version / description / shadowEnabled) の 6 ref と reset() を集約。resetCreator() の一行リセットを支える (audit C20-SIZE-001 部分)。" },
+      { "file": "app/composables/useBulkImportPreviewState.ts", "name": "useBulkImportPreviewState", "role": "BulkImportPreviewModal の matches/unmatched 三方移動 state machine + props.open 連動の初期マッチ watch + Blob URL ライフサイクル + ApplyPayload 組立を集約。PendingMatch / UnmatchedFile / ApplyPayload 型もここで export (audit C21-SIZE 部分)。" },
       { "file": "app/composables/useUpdater.ts", "name": "useUpdater", "role": "check / downloadAndInstall / relaunch。", "ipc_calls": ["check_update_is_major_jump"] },
       { "file": "app/composables/useUpdaterBootstrap.ts", "name": "useUpdaterBootstrap", "role": "起動時 1 回だけ auto_update + 24h クールダウンで check し、ヒット時に Toast 通知。", "ipc_calls": [] },
       { "file": "app/composables/useNotify.ts", "name": "useNotify", "role": "Toast 通知 (permission をキャッシュ)。" },

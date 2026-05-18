@@ -12,7 +12,7 @@
 import { ref, type Ref } from 'vue'
 import type { useBulkImport, ResolvedAsset, ParsedCursorpack } from './useBulkImport'
 import type { useCreatorAssets } from './useCreatorAssets'
-import type { ApplyPayload } from '~/components/creator/BulkImportPreviewModal.vue'
+import type { ApplyPayload } from './useBulkImportPreviewState'
 
 export interface CreatorBulkImportFlowDeps {
   bulkImport: ReturnType<typeof useBulkImport>
