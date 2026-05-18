@@ -15,6 +15,7 @@ import { invokeTauri } from '~/composables/useTauri'
 import { notify } from '~/composables/useNotify'
 import { useI18n } from '~/composables/useI18n'
 import { useThemePreviews } from '~/composables/useThemePreviews'
+import { useThemes } from '~/composables/useThemes'
 import { useAppSettings } from '~/composables/useAppSettings'
 import { useCursorpackOpener } from '~/composables/useCursorpackOpener'
 import { mapLocalSummaryToCard, type IpcThemeSummary } from '~/pages/index.helpers'
@@ -54,6 +55,18 @@ const detailPreviewDetails = ref<Record<
   import('~/composables/useThemePreviews').RolePreviewDetail
 > | null>(null)
 const themePreviewCache = useThemePreviews()
+// Theme mutation IPC は useThemes に集約 (audit B8-SIZE-001)。
+// `themes` ref と `refresh` は本ページが自前管理する `loadThemes()` を使い続けるため、
+// メソッドだけ取り出す。
+const {
+  applyTheme: applyThemeIpc,
+  setFavorite: setFavoriteIpc,
+  repackageTheme: repackageThemeIpc,
+  duplicateTheme: duplicateThemeIpc,
+  deleteTheme: deleteThemeIpc,
+  inspectCursorpack: inspectCursorpackIpc,
+  importCursorpack: importCursorpackIpc,
+} = useThemes()
 
 // インポート衝突ダイアログ用
 interface ConflictPending {
@@ -150,7 +163,7 @@ async function confirmApply(id: string) {
     if (target?.kind === 'system') {
       await invokeTauri<void>('apply_windows_scheme', { name: target.name })
     } else {
-      await invokeTauri<void>('apply_theme', { themeId: id })
+      await applyThemeIpc(id)
     }
     // 成功 → アクティブフラグを更新
     themes.value.forEach((t) => (t.isActive = t.id === id))
@@ -183,10 +196,7 @@ async function toggleFavorite(id: string) {
   // 楽観的更新 (失敗時は Rust の戻り値で上書き)
   target.isFavorite = next
   try {
-    const updated = await invokeTauri<string[]>('set_theme_favorite', {
-      themeId: id,
-      isFavorite: next,
-    })
+    const updated = await setFavoriteIpc(id, next)
     if (updated) {
       const set = new Set(updated)
       themes.value.forEach((tt) => {
@@ -248,7 +258,7 @@ async function editInCreator(id: string) {
     const { tempDir, sep } = await import('@tauri-apps/api/path')
     const dir = await tempDir()
     const tempPath = `${dir}${sep()}_easycursorswap_edit_${Date.now()}.cursorpack`
-    await invokeTauri<number>('repackage_theme', { themeId: id, outputPath: tempPath })
+    await repackageThemeIpc(id, tempPath)
     closeDetails()
     // Creator ページに遷移し、ロード対象のパスをクエリで渡す。Creator 側で
     // `editThemePath` クエリを拾って parse_cursorpack_for_creator を呼ぶ。
@@ -263,7 +273,7 @@ async function editInCreator(id: string) {
 /** 詳細モーダルからの「複製」。`duplicate_theme` IPC で新 UUID を作りリロードする。 */
 async function duplicateTheme(id: string) {
   try {
-    await invokeTauri<string>('duplicate_theme', { themeId: id })
+    await duplicateThemeIpc(id)
     closeDetails()
     await loadThemes()
     void notify({
@@ -303,7 +313,7 @@ async function exportTheme(id: string) {
       )
       bytes = result?.size_bytes ?? null
     } else {
-      bytes = await invokeTauri<number>('repackage_theme', { themeId: id, outputPath })
+      bytes = await repackageThemeIpc(id, outputPath)
     }
     void notify({
       title: 'EasyCursorSwap',
@@ -335,7 +345,7 @@ async function deleteTheme(id: string) {
   const ok = window.confirm(t('library.confirmDeleteMsg', { name: target.name }))
   if (!ok) return
   try {
-    await invokeTauri<void>('delete_theme', { themeId: id })
+    await deleteThemeIpc(id)
     closeDetails()
     await loadThemes()
     void notify({
@@ -355,24 +365,10 @@ async function deleteTheme(id: string) {
 // onMounted で `onDragDropEvent` 購読 → unlisten をクリーンアップ用に保持。
 let unlistenDrop: (() => void) | null = null
 
-interface InspectionResult {
-  id: string
-  name: string
-  version: string
-  author: string | null
-  role_count: number
-  existing: {
-    name: string
-    version: string
-    author: string | null
-    role_count: number
-  } | null
-}
-
 async function importByPath(path: string) {
   try {
     // まず軽量検査して既存テーマと衝突するか確認
-    const inspection = await invokeTauri<InspectionResult>('inspect_cursorpack', { path })
+    const inspection = await inspectCursorpackIpc(path)
     if (inspection?.existing) {
       conflictDialog.value = {
         path,
@@ -401,7 +397,7 @@ async function importByPath(path: string) {
 }
 
 async function actuallyImport(path: string) {
-  const id = await invokeTauri<string>('import_cursorpack', { path })
+  const id = await importCursorpackIpc(path)
   if (id) {
     console.info('[Library] imported', id, 'from', path)
     await loadThemes()

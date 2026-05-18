@@ -9,7 +9,7 @@
 import { watch } from 'vue'
 import { useGithubAuth } from '~/composables/useGithubAuth'
 import { useI18n } from '~/composables/useI18n'
-import { invokeTauri } from '~/composables/useTauri'
+import { openExternalUrl } from '~/composables/useExternalUrl'
 import UiIcon from '~/components/icons/UiIcon.vue'
 
 const { t } = useI18n()
@@ -52,11 +52,7 @@ watch(status, (s) => {
 
 async function openGithub() {
   if (!verificationUri.value) return
-  try {
-    await invokeTauri<void>('open_url', { url: verificationUri.value })
-  } catch {
-    window.open(verificationUri.value, '_blank', 'noopener,noreferrer')
-  }
+  await openExternalUrl(verificationUri.value)
 }
 
 async function onCancel() {

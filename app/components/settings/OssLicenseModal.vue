@@ -7,9 +7,10 @@
  * すべて MIT / Apache-2.0 / BSD-3-Clause のいずれかなので個別ライセンス全文表示は省略し、
  * 各エントリの URL から確認できるようにする。
  */
-import { onBeforeUnmount, watch } from 'vue'
+import { toRef } from 'vue'
 import { useI18n } from '~/composables/useI18n'
-import { invokeTauri } from '~/composables/useTauri'
+import { openExternalUrl } from '~/composables/useExternalUrl'
+import { useModalLifecycle } from '~/composables/useModalLifecycle'
 
 const { t } = useI18n()
 
@@ -99,50 +100,14 @@ const BACKEND_DEPS: OssEntry[] = [
   { name: 'thiserror', license: 'MIT / Apache-2.0', url: 'https://github.com/dtolnay/thiserror' },
 ]
 
-async function openExternal(url: string) {
-  try {
-    await invokeTauri<void>('open_url', { url })
-  } catch {
-    if (typeof window !== 'undefined') {
-      window.open(url, '_blank', 'noopener,noreferrer')
-    }
-  }
-}
+const openExternal = openExternalUrl
 
 function close() {
   emit('close')
 }
 
-function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape') {
-    e.preventDefault()
-    close()
-  }
-}
-
-let prevOverflow: string | null = null
-watch(
-  () => props.open,
-  (open) => {
-    if (typeof document === 'undefined') return
-    if (open) {
-      prevOverflow = document.body.style.overflow
-      document.body.style.overflow = 'hidden'
-      document.addEventListener('keydown', onKeydown)
-    } else {
-      if (prevOverflow !== null) {
-        document.body.style.overflow = prevOverflow
-        prevOverflow = null
-      }
-      document.removeEventListener('keydown', onKeydown)
-    }
-  },
-)
-onBeforeUnmount(() => {
-  if (typeof document === 'undefined') return
-  if (prevOverflow !== null) document.body.style.overflow = prevOverflow
-  document.removeEventListener('keydown', onKeydown)
-})
+// Body scroll lock + Esc 購読 + cleanup は useModalLifecycle に委譲。
+useModalLifecycle({ open: toRef(props, 'open'), onClose: close })
 </script>
 
 <template>

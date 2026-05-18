@@ -199,6 +199,7 @@ export default {
     dropTitle: '画像 / .cursorpack をドロップ',
     dropSub: 'PNG / SVG / CUR / ICO / ANI / .cursorpack を受け付けます',
     recentRoleCount: '{count}/17 役割',
+    untitledThemeName: 'Untitled Theme',
   },
   panic: {
     title: 'リセットを実行',

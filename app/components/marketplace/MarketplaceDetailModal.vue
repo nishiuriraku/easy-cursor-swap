@@ -9,10 +9,11 @@
  *  - マウント時に useMarketplacePreviews で 6 ロール PNG を並列取得
  *  - フッター中央に「ライブラリに追加」プライマリボタン (インストール済みなら disabled)
  */
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { MarketplaceEntry } from '~/types/marketplace'
 import { useI18n } from '~/composables/useI18n'
 import { useMarketplacePreviews } from '~/composables/useMarketplacePreviews'
+import { useModalLifecycle } from '~/composables/useModalLifecycle'
 import { useThemes } from '~/composables/useThemes'
 
 const { t } = useI18n()
@@ -56,34 +57,8 @@ function close() {
   emit('close')
 }
 
-function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape') {
-    e.preventDefault()
-    close()
-  }
-}
-
-let prevOverflow: string | null = null
-watch(isOpen, (open) => {
-  if (typeof document === 'undefined') return
-  if (open) {
-    prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    document.addEventListener('keydown', onKeydown)
-  } else {
-    if (prevOverflow !== null) {
-      document.body.style.overflow = prevOverflow
-      prevOverflow = null
-    }
-    document.removeEventListener('keydown', onKeydown)
-  }
-})
-
-onBeforeUnmount(() => {
-  if (typeof document === 'undefined') return
-  if (prevOverflow !== null) document.body.style.overflow = prevOverflow
-  document.removeEventListener('keydown', onKeydown)
-})
+// Body scroll lock + Esc 購読 + cleanup は useModalLifecycle に委譲。
+useModalLifecycle({ open: isOpen, onClose: close })
 
 function onInstall() {
   if (!props.entry) return

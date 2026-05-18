@@ -200,6 +200,7 @@ export default {
     dropTitle: 'Drop images or .cursorpack',
     dropSub: 'PNG / SVG / CUR / ICO / ANI / .cursorpack are accepted',
     recentRoleCount: '{count}/17 roles',
+    untitledThemeName: 'Untitled Theme',
   },
   panic: {
     title: 'Run Reset',

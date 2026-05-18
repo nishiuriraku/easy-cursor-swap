@@ -1,13 +1,16 @@
 /**
  * テーマカード/ApplyModal で「実物の絵」を表示するためのプレビューキャッシュ。
  *
- * Rust の `get_theme_previews` IPC で取得した PNG バイト列を Blob URL に変換し、
+ * Rust の `get_theme_role_previews` IPC で取得した PNG バイト列を Blob URL に変換し、
  * テーマ ID 単位でキャッシュする。同じテーマに対する重複リクエストは in-flight Promise を共有する。
  *
  * Demo / Marketplace のリモートテーマには使用しない (UUID 形式の ID のみ対応)。
+ *
+ * Map + inflight + invalidate のコア機構は `usePngBlobCache` に統一済み。
  */
 import { ref } from 'vue'
 import { invokeTauri } from './useTauri'
+import { usePngBlobCache } from './usePngBlobCache'
 
 /**
  * 個別ロールのプレビュー詳細。
@@ -57,9 +60,6 @@ interface IpcRolePreview {
   frames?: IpcAniFrameData
 }
 
-const cache = new Map<string, PreviewCacheEntry>()
-const inflight = new Map<string, Promise<PreviewCacheEntry | null>>()
-
 /** UUID v4 風 (xxxxxxxx-xxxx-...) のテーマ ID か簡易判定。 */
 function looksLikeUuid(id: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
@@ -68,25 +68,48 @@ function looksLikeUuid(id: string): boolean {
 const WINDOWS_PREFIX = 'windows:'
 
 /**
- * 指定テーマの全ロール (または指定ロール) のプレビューを取得する。
- *
- * 結果は `cache` に保存され、`role → blob URL` のマップを返す。失敗時は null。
- *
- * - UUID 形式 → ローカルテーマ (`get_theme_previews`)
- * - `windows:<scheme name>` → Windows レジストリスキーム (`get_windows_scheme_previews`)
+ * IPC 結果 (role → IpcRolePreview の Record) をフロント表現
+ * (`urls` + `details`) に正規化する純粋関数。
  */
-async function fetchPreviews(themeId: string, roles?: string[]): Promise<PreviewCacheEntry | null> {
-  const isWindowsScheme = themeId.startsWith(WINDOWS_PREFIX)
-  if (!isWindowsScheme && !looksLikeUuid(themeId)) return null
-  // 全ロール取得済みならキャッシュをそのまま返す。部分リクエストはキャッシュに合流させる。
-  const existing = cache.get(themeId)
-  if (existing) return existing
+function normalize(result: Record<string, IpcRolePreview>): PreviewCacheEntry {
+  const urls: Record<string, string> = {}
+  const details: Record<string, RolePreviewDetail> = {}
+  for (const [role, info] of Object.entries(result)) {
+    const u8 = new Uint8Array(info.pngBytes)
+    const blob = new Blob([u8], { type: 'image/png' })
+    const url = URL.createObjectURL(blob)
+    urls[role] = url
+    const aniFrames = info.frames
+      ? {
+          framePngs: info.frames.framePngs.map((arr) => new Uint8Array(arr)),
+          sequence: info.frames.sequence,
+          durations: info.frames.perStepDurationsMs,
+          // ANI フレームの内在ピクセル幅。ライブラリのプレビューでは正方画像前提なので
+          // `width` のみ採用。
+          nativeSize: info.width,
+        }
+      : undefined
+    details[role] = {
+      url,
+      hotspot: info.hotspot,
+      width: info.width,
+      height: info.height,
+      ...(aniFrames ? { aniFrames } : {}),
+    }
+  }
+  return { urls, details }
+}
 
-  const key = themeId
-  const pending = inflight.get(key)
-  if (pending) return pending
-
-  const promise = (async () => {
+/**
+ * モジュールスコープの singleton キャッシュ。
+ *
+ * - UUID 形式 → ローカルテーマ (`get_theme_role_previews`)
+ * - `windows:<scheme name>` → Windows レジストリスキーム (`get_windows_scheme_role_previews`)
+ */
+const previewCache = usePngBlobCache<string, PreviewCacheEntry>({
+  async fetcher(themeId) {
+    const isWindowsScheme = themeId.startsWith(WINDOWS_PREFIX)
+    if (!isWindowsScheme && !looksLikeUuid(themeId)) return null
     try {
       // ホットスポット情報込みの新 IPC を優先利用。
       // 単一の往復で url + 寸法 + hotspot を確定させ、テーマ詳細ドロワーの
@@ -97,76 +120,25 @@ async function fetchPreviews(themeId: string, roles?: string[]): Promise<Preview
           })
         : await invokeTauri<Record<string, IpcRolePreview>>('get_theme_role_previews', {
             themeId,
-            roles: roles ?? [],
+            roles: [],
           })
       if (!result) return null
-      const urls: Record<string, string> = {}
-      const details: Record<string, RolePreviewDetail> = {}
-      for (const [role, info] of Object.entries(result)) {
-        const u8 = new Uint8Array(info.pngBytes)
-        const blob = new Blob([u8], { type: 'image/png' })
-        const url = URL.createObjectURL(blob)
-        urls[role] = url
-        // .ani ロールは Rust 側で全フレーム PNG を詰めて返してくる。
-        // 各 number[] を Uint8Array に正規化して useAniPlayer に渡せる形にしておく。
-        const aniFrames = info.frames
-          ? {
-              framePngs: info.frames.framePngs.map((arr) => new Uint8Array(arr)),
-              sequence: info.frames.sequence,
-              durations: info.frames.perStepDurationsMs,
-              // ANI フレームの内在ピクセル幅。`<CursorPreview asset.nativeSize>` 経由で
-              // `<AniThumb width/height>` の値に渡る。ライブラリのプレビューでは正方
-              // 画像前提なので `width` のみ採用。
-              nativeSize: info.width,
-            }
-          : undefined
-        details[role] = {
-          url,
-          hotspot: info.hotspot,
-          width: info.width,
-          height: info.height,
-          ...(aniFrames ? { aniFrames } : {}),
-        }
-      }
-      const entry: PreviewCacheEntry = { urls, details }
-      cache.set(themeId, entry)
-      return entry
+      return normalize(result)
     } catch (err) {
       console.warn('[useThemePreviews] preview fetch failed:', err)
       return null
-    } finally {
-      inflight.delete(key)
     }
-  })()
-  inflight.set(key, promise)
-  return promise
-}
-
-/** キャッシュを破棄して Blob URL を revoke する (テーマ削除/再インポート時に呼ぶ)。 */
-function invalidate(themeId: string) {
-  const entry = cache.get(themeId)
-  if (entry) {
+  },
+  dispose(entry) {
     for (const url of Object.values(entry.urls)) URL.revokeObjectURL(url)
-    cache.delete(themeId)
-  }
-  inflight.delete(themeId)
-}
-
-/** 全エントリを破棄する (アプリ終了/言語切替などで使用)。 */
-function invalidateAll() {
-  for (const entry of cache.values()) {
-    for (const url of Object.values(entry.urls)) URL.revokeObjectURL(url)
-  }
-  cache.clear()
-  inflight.clear()
-}
+  },
+})
 
 export function useThemePreviews() {
-  // 個別リアクティブな `previews` 参照が必要な利用側のために、ヘルパーも返す。
   const lastError = ref<string | null>(null)
 
-  async function getMap(themeId: string, roles?: string[]): Promise<Record<string, string> | null> {
-    const entry = await fetchPreviews(themeId, roles)
+  async function getMap(themeId: string): Promise<Record<string, string> | null> {
+    const entry = await previewCache.get(themeId)
     return entry?.urls ?? null
   }
 
@@ -174,19 +146,16 @@ export function useThemePreviews() {
    * ホットスポット情報込みのプレビュー詳細を返す。
    * テーマ詳細ドロワーで `<img>` の上に hot ドットを正しい位置に置くために使う。
    */
-  async function getDetails(
-    themeId: string,
-    roles?: string[],
-  ): Promise<Record<string, RolePreviewDetail> | null> {
-    const entry = await fetchPreviews(themeId, roles)
+  async function getDetails(themeId: string): Promise<Record<string, RolePreviewDetail> | null> {
+    const entry = await previewCache.get(themeId)
     return entry?.details ?? null
   }
 
   return {
     getMap,
     getDetails,
-    invalidate,
-    invalidateAll,
+    invalidate: (themeId: string) => previewCache.invalidate(themeId),
+    invalidateAll: () => previewCache.invalidateAll(),
     lastError,
   }
 }

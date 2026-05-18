@@ -3,17 +3,20 @@
  *
  * MarketplaceDetailModal で 6 ロール分の PNG (Arrow / Help / AppStarting / Wait / Crosshair / IBeam)
  * を `marketplace_fetch_preview` IPC 経由で並列取得し、Blob URL にして Map にキャッシュする。
- * 同一エントリへの再要求は同じ in-flight Promise を共有する (useThemePreviews と同じパターン)。
+ * 同一エントリへの再要求は同じ in-flight Promise を共有する。
+ *
+ * Map + inflight + invalidate のコア機構は `usePngBlobCache` に統一済み。本ファイルでは
+ * Marketplace 固有の fetcher (6 ロール並列取得 + Uint8Array 正規化) と dispose
+ * (Blob URL revoke) のみを定義する。
  */
 import { ref } from 'vue'
 import { invokeTauri } from './useTauri'
+import { usePngBlobCache } from './usePngBlobCache'
 
 /** 公式インデックスと約束された先頭 6 ロール (CURSOR_ROLES 正規順)。 */
 const PREVIEW_ROLES = ['Arrow', 'Help', 'AppStarting', 'Wait', 'Crosshair', 'IBeam'] as const
 
-const cache = new Map<string, Record<string, string>>()
-const inflight = new Map<string, Promise<Record<string, string>>>()
-
+/** マーケットプレース取得時の単一ロール raw bytes フェッチ。 */
 async function fetchOne(previewBaseUrl: string, role: string): Promise<Uint8Array | null> {
   try {
     const bytes = await invokeTauri<number[] | ArrayBuffer>('marketplace_fetch_preview', {
@@ -30,16 +33,17 @@ async function fetchOne(previewBaseUrl: string, role: string): Promise<Uint8Arra
   }
 }
 
-async function fetchPreviews(
-  entryId: string,
-  previewBaseUrl: string,
-): Promise<Record<string, string>> {
-  const cached = cache.get(entryId)
-  if (cached) return cached
-  const pending = inflight.get(entryId)
-  if (pending) return pending
-
-  const promise = (async () => {
+/**
+ * モジュールスコープの singleton キャッシュ。
+ * キーは `${entryId}::${previewBaseUrl}` の合成だが、entryId 1 つに対し base URL は 1 つなので
+ * 実質 entryId をキーにしている。
+ */
+const previewCache = usePngBlobCache<
+  { entryId: string; previewBaseUrl: string },
+  Record<string, string>
+>({
+  keyOf: (k) => k.entryId,
+  async fetcher({ previewBaseUrl }) {
     const settled = await Promise.all(PREVIEW_ROLES.map((r) => fetchOne(previewBaseUrl, r)))
     const urls: Record<string, string> = {}
     settled.forEach((bytes, i) => {
@@ -48,40 +52,25 @@ async function fetchPreviews(
         urls[PREVIEW_ROLES[i]] = URL.createObjectURL(blob)
       }
     })
-    cache.set(entryId, urls)
     return urls
-  })()
-  inflight.set(entryId, promise)
-  try {
-    return await promise
-  } finally {
-    inflight.delete(entryId)
-  }
-}
-
-function invalidate(entryId: string) {
-  const urls = cache.get(entryId)
-  if (urls) {
+  },
+  dispose(urls) {
     for (const u of Object.values(urls)) URL.revokeObjectURL(u)
-    cache.delete(entryId)
-  }
-  inflight.delete(entryId)
-}
-
-function invalidateAll() {
-  for (const urls of cache.values()) {
-    for (const u of Object.values(urls)) URL.revokeObjectURL(u)
-  }
-  cache.clear()
-  inflight.clear()
-}
+  },
+})
 
 export function useMarketplacePreviews() {
   const lastError = ref<string | null>(null)
   async function getMap(entryId: string, previewBaseUrl: string): Promise<Record<string, string>> {
     if (!previewBaseUrl) return {}
     lastError.value = null
-    return fetchPreviews(entryId, previewBaseUrl)
+    const urls = await previewCache.get({ entryId, previewBaseUrl })
+    return urls ?? {}
   }
-  return { getMap, invalidate, invalidateAll, lastError }
+  return {
+    getMap,
+    invalidate: (entryId: string) => previewCache.invalidate({ entryId, previewBaseUrl: '' }),
+    invalidateAll: () => previewCache.invalidateAll(),
+    lastError,
+  }
 }
