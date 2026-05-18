@@ -8,8 +8,6 @@
  * 起動時の自動アップデートチェック (`general.auto_update === true` の時) も
  * ここでキック。24h クールダウン + Toast 通知のみで実装は composable 側。
  */
-import { useUiTheme } from '~/composables/useUiTheme'
-import { bootstrapUpdaterCheck } from '~/composables/useUpdaterBootstrap'
 
 useUiTheme()
 bootstrapUpdaterCheck()

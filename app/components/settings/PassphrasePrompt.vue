@@ -6,8 +6,6 @@
  * - 8 文字以上の弱バリデーション
  * - エンターで確定
  */
-import { computed, ref, watch } from 'vue'
-import { useI18n } from '~/composables/useI18n'
 
 const { t } = useI18n()
 

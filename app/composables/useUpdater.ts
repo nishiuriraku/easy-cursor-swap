@@ -9,7 +9,6 @@
  * 本 composable は手動チェック / ダウンロード / インストールを担当。
  * `dialog: false` で標準ダイアログを抑制し、UI 側で進捗表示する。
  */
-import { ref } from 'vue'
 
 export interface UpdateInfo {
   version: string

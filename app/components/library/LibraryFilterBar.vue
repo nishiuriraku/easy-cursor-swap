@@ -8,7 +8,6 @@
  *
  * 2026-05-13: 非技術者向け簡略化のため "unsigned" チップを撤去。
  */
-import { useI18n } from '~/composables/useI18n'
 
 type FilterId = 'all' | 'favorites' | 'recent'
 

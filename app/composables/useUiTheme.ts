@@ -10,7 +10,6 @@
  *
  * 永続化は localStorage (UI 設定なので config.json に汚染しない)。
  */
-import { ref, watch, onMounted, onUnmounted } from 'vue'
 
 export type UiThemeMode = 'auto' | 'light' | 'dark'
 

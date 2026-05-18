@@ -13,7 +13,7 @@
  *  - composable のインスタンス化
  *  - listbox / item の template + style
  */
-import { computed, nextTick, onBeforeUnmount, ref, watch, type Ref } from 'vue'
+import type { Ref } from 'vue'
 
 export interface ListboxOption<V> {
   value: V

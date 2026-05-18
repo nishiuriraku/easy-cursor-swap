@@ -4,8 +4,6 @@
  * `submit_theme_auto` IPC を呼び、進捗イベント `submit:progress` を購読して
  * リアクティブな stage を提供する。終了時 (成功/失敗どちらも) にリスナーを解除する。
  */
-import { ref } from 'vue'
-import { invokeTauri, listenTauri } from '~/composables/useTauri'
 import type { SubmitResult, SubmitStage } from '~/types/githubAuth'
 
 export function useMarketplaceSubmit() {

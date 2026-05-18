@@ -9,10 +9,7 @@
  *
  * 依存: meta データ ref 群と `creatorAssets` の集計プロパティ、t()。
  */
-import { ref, watch, type Ref } from 'vue'
-import { invokeTauri } from './useTauri'
-import { useThemes } from './useThemes'
-import { useThemePreviews } from './useThemePreviews'
+import type { Ref } from 'vue'
 
 /** ストリームエクスポート時の進捗状態 */
 export interface BuildProgress {

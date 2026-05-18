@@ -9,7 +9,6 @@
  * ユーザー操作 (hotspot 更新 / サイズ選択 / 詳細トグル) は emit で受ける。
  * 編集ロジック (writeActiveHotspot, perSizeHotspot 切替, sizedOverride 等) は親に残す。
  */
-import { useI18n } from '~/composables/useI18n'
 import type { CursorRoleDef } from '~/components/icons/CursorIcons'
 import type { CursorPreviewAsset } from '~/components/preview/CursorPreview.vue'
 import type { Hotspot } from '~/composables/useCreatorAssets'

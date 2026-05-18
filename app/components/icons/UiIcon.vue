@@ -6,7 +6,6 @@
  * NOTE: v-html を避けるため innerHTML プロパティで SVG body を注入する。
  * 注入元は内部静的データ (UI_ICONS) のみで、ユーザー入力は含まない。
  */
-import { defineComponent, h } from 'vue'
 import { UI_ICONS } from './UiIcons'
 
 export default defineComponent({

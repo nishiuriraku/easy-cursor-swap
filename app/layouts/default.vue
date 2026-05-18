@@ -6,12 +6,6 @@
  *
  * グローバルパニックホットキー (Ctrl+Alt+Shift+R) もここで購読する。
  */
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useAppSettings } from '~/composables/useAppSettings'
-import { useI18n } from '~/composables/useI18n'
-import { useThemes } from '~/composables/useThemes'
-import { invokeTauri } from '~/composables/useTauri'
-// `useRoute` / `useRouter` / コンポーネント類は Nuxt の自動インポートで解決
 
 const { config: appConfig, load: loadAppConfig } = useAppSettings()
 const { t, syncFromConfig } = useI18n()

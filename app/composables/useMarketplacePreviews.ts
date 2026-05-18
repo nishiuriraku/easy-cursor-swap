@@ -9,9 +9,6 @@
  * Marketplace 固有の fetcher (6 ロール並列取得 + Uint8Array 正規化) と dispose
  * (Blob URL revoke) のみを定義する。
  */
-import { ref } from 'vue'
-import { invokeTauri } from './useTauri'
-import { usePngBlobCache } from './usePngBlobCache'
 
 /** 公式インデックスと約束された先頭 6 ロール (CURSOR_ROLES 正規順)。 */
 const PREVIEW_ROLES = ['Arrow', 'Help', 'AppStarting', 'Wait', 'Crosshair', 'IBeam'] as const

@@ -3,7 +3,6 @@
  * 設定 → 起動・常駐 セクション。
  * 自動起動 / 最小化起動の 2 つのトグルのみ。
  */
-import { useI18n } from '~/composables/useI18n'
 
 const { t } = useI18n()
 

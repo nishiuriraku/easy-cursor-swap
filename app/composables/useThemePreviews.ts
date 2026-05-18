@@ -8,9 +8,6 @@
  *
  * Map + inflight + invalidate のコア機構は `usePngBlobCache` に統一済み。
  */
-import { ref } from 'vue'
-import { invokeTauri } from './useTauri'
-import { usePngBlobCache } from './usePngBlobCache'
 
 /**
  * 個別ロールのプレビュー詳細。

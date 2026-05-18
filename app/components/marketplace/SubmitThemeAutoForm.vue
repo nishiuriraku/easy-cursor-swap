@@ -6,7 +6,6 @@
  * submitter (useMarketplaceSubmit) は親が保持し、reactive な値を props で受け取るだけにする
  * (useMarketplaceSubmit は singleton ではないため、子側で呼び直すと state が分裂する)。
  */
-import { useI18n } from '~/composables/useI18n'
 import type { GithubAccount } from '~/types/githubAuth'
 
 interface ThemeSummary {

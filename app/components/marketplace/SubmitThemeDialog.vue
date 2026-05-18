@@ -10,16 +10,6 @@
  * Auto/Manual タブの本文は子コンポーネント (SubmitThemeAutoForm / SubmitThemeManualForm) に委譲する。
  * フッターは step / submitDone の状態を見て切り替えるため親に残す。
  */
-import { computed, onMounted, ref } from 'vue'
-import { invokeTauri } from '~/composables/useTauri'
-import { openExternalUrl } from '~/composables/useExternalUrl'
-import { useKeystore } from '~/composables/useKeystore'
-import { useI18n } from '~/composables/useI18n'
-import { useMarketplaceSubmit } from '~/composables/useMarketplaceSubmit'
-import { useTagChipInput } from '~/composables/useTagChipInput'
-import SubmitThemeAutoForm from './SubmitThemeAutoForm.vue'
-import SubmitThemeManualForm from './SubmitThemeManualForm.vue'
-import SubmitDeviceFlowModal from './SubmitDeviceFlowModal.vue'
 import type { GithubAccount, SubmitStage } from '~/types/githubAuth'
 
 const { t } = useI18n()

@@ -5,7 +5,6 @@
  * 検索クエリは v-model で双方向バインディング、Import ボタンは emit で親に通知する。
  * New ボタンは `/creator` ページへの NuxtLink なので emit 不要。
  */
-import { useI18n } from '~/composables/useI18n'
 
 const { t } = useI18n()
 

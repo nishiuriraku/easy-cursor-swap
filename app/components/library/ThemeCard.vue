@@ -4,10 +4,7 @@
  * - 詳細モーダルへの遷移とお気に入りトグルは `useThemeCardState` に共通化済み。
  * - カード本体クリック/Enter/Space で詳細モーダルを開く (内側 button は stopPropagation)。
  */
-import { computed, toRef } from 'vue'
 import type { ThemeCardData } from '~/types/theme'
-import { useI18n } from '~/composables/useI18n'
-import { useThemeCardState } from '~/composables/useThemeCardState'
 
 const { t } = useI18n()
 

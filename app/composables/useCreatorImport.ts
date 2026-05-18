@@ -12,8 +12,7 @@
  *
  * これらは creator.vue が所有しているため、依存注入 (factory deps) でやり取りする。
  */
-import { ref, watch, type Ref } from 'vue'
-import { initialHotspotFor } from './useHotspotDefaults'
+import type { Ref } from 'vue'
 import type { useCreatorAssets } from './useCreatorAssets'
 
 export interface CreatorImportDeps {

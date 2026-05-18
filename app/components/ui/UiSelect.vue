@@ -15,8 +15,7 @@
  * 状態機械 + キーボードナビ + 位置計算は `useListbox` に共通化済み (audit F43-SIZE-001)。
  * 本ファイルは props / emits + 薄い wrapper + template + style のみ。
  */
-import { ref, toRef } from 'vue'
-import { useListbox, type ListboxOption } from '~/composables/useListbox'
+import type { ListboxOption } from '~/composables/useListbox'
 
 const props = withDefaults(
   defineProps<{

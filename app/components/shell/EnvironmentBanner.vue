@@ -7,9 +7,6 @@
  *
  * 一度閉じると同セッション中は再表示しない (sessionStorage で記憶)。
  */
-import { onMounted, ref } from 'vue'
-import { invokeTauri } from '~/composables/useTauri'
-import { useI18n } from '~/composables/useI18n'
 
 const { t } = useI18n()
 

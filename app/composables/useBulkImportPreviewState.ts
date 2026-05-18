@@ -14,15 +14,9 @@
  *
  * 注意: per-call インスタンス (singleton ではない)。BulkImportPreviewModal で 1 回だけ呼ぶ前提。
  */
-import { ref, watch, onUnmounted } from 'vue'
-import {
-  matchAssetWithContext,
-  resolveCollisions,
-  type MatchCandidate,
-} from '~/composables/useRoleMatcher'
+import type { MatchCandidate } from '~/composables/useRoleMatcher'
 import type { ResolvedAsset, ParsedCursorpack } from '~/composables/useBulkImport'
 import type { RoleAsset, SizedAsset } from '~/composables/useCreatorAssets'
-import { initialHotspotFor } from '~/composables/useHotspotDefaults'
 
 /**
  * 1 ロールに割当て済みのアセット。

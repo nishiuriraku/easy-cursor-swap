@@ -10,14 +10,8 @@
  * - Ed25519 署名検証済みのテーマのみ掲載 (CI 自動検証)
  * - インポートは Rust 側の `import_from_marketplace` (将来実装) に委譲
  */
-import { computed, onMounted, ref, watch } from 'vue'
 import type { MarketplaceEntry, MarketplaceName, MarketplaceTag } from '~/types/marketplace'
 import { computeFilteredGrid } from '~/pages/marketplace.helpers'
-import { invokeTauri } from '~/composables/useTauri'
-import { openExternalUrl } from '~/composables/useExternalUrl'
-import { useI18n } from '~/composables/useI18n'
-import { useThemes } from '~/composables/useThemes'
-import { pickLocalizedName } from '~/composables/pickLocalizedName'
 
 const { t, locale } = useI18n()
 

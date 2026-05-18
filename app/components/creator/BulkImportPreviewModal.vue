@@ -6,17 +6,9 @@
  * 組立) は `useBulkImportPreviewState` composable に分離済み。本 SFC は presentation
  * (テンプレート + 派生 computed + apply emit) に専念する。
  */
-import { computed } from 'vue'
-import { CURSOR_ROLE_IDS } from '~/composables/useRoleMatcher'
 import { CURSOR_ROLES } from '~/components/icons/CursorIcons'
-import {
-  useBulkImportPreviewState,
-  type ApplyPayload,
-} from '~/composables/useBulkImportPreviewState'
+import type { ApplyPayload } from '~/composables/useBulkImportPreviewState'
 import type { ResolvedAsset, ParsedCursorpack } from '~/composables/useBulkImport'
-import { useI18n } from '~/composables/useI18n'
-import BulkImportRoleRow from './BulkImportRoleRow.vue'
-import AniThumb from './AniThumb.vue'
 
 const { t } = useI18n()
 

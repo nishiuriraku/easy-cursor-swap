@@ -5,7 +5,6 @@
  * `.cursorpack` をウィンドウへドラッグしたときに半透明で覆って視覚フィードバックする。
  * 表示制御は親側 (`showDrop` ref) で `dragenter`/`dragleave` を見て切り替える。
  */
-import { useI18n } from '~/composables/useI18n'
 
 const { t } = useI18n()
 

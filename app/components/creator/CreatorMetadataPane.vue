@@ -8,7 +8,6 @@
  * 純粋なフォーム + 進捗表示なので 6 つの v-model + 数件の read-only props +
  * 2 つの emit (dismiss-export-message, cancel-export) で creator.vue から切り出している。
  */
-import { useI18n } from '~/composables/useI18n'
 
 const { t } = useI18n()
 

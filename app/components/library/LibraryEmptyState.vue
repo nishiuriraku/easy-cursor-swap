@@ -5,7 +5,6 @@
  * design/empty-states.jsx の LibraryEmpty を Vue 化したもの。
  * 新規作成 / インポート / Marketplace 遷移の 3 つの導線を提供する。
  */
-import { useI18n } from '~/composables/useI18n'
 
 const { t } = useI18n()
 

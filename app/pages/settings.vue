@@ -9,13 +9,7 @@
  *       重い状態を持たないため SFC 分割するメリットが薄い)。
  *       将来セクションが肥大化したら個別 SFC に切り出す。
  */
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import { useAppSettings } from '~/composables/useAppSettings'
-import { useKeystore } from '~/composables/useKeystore'
-import { invokeTauri } from '~/composables/useTauri'
-import { useI18n } from '~/composables/useI18n'
-import { useUpdater, classifyUpdaterError } from '~/composables/useUpdater'
-import { useSettingsSearch, type SettingsSearchEntry } from '~/composables/useSettingsSearch'
+import type { SettingsSearchEntry } from '~/composables/useSettingsSearch'
 import type { GithubAccount } from '~/types/githubAuth'
 import type { CrashSubmitSummary } from '~/types/config'
 

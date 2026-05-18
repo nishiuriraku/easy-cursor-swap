@@ -7,7 +7,6 @@
  * から受け取って渡す。autoCheckHint は親側で localStorage の last_check_at を見て計算した
  * 表示文字列。子は表示と emit 通知のみ。
  */
-import { useI18n } from '~/composables/useI18n'
 
 const { t } = useI18n()
 

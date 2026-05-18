@@ -12,10 +12,6 @@
  * 取得は useMarketplacePreviews のキャッシュ越しなので、後で DetailModal を
  * 開いたときは即座に 6 ロール分の preview がヒットする。
  */
-import { computed, onMounted, ref, watch } from 'vue'
-import { useI18n } from '~/composables/useI18n'
-import { useMarketplacePreviews } from '~/composables/useMarketplacePreviews'
-import { pickLocalizedName } from '~/composables/pickLocalizedName'
 import type { MarketplaceEntry } from '~/types/marketplace'
 
 const { t, locale } = useI18n()

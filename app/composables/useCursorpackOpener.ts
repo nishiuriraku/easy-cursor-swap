@@ -1,5 +1,3 @@
-import { takePendingCursorpack } from './useTauri'
-
 /**
  * `.cursorpack` のインポート要求を Rust 側から受け取り、ハンドラに引き渡す composable。
  *

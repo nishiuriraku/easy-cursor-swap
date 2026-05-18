@@ -10,7 +10,6 @@
  * marketplace.vue / SubmitThemeDialog (×2) / ThemeDetailDrawer の合計
  * 6 箇所で同型の try/catch 重複があった (audit B10-related & D26 横断)。
  */
-import { invokeTauri } from './useTauri'
 
 /**
  * 指定 URL をシステムブラウザで開く。Tauri 未接続時は `window.open` にフォールバックする。

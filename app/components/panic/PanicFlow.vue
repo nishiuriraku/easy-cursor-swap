@@ -12,10 +12,7 @@
  * 進行中はライブログ + 17 ロールグリッドで進捗を可視化。
  * 親 (default.vue) が `v-model:open` で表示制御。
  */
-import { computed, ref, watch } from 'vue'
 import { CURSOR_ROLES } from '~/components/icons/CursorIcons'
-import { invokeTauri } from '~/composables/useTauri'
-import { useI18n } from '~/composables/useI18n'
 
 const { t } = useI18n()
 

@@ -9,13 +9,7 @@
  *  - マウント時に useMarketplacePreviews で 6 ロール PNG を並列取得
  *  - フッター中央に「ライブラリに追加」プライマリボタン (インストール済みなら disabled)
  */
-import { computed, ref, watch } from 'vue'
 import type { MarketplaceEntry } from '~/types/marketplace'
-import { useI18n } from '~/composables/useI18n'
-import { useMarketplacePreviews } from '~/composables/useMarketplacePreviews'
-import { useModalLifecycle } from '~/composables/useModalLifecycle'
-import { useThemes } from '~/composables/useThemes'
-import { pickLocalizedName } from '~/composables/pickLocalizedName'
 
 const { t, locale } = useI18n()
 

@@ -4,10 +4,6 @@
  * Tauri ウィンドウコントロール (最小化/最大化/閉じる) は @tauri-apps/api/window 経由で接続済み。
  * Web 開発時は API が存在しないので onMounted で動的 import + 失敗時はコンソール警告。
  */
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useUiTheme } from '~/composables/useUiTheme'
-import { useI18n } from '~/composables/useI18n'
-import { useAppInfo } from '~/composables/useAppInfo'
 
 const { t } = useI18n()
 

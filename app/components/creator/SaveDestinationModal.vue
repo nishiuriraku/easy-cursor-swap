@@ -9,8 +9,6 @@
  * destination='file' で submit したときだけ tauri-plugin-dialog を呼んでパスを取得する。
  * Library 系は invokeTauri に渡すだけなので path 取得は不要。
  */
-import { ref, computed, watch } from 'vue'
-import { useI18n } from '~/composables/useI18n'
 
 const { t } = useI18n()
 

@@ -5,10 +5,7 @@
  * 純粋表示: theme から派生する displaySize / lastAppliedDate / coverage / isSystem の
  * 計算と、homepage の外部ブラウザオープン (useExternalUrl) のみを行う。
  */
-import { computed } from 'vue'
 import type { ThemeCardData } from '~/types/theme'
-import { useI18n } from '~/composables/useI18n'
-import { openExternalUrl } from '~/composables/useExternalUrl'
 
 const { t } = useI18n()
 

@@ -6,7 +6,6 @@
  * profileBusy/profileMessage は親 (settings.vue) が IPC 呼び出しと進捗管理を持ち、
  * 子はそのスナップショットを読み取って UI に反映するだけ。
  */
-import { useI18n } from '~/composables/useI18n'
 
 const { t } = useI18n()
 

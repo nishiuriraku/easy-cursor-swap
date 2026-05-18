@@ -8,8 +8,6 @@
  *
  * 注意: singleton ではなく per-call インスタンス。creator.vue で 1 回だけ呼ぶ前提。
  */
-import { ref } from 'vue'
-import { useI18n } from '~/composables/useI18n'
 
 export function useCreatorMetaState() {
   const { t } = useI18n()

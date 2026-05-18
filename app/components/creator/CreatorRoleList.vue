@@ -6,7 +6,6 @@
  * 受け取り、フォーカス移動を担う。アクティブな役割の判定や filled/partial/empty の
  * ステータス計算も親 (creator.vue) で行い、こちらは props を受けて表示するだけ。
  */
-import { useI18n } from '~/composables/useI18n'
 import { CURSOR_ROLES, type CursorRoleDef } from '~/components/icons/CursorIcons'
 
 type RoleStatus = 'filled' | 'empty'

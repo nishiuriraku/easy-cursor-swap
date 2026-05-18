@@ -1,6 +1,3 @@
-import { ref } from 'vue'
-import { invokeTauri } from '~/composables/useTauri'
-
 /**
  * Rust 側 theme::types::AniFrameData に対応する TS 型 (Phase 3a 以降)。
  * フィールド名は flatten 後の JSON とそのまま一致。

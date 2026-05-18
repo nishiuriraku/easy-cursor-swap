@@ -10,8 +10,6 @@
  * BulkImportButton を移植したもの。creator.vue 側で pickBulkAuto / pickBulkFolder
  * にそのまま接続する。
  */
-import BulkImportButton from '~/components/creator/BulkImportButton.vue'
-import { useI18n } from '~/composables/useI18n'
 
 const { t } = useI18n()
 

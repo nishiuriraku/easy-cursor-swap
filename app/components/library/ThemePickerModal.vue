@@ -7,9 +7,7 @@
  * - 選択中ハイライト + クリックで選択
  * - クリアボタン (null = 未指定)
  */
-import { computed, ref } from 'vue'
 import type { ThemeCardData } from '~/types/theme'
-import { useI18n } from '~/composables/useI18n'
 
 const { t } = useI18n()
 

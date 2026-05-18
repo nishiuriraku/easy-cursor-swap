@@ -8,7 +8,6 @@
  * 親 (SubmitThemeDialog) は step / githubUsername / downloadUrl を v-model 互換の
  * props/emit で保持する。これにより親のフッターが state を見て表示制御できる。
  */
-import { useI18n } from '~/composables/useI18n'
 
 interface ThemeSummary {
   id: string

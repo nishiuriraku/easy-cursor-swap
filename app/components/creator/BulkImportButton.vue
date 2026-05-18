@@ -10,8 +10,6 @@
  * - サブメニュー: フォルダ取込のみ。ネイティブダイアログがファイル/フォルダ併用不可なため
  *   ここだけ別経路。
  */
-import { ref } from 'vue'
-import { useI18n } from '~/composables/useI18n'
 
 const { t } = useI18n()
 

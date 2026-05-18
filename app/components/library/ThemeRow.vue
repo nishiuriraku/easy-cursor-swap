@@ -15,10 +15,7 @@
  *  2026-05-14 で Arrow セルを実 PNG プレビュー表示へ昇格):
  *  fav | preview (Arrow 1 個) | name+tags | ver | date | size
  */
-import { computed, toRef } from 'vue'
 import type { ThemeCardData } from '~/types/theme'
-import { useI18n } from '~/composables/useI18n'
-import { useThemeCardState } from '~/composables/useThemeCardState'
 
 const { t } = useI18n()
 

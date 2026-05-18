@@ -11,8 +11,6 @@
  * クラッシュ系の親子契約は `keystoreInfo` パターンと同じ: 状態 (件数 / メッセージ)
  * は親が `useAppSettings` から渡し、子は表示と emit のみ。
  */
-import { useI18n } from '~/composables/useI18n'
-import { invokeTauri } from '~/composables/useTauri'
 
 const { t } = useI18n()
 

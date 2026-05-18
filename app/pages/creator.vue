@@ -12,27 +12,9 @@
  *  - useCreatorBulkImportFlow (複数ファイル / .cursorpack の bulk 取込)
  *  - useCreatorExport (Rust 側 export_cursorpack_streamed への引き渡し)
  */
-import { computed, onBeforeUnmount, onUnmounted, ref } from 'vue'
 import { CURSOR_ROLES, type CursorRoleDef } from '~/components/icons/CursorIcons'
-import { sanitizeSvg } from '~/composables/sanitizeSvg'
-import { useKeystore } from '~/composables/useKeystore'
-import { useI18n } from '~/composables/useI18n'
-import { useCreatorAssets } from '~/composables/useCreatorAssets'
 import type { Hotspot } from '~/composables/useCreatorAssets'
-import { initialHotspotFor } from '~/composables/useHotspotDefaults'
-import { useBulkImport } from '~/composables/useBulkImport'
-import { useCreatorImport } from '~/composables/useCreatorImport'
-import { useCreatorExport } from '~/composables/useCreatorExport'
-import { useCreatorBulkImportFlow } from '~/composables/useCreatorBulkImportFlow'
-import { useCreatorPickers } from '~/composables/useCreatorPickers'
-import { useCreatorMetaState } from '~/composables/useCreatorMetaState'
 import type { CursorPreviewAsset } from '~/components/preview/CursorPreview.vue'
-import BulkImportPreviewModal from '~/components/creator/BulkImportPreviewModal.vue'
-import NewThemeStartModal from '~/components/creator/NewThemeStartModal.vue'
-import SaveDestinationModal from '~/components/creator/SaveDestinationModal.vue'
-import CreatorEditorCanvas from '~/components/creator/CreatorEditorCanvas.vue'
-import ThemePickerModal from '~/components/library/ThemePickerModal.vue'
-import { useThemes } from '~/composables/useThemes'
 
 const { t } = useI18n()
 
@@ -395,7 +377,6 @@ function isRequired(id: string): boolean {
 }
 
 // 起動時に keystore 状態を取得して「署名 & エクスポート」ボタンの表示判定に使う
-import { onMounted } from 'vue'
 onMounted(async () => {
   void refreshKeystore()
   void setupTauriDrop()

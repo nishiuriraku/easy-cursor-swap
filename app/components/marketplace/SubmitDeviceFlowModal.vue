@@ -6,11 +6,6 @@
  * 同時に clipboard に user_code をコピーし「GitHub を開く」ボタンで認可ページへ。
  * `useGithubAuth().status` が `ready` になったら `ready` イベントで親に login を渡し閉じる。
  */
-import { watch } from 'vue'
-import { useGithubAuth } from '~/composables/useGithubAuth'
-import { useI18n } from '~/composables/useI18n'
-import { openExternalUrl } from '~/composables/useExternalUrl'
-import UiIcon from '~/components/icons/UiIcon.vue'
 
 const { t } = useI18n()
 const { status, userCode, verificationUri, login, start, cancel } = useGithubAuth()

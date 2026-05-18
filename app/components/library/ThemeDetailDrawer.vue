@@ -11,9 +11,6 @@
  */
 import type { ThemeCardData } from '~/types/theme'
 import type { RolePreviewDetail } from '~/composables/useThemePreviews'
-import ThemeDetailDrawerHero from './ThemeDetailDrawerHero.vue'
-import ThemeDetailDrawerStrip from './ThemeDetailDrawerStrip.vue'
-import ThemeDetailDrawerFooter from './ThemeDetailDrawerFooter.vue'
 
 const props = defineProps<{
   theme: ThemeCardData

@@ -13,10 +13,6 @@
  *     localStorage が消えても再チェックが走るだけで副作用なし → 設定ファイルの schema を汚さない。
  *   - 通知の permission リクエストは `useNotify` 側でキャッシュ済 (起動時に 1 度だけ)。
  */
-import { useAppSettings } from './useAppSettings'
-import { useUpdater } from './useUpdater'
-import { notify } from './useNotify'
-import { invokeTauri } from './useTauri'
 
 /** クールダウン期間 (ms)。24 時間。 */
 const CHECK_COOLDOWN_MS = 24 * 60 * 60 * 1000

@@ -6,8 +6,6 @@
  * `cursorpack` に同梱されている theme.json の内容と、
  * 既存テーマの theme.json を並べて表示。
  */
-import { computed } from 'vue'
-import { useI18n } from '~/composables/useI18n'
 
 const { t } = useI18n()
 

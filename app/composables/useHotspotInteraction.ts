@@ -5,7 +5,7 @@
  * 中心の座標計算 (`pointerToHotspotRatio` / `applyKeyboardNudge`) は純粋関数として export し、
  * vitest で単体検証する。
  */
-import { ref, type Ref } from 'vue'
+import type { Ref } from 'vue'
 import type { Hotspot } from './useCreatorAssets'
 
 function clamp01(value: number): number {

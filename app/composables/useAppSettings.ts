@@ -2,9 +2,7 @@
  * Rust 側の `AppConfig` を取得 / 更新する composable。
  * グローバルなリアクティブシングルトンで全画面が同じインスタンスを参照する。
  */
-import { ref } from 'vue'
 import type { AppConfig } from '~/types/config'
-import { invokeTauri } from './useTauri'
 
 const config = ref<AppConfig | null>(null)
 const loading = ref(false)

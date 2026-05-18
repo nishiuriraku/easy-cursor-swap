@@ -3,7 +3,6 @@
  * 設定 → セキュリティ セクション。
  * 署名検証関連の 2 トグル。
  */
-import { useI18n } from '~/composables/useI18n'
 
 const { t } = useI18n()
 

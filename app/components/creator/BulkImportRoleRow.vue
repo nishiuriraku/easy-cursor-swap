@@ -8,9 +8,6 @@
  * 確信度パーセント表示と採用/スキップトグルは廃止。「適用しないファイル」は
  * 解除ボタンで未マッチプールへ戻す UX に統一した (情報を失わず、操作が 1 種類で済む)。
  */
-import { computed } from 'vue'
-import { useI18n } from '~/composables/useI18n'
-import AniThumb from './AniThumb.vue'
 
 const { t } = useI18n()
 

@@ -12,8 +12,6 @@
  * 既存呼び出し元 (settings.vue の onDownloadUpdate) は直接 invokeTauri しているが、
  * 呼び出しタイミングが異なる (起動時 vs ユーザー操作時) ので併存可能。
  */
-import { ref } from 'vue'
-import { invokeTauri } from './useTauri'
 
 export interface AppInfo {
   version: string

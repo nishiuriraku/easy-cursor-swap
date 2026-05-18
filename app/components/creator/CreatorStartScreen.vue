@@ -11,9 +11,6 @@
  * ヒーローの "CREATOR · vX.Y" 表示は `useAppInfo` 経由で Cargo.toml の実
  * version を表示する (旧実装はハードコード `v1.0`)。
  */
-import { computed, onMounted } from 'vue'
-import { useAppInfo } from '~/composables/useAppInfo'
-import { useI18n } from '~/composables/useI18n'
 
 const { t } = useI18n()
 const { info, load: loadAppInfo } = useAppInfo()

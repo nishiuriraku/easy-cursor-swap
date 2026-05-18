@@ -1,5 +1,3 @@
-import { ref, computed } from 'vue'
-
 export type AssetSource = 'manual' | 'bulk-file' | 'bulk-folder' | 'cursorpack'
 
 /** ホットスポット (比率, 0.0..=1.0)。`.cur` 書出時に Rust 側で primarySize と乗算して px に変換する。 */

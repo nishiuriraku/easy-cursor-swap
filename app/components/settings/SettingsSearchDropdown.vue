@@ -12,8 +12,6 @@
  *  - body 直下にレンダリングしておけば祖先の `overflow` や stacking-context
  *    に左右されず、必ず最前面に不透明な背景で描画される。
  */
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useI18n } from '~/composables/useI18n'
 import type { SearchResult, SettingsSearchEntry } from '~/composables/useSettingsSearch'
 
 const { t } = useI18n()

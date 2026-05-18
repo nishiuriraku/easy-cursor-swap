@@ -8,7 +8,6 @@
  *
  * ホットスポット表示・編集は `<CursorPreview>` 側で行うため、本コンポーネントは持たない。
  */
-import { useAniPlayer } from '~/composables/useAniPlayer'
 
 interface Props {
   framePngs: readonly Uint8Array[]

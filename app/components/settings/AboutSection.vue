@@ -9,11 +9,6 @@
  * Rust 側 `open_url` IPC (内部で Win32 ShellExecuteW) を経由してホスト OS の
  * ブラウザを起動する。SubmitThemeDialog / marketplace.vue と同じパターン。
  */
-import { onMounted, ref } from 'vue'
-import { useI18n } from '~/composables/useI18n'
-import { useAppInfo } from '~/composables/useAppInfo'
-import { openExternalUrl } from '~/composables/useExternalUrl'
-import OssLicenseModal from './OssLicenseModal.vue'
 
 const { t } = useI18n()
 

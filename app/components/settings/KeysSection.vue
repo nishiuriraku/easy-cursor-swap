@@ -8,7 +8,6 @@
  *
  * また GitHub 連携状態 (githubAccount) を受け取り、連携解除 emit を提供する。
  */
-import { useI18n } from '~/composables/useI18n'
 import type { GithubAccount } from '~/types/githubAuth'
 
 const { t } = useI18n()

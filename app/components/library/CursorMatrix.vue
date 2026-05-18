@@ -9,7 +9,6 @@
  * - `previewMap` (任意) を渡すと、該当ロールのみ実際の PNG カーソル画像を表示する。
  *   渡されなければ従来どおり SVG ベクター (CursorIcon) を表示する。
  */
-import { computed } from 'vue'
 // CursorIcon は Nuxt の自動インポートで解決される
 import { CURSOR_ROLES, type CursorRoleDef } from '~/components/icons/CursorIcons'
 

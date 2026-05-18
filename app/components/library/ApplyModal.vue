@@ -10,12 +10,8 @@
  *
  * 実際の IPC 呼び出しは親 (Library) で行う。当コンポーネントは emit のみ。
  */
-import { computed, onMounted, ref } from 'vue'
 import type { ThemeCardData } from '~/types/theme'
 import { CURSOR_ROLES } from '~/components/icons/CursorIcons'
-import { useI18n } from '~/composables/useI18n'
-import { invokeTauri } from '~/composables/useTauri'
-import { useThemePreviews } from '~/composables/useThemePreviews'
 
 const { t } = useI18n()
 

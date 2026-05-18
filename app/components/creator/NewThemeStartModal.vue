@@ -14,7 +14,6 @@
  *  - 取込結果は `BulkImportPreviewModal` に流れ、ロールマッチング/上書き判定/
  *    メタデータ反映を経て Creator が editing ステージに遷移する。
  */
-import { useI18n } from '~/composables/useI18n'
 
 const { t } = useI18n()
 

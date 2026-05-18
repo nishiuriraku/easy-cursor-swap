@@ -13,9 +13,7 @@
  *
  * 複数画面で同じインスタンスを参照したいので Pinia 不使用のシンプル composable で実装。
  */
-import { ref } from 'vue'
 import type { ThemeCardData, ThemeKind } from '~/types/theme'
-import { invokeTauri } from './useTauri'
 
 /**
  * Rust 側 theme::types::ThemeSummary に対応する IPC ペイロード。

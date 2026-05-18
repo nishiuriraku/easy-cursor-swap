@@ -12,7 +12,7 @@
  *
  * `prefers-reduced-motion` は仕様により尊重しない (ユーザー要望: ずっと動いてる)。
  */
-import { computed, onScopeDispose, ref, type ComputedRef, type Ref } from 'vue'
+import type { ComputedRef, Ref } from 'vue'
 
 export interface UseAniPlayerInput {
   framePngs: readonly Uint8Array[]

@@ -11,7 +11,7 @@
  * かつ各実装が独立して `prevOverflow` を握っていたため、A→B→A close 時に lock
  * が永続化する潜在バグがあった (audit D28-DUP-001)。
  */
-import { onBeforeUnmount, watch, type Ref } from 'vue'
+import type { Ref } from 'vue'
 
 /**
  * モジュール singleton: 複数の modal が同時に開いた時の scroll lock 重ね合わせを管理する。

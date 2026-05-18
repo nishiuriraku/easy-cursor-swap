@@ -8,10 +8,8 @@
  * `.ani` プレビューは `<CursorPreview kind="ani">` 経路で AniThumb (useAniPlayer 内蔵)
  * に合流させているので、ロール切替時に再マウントされて blob URL は自動 revoke される。
  */
-import { computed, ref } from 'vue'
 import type { ThemeCardData } from '~/types/theme'
 import { CURSOR_ROLES } from '~/components/icons/CursorIcons'
-import { useI18n } from '~/composables/useI18n'
 import type { RolePreviewDetail } from '~/composables/useThemePreviews'
 import type { CursorPreviewAsset } from '~/components/preview/CursorPreview.vue'
 

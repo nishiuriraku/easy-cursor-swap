@@ -9,10 +9,7 @@
  * - 非編集 (既定): 画像 + dot のみ。
  * - 編集 (`editable=true`): pointer ドラッグ / keyboard nudge / crosshair / focus ring を追加。
  */
-import { computed, ref, toRef } from 'vue'
 import type { Hotspot } from '~/composables/useCreatorAssets'
-import { useHotspotInteraction, hotspotDotStyle } from '~/composables/useHotspotInteraction'
-import AniThumb from '~/components/creator/AniThumb.vue'
 
 export type CursorPreviewAsset =
   | {

@@ -5,9 +5,6 @@
  * config.corrupt.*.json が存在する場合のみ表示。
  * 選択したバックアップを config.json に上書きして設定を復旧する。
  */
-import { onMounted, ref } from 'vue'
-import { invokeTauri } from '~/composables/useTauri'
-import { useI18n } from '~/composables/useI18n'
 
 const { t } = useI18n()
 

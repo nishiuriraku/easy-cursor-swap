@@ -14,7 +14,6 @@
  *   - chips 個数 (default 8)
  *   - 1 chip あたりの最大長 (default 24)
  */
-import { ref } from 'vue'
 
 export interface TagChipInputOptions {
   /** タグ chip の最大個数 (default 8) */

@@ -6,7 +6,7 @@
  * - ja/en 両 locale の labelKey/descKey を小文字化 substring で検索。
  * - jumpTo は section ref を切替えてから DOM をスクロール + パルスハイライト。
  */
-import { computed, nextTick, ref, type Ref } from 'vue'
+import type { Ref } from 'vue'
 import ja from '~/locales/ja'
 import en from '~/locales/en'
 import type { Locale } from '~/composables/useI18n'

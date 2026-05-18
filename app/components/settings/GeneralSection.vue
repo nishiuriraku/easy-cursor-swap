@@ -5,7 +5,6 @@
  * UI 言語選択 + 通知トグル 2 つ + ConfigRecoveryPanel (バックアップ復旧) を含む。
  * ConfigRecoveryPanel が emit する `restored` を親に伝播するためのラッパー。
  */
-import { useI18n } from '~/composables/useI18n'
 
 const { t } = useI18n()
 

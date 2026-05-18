@@ -8,9 +8,7 @@
  *
  * すべてのアクションは emit でコンテナに伝え、IPC 呼出は親 (pages/index.vue) 側で行う。
  */
-import { computed } from 'vue'
 import type { ThemeCardData } from '~/types/theme'
-import { useI18n } from '~/composables/useI18n'
 
 const { t } = useI18n()
 

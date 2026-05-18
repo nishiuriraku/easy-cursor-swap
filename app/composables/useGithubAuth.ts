@@ -7,8 +7,7 @@
  * Rust 側 (commands/marketplace_submit.rs) は単発 IPC のみ提供し、
  * interval / slow_down の制御はこの composable が行う。
  */
-import { ref, getCurrentScope, onScopeDispose, type Ref } from 'vue'
-import { invokeTauri } from '~/composables/useTauri'
+import type { Ref } from 'vue'
 import type { StartFlowResult, CompleteFlowResult } from '~/types/githubAuth'
 
 export type GithubAuthStatus = 'idle' | 'waiting' | 'ready' | 'denied' | 'expired' | 'error'

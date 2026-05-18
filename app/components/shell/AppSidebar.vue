@@ -6,9 +6,6 @@
  * バージョン表示は `useAppInfo` 経由で Cargo.toml の実 version を表示する。
  * `useAppInfo` は singleton 設計のため複数コンポーネントから呼んでも IPC は 1 回のみ。
  */
-import { computed, onMounted } from 'vue'
-import { useAppInfo } from '~/composables/useAppInfo'
-import { useI18n } from '~/composables/useI18n'
 // UiIcon は Nuxt の自動インポートで解決される
 
 const { t } = useI18n()

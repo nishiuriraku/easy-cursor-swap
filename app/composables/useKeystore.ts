@@ -2,8 +2,6 @@
  * Ed25519 鍵ペアのリアクティブ状態管理 composable。
  * Rust 側 `keystore_*` IPC をラップし、UI から鍵生成 / 削除 / 状態取得を行う。
  */
-import { ref } from 'vue'
-import { invokeTauri } from './useTauri'
 
 export interface KeystoreInfo {
   has_keypair: boolean

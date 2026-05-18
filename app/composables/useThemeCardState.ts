@@ -12,9 +12,8 @@
  * 利用側 (`ThemeCard.vue` / `ThemeRow.vue`) は template + style + (Row 固有の
  * displaySize / arrowPreviewUrl 等) のみを保持すればよくなる。
  */
-import { computed, onMounted, ref, watch, type Ref } from 'vue'
+import type { Ref } from 'vue'
 import type { ThemeCardData } from '~/types/theme'
-import { useThemePreviews } from './useThemePreviews'
 
 export interface ThemeCardEmit {
   showDetails: (id: string) => void

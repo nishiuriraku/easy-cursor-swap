@@ -7,7 +7,6 @@
  *   (2) ブラウザ/Tauri OS ロケール (`navigator.language`) でフォールバック判定。
  * - `t('a.b.c', { name: 'foo' })` でキー解決 + `{var}` プレースホルダ展開。
  */
-import { computed, ref } from 'vue'
 import ja from '~/locales/ja'
 import en from '~/locales/en'
 

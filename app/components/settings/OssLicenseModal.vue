@@ -7,10 +7,6 @@
  * すべて MIT / Apache-2.0 / BSD-3-Clause のいずれかなので個別ライセンス全文表示は省略し、
  * 各エントリの URL から確認できるようにする。
  */
-import { toRef } from 'vue'
-import { useI18n } from '~/composables/useI18n'
-import { openExternalUrl } from '~/composables/useExternalUrl'
-import { useModalLifecycle } from '~/composables/useModalLifecycle'
 
 const { t } = useI18n()
 

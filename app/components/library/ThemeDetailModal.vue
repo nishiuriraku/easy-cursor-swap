@@ -10,10 +10,7 @@
  * - スクロールロック (body に overflow: hidden を一時的に付与)
  * - Teleport で `<body>` 直下にレンダリングして z-index 戦争を回避
  */
-import { computed } from 'vue'
 import type { ThemeCardData } from '~/types/theme'
-import { useI18n } from '~/composables/useI18n'
-import { useModalLifecycle } from '~/composables/useModalLifecycle'
 import type { RolePreviewDetail } from '~/composables/useThemePreviews'
 
 const { t } = useI18n()

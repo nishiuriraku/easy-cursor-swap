@@ -3,7 +3,6 @@
  * 17 種カーソル役割アイコン描画コンポーネント。
  * <CursorIcon role="Arrow" :size="14" />
  */
-import { defineComponent, h } from 'vue'
 import { CURSOR_ICONS } from './CursorIcons'
 
 export default defineComponent({

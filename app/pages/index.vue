@@ -9,15 +9,7 @@
  * - ドラッグ&ドロップによる .cursorpack インポート (UI のみ; IPC 未接続)
  * - 適用ボタン → 親へ emit (将来的に invoke('apply_theme'))
  */
-import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { ThemeCardData } from '~/types/theme'
-import { invokeTauri } from '~/composables/useTauri'
-import { notify } from '~/composables/useNotify'
-import { useI18n } from '~/composables/useI18n'
-import { useThemePreviews } from '~/composables/useThemePreviews'
-import { useThemes } from '~/composables/useThemes'
-import { useAppSettings } from '~/composables/useAppSettings'
-import { useCursorpackOpener } from '~/composables/useCursorpackOpener'
 import { mapLocalSummaryToCard, type IpcThemeSummary } from '~/pages/index.helpers'
 
 const { t } = useI18n()
