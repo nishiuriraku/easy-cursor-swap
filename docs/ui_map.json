@@ -1,6 +1,6 @@
 {
   "$schema_version": "0.1.0",
-  "generated_at": "2026-05-17",
+  "generated_at": "2026-05-18",
   "generated_from": [
     "app/layouts/default.vue",
     "app/pages/index.vue",
@@ -138,9 +138,9 @@
             "id": "titlebar-theme-cycle",
             "trigger": "click",
             "ui": "[テーマアイコン (Sun / Globe / Moon)] ボタン",
-            "action": "UI テーマモードを巡回 (light → auto → dark → ...) し、html クラスと config に永続化",
-            "flow": "useUiTheme().cycle() → html.light クラスを付け外し + config.general.theme を更新",
-            "ipc": ["update_config"],
+            "action": "UI テーマモードを巡回 (dark → light → auto → ...) し、html.light クラスの付け外しと localStorage への永続化のみを行う (Rust config には書き込まない)",
+            "flow": "useUiTheme().cycle() → mode ref 更新 → watch 経由で localStorage.setItem + applyClass() で html.light を切り替え",
+            "ipc": [],
             "module": "useUiTheme"
           },
           {

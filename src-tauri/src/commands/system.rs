@@ -109,16 +109,59 @@ pub fn get_app_info() -> AppInfo {
     }
 }
 
-/// OS バージョンを取得する
+/// OS バージョンを取得する。
+///
+/// `GetVersionExW` はアプリマニフェスト互換のため Windows 8.1 以降では
+/// クランプされ得る (常に 6.2 を返す可能性) ため、`ntdll.dll` の
+/// `RtlGetVersion` を直接呼ぶ。Microsoft 公式が "true OS version"
+/// を取得する用途で推奨している経路。
 fn get_os_version() -> String {
     #[cfg(windows)]
     {
-        let info = windows::Win32::System::SystemInformation::OSVERSIONINFOW::default();
-        format!("Windows {}.{}", info.dwMajorVersion, info.dwMinorVersion)
+        use windows::Wdk::System::SystemServices::RtlGetVersion;
+        use windows::Win32::System::SystemInformation::OSVERSIONINFOW;
+        let mut info = OSVERSIONINFOW {
+            dwOSVersionInfoSize: std::mem::size_of::<OSVERSIONINFOW>() as u32,
+            ..Default::default()
+        };
+        // SAFETY: `RtlGetVersion` は dwOSVersionInfoSize を正しく設定した
+        // OSVERSIONINFOW へのポインタを要求する。`info` はスタック上の
+        // 有効な値で、上で `dwOSVersionInfoSize` を設定済み。
+        let status = unsafe { RtlGetVersion(&mut info) };
+        if status.is_ok() {
+            format!(
+                "Windows {}.{} (build {})",
+                info.dwMajorVersion, info.dwMinorVersion, info.dwBuildNumber
+            )
+        } else {
+            "Windows (unknown)".to_string()
+        }
     }
     #[cfg(not(windows))]
     {
         "Non-Windows".to_string()
+    }
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::*;
+
+    /// `get_os_version` は "Windows {major}.{minor} (build {build})" 形式で返し、
+    /// major が 10 以上 (Win10 22H2 / Win11 のいずれか) であることを確認する。
+    /// 旧実装は `OSVERSIONINFOW::default()` のフィールドゼロから "Windows 0.0"
+    /// を返していた回帰防止。
+    #[test]
+    fn get_os_version_returns_real_windows_version() {
+        let v = get_os_version();
+        assert!(v.starts_with("Windows "), "unexpected prefix: {v}");
+        let rest = v.trim_start_matches("Windows ");
+        let major: u32 = rest
+            .split('.')
+            .next()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
+        assert!(major >= 10, "expected major >= 10 (Win10/Win11), got {v}");
     }
 }
 

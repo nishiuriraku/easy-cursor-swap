@@ -204,13 +204,15 @@ async function openGithub() {
   }
 }
 
-const filters: Array<{ id: MarketplaceTag; label: string }> = [
-  { id: 'all', label: 'All' },
-  { id: 'pixel', label: 'Pixel' },
-  { id: 'minimal', label: 'Minimal' },
-  { id: 'animated', label: 'Animated' },
-  { id: 'dark', label: 'Dark' },
-]
+// computed にする理由: useI18n の t() は言語切替時に reactive 評価される。
+// 静的配列のままだと言語変更後も英語ラベルが残ってしまうので追従させる。
+const filters = computed<Array<{ id: MarketplaceTag; label: string }>>(() => [
+  { id: 'all', label: t('marketplace.tagAll') },
+  { id: 'pixel', label: t('marketplace.tagPixel') },
+  { id: 'minimal', label: t('marketplace.tagMinimal') },
+  { id: 'animated', label: t('marketplace.tagAnimated') },
+  { id: 'dark', label: t('marketplace.tagDark') },
+])
 
 onMounted(async () => {
   // marketplace 由来テーマの alreadyInstalled 判定で stale state を踏まないよう、

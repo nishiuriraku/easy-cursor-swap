@@ -1,6 +1,6 @@
 {
   "$schema_version": "0.1.0",
-  "generated_at": "2026-05-17",
+  "generated_at": "2026-05-18",
   "generated_from": [
     "docs/architecture.md",
     "docs/file_inventory.md",
@@ -452,7 +452,7 @@
       { "file": "app/composables/useAppSettings.ts", "name": "useAppSettings", "role": "get_config / update_config ラッパー + dirty フラグ。", "ipc_calls": ["get_config", "update_config", "export_profile", "import_profile"] },
       { "file": "app/composables/useI18n.ts", "name": "useI18n", "role": "t(key, params) + フォールバック + OS ロケール検出。app/locales/{ja,en}.ts をバックエンドとする。" },
       { "file": "app/composables/useKeystore.ts", "name": "useKeystore", "role": "鍵生成 / 削除 / エクスポート / インポート + key_id 表示。", "ipc_calls": ["keystore_info", "keystore_generate", "keystore_delete", "keystore_export", "keystore_import"] },
-      { "file": "app/composables/useUiTheme.ts", "name": "useUiTheme", "role": "アプリ自身のライト / ダークモード切替 (デフォルトは Windows 追従、config に永続化)。" },
+      { "file": "app/composables/useUiTheme.ts", "name": "useUiTheme", "role": "アプリ自身のライト / ダーク / Auto モード切替。永続化先は localStorage のみで、Rust config (update_config IPC) には一切書き込まない (UI 専用設定を config.json に汚染しない設計)。" },
       { "file": "app/composables/useRoleMatcher.ts", "name": "useRoleMatcher", "role": "エイリアス辞書 + scoreRole + resolveCollisions。17 役割マッチング用の純粋関数群。" },
       { "file": "app/composables/useThemePreviews.ts", "name": "useThemePreviews", "role": "プレビュー画像取得 (役割 × サイズ + ホットスポット + ANI フレーム)。UUID 形式はローカルテーマ、`windows:` プレフィックスはシステムスキームへ分岐。", "ipc_calls": ["get_theme_role_previews", "get_windows_scheme_role_previews"] },
       { "file": "app/composables/useBulkImport.ts", "name": "useBulkImport", "role": "バルクインポート IPC ラッパー + 進捗購読。", "ipc_calls": ["bulk_resolve_assets", "cancel_bulk_import"] },
