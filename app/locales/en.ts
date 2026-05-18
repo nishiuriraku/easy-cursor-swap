@@ -353,7 +353,7 @@ export default {
     descUpdates: 'Auto-update toggle and channel. Major version jumps are always manual.',
     groupAutoUpdate: 'Auto-update',
     autoUpdateLabel: 'Enable background updates',
-    autoUpdateDesc: 'Tauri Updater fetches signed delta updates',
+    autoUpdateDesc: 'Fetches signed delta updates',
     checkNowLabel: 'Check now',
     btnChecking: 'Checking...',
     btnCheckUpdate: 'Check for updates',

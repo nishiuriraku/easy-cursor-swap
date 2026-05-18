@@ -352,7 +352,7 @@ export default {
     descUpdates: '自動アップデートの有効化と更新チャンネル。メジャーバージョン跨ぎは常に手動。',
     groupAutoUpdate: '自動アップデート',
     autoUpdateLabel: 'バックグラウンド更新を有効化',
-    autoUpdateDesc: 'Tauri Updater で署名検証付きの差分更新を取得',
+    autoUpdateDesc: '署名検証付きの差分更新を取得',
     checkNowLabel: '今すぐ確認',
     btnChecking: '確認中...',
     btnCheckUpdate: '更新を確認',
