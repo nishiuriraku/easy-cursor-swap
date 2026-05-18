@@ -831,16 +831,17 @@ impl ThemeManager {
         use crate::errors::AppError;
         use std::io::{Cursor, Read};
 
-        // 上限値 — 将来 config から取得する設計だが、現状は仕様書の固定値
-        const MAX_COMPRESSED: u64 = 50 * 1024 * 1024;
+        // 圧縮サイズの SoT は config.rs の DEFAULT_MAX_PACK_COMPRESSED_SIZE。
+        // 残り 2 つ (uncompressed total / per-file size) は本 commit のスコープ外。
+        use crate::config::DEFAULT_MAX_PACK_COMPRESSED_SIZE;
         const MAX_UNCOMPRESSED_TOTAL: u64 = 200 * 1024 * 1024;
         const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024;
 
-        if bytes.len() as u64 > MAX_COMPRESSED {
+        if bytes.len() as u64 > DEFAULT_MAX_PACK_COMPRESSED_SIZE {
             return Err(AppError::Theme(format!(
                 ".cursorpack 圧縮サイズ {} bytes が上限 {} を超えています",
                 bytes.len(),
-                MAX_COMPRESSED
+                DEFAULT_MAX_PACK_COMPRESSED_SIZE
             )));
         }
 
@@ -1074,12 +1075,12 @@ impl ThemeManager {
         use crate::errors::AppError;
         use std::io::{Cursor, Read};
 
-        const MAX_COMPRESSED: u64 = 50 * 1024 * 1024;
-        if bytes.len() as u64 > MAX_COMPRESSED {
+        use crate::config::DEFAULT_MAX_PACK_COMPRESSED_SIZE;
+        if bytes.len() as u64 > DEFAULT_MAX_PACK_COMPRESSED_SIZE {
             return Err(AppError::Theme(format!(
                 ".cursorpack 圧縮サイズ {} が上限 {} を超えています",
                 bytes.len(),
-                MAX_COMPRESSED
+                DEFAULT_MAX_PACK_COMPRESSED_SIZE
             )));
         }
 

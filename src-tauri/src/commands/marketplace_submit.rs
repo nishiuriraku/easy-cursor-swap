@@ -10,7 +10,7 @@
 //! polling 間隔制御 (interval / slow_down 5s 加算) は **フロント側** で行う。
 //! Rust 側はステートレスな 1 try IPC のみを提供する。
 
-use crate::config::{ConfigManager, GithubAccount};
+use crate::config::{ConfigManager, GithubAccount, DEFAULT_MAX_PACK_COMPRESSED_SIZE};
 use crate::errors::AppError;
 use crate::github::client::Client;
 use crate::github::device_flow::{DeviceFlow, PollOutcome};
@@ -22,7 +22,6 @@ use tauri::{AppHandle, Emitter, State};
 
 const UPSTREAM_OWNER: &str = "nishiuriraku";
 const UPSTREAM_REPO: &str = "easy-cursor-swap-index";
-const MAX_PACK_SIZE: usize = 50 * 1024 * 1024;
 
 /// Device Flow 開始時に GitHub から受け取った値のうち、ポーリングに必要な分。
 #[derive(Debug, Clone)]
@@ -180,10 +179,10 @@ pub async fn submit_theme_auto(
 
     emit_progress(&app, "build");
     let pack_bytes = build_cursorpack_for_submit(parsed_id)?;
-    if pack_bytes.len() > MAX_PACK_SIZE {
+    if (pack_bytes.len() as u64) > DEFAULT_MAX_PACK_COMPRESSED_SIZE {
         return Err(AppError::Theme(format!(
             ".cursorpack が {}MB 超: 提出できません",
-            MAX_PACK_SIZE / 1024 / 1024
+            DEFAULT_MAX_PACK_COMPRESSED_SIZE / 1024 / 1024
         )));
     }
     let sha256 = sha256_hex(&pack_bytes);

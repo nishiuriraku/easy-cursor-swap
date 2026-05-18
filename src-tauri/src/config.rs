@@ -27,6 +27,14 @@ pub struct BackupInfo {
 /// 設定スキーマの現在のバージョン
 const CURRENT_SCHEMA_VERSION: u32 = 1;
 
+/// pack (.cursorpack) 圧縮サイズの既定上限 (50 MB)。
+///
+/// `import_cursorpack_bytes` / `inspect_cursorpack_bytes` / `submit_theme_auto` の
+/// 上限チェックで参照する。実行時に `SecurityConfig::max_pack_compressed_size` を
+/// 変更しても本 const は不変 — 「default 値の SoT」として機能する。
+/// runtime config 値を読む経路は別 PR で API カスケード変更とともに導入予定。
+pub const DEFAULT_MAX_PACK_COMPRESSED_SIZE: u64 = 50 * 1024 * 1024;
+
 /// アプリケーション設定（Source of Truth）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
@@ -143,8 +151,7 @@ impl Default for AppConfig {
                 usage: HashMap::new(),
             },
             security: SecurityConfig {
-                // 50 MB
-                max_pack_compressed_size: 50 * 1024 * 1024,
+                max_pack_compressed_size: DEFAULT_MAX_PACK_COMPRESSED_SIZE,
                 // 200 MB
                 max_pack_uncompressed_size: 200 * 1024 * 1024,
                 // 10 MB
