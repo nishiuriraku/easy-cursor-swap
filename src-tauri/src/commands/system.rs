@@ -13,26 +13,45 @@ use crate::registry::RegistryManager;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
 
-/// Windows 既定カーソルにリセットする（パニックボタン）
+/// reset 系 IPC の共通後処理。
 ///
-/// 副作用:
-///  - レジストリ `HKCU\Control Panel\Cursors` を Windows 既定に戻す
-///  - config の `active_theme_id` を `None` にクリア (アクティブテーマ解除)
-///  - `cursor-changed` イベントを発火 (UI 側で `is_active` バッジを再評価させる)
+/// レジストリ操作 (`RegistryManager::reset_to_windows_default` 等) を closure で
+/// 受け、成功した場合のみ `active_theme_id` クリアと `cursor-changed` 発火を
+/// 走らせる。 `action_label` はログ出力時の prefix。
 ///
 /// `cursor-changed` を明示発火する理由: cursor_watcher は `HWND_MESSAGE` で
 /// 作られた message-only window で WM_SETTINGCHANGE のブロードキャストを
 /// 受け取れない。SPI_SETCURSORS による即時反映だけでは UI に伝わらない。
-#[tauri::command]
-pub fn reset_to_default(app: AppHandle, config: State<'_, ConfigManager>) -> Result<(), AppError> {
-    RegistryManager::reset_to_windows_default()?;
+fn reset_with_cleanup<F>(
+    app: AppHandle,
+    config: State<'_, ConfigManager>,
+    action_label: &str,
+    registry_action: F,
+) -> Result<(), AppError>
+where
+    F: FnOnce() -> Result<(), AppError>,
+{
+    registry_action()?;
     if let Err(err) = config.update(|c| c.general.active_theme_id = None) {
-        tracing::warn!("reset_to_default: active_theme_id クリア失敗: {}", err);
+        tracing::warn!("{}: active_theme_id クリア失敗: {}", action_label, err);
     }
     if let Err(err) = app.emit("cursor-changed", ()) {
-        tracing::warn!("reset_to_default: cursor-changed emit 失敗: {}", err);
+        tracing::warn!("{}: cursor-changed emit 失敗: {}", action_label, err);
     }
     Ok(())
+}
+
+/// Windows 既定カーソルにリセットする（パニックボタン）。
+///
+/// 副作用:
+///  - レジストリ `HKCU\Control Panel\Cursors` を Windows 既定に戻す
+///  - config の `active_theme_id` を `None` にクリア
+///  - `cursor-changed` イベントを発火
+#[tauri::command]
+pub fn reset_to_default(app: AppHandle, config: State<'_, ConfigManager>) -> Result<(), AppError> {
+    reset_with_cleanup(app, config, "reset_to_default", || {
+        RegistryManager::reset_to_windows_default()
+    })
 }
 
 /// インストール前の状態にリセットする。
@@ -40,14 +59,9 @@ pub fn reset_to_default(app: AppHandle, config: State<'_, ConfigManager>) -> Res
 /// `reset_to_default` と同じく `active_theme_id` クリア + `cursor-changed` 発火を行う。
 #[tauri::command]
 pub fn reset_to_initial(app: AppHandle, config: State<'_, ConfigManager>) -> Result<(), AppError> {
-    RegistryManager::restore_from_initial_snapshot()?;
-    if let Err(err) = config.update(|c| c.general.active_theme_id = None) {
-        tracing::warn!("reset_to_initial: active_theme_id クリア失敗: {}", err);
-    }
-    if let Err(err) = app.emit("cursor-changed", ()) {
-        tracing::warn!("reset_to_initial: cursor-changed emit 失敗: {}", err);
-    }
-    Ok(())
+    reset_with_cleanup(app, config, "reset_to_initial", || {
+        RegistryManager::restore_from_initial_snapshot()
+    })
 }
 
 /// 動作環境レポートを返す (RDP / Server SKU 検出)。
