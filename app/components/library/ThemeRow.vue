@@ -6,15 +6,19 @@
  * グリッド表示の `ThemeCard.vue` と同じ emit を共有し、Library ページで
  * 表示モード切替 (`viewMode === 'list'`) に応じて差し替えられる。
  *
+ * 共通プレゼンテーション状態 (preview fetch / isSystem / isMarketplace /
+ * displayDate / onActivate / onKeydown / onFavorite) は `useThemeCardState`
+ * に集約。
+ *
  * 6 列構成 (Phase 13-A で coverage バーを撤去、preview を Arrow 1 個に。
  *  2026-05-13 で署名列 sig を撤去。
  *  2026-05-14 で Arrow セルを実 PNG プレビュー表示へ昇格):
  *  fav | preview (Arrow 1 個) | name+tags | ver | date | size
  */
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, toRef } from 'vue'
 import type { ThemeCardData } from '~/types/theme'
 import { useI18n } from '~/composables/useI18n'
-import { useThemePreviews } from '~/composables/useThemePreviews'
+import { useThemeCardState } from '~/composables/useThemeCardState'
 
 const { t } = useI18n()
 
@@ -27,34 +31,15 @@ const emit = defineEmits<{
   showDetails: [id: string]
 }>()
 
+const { previewMap, isSystem, isMarketplace, displayDate, onActivate, onKeydown, onFavorite } =
+  useThemeCardState(toRef(props, 'theme'), {
+    showDetails: (id) => emit('showDetails', id),
+    toggleFavorite: (id) => emit('toggleFavorite', id),
+  })
+
 /** 行ビューでは Arrow 1 個だけアイコン表示する。included かどうかで描画切替。 */
 const hasArrow = computed(() => props.theme.includedRoles.includes('Arrow'))
-
-/** 実カーソル画像のプレビュー (キャッシュ越しに取得)。Arrow PNG が取れた場合だけ img を出す。 */
-const previewMap = ref<Record<string, string> | null>(null)
-const { getMap } = useThemePreviews()
-
-async function fetchPreview() {
-  if (!props.theme.id) return
-  const map = await getMap(props.theme.id)
-  previewMap.value = map
-}
-
-onMounted(fetchPreview)
-watch(() => props.theme.id, fetchPreview)
-
 const arrowPreviewUrl = computed(() => previewMap.value?.['Arrow'] ?? null)
-
-const isSystem = computed(() => props.theme.kind === 'system')
-const isMarketplace = computed(() => props.theme.kind === 'marketplace')
-
-/** ISO8601 / YYYY-MM-DD どちらでも先頭 10 文字に切り詰める。
- *  Windows システムスキームは `date` が空文字で来るので「—」で代替。 */
-const displayDate = computed(() => {
-  const d = props.theme.date
-  if (!d) return '—'
-  return d.length > 10 ? d.slice(0, 10) : d
-})
 
 /** バイト数 → 「2.1 MB」「412 KB」表示。
  *  - undefined または 0 は「—」(Windows システムスキーム想定)
@@ -66,29 +51,6 @@ const displaySize = computed(() => {
   if (b < 1024 * 1024) return `${(b / 1024).toFixed(0)} KB`
   return `${(b / (1024 * 1024)).toFixed(1)} MB`
 })
-
-function onFav(e: Event) {
-  e.stopPropagation()
-  if (isSystem.value) return
-  emit('toggleFavorite', props.theme.id)
-}
-
-/**
- * 行クリック/Enter/Space → 詳細モーダル。
- * 内側の <button> は stopPropagation で防御し、星ボタンとイベントの取り合いを避ける。
- */
-function onRowActivate(e: Event) {
-  const target = e.target as HTMLElement | null
-  if (target?.closest('button, a, input')) return
-  emit('showDetails', props.theme.id)
-}
-
-function onRowKeydown(e: KeyboardEvent) {
-  if (e.key === 'Enter' || e.key === ' ') {
-    e.preventDefault()
-    onRowActivate(e)
-  }
-}
 </script>
 
 <template>
@@ -97,8 +59,8 @@ function onRowKeydown(e: KeyboardEvent) {
     role="row"
     tabindex="0"
     :aria-label="t('library.detailAria', { name: theme.name })"
-    @click="onRowActivate"
-    @keydown="onRowKeydown"
+    @click="onActivate"
+    @keydown="onKeydown"
   >
     <!-- お気に入り -->
     <div class="lt-col lt-fav" role="cell">
@@ -107,7 +69,7 @@ function onRowKeydown(e: KeyboardEvent) {
         :class="['star', { on: theme.isFavorite }]"
         :aria-label="theme.isFavorite ? t('library.favRemove') : t('library.favAdd')"
         :aria-pressed="theme.isFavorite"
-        @click="onFav"
+        @click="onFavorite"
       >
         <UiIcon :name="theme.isFavorite ? 'Star' : 'StarO'" :size="12" aria-hidden="true" />
       </button>
