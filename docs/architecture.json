@@ -229,11 +229,15 @@
         "name": "theme",
         "file": "src-tauri/src/theme/mod.rs",
         "category": "theme",
-        "role": "ThemeManager。.cursorpack の作成・取り込み・検証。theme.json。孤児カーソルの復旧。Ed25519 署名埋込。",
+        "role": "ThemeManager (ZST + 機能別 impl 分散)。.cursorpack の作成・取り込み・検証、theme.json 管理、孤児カーソルの復旧、Ed25519 署名埋込。2026-05-18 で listing / preview / apply / package の 4 サブモジュールに分割 (それぞれが追加の `impl ThemeManager` ブロックを提供)。",
         "files": [
           "src-tauri/src/theme/mod.rs",
           "src-tauri/src/theme/types.rs",
-          "src-tauri/src/theme/sanitize.rs"
+          "src-tauri/src/theme/sanitize.rs",
+          "src-tauri/src/theme/listing.rs",
+          "src-tauri/src/theme/preview.rs",
+          "src-tauri/src/theme/apply.rs",
+          "src-tauri/src/theme/package.rs"
         ],
         "depends_on": ["cursor", "errors", "logging", "keystore"]
       },
