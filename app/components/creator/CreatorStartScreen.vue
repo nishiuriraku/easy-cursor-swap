@@ -7,10 +7,25 @@
  *
  * ドラフト一覧は将来の `get_drafts` IPC を想定し、現状は空配列で渡されたら
  * セクションごと非表示にするフォールバック設計。
+ *
+ * ヒーローの "CREATOR · vX.Y" 表示は `useAppInfo` 経由で Cargo.toml の実
+ * version を表示する (旧実装はハードコード `v1.0`)。
  */
+import { computed, onMounted } from 'vue'
+import { useAppInfo } from '~/composables/useAppInfo'
 import { useI18n } from '~/composables/useI18n'
 
 const { t } = useI18n()
+const { info, load: loadAppInfo } = useAppInfo()
+
+onMounted(() => {
+  void loadAppInfo()
+})
+
+const eyebrow = computed(() => {
+  const v = info.value?.version
+  return v ? `CREATOR · v${v}` : 'CREATOR'
+})
 
 defineProps<{
   /** 最近編集中のドラフト一覧。空配列なら "RECENT DRAFTS" セクションを隠す。 */
@@ -40,7 +55,7 @@ const emit = defineEmits<{
       <div class="es-mark">
         <CursorIcon role="Arrow" :size="48" style="color: var(--accent)" />
       </div>
-      <div class="es-eyebrow">CREATOR · v1.0</div>
+      <div class="es-eyebrow">{{ eyebrow }}</div>
       <h1>{{ t('creatorStart.title') }}</h1>
       <p>{{ t('creatorStart.description') }}</p>
 

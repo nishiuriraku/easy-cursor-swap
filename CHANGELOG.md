@@ -7,7 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(none)_
+### Fixed
+
+- `get_app_info` IPC が常に `os_version: "Windows 0.0"` を返していたバグを修正 (`OSVERSIONINFOW::default()` のフィールドゼロのままだった)。`ntdll!RtlGetVersion` 経由でクランプされない真の OS バージョンを返す。
+- `export_cursorpack_streamed` の sign / package 段階でビルドを中断したとき `build-progress` イベントに `stage: "cancelled"` が発火されず、Creator の進捗バーが固まる問題を修正。
+
+### Changed
+
+- パニックリセットフロー (`Ctrl+Alt+Shift+R`) が 17 ロール × 40ms の擬似アニメと「snapshot saved」「writing X → Y」「recovery completed in Xms」のハードコード英文ログを擬似的に表示していた挙動を廃止。実 IPC (`reset_to_default` / `reset_to_initial`) を即時呼び出し、完了/失敗のみを正直に表示するシンプルな UI に改修。
+- サイドバーのバージョン表記がハードコード `v1.0` だったのを `useAppInfo` 経由で `Cargo.toml` の実バージョンを表示するよう変更。Creator 画面のヒーロー表示 (`CREATOR · v…`) も同様。
+
+### Removed
+
+- サイドバーの「トレイ常駐 · 11.4 MB」ステータス表示を削除 (`trayMemoryMb` props は親から渡されておらず、常にデフォルト値 11.4 の偽データだった)。関連する i18n キー `common.trayResident` も削除。
+- 旧パニックフローで使用していた i18n キー `panic.writingProgress` / `panic.targetWindowsDefault` / `panic.targetSnapshot` を削除。代わりに `panic.recoveryStarted` / `panic.recoveryDone` / `panic.recoveryFailed` を追加。
+
+### Internal
+
+- マーケットプレースのフィルタチップ (`All` / `Pixel` / `Minimal` / `Animated` / `Dark`) とレイアウトのスキップナビゲーション (「メインコンテンツへスキップ」) を i18n 化。
+- `docs/architecture.json` の `useUiTheme` 役割記述、および `docs/ui_map.json` の `titlebar-theme-cycle` インタラクションが「`update_config` IPC を呼ぶ / config に永続化する」と宣言していたが、実際には localStorage のみ操作する設計であるため記述を修正。生成済み HTML (`docs/architecture.html` / `docs/ui_map.html`) も再埋め込み。
 
 ## [0.1.0] - 2026-05-16
 

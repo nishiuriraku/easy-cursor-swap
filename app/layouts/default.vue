@@ -14,7 +14,7 @@ import { invokeTauri } from '~/composables/useTauri'
 // `useRoute` / `useRouter` / コンポーネント類は Nuxt の自動インポートで解決
 
 const { config: appConfig, load: loadAppConfig } = useAppSettings()
-const { syncFromConfig } = useI18n()
+const { t, syncFromConfig } = useI18n()
 const { themes, refresh: refreshThemes } = useThemes()
 
 const route = useRoute()
@@ -127,7 +127,7 @@ onUnmounted(() => {
 <template>
   <div class="win">
     <!-- スキップナビゲーション: キーボード / スクリーンリーダー用 -->
-    <a href="#main-content" class="skip-to-content">メインコンテンツへスキップ</a>
+    <a href="#main-content" class="skip-to-content">{{ t('nav.skipToContent') }}</a>
 
     <AppTitlebar />
     <EnvironmentBanner />

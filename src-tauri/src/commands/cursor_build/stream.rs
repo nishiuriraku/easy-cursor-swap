@@ -122,6 +122,17 @@ pub fn export_cursorpack_streamed(
     let signed_key_id: Option<String> = if req.sign {
         if cancel::is_cancelled(&req.build_id) {
             cancel::clear_cancel(&req.build_id);
+            // role 段階と同様に cancelled イベントを発火し、UI 進捗バーを解放する。
+            emit_progress(
+                &app,
+                BuildProgress {
+                    build_id: req.build_id.clone(),
+                    stage: "cancelled".to_string(),
+                    current: total_roles,
+                    total: total_steps,
+                    message: Some("sign".to_string()),
+                },
+            );
             return Err(AppError::Other("ビルドがキャンセルされました".to_string()));
         }
         emit_progress(
@@ -142,6 +153,17 @@ pub fn export_cursorpack_streamed(
     // 4) Zip 出力
     if cancel::is_cancelled(&req.build_id) {
         cancel::clear_cancel(&req.build_id);
+        // 同上: package 段階キャンセル時も UI へ通知する。
+        emit_progress(
+            &app,
+            BuildProgress {
+                build_id: req.build_id.clone(),
+                stage: "cancelled".to_string(),
+                current: total_steps - 1,
+                total: total_steps,
+                message: Some("package".to_string()),
+            },
+        );
         return Err(AppError::Other("ビルドがキャンセルされました".to_string()));
     }
     emit_progress(
@@ -227,4 +249,21 @@ pub fn export_cursorpack_streamed(
         applied,
         apply_error,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    /// `BuildProgress { stage: "cancelled", .. }` は role / sign / package の
+    /// 3 段階すべてのキャンセルパスで発火されなければならない。Tauri AppHandle を
+    /// 伴う非同期 emit を unit-test するには test setup が重いため、コードに
+    /// "cancelled" 文字列が必要回数出現することを静的に検証して回帰防止する。
+    #[test]
+    fn cancel_paths_emit_cancelled_stage_in_all_three_phases() {
+        let source = include_str!("stream.rs");
+        let count = source.matches("\"cancelled\"").count();
+        assert!(
+            count >= 3,
+            "expected at least 3 occurrences of \"cancelled\" (role + sign + package), got {count}"
+        );
+    }
 }

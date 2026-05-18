@@ -2,12 +2,23 @@
 /**
  * サイドバー: Workspace / System のナビゲーションとパニックリセット導線。
  * `active` プロップで現在地をハイライト。クリックで `update:active` を emit。
+ *
+ * バージョン表示は `useAppInfo` 経由で Cargo.toml の実 version を表示する。
+ * `useAppInfo` は singleton 設計のため複数コンポーネントから呼んでも IPC は 1 回のみ。
  */
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
+import { useAppInfo } from '~/composables/useAppInfo'
 import { useI18n } from '~/composables/useI18n'
 // UiIcon は Nuxt の自動インポートで解決される
 
 const { t } = useI18n()
+const { info, load: loadAppInfo } = useAppInfo()
+
+onMounted(() => {
+  void loadAppInfo()
+})
+
+const versionLabel = computed(() => (info.value?.version ? `v${info.value.version}` : ''))
 
 interface NavEntry {
   id: string
@@ -21,12 +32,10 @@ const props = withDefaults(
     active: string
     themeCount?: number
     marketplaceCount?: number
-    trayMemoryMb?: number
   }>(),
   {
     themeCount: 0,
     marketplaceCount: 0,
-    trayMemoryMb: 11.4,
   },
 )
 
@@ -56,7 +65,10 @@ function navigate(id: string) {
       <div class="brand-mark"><UiIcon name="Logo" :size="18" /></div>
       <div class="brand-name">
         {{ t('app.name') }}
-        <small>{{ t('app.edition').toUpperCase() }} · v1.0</small>
+        <small
+          >{{ t('app.edition').toUpperCase()
+          }}<span v-if="versionLabel"> · {{ versionLabel }}</span></small
+        >
       </div>
     </div>
 
@@ -105,10 +117,6 @@ function navigate(id: string) {
         <span>{{ t('common.panic') }}</span>
         <span class="kbd" aria-hidden="true">⌃⌥⇧R</span>
       </button>
-      <div class="session" aria-live="polite" aria-atomic="true">
-        <span class="dot" aria-hidden="true" />
-        <span>{{ t('common.trayResident') }} · {{ trayMemoryMb.toFixed(1) }} MB</span>
-      </div>
     </div>
   </aside>
 </template>
@@ -172,7 +180,7 @@ nav {
 }
 
 /* ─────────────────────────────────────────────────────────────
- * フッター (パニック + セッション)
+ * フッター (パニックボタン)
  * ────────────────────────────────────────────────────────────*/
 .sidebar-foot {
   @apply mt-auto flex flex-col gap-2;
@@ -195,16 +203,5 @@ nav {
 }
 .panic .kbd {
   @apply ml-auto font-mono text-[9.5px] tracking-[0.08em] text-fg-mute;
-}
-.session {
-  @apply flex items-center gap-2.5 border-t border-line px-2 py-2.5 text-[11.5px] text-fg-dim;
-}
-.session .dot {
-  @apply size-1.5 rounded-full bg-accent;
-  box-shadow: 0 0 8px var(--accent);
-  animation: pulse 2.4s infinite;
-}
-:where(html.light) .session .dot {
-  box-shadow: 0 0 8px rgba(15, 168, 133, 0.5);
 }
 </style>

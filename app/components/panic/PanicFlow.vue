@@ -65,46 +65,47 @@ function selectStage(s: 1 | 2) {
 }
 
 async function execute() {
+  // 旧実装は 17 ロール × 40ms の擬似アニメ (合計 680ms) を IPC 呼出より前に
+  // 流していた。実 IPC (reset_to_default / reset_to_initial) は Rust 側で 1
+  // トランザクションとして完結するため、擬似ロール進捗を被せるとユーザーに
+  // 「snapshot saved」「writing X」などの実際には起きていない処理が起きた
+  // ように見せる deceptive UI になっていた (監査 A4-FAKE-001)。
+  // 修正後は実 IPC を即時呼出し、完了時にロールグリッドを done 状態に一括
+  // 反映する。失敗時は recoveryFailed ログを残し、UI に正直なエラー状態を伝える。
   phase.value = 'running'
   startedAt.value = Date.now()
-  logs.value = [{ status: 'ok', text: 'HKCU\\Control Panel\\Cursors snapshot saved', t: '0' }]
   completedRoles.value = 0
-
-  // 進捗の擬似アニメ (実 IPC は ms オーダーで完了するため、UI 演出として)
-  const step = async (delay: number) => {
-    await new Promise((r) => setTimeout(r, delay))
-  }
+  logs.value = [
+    {
+      status: 'running',
+      text: t('panic.recoveryStarted'),
+      t: '0',
+    },
+  ]
 
   try {
-    // 17 ロール書き込みの演出
-    for (let i = 0; i < CURSOR_ROLES.length; i++) {
-      const role = CURSOR_ROLES[i]!
-      logs.value.push({
-        status: 'running',
-        text: t('panic.writingProgress', {
-          role: role.id,
-          target: stage.value === 1 ? t('panic.targetWindowsDefault') : t('panic.targetSnapshot'),
-        }),
-        t: String(Date.now() - startedAt.value),
-      })
-      await step(40)
-      logs.value[logs.value.length - 1]!.status = 'ok'
-      completedRoles.value = i + 1
-    }
-
-    // 実 IPC 呼び出し
     const cmd = stage.value === 1 ? 'reset_to_default' : 'reset_to_initial'
     await invokeTauri<void>(cmd)
-
+    const elapsed = Date.now() - startedAt.value
+    // 視覚的に「完了」と認識できるよう、ロールグリッドを一気に done 状態へ。
+    // Rust 側は 17 役割すべての registry エントリを書き換えるので意味的に妥当。
+    completedRoles.value = CURSOR_ROLES.length
+    logs.value[0]!.status = 'ok'
     logs.value.push({
       status: 'ok',
-      text: `recovery completed in ${Date.now() - startedAt.value} ms`,
-      t: String(Date.now() - startedAt.value),
+      text: t('panic.recoveryDone', { ms: elapsed }),
+      t: String(elapsed),
     })
     phase.value = 'done'
     emit('done', stage.value)
   } catch (err) {
-    logs.value.push({ status: 'pending', text: `error: ${err}`, t: '' })
+    const elapsed = Date.now() - startedAt.value
+    logs.value[0]!.status = 'pending'
+    logs.value.push({
+      status: 'pending',
+      text: t('panic.recoveryFailed', { reason: String(err) }),
+      t: String(elapsed),
+    })
     phase.value = 'error'
   }
 }
