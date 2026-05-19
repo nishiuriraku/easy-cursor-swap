@@ -3,7 +3,9 @@
  * Library 画面のヘッダー (パンくず + 検索ボックス + Import/New ボタン)。
  *
  * 検索クエリは v-model で双方向バインディング、Import ボタンは emit で親に通知する。
- * New ボタンは `/creator` ページへの NuxtLink なので emit 不要。
+ * New ボタンは `/creator` への遷移を担うが、WebView2 の URL プレビュー (リンクホバー時に
+ * 左下へ出る) を回避するため `<NuxtLink custom v-slot>` で <button> にレンダリングする
+ * (DOM 上に <a href> を残さない)。slot props の navigate() が router.push に対応。
  */
 
 const { t } = useI18n()
@@ -34,8 +36,12 @@ defineEmits<{
       <button class="btn ghost" @click="$emit('open-import')">
         <UiIcon name="Import" :size="14" />{{ t('common.import') }}
       </button>
-      <NuxtLink class="btn primary" to="/creator">
-        <UiIcon name="Plus" :size="14" />{{ t('library.new') }}
+      <NuxtLink to="/creator" custom>
+        <template #default="{ navigate }">
+          <button class="btn primary" @click="navigate">
+            <UiIcon name="Plus" :size="14" />{{ t('library.new') }}
+          </button>
+        </template>
       </NuxtLink>
     </div>
   </div>

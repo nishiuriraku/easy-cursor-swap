@@ -29,14 +29,30 @@ defineEmits<{
       </p>
 
       <div class="es-cta-row">
-        <NuxtLink class="btn primary" to="/creator">
-          <UiIcon name="Plus" :size="14" />{{ t('library.emptyNew') }}
+        <!--
+          NuxtLink を custom v-slot で button にレンダリングしている理由:
+          WebView2 (Edge) が <a href> のフォーカス/ホバー時に左下へ URL プレビューを
+          出すのを止めるため。`IsStatusBarEnabled=false` は古い status bar しか
+          抑止できず、modern Chromium の floating URL chip は別経路で出る。
+          DOM 上に <a href> が無ければ Chromium はそもそも preview を出さない。
+          slot props の navigate() を click に直接渡せば router.push と等価。
+        -->
+        <NuxtLink to="/creator" custom>
+          <template #default="{ navigate }">
+            <button class="btn primary" @click="navigate">
+              <UiIcon name="Plus" :size="14" />{{ t('library.emptyNew') }}
+            </button>
+          </template>
         </NuxtLink>
         <button class="btn" @click="$emit('open-import')">
           <UiIcon name="Import" :size="13" />{{ t('library.emptyImport') }}
         </button>
-        <NuxtLink class="btn ghost" to="/marketplace">
-          <UiIcon name="Globe" :size="13" />{{ t('library.emptyOpenIndex') }}
+        <NuxtLink to="/marketplace" custom>
+          <template #default="{ navigate }">
+            <button class="btn ghost" @click="navigate">
+              <UiIcon name="Globe" :size="13" />{{ t('library.emptyOpenIndex') }}
+            </button>
+          </template>
         </NuxtLink>
       </div>
 

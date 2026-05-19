@@ -6,13 +6,25 @@
  */
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { h } from 'vue'
 import LibraryToolbar from '../LibraryToolbar.vue'
 
+// NuxtLink は本体側で `custom v-slot` 形式に切り替わったため、スロットに渡される
+// `navigate` を含むスロット props をモックする。外側 <span> 包みで「NuxtLink がどの
+// ルートを向いているか」を data-to で識別可能にする。
 const stubs = {
   UiIcon: { template: '<span></span>' },
   NuxtLink: {
-    props: ['to'],
-    template: '<a :href="to" data-testid="nuxt-link"><slot /></a>',
+    props: ['to', 'custom'],
+    setup(props: { to: string; custom?: boolean }, { slots }: { slots: any }) {
+      const navigate = () => {}
+      return () =>
+        h(
+          'span',
+          { 'data-testid': 'nuxt-link', 'data-to': props.to },
+          slots.default?.({ navigate, isActive: false, isExactActive: false, href: props.to }),
+        )
+    },
   },
 }
 
@@ -49,10 +61,10 @@ describe('LibraryToolbar', () => {
       props: { searchQuery: '' },
       global: { stubs },
     })
-    // ボタンは Import 1 つ (New は NuxtLink)
-    const buttons = wrapper.findAll('button')
-    expect(buttons).toHaveLength(1)
-    await buttons[0]!.trigger('click')
+    // Import ボタンは .tb-actions の直接の子 <button> (New は NuxtLink スタブ内)。
+    const importBtn = wrapper.find<HTMLButtonElement>('.tb-actions > button')
+    expect(importBtn.exists()).toBe(true)
+    await importBtn.trigger('click')
     expect(wrapper.emitted('open-import')).toHaveLength(1)
   })
 
@@ -63,7 +75,10 @@ describe('LibraryToolbar', () => {
     })
     const link = wrapper.find('[data-testid="nuxt-link"]')
     expect(link.exists()).toBe(true)
-    expect(link.attributes('href')).toBe('/creator')
+    // NuxtLink を custom v-slot 化したので `data-to` で参照先を確認する。
+    expect(link.attributes('data-to')).toBe('/creator')
+    // slot 内に <button> がレンダリングされていること
+    expect(link.find('button').exists()).toBe(true)
   })
 
   it('does not render a keyboard shortcut hint (Ctrl+K is not wired up)', () => {
