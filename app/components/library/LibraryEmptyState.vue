@@ -61,14 +61,17 @@ defineEmits<{
 }
 .es-bg {
   @apply pointer-events-none absolute inset-0 z-0;
+  /* gradient のサイズは stage 寸法に追従させる (% ベース)。固定 px だと
+   * stage が flex-1 で伸びた際に上下端まで halo が届かず dead zone ができる。
+   * stop を 80% に伸ばし、上下の halo を中央近くまで滑らかに繋ぐ。 */
   background:
-    radial-gradient(700px 400px at 50% 0%, rgba(124, 242, 212, 0.08), transparent 60%),
-    radial-gradient(900px 500px at 50% 100%, rgba(139, 125, 255, 0.05), transparent 60%);
+    radial-gradient(85% 65% at 50% 0%, rgba(124, 242, 212, 0.08), transparent 80%),
+    radial-gradient(100% 70% at 50% 100%, rgba(139, 125, 255, 0.05), transparent 80%);
 }
 :where(html.light) .es-bg {
   background:
-    radial-gradient(700px 400px at 50% 0%, rgba(15, 168, 133, 0.08), transparent 60%),
-    radial-gradient(900px 500px at 50% 100%, rgba(106, 92, 255, 0.05), transparent 60%);
+    radial-gradient(85% 65% at 50% 0%, rgba(15, 168, 133, 0.08), transparent 80%),
+    radial-gradient(100% 70% at 50% 100%, rgba(106, 92, 255, 0.05), transparent 80%);
 }
 .es-empty {
   @apply relative z-10 flex w-[640px] max-w-full flex-col items-center text-center;
