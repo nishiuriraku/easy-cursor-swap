@@ -7,10 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.2] - 2026-05-19 (pre-release)
+
+v0.0.1 と同じく仮リリース系列 (provisional, SemVer 0.0.x で API 安定保証なし)。Marketplace 提出フローのバグ修正と、Windows カーソルサイズ拡大時に発生していたレジストリ書き込み偽陽性の修正が中心。
+
 ### Fixed
 
+- マーケットプレイス『公式インデックスに提出』モーダル (Auto / Manual 両タブ) のテーマ選択ドロップダウンで、`name` が `LocalizedString` マップ形式のテーマ (マーケットプレイス由来テーマなど) に対して `[object Object]` と表示される問題を修正。`MarketplaceName` 型と `pickLocalizedName(name, locale)` composable を通じて現在ロケールのラベルに解決するよう変更し、`themeOptions` を script-side computed として宣言することで unimport の auto-import を確実に発火させた。`entryJson` 側は `th.name` を raw のまま保持し、公式インデックス entry の `LocalizedString` 形式 name と整合 (`FeaturedCard.vue` の `displayName` パターンと一致)。`SubmitThemeDialog.test.ts` に `name: { ja, en }` でマウントして `[object Object]` が出ないことを保証するリグレッションテストを追加。
+- Creator の『複製するテーマを選択』モーダル、および マーケットプレイスの『公式インデックスに提出』モーダル (Auto / Manual 両タブ) で、`source/kind` が `marketplace` のテーマを選択肢から除外。マーケットプレイス由来テーマからの派生作品で出所が曖昧になる問題と、公式由来テーマの二重提出を防止する。
 - Windows の「マウス ポインターとタッチ」でカーソルサイズを拡大した状態で Library からテーマを「適用」すると、カーソル画像自体は正しく差し替わっているのに `適用に失敗しました: レジストリエラー: SystemParametersInfoW の呼び出しに失敗: ハンドルが無効です。 (0x80070006)` というエラートーストが出る問題を修正。`SPI_SETCURSORS` に同梱される `SPIF_SENDCHANGE` の `WM_SETTINGCHANGE` ブロードキャスト経路で受信側 (シェル / アクセシビリティサービス) のカーネルハンドルがライフサイクル境界で `ERROR_INVALID_HANDLE (6)` を返した場合の偽陽性。レジストリ書き込みは既に完了しているため、既存の `ERROR_INVALID_WINDOW_HANDLE (1400)` と同じく `is_broadcast_false_positive` のホワイトリストに `HRESULT_FROM_WIN32(6) = 0x80070006` を追加し、debug ログ扱いで握りつぶす。ACCESS_DENIED など本物の Win32 エラーは引き続き伝播する。
-- Marketplace 自動提出 (`submit_theme_auto`) が公式インデックス entry の `author` フィールドに提出者の GitHub username を上書きしていたバグを修正。`theme.json` の `author` フィールドが優先採用されるようになり、第三者が代理提出しても本来の作者クレジットが保持される (Manual タブの `th.author ?? githubUsername.value` と挙動を一致)。`theme.json` に `author` が無い場合のみ提出者 GitHub username にフォールバックする。あわせて公式インデックスリポ ([`easy-cursor-swap-index`](https://github.com/nishiuriraku/easy-cursor-swap-index)) の `scripts/marketplace/validate.mjs` に `.cursorpack` 内 `theme.json` と `entry.author` の一致チェックを追加し、CI で drift を検出するようにした。既存 entry `f2d3825c` (Hamuchi Mouse Cursor) の `author` も `"nishiuriraku"` → `"無ナ"` に修正。
+- マーケットプレイス自動提出 (`submit_theme_auto`) が公式インデックス entry の `author` フィールドに提出者の GitHub username を上書きしていたバグを修正。`theme.json` の `author` フィールドが優先採用されるようになり、第三者が代理提出しても本来の作者クレジットが保持される (Manual タブの `th.author ?? githubUsername.value` と挙動を一致)。`theme.json` に `author` が無い場合のみ提出者 GitHub username にフォールバックする。あわせて公式インデックスリポ ([`easy-cursor-swap-index`](https://github.com/nishiuriraku/easy-cursor-swap-index)) の `scripts/marketplace/validate.mjs` に `.cursorpack` 内 `theme.json` と `entry.author` の一致チェックを追加し、CI で drift を検出するようにした。既存 entry `f2d3825c` (Hamuchi Mouse Cursor) の `author` も `"nishiuriraku"` → `"無ナ"` に修正。
 
 ## [0.0.1] - 2026-05-18
 
@@ -62,5 +68,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `BulkImportPreviewModal.vue` (579 → 297 行 / -49%) から `useBulkImportPreviewState` を抽出。matches/unmatched の三方移動 state machine + props.open 連動の初期マッチ watch + Blob URL ライフサイクル + ApplyPayload 組立を composable に閉じ込め、SFC は presentation に専念 (audit C21-SIZE 部分)。`ApplyPayload` 型の output 場所も SFC から composable に移動 (`useCreatorBulkImportFlow` 側 import を更新)。
 - component 総数: 50 → 56 (library +3 / marketplace +2 / creator +1)。`docs/architecture.json` / `docs/ui_map.json` の `measured_counts.components_total` を再測定し、HTML viewer に再埋め込み。
 
-[Unreleased]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.1...HEAD
+[Unreleased]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.2...HEAD
+[0.0.2]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/nishiuriraku/easy-cursor-swap/releases/tag/v0.0.1

@@ -134,7 +134,9 @@ jobs:
             - Windows Server は動作対象外
             - `.ani` の新規生成は未対応
           releaseDraft: true
-          prerelease: false
+          # SemVer 0.0.x はプロジェクト方針として provisional (API 安定保証なし) 扱いのため、
+          # GitHub Release の Pre-release チェックを常に立てる。0.1.0 で stable に切り替える際に false へ戻す。
+          prerelease: true
           includeUpdaterJson: true
 
       # -----------------------------------------------------------

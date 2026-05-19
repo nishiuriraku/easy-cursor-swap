@@ -1,7 +1,7 @@
 {
   "name": "easy-cursor-swap",
   "description": "Windows 用マウスカーソルテーマ管理ツール",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "type": "module",
   "private": true,
   "license": "MIT",
