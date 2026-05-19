@@ -118,6 +118,38 @@ describe('SubmitThemeDialog Auto tab', () => {
     w.unmount()
   })
 
+  it('renders localized theme name in select options instead of [object Object]', async () => {
+    // 回帰テスト: Rust 側 `ThemeSummary.name` は `LocalizedString` で
+    // localized object (`{ja, en, ...}`) が JSON 化されて届く。
+    // UiSelect の option label で `${th.name}` を生展開すると `"[object Object] (v...)"`
+    // に化けるため、`pickLocalizedName(th.name, locale)` を介して解決する必要がある。
+    invokeMock.mockResolvedValueOnce([
+      {
+        id: 'aaa',
+        name: { ja: 'ローカライズドテーマ', en: 'Localized Theme' },
+        author: 'me',
+        version: '1.0',
+        included_roles: [],
+        is_active: false,
+      },
+    ])
+    invokeMock.mockResolvedValueOnce({ has_keypair: true, key_id: 'k', public_key_b64: 'p' })
+    invokeMock.mockResolvedValueOnce({ github_account: null })
+    const w = mountOpen()
+    await flushPromises()
+
+    // UiSelect の listbox を開いて option を露出させる
+    const trigger = document.body.querySelector('#submit-auto-theme') as HTMLButtonElement | null
+    expect(trigger).toBeTruthy()
+    trigger!.click()
+    await flushPromises()
+
+    const body = document.body.textContent ?? ''
+    expect(body).toContain('ローカライズドテーマ')
+    expect(body).not.toContain('[object Object]')
+    w.unmount()
+  })
+
   it('switches to Manual tab when clicked', async () => {
     invokeMock.mockResolvedValueOnce([])
     invokeMock.mockResolvedValueOnce({ has_keypair: true, key_id: 'k', public_key_b64: 'p' })

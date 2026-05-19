@@ -11,6 +11,7 @@
  * フッターは step / submitDone の状態を見て切り替えるため親に残す。
  */
 import type { GithubAccount, SubmitStage } from '~/types/githubAuth'
+import type { MarketplaceName } from '~/types/marketplace'
 
 const { t } = useI18n()
 
@@ -22,10 +23,13 @@ const emit = defineEmits<{
   'update:open': [value: boolean]
 }>()
 
-// ローカルテーマ一覧の型 (Rust ThemeSummary に対応)
+// ローカルテーマ一覧の型 (Rust ThemeSummary に対応)。
+// `name` は Rust 側 `LocalizedString` の生形 (`string | { [locale]: string }`) で渡ってくるため
+// 表示時は `pickLocalizedName` を介す。公式インデックス entry の `name` も localized object を
+// 許容するので、`entryJson` ではそのまま JSON 化する (`MarketplaceEntry.name` 型と整合)。
 interface ThemeSummary {
   id: string
-  name: string
+  name: MarketplaceName
   author: string | null
   version: string
   included_roles: string[]

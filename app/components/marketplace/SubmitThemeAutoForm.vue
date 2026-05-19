@@ -7,10 +7,12 @@
  * (useMarketplaceSubmit は singleton ではないため、子側で呼び直すと state が分裂する)。
  */
 import type { GithubAccount } from '~/types/githubAuth'
+import type { MarketplaceName } from '~/types/marketplace'
 
 interface ThemeSummary {
   id: string
-  name: string
+  /** Rust 側 `LocalizedString` の生形 (`string | { [locale]: string }`)。表示時は `pickLocalizedName` で解決する。 */
+  name: MarketplaceName
   author: string | null
   version: string
   included_roles: string[]
@@ -39,7 +41,19 @@ const emit = defineEmits<{
   'tag-keydown': [e: KeyboardEvent]
 }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
+
+// Rust `LocalizedString` (`string | { [locale]: string }`) を現在の locale に解決して
+// `${name} (v${version})` 形式に整形する。
+// テンプレート内で `pickLocalizedName(...)` を直接呼ぶと unimport が script AST を見て
+// import を注入できず実行時に未定義になるため、script 側で wrap する
+// (`FeaturedCard.vue` の `displayName` と同じパターン)。
+const themeOptions = computed(() =>
+  props.themes.map((th) => ({
+    value: th.id,
+    label: `${pickLocalizedName(th.name, locale.value)} (v${th.version})`,
+  })),
+)
 </script>
 
 <template>
@@ -52,12 +66,7 @@ const { t } = useI18n()
       :model-value="props.selectedThemeId"
       width="100%"
       :placeholder="t('marketplace.submitSelectPlaceholder')"
-      :options="
-        props.themes.map((th) => ({
-          value: th.id,
-          label: `${th.name} (v${th.version})`,
-        }))
-      "
+      :options="themeOptions"
       @update:model-value="(v: string | null) => emit('update:selectedThemeId', v)"
     />
   </div>
