@@ -1,6 +1,6 @@
 # EasyCursorSwap ファイル機能インベントリ
 
-> 最終更新: 2026-05-13
+> 最終更新: 2026-05-20
 >
 > `src-tauri/src/` と `app/` の **生きたファイル索引**。何がどこにあるかを 1 ファイル単位で把握するための辞書。
 > 俯瞰の見取り図は [`architecture.md`](./architecture.md) を参照。
@@ -108,7 +108,7 @@
 |---|---|
 | [shell/](../app/components/shell/) | `AppTitlebar` / `AppSidebar` / `EnvironmentBanner` |
 | [library/](../app/components/library/) (15) | `ThemeCard` / `ThemeRow` / `ThemeDetailModal` / `ThemeDetailDrawer` / `ThemeDetailDrawerHero` / `ThemeDetailDrawerStrip` / `ThemeDetailDrawerFooter` / `ApplyModal` / `ImportConflictDialog` / `ThemePickerModal` / `CursorMatrix` / `LibraryToolbar` / `LibraryFilterBar` / `LibraryEmptyState` / `LibraryDropOverlay` |
-| [creator/](../app/components/creator/) (13) | `CreatorStartScreen` / `CreatorToolbar` / `CreatorRoleList` / `CreatorMetadataPane` (Hotspot 節を内包) / `CreatorEditorCanvas` / `NewThemeStartModal` / `SaveDestinationModal` / `BulkImportButton` / `BulkImportPreviewModal` / `BulkImportRoleRow` / `RoleListItem` / `SizeStrip` / `AniThumb` |
+| [creator/](../app/components/creator/) (14) | `CreatorStartScreen` / `CreatorToolbar` / `CreatorRoleList` / `CreatorMetadataPane` (Hotspot 節を内包) / `CreatorEditorCanvas` / `NewThemeStartModal` / `SaveDestinationModal` / `DiscardEditDialog` (Clear / 画面遷移時の編集破棄確認) / `BulkImportButton` / `BulkImportPreviewModal` / `BulkImportRoleRow` / `RoleListItem` / `SizeStrip` / `AniThumb` |
 | [marketplace/](../app/components/marketplace/) (6) | `FeaturedCard` / `SubmitThemeDialog` (Auto/Manual タブ切替) / `SubmitThemeAutoForm` / `SubmitThemeManualForm` / `MarketplaceDetailModal` / `SubmitDeviceFlowModal` (Device Flow 認証 UI) |
 | [settings/](../app/components/settings/) (14) | `GeneralSection` / `StartupSection` / `LibrarySection` / `SecuritySection` / `KeysSection` / `LoggingSection` (ログ出力設定 + クラッシュレポート opt-in トグル / 件数表示 / 送信・クリアボタン) / `UpdatesSection` / `AboutSection` / `SettingsRow` (anchor prop で検索ジャンプ対応) / `SettingsToggle` / `PassphrasePrompt` / `ConfigRecoveryPanel` / `SettingsSearchDropdown` (ja/en 両言語の横断検索ドロップダウン) / `OssLicenseModal` |
 | [preview/](../app/components/preview/) | `CursorPreview` (theme detail で使うプレビュー) |
@@ -188,7 +188,7 @@
 | Rust モジュール数 (lib.rs `pub mod`) | 23 + ベンチ 2 |
 | Tauri IPC コマンド数 | 52 |
 | Vue ページ数 | 4 (+2 helpers) |
-| Vue コンポーネント (subdir 別) | shell 3 / library 15 / creator 13 / marketplace 6 / settings 14 / preview 1 / panic 1 / icons 2 / ui 1 (合計 56) |
+| Vue コンポーネント (subdir 別) | shell 3 / library 15 / creator 14 / marketplace 6 / settings 14 / preview 1 / panic 1 / icons 2 / ui 1 (合計 57) |
 | Composables 数 | 36 |
-| Vitest テストファイル数 | 19 (composables) + 4 (pages) + 5 (components/creator) + 7 (components/library) + 8 (components/settings) + 2 (components/marketplace) + 1 (components/preview) = 46 |
+| Vitest テストファイル数 | 20 (composables) + 4 (pages) + 6 (components/creator) + 7 (components/library) + 8 (components/settings) + 2 (components/marketplace) + 1 (components/preview) = 48 |
 | CI ワークフロー数 | 3 (ci / performance / release) |

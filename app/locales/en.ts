@@ -198,6 +198,16 @@ export default {
     dropSub: 'PNG / SVG / CUR / ICO / ANI / .cursorpack are accepted',
     recentRoleCount: '{count}/17 roles',
     untitledThemeName: 'Untitled Theme',
+    discardDialog: {
+      titleClear: 'Discard your edits?',
+      titleNavigate: 'Leave Creator?',
+      messageClear:
+        'Your assets and metadata are unsaved. Clearing will discard them permanently.',
+      messageNavigate:
+        'Your assets and metadata are unsaved. Leaving this screen will discard the changes.',
+      warning: 'Unsaved changes cannot be recovered',
+      confirm: 'Discard and continue',
+    },
   },
   panic: {
     title: 'Run Reset',

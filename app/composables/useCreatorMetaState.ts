@@ -33,5 +33,20 @@ export function useCreatorMetaState() {
     shadowEnabled.value = false
   }
 
-  return { name, nameEn, author, version, description, shadowEnabled, reset }
+  /**
+   * いずれかのメタフィールドが「初期セッション値」から変更されているか。
+   * 編集破棄ダイアログのガード判定 (creator.vue::hasUnsavedEdits) で使う。
+   * untitledThemeName は locale 切替で変わる可能性があるため、現在の翻訳と比較する。
+   */
+  const isDirty = computed(
+    () =>
+      name.value !== t('creator.untitledThemeName') ||
+      nameEn.value !== '' ||
+      author.value !== '' ||
+      version.value !== '1.0.0' ||
+      description.value !== '' ||
+      shadowEnabled.value !== false,
+  )
+
+  return { name, nameEn, author, version, description, shadowEnabled, reset, isDirty }
 }

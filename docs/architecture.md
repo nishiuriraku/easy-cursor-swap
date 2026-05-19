@@ -151,8 +151,8 @@ app/
 │  │                LibraryToolbar, LibraryFilterBar, LibraryEmptyState, LibraryDropOverlay (15)
 │  ├─ creator/     ← CreatorStartScreen, CreatorToolbar, CreatorRoleList, CreatorMetadataPane,
 │  │                CreatorEditorCanvas, NewThemeStartModal, SaveDestinationModal,
-│  │                BulkImportButton, BulkImportPreviewModal, BulkImportRoleRow, RoleListItem,
-│  │                SizeStrip, AniThumb (13)
+│  │                DiscardEditDialog, BulkImportButton, BulkImportPreviewModal,
+│  │                BulkImportRoleRow, RoleListItem, SizeStrip, AniThumb (14)
 │  ├─ marketplace/ ← FeaturedCard, SubmitThemeDialog, SubmitThemeAutoForm, SubmitThemeManualForm,
 │  │                MarketplaceDetailModal, SubmitDeviceFlowModal (6)
 │  ├─ settings/    ← SettingsRow, SettingsToggle, ConfigRecoveryPanel, PassphrasePrompt,
@@ -187,7 +187,7 @@ app/
 | Page | 主な composable / Component | 主な IPC |
 |---|---|---|
 | `index.vue` (Library) | useThemes, useCursorpackOpener, useThemePreviews, ThemeCard / ThemeRow, ApplyModal, ImportConflictDialog, ThemePickerModal | `get_themes`, `apply_theme`, `import_cursorpack`, `inspect_cursorpack`, `delete_theme`, `duplicate_theme`, `repackage_theme`, `list_windows_schemes`, `apply_windows_scheme`, `get_windows_scheme_role_previews`, `export_windows_scheme_as_cursorpack`, `set_theme_favorite`, `take_pending_cursorpack` |
-| `creator.vue` | useCreatorAssets, useCreatorPickers, useCreatorImport, useCreatorBulkImportFlow, useCreatorExport, useRoleMatcher, useBulkImport, useKeystore, useHotspotDefaults, useHotspotInteraction, useAniPlayer, sanitizeSvg, NewThemeStartModal, BulkImportPreviewModal | `parse_cursorpack_for_creator`, `bulk_resolve_assets`, `cancel_bulk_import`, `export_cursorpack_streamed`, `cancel_build`, `repackage_theme`, `apply_theme`, `keystore_info` |
+| `creator.vue` | useCreatorAssets, useCreatorPickers, useCreatorImport, useCreatorBulkImportFlow, useCreatorExport, useRoleMatcher, useBulkImport, useKeystore, useHotspotDefaults, useHotspotInteraction, useAniPlayer, sanitizeSvg, NewThemeStartModal, BulkImportPreviewModal, DiscardEditDialog (Clear / 画面遷移ガード) | `parse_cursorpack_for_creator`, `bulk_resolve_assets`, `cancel_bulk_import`, `export_cursorpack_streamed`, `cancel_build`, `repackage_theme`, `apply_theme`, `keystore_info` |
 | `marketplace.vue` | useThemes, useMarketplacePreviews, useGithubAuth, useMarketplaceSubmit, FeaturedCard, MarketplaceDetailModal, SubmitThemeDialog, SubmitDeviceFlowModal | `marketplace_fetch_index`, `marketplace_install`, `marketplace_fetch_preview`, `keystore_info`, `start_device_flow`, `complete_device_flow`, `cancel_device_flow`, `submit_theme_auto`, `revoke_github_link`, `open_url` |
 | `settings.vue` | useAppSettings, useKeystore, useUpdater, useSettingsSearch, ConfigRecoveryPanel, PassphrasePrompt, SettingsSearchDropdown, GeneralSection 〜 AboutSection の 8 セクション | `get_config`, `update_config`, `keystore_*`, `list_config_backups`, `restore_config_backup`, `export_profile`, `import_profile`, `list_crash_reports`, `clear_crash_reports`, `submit_crash_reports`, `check_update_is_major_jump` |
 | `PanicFlow.vue` (modal) | useNotify | `reset_to_default`, `reset_to_initial` |
