@@ -13,7 +13,7 @@ import type { CursorRoleDef } from '~/components/icons/CursorIcons'
 import type { CursorPreviewAsset } from '~/components/preview/CursorPreview.vue'
 import type { Hotspot } from '~/composables/useCreatorAssets'
 
-type ResampleMode = 'lanczos' | 'nearest' | 'auto'
+type ResampleMode = 'lanczos' | 'nearest'
 
 const SIZES = [32, 48, 64, 96, 128, 256] as const
 
@@ -128,13 +128,13 @@ function centerHotspot() {
             <span>RESAMPLE</span>
             <div class="btn-group">
               <button
-                v-for="mode in ['lanczos', 'nearest', 'auto'] as ResampleMode[]"
+                v-for="mode in ['lanczos', 'nearest'] as ResampleMode[]"
                 :key="mode"
                 :class="['btn', { active: props.resample === mode }]"
                 style="height: 26px; font-size: 11px"
                 @click="emit('update:resample', mode)"
               >
-                {{ mode === 'lanczos' ? 'Lanczos' : mode === 'nearest' ? 'Nearest' : 'Auto' }}
+                {{ mode === 'lanczos' ? 'Lanczos' : 'Nearest' }}
               </button>
             </div>
           </div>

@@ -22,7 +22,7 @@ const { info: keystoreInfo, refresh: refreshKeystore } = useKeystore()
 const hasKeystoreSigning = computed(() => keystoreInfo.value.has_keypair)
 
 type RoleStatus = 'filled' | 'empty'
-type ResampleMode = 'lanczos' | 'nearest' | 'auto'
+type ResampleMode = 'lanczos' | 'nearest'
 
 const SIZES = [32, 48, 64, 96, 128, 256] as const
 type TabId = 'assign' | 'metadata'
