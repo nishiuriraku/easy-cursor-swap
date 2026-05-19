@@ -119,10 +119,6 @@ function onInstall() {
                 </div>
                 <span class="num">{{ entry.includedRoles.length }}/17</span>
               </div>
-              <div class="md-row">
-                <span class="md-k">{{ t('marketplace.downloads') }}</span>
-                <span class="md-v">↓ {{ entry.downloadCount.toLocaleString('ja-JP') }}</span>
-              </div>
               <div v-if="entry.tags.length" class="md-row">
                 <span class="md-k">Tags</span>
                 <span class="md-v chips-row">

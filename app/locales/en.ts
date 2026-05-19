@@ -449,7 +449,6 @@ export default {
     addToLibrary: 'Add to Library',
     alreadyInstalled: 'Already installed',
     installing: 'Installing…',
-    downloads: 'Downloads',
     openMarketplaceDetailAria: 'Open details for {name}',
     // Auto-submit flow (Phase 10)
     submitMode: 'Submission mode',

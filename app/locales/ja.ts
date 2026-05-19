@@ -448,7 +448,6 @@ export default {
     addToLibrary: 'ライブラリに追加',
     alreadyInstalled: 'インストール済み',
     installing: 'インストール中…',
-    downloads: 'ダウンロード',
     openMarketplaceDetailAria: '{name} の詳細を開く',
     // Auto-submit flow (Phase 10)
     submitMode: '提出モード',

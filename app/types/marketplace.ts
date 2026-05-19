@@ -35,7 +35,12 @@ export interface MarketplaceEntry {
   /** 直接ダウンロード URL */
   downloadUrl: string
   version: string
-  /** ダウンロード回数 (CI 集計値) */
+  /**
+   * ダウンロード回数。
+   * 現状 raw.githubusercontent.com 直 DL のためカウント供給源が無く、index.json では常に 0。
+   * UI からは非表示 (FeaturedCard / MarketplaceDetailModal とも DL 数表示を撤去)。
+   * Rust 側 (`MarketplaceEntry.download_count`) と index スキーマには互換のため残してある。
+   */
   downloadCount: number
   /** プレビュー用の役割 ID 一覧 */
   includedRoles: string[]
