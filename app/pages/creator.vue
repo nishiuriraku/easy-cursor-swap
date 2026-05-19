@@ -92,7 +92,7 @@ const perSizeHotspot = ref(false)
 const sourceThemeId = ref<string | null>(null)
 /** SaveDestinationModal の開閉と初期 destination 制御 */
 const saveModalOpen = ref(false)
-const saveModalDefault = ref<'file' | 'library' | 'libraryAndApply'>('file')
+const saveModalDefault = ref<'file' | 'library' | 'libraryAndApply'>('library')
 
 /**
  * 役割ごとのインポート済みアセットを `useCreatorAssets` 経由で集約管理する。
@@ -583,7 +583,7 @@ function resetCreator() {
   }
   activeRoleId.value = 'Arrow'
   sourceThemeId.value = null
-  saveModalDefault.value = 'file'
+  saveModalDefault.value = 'library'
   saveModalOpen.value = false
   activeSize.value = 64
   metaState.reset()

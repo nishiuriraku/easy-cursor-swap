@@ -36,7 +36,9 @@ const emit = defineEmits<{
 
 const destination = ref<Props['defaultDestination']>(props.defaultDestination)
 const overwriteExisting = ref(true)
-const sign = ref(false)
+// 鍵ペアがある (= 署名可能な) ときは「署名する」をデフォルト ON にする。
+// disabled (= hasKeystoreSigning=false) のときはチェック不可なので false で確定。
+const sign = ref(props.hasKeystoreSigning)
 const nameInput = ref(props.metaName)
 
 watch(
@@ -45,7 +47,7 @@ watch(
     if (open) {
       destination.value = props.defaultDestination
       overwriteExisting.value = true
-      sign.value = false
+      sign.value = props.hasKeystoreSigning
       nameInput.value = props.metaName
     }
   },
