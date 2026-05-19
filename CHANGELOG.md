@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Windows の「マウス ポインターとタッチ」でカーソルサイズを拡大した状態で Library からテーマを「適用」すると、カーソル画像自体は正しく差し替わっているのに `適用に失敗しました: レジストリエラー: SystemParametersInfoW の呼び出しに失敗: ハンドルが無効です。 (0x80070006)` というエラートーストが出る問題を修正。`SPI_SETCURSORS` に同梱される `SPIF_SENDCHANGE` の `WM_SETTINGCHANGE` ブロードキャスト経路で受信側 (シェル / アクセシビリティサービス) のカーネルハンドルがライフサイクル境界で `ERROR_INVALID_HANDLE (6)` を返した場合の偽陽性。レジストリ書き込みは既に完了しているため、既存の `ERROR_INVALID_WINDOW_HANDLE (1400)` と同じく `is_broadcast_false_positive` のホワイトリストに `HRESULT_FROM_WIN32(6) = 0x80070006` を追加し、debug ログ扱いで握りつぶす。ACCESS_DENIED など本物の Win32 エラーは引き続き伝播する。
+- Marketplace 自動提出 (`submit_theme_auto`) が公式インデックス entry の `author` フィールドに提出者の GitHub username を上書きしていたバグを修正。`theme.json` の `author` フィールドが優先採用されるようになり、第三者が代理提出しても本来の作者クレジットが保持される (Manual タブの `th.author ?? githubUsername.value` と挙動を一致)。`theme.json` に `author` が無い場合のみ提出者 GitHub username にフォールバックする。あわせて公式インデックスリポ ([`easy-cursor-swap-index`](https://github.com/nishiuriraku/easy-cursor-swap-index)) の `scripts/marketplace/validate.mjs` に `.cursorpack` 内 `theme.json` と `entry.author` の一致チェックを追加し、CI で drift を検出するようにした。既存 entry `f2d3825c` (Hamuchi Mouse Cursor) の `author` も `"nishiuriraku"` → `"無ナ"` に修正。
 
 ## [0.0.1] - 2026-05-18
 

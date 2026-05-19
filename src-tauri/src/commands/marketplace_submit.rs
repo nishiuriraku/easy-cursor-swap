@@ -348,6 +348,12 @@ struct ThemeMetaForSubmit {
     /// PR タイトル / ログ等の単一文字列が必要な箇所用の表示名。
     /// fallback: en → ja → "default" → first → "Untitled"。
     display_name: String,
+    /// `theme.json` の `author` フィールド (= 作者クレジット, plain string)。
+    /// 公式インデックスの `entry.author` はこの値を優先し、未設定 (None) の
+    /// 場合のみ提出者の GitHub username にフォールバックする。
+    /// 提出者識別 (`author_github` / authors/<gh>.json 紐付け / 署名検証) には
+    /// `me.login` を使うため、この 2 概念を取り違えないこと。
+    author: Option<String>,
     version: String,
     included_roles: Vec<String>,
     tags: Vec<String>,
@@ -402,6 +408,7 @@ fn load_theme_meta_for_submit(theme_id: uuid::Uuid) -> Result<ThemeMetaForSubmit
     Ok(ThemeMetaForSubmit {
         name: meta.name,
         display_name,
+        author: meta.author,
         version: meta.version,
         included_roles: meta.cursors.keys().cloned().collect(),
         tags: meta.tags,
@@ -446,10 +453,16 @@ fn build_entry_json(
     //   "name": "X" として出力 (index 側 schemas/index-entry.json は object 形式の場合
     //   `required: ["ja", "en"]` を要求するため、片方欠落の object は validate を通らない)。
     let name_value = name_value_for_index(&meta.name)?;
+    // `author` は作者クレジット = theme.json の `author` を最優先。
+    // theme.json で未設定の場合のみ提出者 (`author_github` = `me.login`) にフォールバック。
+    // この分離が無いと、別人 (例: コミュニティ) が代理提出したテーマで本来の作者名が
+    // 上書きされてしまう (旧バグ: index entry `f2d3825c` の author が `"無ナ"` ではなく
+    // `"nishiuriraku"` で書き出されていた事例)。
+    let author_credit = meta.author.as_deref().unwrap_or(author_github);
     let mut entry = serde_json::json!({
         "id": theme_id,
         "name": name_value,
-        "author": author_github,
+        "author": author_credit,
         "author_github": author_github,
         "author_pubkey_id": author_pubkey_id,
         "sha256": sha256,
@@ -605,6 +618,7 @@ mod tests {
         let meta = ThemeMetaForSubmit {
             name: crate::theme::LocalizedString::Localized(map),
             display_name: "Mint".to_string(),
+            author: None,
             version: "1.0.0".to_string(),
             included_roles: vec!["Arrow".to_string()],
             tags: vec!["minimal".to_string()],
@@ -642,6 +656,7 @@ mod tests {
         let meta = ThemeMetaForSubmit {
             name: crate::theme::LocalizedString::Localized(map),
             display_name: "ハムチマウスカーソル".to_string(),
+            author: None,
             version: "1.0.0".to_string(),
             included_roles: vec!["Arrow".to_string()],
             tags: vec![],
@@ -676,6 +691,7 @@ mod tests {
         let meta = ThemeMetaForSubmit {
             name: crate::theme::LocalizedString::Localized(map),
             display_name: "EnglishOnly".to_string(),
+            author: None,
             version: "1.0.0".to_string(),
             included_roles: vec![],
             tags: vec![],
@@ -702,6 +718,7 @@ mod tests {
         let meta = ThemeMetaForSubmit {
             name: crate::theme::LocalizedString::Simple("Plain Name".to_string()),
             display_name: "Plain Name".to_string(),
+            author: None,
             version: "1.0.0".to_string(),
             included_roles: vec![],
             tags: vec![],
@@ -719,6 +736,76 @@ mod tests {
         .unwrap();
         let v: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(v["name"], "Plain Name");
+    }
+
+    #[test]
+    fn build_entry_json_prefers_theme_author_over_github_login() {
+        // 回帰テスト: theme.json に `author` が書かれていれば、index entry の `author` は
+        // 必ずそれを採用する (提出者 GitHub username = `author_github` で上書きしない)。
+        //
+        // 旧バグ: 自動提出 (`submit_theme_auto`) が `author` と `author_github` の両方に
+        // `me.login` を入れていたため、第三者が代理提出すると本来の作者クレジットが消えた。
+        // 実例: cursorpack `f2d3825c` (theme.author = "無ナ") の index entry が
+        // `author: "nishiuriraku"` (= 提出者) で書き出されていた。
+        let meta = ThemeMetaForSubmit {
+            name: crate::theme::LocalizedString::Simple("Hamuchi Mouse Cursor".to_string()),
+            display_name: "Hamuchi Mouse Cursor".to_string(),
+            author: Some("無ナ".to_string()),
+            version: "1.0.0".to_string(),
+            included_roles: vec!["Arrow".to_string()],
+            tags: vec![],
+        };
+        let json = build_entry_json(
+            "00000000-0000-0000-0000-000000000000",
+            &meta,
+            "nishiuriraku",
+            "deadbeef",
+            "00",
+            "AA==",
+            "https://example.com/pack",
+            None,
+        )
+        .unwrap();
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            v["author"], "無ナ",
+            "entry.author は theme.author を採用すべき"
+        );
+        assert_eq!(
+            v["author_github"], "nishiuriraku",
+            "entry.author_github は提出者 GitHub username であるべき"
+        );
+    }
+
+    #[test]
+    fn build_entry_json_falls_back_to_github_when_theme_author_missing() {
+        // theme.json に author が無い (Option::None) 場合は、index entry の `author` を
+        // 提出者の GitHub username にフォールバックする (Manual タブの
+        // `th.author ?? githubUsername.value` と同じ挙動)。
+        // schema が `author` を required string にしているので空文字列にはせず、
+        // 必ず非空の値を入れる必要がある。
+        let meta = ThemeMetaForSubmit {
+            name: crate::theme::LocalizedString::Simple("No Author".to_string()),
+            display_name: "No Author".to_string(),
+            author: None,
+            version: "1.0.0".to_string(),
+            included_roles: vec!["Arrow".to_string()],
+            tags: vec![],
+        };
+        let json = build_entry_json(
+            "00000000-0000-0000-0000-000000000000",
+            &meta,
+            "octocat",
+            "deadbeef",
+            "00",
+            "AA==",
+            "https://example.com/pack",
+            None,
+        )
+        .unwrap();
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(v["author"], "octocat");
+        assert_eq!(v["author_github"], "octocat");
     }
 
     #[test]
