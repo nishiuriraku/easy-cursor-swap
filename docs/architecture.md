@@ -174,7 +174,7 @@ app/
 │                    useMarketplaceSubmit (自動 PR 提出フロー),
 │                    pickLocalizedName (Marketplace name の locale 解決),
 │                    useExternalUrl, useListbox, useModalLifecycle, usePngBlobCache,
-│                    useTagChipInput, useThemeCardState (合計 36)
+│                    useThemeCardState (合計 35)
 ├─ types/          ← config.ts, theme.ts, marketplace.ts, githubAuth.ts (Rust struct と 1:1)
 ├─ locales/        ← ja.ts, en.ts (CI で parity チェック)
 ├─ assets/css/     ← tailwind.css (Tailwind v4 entry + @theme + 横断 shared utility) +

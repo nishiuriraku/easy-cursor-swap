@@ -217,4 +217,32 @@ describe('SubmitThemeDialog Auto tab', () => {
     expect(body).not.toContain('Cloned From Marketplace')
     w.unmount()
   })
+
+  it('renders all 8 allowed tags as toggle buttons (no free-text input)', async () => {
+    // 公式インデックス側スキーマ enum と一致する 8 個の chip だけが表示され、
+    // 自由入力 <input> は撤去されていること。タイポ防止 / Ajv 失敗 PR 抑止のため
+    // フロント UI を allow-list に閉じる回帰テスト。
+    invokeMock.mockResolvedValueOnce([])
+    invokeMock.mockResolvedValueOnce({ has_keypair: true, key_id: 'k', public_key_b64: 'p' })
+    invokeMock.mockResolvedValueOnce({ github_account: null })
+    const w = mountOpen()
+    await flushPromises()
+
+    const buttons = Array.from(
+      document.body.querySelectorAll<HTMLButtonElement>('button.tag-toggle'),
+    )
+    const labels = buttons.map((b) => b.textContent?.trim()).sort()
+    expect(labels).toEqual(
+      ['animated', 'anime', 'dark', 'light', 'minimal', 'neon', 'pixel', 'retro'].sort(),
+    )
+
+    // 旧 UI の自由入力欄が残っていないこと
+    expect(document.body.querySelector('#submit-auto-tags')).toBeNull()
+    expect(document.body.querySelector('.tag-input')).toBeNull()
+
+    // 新文言が反映されていること
+    expect(document.body.textContent).toContain('クリックで選択 / 解除')
+
+    w.unmount()
+  })
 })

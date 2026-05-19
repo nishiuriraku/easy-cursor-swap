@@ -33,14 +33,14 @@
     "measured_counts": {
       "rust_modules_in_lib_rs": 23,
       "tauri_ipc_commands": 52,
-      "composables": 36,
+      "composables": 35,
       "pages_vue": 4,
       "pages_ts_helpers": 2,
       "components_total": 56,
       "ci_workflows": 3
     },
     "doc_drift_warnings": [
-      "No known drift as of 2026-05-20 (re-measured)。本コミットで invariants が 14 → 15 件に増加 (`marketplace_clone_resubmit_forbidden` を追加)。modules=23 / IPC=52 / composables=36 / components=56 / commands-submodules=9 は変化なし。architecture.json/file_inventory.md/CLAUDE.md/README*.md/architecture.html が同期。",
+      "No known drift as of 2026-05-20 (re-measured)。本コミットで composables が 36 → 35 件に減少 (`useTagChipInput` を削除、`SubmitThemeDialog` に inline 化)。modules=23 / IPC=52 / components=56 / commands-submodules=9 は変化なし。architecture.json / file_inventory.md / architecture.md / architecture.html が同期。",
       "ui_map.json と相互整合済み: backend.ipc_commands 52 件のうち 3 件 (export_cursorpack / get_theme_previews / get_windows_scheme_previews) は Rust に登録だけされた legacy_unused 状態で、それぞれ status と replaced_by を明示。次の PR で Rust 側からも削除するか、frontend で再利用する決定をすること。",
       "新たに食い違いを見つけたら『docs/<file> は X と書いているが実測 Y』の形で追記し、修正コミットと同じ PR で解消する。",
       "数字が docs と食い違ったら grep を信用する。frontend の数字は ui_map.html の live check (末尾) が canonical counter。"
@@ -487,7 +487,6 @@
       { "file": "app/composables/useListbox.ts", "name": "useListbox", "role": "UiSelect の listbox 状態機械 + キーボードナビ + viewport-aware Teleport 位置計算 (audit F43-SIZE-001)。" },
       { "file": "app/composables/useThemeCardState.ts", "name": "useThemeCardState", "role": "ThemeCard / ThemeRow の 5 ブロック並行重複 (preview fetch / kind 判定 / displayDate / 詳細遷移 / お気に入り) を共通化 (audit B9-DUP-001)。" },
       { "file": "app/composables/useExternalUrl.ts", "name": "useExternalUrl", "role": "open_url IPC + window.open フォールバックの 1 行 API。6 callsite で重複していた try/catch を集約。", "ipc_calls": ["open_url"] },
-      { "file": "app/composables/useTagChipInput.ts", "name": "useTagChipInput", "role": "Tag chip 入力 UI (Enter/カンマで chip 化 + Backspace 削除 + 上限 / 重複ガード)。SubmitThemeDialog の Auto/Manual タブで共有 (audit D29 部分)。" },
       { "file": "app/composables/useCreatorMetaState.ts", "name": "useCreatorMetaState", "role": "Creator メタデータ入力欄 (name / nameEn / author / version / description / shadowEnabled) の 6 ref と reset() を集約。resetCreator() の一行リセットを支える (audit C20-SIZE-001 部分)。" },
       { "file": "app/composables/useBulkImportPreviewState.ts", "name": "useBulkImportPreviewState", "role": "BulkImportPreviewModal の matches/unmatched 三方移動 state machine + props.open 連動の初期マッチ watch + Blob URL ライフサイクル + ApplyPayload 組立を集約。PendingMatch / UnmatchedFile / ApplyPayload 型もここで export (audit C21-SIZE 部分)。" },
       { "file": "app/composables/useUpdater.ts", "name": "useUpdater", "role": "check / downloadAndInstall / relaunch + classifyUpdaterError。本 composable は tauri-apps/plugin-updater プラグイン API を直接叩くため invokeTauri を呼ばない。`check_update_is_major_jump` IPC は useUpdaterBootstrap と pages/settings.vue が呼び出す。", "ipc_calls": [] },

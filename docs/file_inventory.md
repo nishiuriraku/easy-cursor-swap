@@ -1,6 +1,6 @@
 # EasyCursorSwap ファイル機能インベントリ
 
-> 最終更新: 2026-05-13
+> 最終更新: 2026-05-20
 >
 > `src-tauri/src/` と `app/` の **生きたファイル索引**。何がどこにあるかを 1 ファイル単位で把握するための辞書。
 > 俯瞰の見取り図は [`architecture.md`](./architecture.md) を参照。
@@ -154,7 +154,6 @@
 | [useListbox.ts](../app/composables/useListbox.ts) | `UiSelect` の listbox 状態機械 + キーボードナビ + viewport-aware Teleport 位置計算 |
 | [useModalLifecycle.ts](../app/composables/useModalLifecycle.ts) | Teleport modal の body scroll lock (重ね合わせ対応 counter) + Esc 購読 + cleanup |
 | [usePngBlobCache.ts](../app/composables/usePngBlobCache.ts) | Map + in-flight Promise + dispose の汎用キャッシュ機構 (useThemePreviews / useMarketplacePreviews / Creator の blob URL キャッシュで共有) |
-| [useTagChipInput.ts](../app/composables/useTagChipInput.ts) | Tag chip 入力 UI (Enter/カンマで chip 化 + Backspace 削除 + 上限 / 重複ガード)。SubmitThemeDialog の Auto/Manual タブで共有 |
 | [useThemeCardState.ts](../app/composables/useThemeCardState.ts) | `ThemeCard` / `ThemeRow` の 5 ブロック並行重複 (preview fetch / kind 判定 / displayDate / 詳細遷移 / お気に入り) を共通化 |
 
 ### 2-4. その他

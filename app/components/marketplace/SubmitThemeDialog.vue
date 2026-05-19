@@ -12,6 +12,7 @@
  */
 import type { GithubAccount, SubmitStage } from '~/types/githubAuth'
 import type { MarketplaceName } from '~/types/marketplace'
+import { ALLOWED_MARKETPLACE_TAGS } from '~/types/marketplace'
 
 const { t } = useI18n()
 
@@ -67,16 +68,19 @@ const deviceFlowOpen = ref(false)
 const submitter = useMarketplaceSubmit()
 const submitDone = ref<{ prUrl: string } | null>(null)
 
-// マーケットプレイス用タグ入力 (自動・手動共通)。Enter / カンマ / セミコロンで chip 化。
-const {
-  tagInput,
-  tags,
-  commitTag,
-  onTagKeydown,
-  removeTag,
-  reset: resetTags,
-  maxTags: MAX_TAGS,
-} = useTagChipInput()
+// 公式インデックスが受理するタグの allow-list を toggle で選択させる。
+// 自由入力をやめたので Enter / カンマ / Backspace 等のハンドラは不要。
+const tags = ref<string[]>([])
+
+function toggleTag(tag: string): void {
+  const i = tags.value.indexOf(tag)
+  if (i >= 0) tags.value.splice(i, 1)
+  else tags.value.push(tag)
+}
+
+function resetTags(): void {
+  tags.value = []
+}
 
 const STAGE_LABEL_KEY: Record<SubmitStage, string> = {
   build: 'marketplace.submitStageBuild',
@@ -106,7 +110,6 @@ async function loadGithubAccount() {
 
 async function runAutoSubmit() {
   if (!selectedThemeId.value) return
-  if (tagInput.value.trim().length > 0) commitTag()
   submitDone.value = null
   try {
     const r = await submitter.submit(selectedThemeId.value, tags.value)
@@ -275,19 +278,15 @@ onMounted(async () => {
             :themes="submittableThemes"
             :selected-theme-id="selectedThemeId"
             :tags="tags"
-            :tag-input="tagInput"
+            :allowed-tags="ALLOWED_MARKETPLACE_TAGS"
             :has-keystore="keystoreInfo.has_keypair"
-            :max-tags="MAX_TAGS"
             :github-account="githubAccount"
             :submitter-busy="submitter.busy.value"
             :submitter-stage-label="submitterStageLabel"
             :submitter-error-msg="submitter.errorMsg.value"
             :submit-done="submitDone !== null"
             @update:selected-theme-id="(v) => (selectedThemeId = v)"
-            @update:tag-input="(v) => (tagInput = v)"
-            @commit-tag="commitTag"
-            @remove-tag="removeTag"
-            @tag-keydown="onTagKeydown"
+            @toggle-tag="toggleTag"
           />
 
           <SubmitThemeManualForm
@@ -295,20 +294,16 @@ onMounted(async () => {
             :themes="submittableThemes"
             :selected-theme-id="selectedThemeId"
             :tags="tags"
-            :tag-input="tagInput"
+            :allowed-tags="ALLOWED_MARKETPLACE_TAGS"
             :has-keystore="keystoreInfo.has_keypair"
-            :max-tags="MAX_TAGS"
             :step="step"
             :github-username="githubUsername"
             :download-url="downloadUrl"
             :entry-json="entryJson"
             @update:selected-theme-id="(v) => (selectedThemeId = v)"
-            @update:tag-input="(v) => (tagInput = v)"
             @update:github-username="(v) => (githubUsername = v)"
             @update:download-url="(v) => (downloadUrl = v)"
-            @commit-tag="commitTag"
-            @remove-tag="removeTag"
-            @tag-keydown="onTagKeydown"
+            @toggle-tag="toggleTag"
           />
         </div>
 
