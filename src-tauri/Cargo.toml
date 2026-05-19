@@ -18,6 +18,13 @@ default-run = "easy-cursor-swap"
 name = "app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[features]
+# `npm run tauri:dev` 時のみ `--features devtools` 経由で有効化される。
+# release ビルド (`tauri build`) では渡されないため、配布バイナリには
+# WebView2 DevTools 関連コードが一切リンクされない (バイナリサイズ削減 +
+# 署名済み配布物の Inspect 経路封印)。
+devtools = ["tauri/devtools"]
+
 [build-dependencies]
 tauri-build = { version = "2.6.0", features = [] }
 # build.rs でリポジトリルートの .env からビルド時 env を読み込むため。

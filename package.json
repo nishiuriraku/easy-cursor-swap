@@ -20,7 +20,7 @@
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "tauri": "tauri",
-    "tauri:dev": "tauri dev",
+    "tauri:dev": "tauri dev --features devtools",
     "tauri:build": "tauri build",
     "icon:render": "node scripts/generate-icon.mjs",
     "icon:generate": "node scripts/generate-icon.mjs && tauri icon design/app-icon.png",
