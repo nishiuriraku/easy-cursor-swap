@@ -27,6 +27,9 @@ const emit = defineEmits<{
 // `name` は Rust 側 `LocalizedString` の生形 (`string | { [locale]: string }`) で渡ってくるため
 // 表示時は `pickLocalizedName` を介す。公式インデックス entry の `name` も localized object を
 // 許容するので、`entryJson` ではそのまま JSON 化する (`MarketplaceEntry.name` 型と整合)。
+//
+// `source` は Rust `ThemeSource` (serde lowercase) の `"local" | "marketplace"`。
+// 公式インデックス由来テーマを「再提出」させないためにダイアログ側で除外する。
 interface ThemeSummary {
   id: string
   name: MarketplaceName
@@ -34,6 +37,7 @@ interface ThemeSummary {
   version: string
   included_roles: string[]
   is_active: boolean
+  source?: string
 }
 
 const { info: keystoreInfo, refresh: refreshKeystore } = useKeystore()
@@ -42,6 +46,10 @@ const { info: keystoreInfo, refresh: refreshKeystore } = useKeystore()
 const themes = ref<ThemeSummary[]>([])
 const selectedThemeId = ref<string | null>(null)
 const loading = ref(false)
+
+// 公式インデックス由来 (source === 'marketplace') のテーマは提出対象から除外する。
+// 再提出は二重登録になるため、Auto / Manual 両タブで選択肢自体を隠す。
+const submittableThemes = computed(() => themes.value.filter((th) => th.source !== 'marketplace'))
 
 // タブ管理
 const tab = ref<'auto' | 'manual'>('auto')
@@ -127,7 +135,7 @@ const step = ref<'select' | 'preview'>('select')
 const copyDone = ref(false)
 
 const selectedTheme = computed(
-  () => themes.value.find((th) => th.id === selectedThemeId.value) ?? null,
+  () => submittableThemes.value.find((th) => th.id === selectedThemeId.value) ?? null,
 )
 
 const INDEX_REPO = 'https://github.com/nishiuriraku/easy-cursor-swap-index'
@@ -257,7 +265,7 @@ onMounted(async () => {
 
           <SubmitThemeAutoForm
             v-if="tab === 'auto'"
-            :themes="themes"
+            :themes="submittableThemes"
             :selected-theme-id="selectedThemeId"
             :tags="tags"
             :tag-input="tagInput"
@@ -277,7 +285,7 @@ onMounted(async () => {
 
           <SubmitThemeManualForm
             v-else
-            :themes="themes"
+            :themes="submittableThemes"
             :selected-theme-id="selectedThemeId"
             :tags="tags"
             :tag-input="tagInput"

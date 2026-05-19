@@ -123,6 +123,13 @@ const themePickerOpen = ref(false)
 const themePickerSelected = ref<string | null>(null)
 const { themes: pickerThemes, refresh: refreshPickerThemes } = useThemes()
 
+// 公式インデックス由来 (kind === 'marketplace') は複製元として選ばせない。
+// repackage_theme 自体はローカルファイル経由で実行可能だが、UI 上「公式テーマを
+// ベースに新規作成」を許すと派生作品の出所が曖昧になりやすいため明示的に除外する。
+const duplicatePickerThemes = computed(() =>
+  pickerThemes.value.filter((th) => th.kind !== 'marketplace'),
+)
+
 const existingRolesSet = computed(() => new Set(Object.keys(assigned.value)))
 
 // --- 計算プロパティ ---
@@ -870,7 +877,7 @@ async function onFileChange(e: Event) {
     <ThemePickerModal
       v-if="themePickerOpen"
       :model-value="themePickerSelected"
-      :themes="pickerThemes"
+      :themes="duplicatePickerThemes"
       :title="t('creatorStart.duplicatePickerTitle')"
       :sub="t('creatorStart.duplicatePickerSub')"
       :show-clear="false"
