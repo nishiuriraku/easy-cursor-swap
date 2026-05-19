@@ -197,6 +197,16 @@ export default {
     dropSub: 'PNG / SVG / CUR / ICO / ANI / .cursorpack を受け付けます',
     recentRoleCount: '{count}/17 役割',
     untitledThemeName: 'Untitled Theme',
+    discardDialog: {
+      titleClear: '編集内容を破棄しますか?',
+      titleNavigate: 'クリエイターを離れますか?',
+      messageClear:
+        '現在編集中のアセットとメタデータは保存されておらず、クリアすると失われます。',
+      messageNavigate:
+        '現在編集中のアセットとメタデータは保存されていません。画面を離れると編集内容は失われます。',
+      warning: '保存していない変更は復元できません',
+      confirm: '破棄して続行',
+    },
   },
   panic: {
     title: 'リセットを実行',

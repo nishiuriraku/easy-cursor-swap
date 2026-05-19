@@ -934,7 +934,7 @@
 <script id="data" type="application/json">
 {
   "$schema_version": "0.1.0",
-  "generated_at": "2026-05-20",
+  "generated_at": "2026-05-21",
   "generated_from": [
     "docs/architecture.md",
     "docs/file_inventory.md",
@@ -970,11 +970,11 @@
       "composables": 35,
       "pages_vue": 4,
       "pages_ts_helpers": 2,
-      "components_total": 56,
+      "components_total": 57,
       "ci_workflows": 3
     },
     "doc_drift_warnings": [
-      "No known drift as of 2026-05-20 (re-measured)。本コミットで composables が 36 → 35 件に減少 (`useTagChipInput` を削除、`SubmitThemeDialog` に inline 化)。modules=23 / IPC=52 / components=56 / commands-submodules=9 は変化なし。architecture.json / file_inventory.md / architecture.md / architecture.html が同期。",
+      "No known drift as of 2026-05-21 (re-measured)。本マージで components.creator が 13 → 14 (合計 56 → 57) に増加 (`DiscardEditDialog` を追加 — Creator の Clear ボタン / 画面遷移時の編集破棄確認ダイアログ)。先行コミット (develop) で composables が 36 → 35 件に減少済 (`useTagChipInput` を削除、`SubmitThemeDialog` に inline 化)。modules=23 / IPC=52 / commands-submodules=9 は変化なし。architecture.json/architecture.md/file_inventory.md/architecture.html が同期。",
       "ui_map.json と相互整合済み: backend.ipc_commands 52 件のうち 3 件 (export_cursorpack / get_theme_previews / get_windows_scheme_previews) は Rust に登録だけされた legacy_unused 状態で、それぞれ status と replaced_by を明示。次の PR で Rust 側からも削除するか、frontend で再利用する決定をすること。",
       "新たに食い違いを見つけたら『docs/<file> は X と書いているが実測 Y』の形で追記し、修正コミットと同じ PR で解消する。",
       "数字が docs と食い違ったら grep を信用する。frontend の数字は ui_map.html の live check (末尾) が canonical counter。"
@@ -1376,7 +1376,7 @@
         "name": "クリエイター",
         "role": "クリエイターモード (3 カラム: 役割リスト / アセットペイン / メタデータペイン)。バルクインポート + .cursorpack 出力。",
         "composables": ["useCreatorAssets", "useCreatorPickers", "useCreatorImport", "useCreatorBulkImportFlow", "useCreatorExport", "useRoleMatcher", "useBulkImport", "useKeystore", "useHotspotDefaults", "useHotspotInteraction", "useAniPlayer", "sanitizeSvg"],
-        "components": ["CreatorStartScreen", "CreatorToolbar", "CreatorRoleList", "CreatorMetadataPane", "NewThemeStartModal", "SaveDestinationModal", "BulkImportButton", "BulkImportPreviewModal", "BulkImportRoleRow", "RoleListItem", "SizeStrip", "AniThumb"],
+        "components": ["CreatorStartScreen", "CreatorToolbar", "CreatorRoleList", "CreatorMetadataPane", "NewThemeStartModal", "SaveDestinationModal", "DiscardEditDialog", "BulkImportButton", "BulkImportPreviewModal", "BulkImportRoleRow", "RoleListItem", "SizeStrip", "AniThumb"],
         "ipc_calls": ["parse_cursorpack_for_creator", "bulk_resolve_assets", "cancel_bulk_import", "export_cursorpack_streamed", "cancel_build", "keystore_info"]
       },
       {
@@ -1447,8 +1447,8 @@
       },
       "creator": {
         "dir": "app/components/creator/",
-        "count": 13,
-        "files": ["CreatorStartScreen.vue", "CreatorToolbar.vue", "CreatorRoleList.vue", "CreatorMetadataPane.vue", "CreatorEditorCanvas.vue", "NewThemeStartModal.vue", "SaveDestinationModal.vue", "BulkImportButton.vue", "BulkImportPreviewModal.vue", "BulkImportRoleRow.vue", "RoleListItem.vue", "SizeStrip.vue", "AniThumb.vue"]
+        "count": 14,
+        "files": ["CreatorStartScreen.vue", "CreatorToolbar.vue", "CreatorRoleList.vue", "CreatorMetadataPane.vue", "CreatorEditorCanvas.vue", "NewThemeStartModal.vue", "SaveDestinationModal.vue", "DiscardEditDialog.vue", "BulkImportButton.vue", "BulkImportPreviewModal.vue", "BulkImportRoleRow.vue", "RoleListItem.vue", "SizeStrip.vue", "AniThumb.vue"]
       },
       "marketplace": {
         "dir": "app/components/marketplace/",
