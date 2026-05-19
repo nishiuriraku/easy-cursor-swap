@@ -63,7 +63,7 @@ pub struct RoleBuildEntry {
     pub png_bytes: Vec<u8>,
     /// ホットスポット (比率, 0.0..=1.0)。`.cur` 書出直前に `to_px(size)` で px 変換する。
     pub hotspot: crate::theme::types::Hotspot,
-    /// "lanczos" / "nearest" / "auto"
+    /// "lanczos" / "nearest" (未知の値は ResizeMethod::from_str により Lanczos にフォールバック)
     pub resample: String,
     /// サイズ別オーバーライド (px → PNG bytes + optional 独立 hotspot)。
     /// Some の場合、対応サイズはリサンプルせずそのまま使用。

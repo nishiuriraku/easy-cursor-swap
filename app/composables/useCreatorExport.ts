@@ -38,7 +38,7 @@ export interface SaveSubmitPayload {
   overwriteExisting: boolean
 }
 
-type ResampleMode = 'lanczos' | 'nearest' | 'auto'
+type ResampleMode = 'lanczos' | 'nearest'
 
 interface CreatorAssetsForExport {
   assignedRoleCount: Ref<number>

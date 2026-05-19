@@ -53,10 +53,7 @@ pub(super) fn build_role(entry: &RoleBuildEntry) -> Result<BuiltRole, AppError> 
         });
     }
 
-    let resample = match entry.resample.as_str() {
-        "auto" => ResizeMethod::Lanczos,
-        other => ResizeMethod::from_str(other),
-    };
+    let resample = ResizeMethod::from_str(&entry.resample);
 
     // primary_size を PNG ヘッダから取得して ratio→px 変換する
     let primary_size = image::load_from_memory(&entry.png_bytes)
