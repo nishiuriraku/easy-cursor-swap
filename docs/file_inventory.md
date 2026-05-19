@@ -15,7 +15,7 @@
 | ファイル | 機能 |
 |---|---|
 | [main.rs](../src-tauri/src/main.rs) | Tauri アプリのエントリ。tracing 初期化、`StartupCheck::begin()`、AppUserModelID 登録、ConfigManager 初期化、孤児カーソル復旧、pending snapshot リカバリ、`tauri::Builder` 構築 (single-instance プラグイン / 各種 plugin / setup でトレイ・ホットキー)、`build()` + `run(callback)` 形式で `RunEvent::ExitRequested { code: None }` を `prevent_exit` してトレイ常駐させるガード (close ボタン → WebView destroy → プロセス残留 を保証) |
-| [lib.rs](../src-tauri/src/lib.rs) | 22 モジュールの `pub mod` 宣言 |
+| [lib.rs](../src-tauri/src/lib.rs) | 23 モジュールの `pub mod` 宣言 |
 | [commands/mod.rs](../src-tauri/src/commands/mod.rs) | 全 Tauri コマンドのハンドラ登録 (`get_command_handlers()` が 52 IPC を `tauri::generate_handler!` に渡す) |
 | [errors.rs](../src-tauri/src/errors.rs) | `AppError` (`thiserror`、`Serialize` 派生で IPC 経由 throw 対応) |
 
@@ -23,7 +23,7 @@
 
 | ファイル | 主な IPC |
 |---|---|
-| [commands/cursor_build/](../src-tauri/src/commands/cursor_build/) | `mod` (公開 API + 共通ステート) / `build` (`export_cursorpack`) / `stream` (`export_cursorpack_streamed`、進捗イベント `build-progress`) / `cancel` (`cancel_build`) / `sign` (Ed25519 署名埋込) / `dto` (DTO 定義) |
+| [commands/cursor_build/](../src-tauri/src/commands/cursor_build/) | `mod` (公開 API + 共通ステート + `cancel_build` IPC) / `build` (`export_cursorpack`) / `stream` (`export_cursorpack_streamed`、進捗イベント `build-progress`) / `sign` (Ed25519 署名埋込) / `dto` (DTO 定義)。共有キャンセルレジストリは別 `cancel_registry.rs` に切出済 |
 | [commands/cursor_io.rs](../src-tauri/src/commands/cursor_io.rs) | `take_pending_cursorpack` (起動時 argv からの `.cursorpack` 引き継ぎ。 `extract_cursorpack_arg` / `stash_pending_cursorpack` / `handle_pending_cursorpack` ヘルパー含む) |
 | [commands/theme.rs](../src-tauri/src/commands/theme.rs) | `get_themes` / `get_theme_previews` / `get_theme_role_previews` / `apply_theme` / `set_theme_favorite` / `inspect_cursorpack` / `import_cursorpack` / `delete_theme` / `duplicate_theme` / `repackage_theme` |
 | [commands/system.rs](../src-tauri/src/commands/system.rs) | `reset_to_default` / `reset_to_initial` / `get_environment_report` / `get_config` / `update_config` / `get_app_info` / `list_config_backups` / `restore_config_backup` / `open_url` / `open_log_folder` / `get_accessibility_conflicts` / `check_update_is_major_jump` / `list_crash_reports` / `clear_crash_reports` / `submit_crash_reports` |
@@ -107,47 +107,55 @@
 | グループ | 主要ファイル |
 |---|---|
 | [shell/](../app/components/shell/) | `AppTitlebar` / `AppSidebar` / `EnvironmentBanner` |
-| [library/](../app/components/library/) | `ThemeCard` / `ThemeRow` / `ThemeDetailModal` / `ThemeDetailDrawer` / `ApplyModal` / `ImportConflictDialog` / `ThemePickerModal` / `CursorMatrix` / `LibraryToolbar` / `LibraryFilterBar` / `LibraryEmptyState` / `LibraryDropOverlay` |
-| [creator/](../app/components/creator/) | `CreatorStartScreen` / `CreatorToolbar` / `CreatorRoleList` / `CreatorMetadataPane` (Hotspot 節を内包) / `NewThemeStartModal` / `SaveDestinationModal` / `BulkImportButton` / `BulkImportPreviewModal` / `BulkImportRoleRow` / `RoleListItem` / `SizeStrip` / `AniThumb` |
-| [marketplace/](../app/components/marketplace/) | `FeaturedCard` / `SubmitThemeDialog` (Auto/Manual タブ切替) / `MarketplaceDetailModal` / `SubmitDeviceFlowModal` (Device Flow 認証 UI) |
-| [settings/](../app/components/settings/) | `GeneralSection` / `StartupSection` / `LibrarySection` / `SecuritySection` / `KeysSection` / `LoggingSection` (ログ出力設定 + クラッシュレポート opt-in トグル / 件数表示 / 送信・クリアボタン) / `UpdatesSection` / `AboutSection` / `SettingsRow` (anchor prop で検索ジャンプ対応) / `SettingsToggle` / `PassphrasePrompt` / `ConfigRecoveryPanel` / `SettingsSearchDropdown` (ja/en 両言語の横断検索ドロップダウン) |
+| [library/](../app/components/library/) (15) | `ThemeCard` / `ThemeRow` / `ThemeDetailModal` / `ThemeDetailDrawer` / `ThemeDetailDrawerHero` / `ThemeDetailDrawerStrip` / `ThemeDetailDrawerFooter` / `ApplyModal` / `ImportConflictDialog` / `ThemePickerModal` / `CursorMatrix` / `LibraryToolbar` / `LibraryFilterBar` / `LibraryEmptyState` / `LibraryDropOverlay` |
+| [creator/](../app/components/creator/) (13) | `CreatorStartScreen` / `CreatorToolbar` / `CreatorRoleList` / `CreatorMetadataPane` (Hotspot 節を内包) / `CreatorEditorCanvas` / `NewThemeStartModal` / `SaveDestinationModal` / `BulkImportButton` / `BulkImportPreviewModal` / `BulkImportRoleRow` / `RoleListItem` / `SizeStrip` / `AniThumb` |
+| [marketplace/](../app/components/marketplace/) (6) | `FeaturedCard` / `SubmitThemeDialog` (Auto/Manual タブ切替) / `SubmitThemeAutoForm` / `SubmitThemeManualForm` / `MarketplaceDetailModal` / `SubmitDeviceFlowModal` (Device Flow 認証 UI) |
+| [settings/](../app/components/settings/) (14) | `GeneralSection` / `StartupSection` / `LibrarySection` / `SecuritySection` / `KeysSection` / `LoggingSection` (ログ出力設定 + クラッシュレポート opt-in トグル / 件数表示 / 送信・クリアボタン) / `UpdatesSection` / `AboutSection` / `SettingsRow` (anchor prop で検索ジャンプ対応) / `SettingsToggle` / `PassphrasePrompt` / `ConfigRecoveryPanel` / `SettingsSearchDropdown` (ja/en 両言語の横断検索ドロップダウン) / `OssLicenseModal` |
 | [preview/](../app/components/preview/) | `CursorPreview` (theme detail で使うプレビュー) |
 | [panic/](../app/components/panic/) | `PanicFlow` (ステージ選択 + ライブログ + 17 ロールグリッド) |
 | [icons/](../app/components/icons/) | `UiIcon` + `UI_ICONS`、`CursorIcon` + `CURSOR_ICONS` — render 関数で v-html 回避 |
 | [ui/](../app/components/ui/) | `UiSelect` (ネイティブ select の白背景を回避) |
 
-### 2-3. Composables (28 個)
+### 2-3. Composables (36 個)
 
 | ファイル | 役割 |
 |---|---|
 | [useTauri.ts](../app/composables/useTauri.ts) | `invokeTauri` IPC ラッパー (Web 開発時フォールバック) |
-| [useThemes.ts](../app/composables/useThemes.ts) | テーマ一覧の共有リアクティブ singleton |
+| [useThemes.ts](../app/composables/useThemes.ts) | テーマ一覧の共有リアクティブ singleton + apply/delete/duplicate/repackage/set_favorite/inspect/import IPC ラッパ |
 | [useAppSettings.ts](../app/composables/useAppSettings.ts) | `get_config`/`update_config` + dirty フラグ |
 | [useI18n.ts](../app/composables/useI18n.ts) | `t(key, params)` + フォールバック + OS ロケール検出 |
 | [useKeystore.ts](../app/composables/useKeystore.ts) | 鍵生成/削除/エクスポート/インポート + key_id 表示 |
 | [useUiTheme.ts](../app/composables/useUiTheme.ts) | アプリ自体の light/dark 切替 |
 | [useRoleMatcher.ts](../app/composables/useRoleMatcher.ts) | エイリアス辞書 + `scoreRole` + `resolveCollisions` |
 | [useThemePreviews.ts](../app/composables/useThemePreviews.ts) | プレビュー画像取得 (ロール×サイズ) |
-| [useBulkImport.ts](../app/composables/useBulkImport.ts) | バルクインポート IPC ラッパー + 進捗購読 |
+| [useBulkImport.ts](../app/composables/useBulkImport.ts) | バルクインポート IPC ラッパー + 進捗購読 + `.cursorpack` 解析 |
+| [useBulkImportPreviewState.ts](../app/composables/useBulkImportPreviewState.ts) | `BulkImportPreviewModal` の matches/unmatched 三方移動 state machine + Blob URL ライフサイクル + ApplyPayload 組立。`PendingMatch` / `UnmatchedFile` / `ApplyPayload` 型もここで export |
 | [useCreatorAssets.ts](../app/composables/useCreatorAssets.ts) | `assignedPng` / `Hotspot` 統合管理 |
 | [useCreatorPickers.ts](../app/composables/useCreatorPickers.ts) | Creator のファイル/フォルダピッカー UX |
 | [useCreatorImport.ts](../app/composables/useCreatorImport.ts) | Creator の単発取り込み (`import_cursor_file` / `inspect_ani_file`) |
-| [useCreatorBulkImportFlow.ts](../app/composables/useCreatorBulkImportFlow.ts) | バルクインポート preview → confirm のステートマシン |
+| [useCreatorBulkImportFlow.ts](../app/composables/useCreatorBulkImportFlow.ts) | バルクインポート preview → confirm のステートマシン (IPC 呼出は useBulkImport へ delegation) |
 | [useCreatorExport.ts](../app/composables/useCreatorExport.ts) | `.cursorpack` ストリーム出力フロー (進捗 + cancel) |
+| [useCreatorMetaState.ts](../app/composables/useCreatorMetaState.ts) | Creator メタデータ入力欄 (name / nameEn / author / version / description / shadowEnabled) の 6 ref と reset() を集約 |
 | [useHotspotDefaults.ts](../app/composables/useHotspotDefaults.ts) | 役割別の hotspot デフォルト座標 |
 | [useHotspotInteraction.ts](../app/composables/useHotspotInteraction.ts) | hotspot ドラッグ操作の純粋関数群 |
 | [useAniPlayer.ts](../app/composables/useAniPlayer.ts) | ANI プレビュー再生 (frame タイマー + cancel) |
-| [useCursorpackOpener.ts](../app/composables/useCursorpackOpener.ts) | `.cursorpack` ダブルクリック / argv 開封フロー |
-| [useUpdater.ts](../app/composables/useUpdater.ts) | check / downloadAndInstall / relaunch |
-| [useUpdaterBootstrap.ts](../app/composables/useUpdaterBootstrap.ts) | 起動時 1 回だけ `auto_update + 24h クールダウン` で check し、ヒット時 Toast 通知 (`app.vue` から呼び出し) |
+| [useCursorpackOpener.ts](../app/composables/useCursorpackOpener.ts) | `.cursorpack` ダブルクリック / argv 開封フロー (`take_pending_cursorpack` IPC + `cursorpack-import-requested` event 重複排除) |
+| [useUpdater.ts](../app/composables/useUpdater.ts) | tauri-apps/plugin-updater プラグイン API の check / downloadAndInstall / relaunch + `classifyUpdaterError` |
+| [useUpdaterBootstrap.ts](../app/composables/useUpdaterBootstrap.ts) | 起動時 1 回だけ `auto_update + 24h クールダウン` で check し、`check_update_is_major_jump` IPC でメジャージャンプ判定後にヒット時 Toast 通知 (`app.vue` から呼び出し) |
 | [useNotify.ts](../app/composables/useNotify.ts) | Toast 通知 (permission キャッシュ) |
 | [sanitizeSvg.ts](../app/composables/sanitizeSvg.ts) | SVG サニタイズ (`<script>`/`href`/`on*`/`javascript:` 除去) |
 | [useAppInfo.ts](../app/composables/useAppInfo.ts) | `get_app_info` IPC で取得したアプリ情報 (version, cursors_dir 等) の共有 |
 | [useSettingsSearch.ts](../app/composables/useSettingsSearch.ts) | 設定検索カタログ + ja/en 横断 substring 検索 + アンカージャンプ |
 | [useMarketplacePreviews.ts](../app/composables/useMarketplacePreviews.ts) | マーケットプレース プレビュー PNG のシングルトンキャッシュ + in-flight 重複排除 (`marketplace_fetch_preview` IPC ラッパー) |
-| [useGithubAuth.ts](../app/composables/useGithubAuth.ts) | GitHub Device Flow 認証状態管理。`start_device_flow` / `complete_device_flow` / `cancel_device_flow` / `revoke_github_link` IPC ラッパー + 接続済み GitHub アカウント情報のリアクティブ保持 |
+| [useGithubAuth.ts](../app/composables/useGithubAuth.ts) | GitHub Device Flow 認証状態管理。`start_device_flow` / `complete_device_flow` / `cancel_device_flow` IPC ラッパー + 接続済み GitHub アカウント情報のリアクティブ保持 (revoke_github_link は pages/settings.vue 側) |
 | [useMarketplaceSubmit.ts](../app/composables/useMarketplaceSubmit.ts) | 自動 Marketplace 提出フロー。`submit_theme_auto` IPC ラッパー + 提出進捗・エラー状態管理 |
 | [pickLocalizedName.ts](../app/composables/pickLocalizedName.ts) | `MarketplaceEntry.name` (`LocalizedString`: string \| locale マップ) を現 locale で 1 つの表示文字列に解決する純関数。Rust `crate::theme::LocalizedString::get` と 1:1 同期し、`FeaturedCard` / `MarketplaceDetailModal` / 検索 / トーストで共有 |
+| [useExternalUrl.ts](../app/composables/useExternalUrl.ts) | `open_url` IPC + `window.open` フォールバックの 1 行 API。6 callsite で重複していた try/catch を集約 |
+| [useListbox.ts](../app/composables/useListbox.ts) | `UiSelect` の listbox 状態機械 + キーボードナビ + viewport-aware Teleport 位置計算 |
+| [useModalLifecycle.ts](../app/composables/useModalLifecycle.ts) | Teleport modal の body scroll lock (重ね合わせ対応 counter) + Esc 購読 + cleanup |
+| [usePngBlobCache.ts](../app/composables/usePngBlobCache.ts) | Map + in-flight Promise + dispose の汎用キャッシュ機構 (useThemePreviews / useMarketplacePreviews / Creator の blob URL キャッシュで共有) |
+| [useTagChipInput.ts](../app/composables/useTagChipInput.ts) | Tag chip 入力 UI (Enter/カンマで chip 化 + Backspace 削除 + 上限 / 重複ガード)。SubmitThemeDialog の Auto/Manual タブで共有 |
+| [useThemeCardState.ts](../app/composables/useThemeCardState.ts) | `ThemeCard` / `ThemeRow` の 5 ブロック並行重複 (preview fetch / kind 判定 / displayDate / 詳細遷移 / お気に入り) を共通化 |
 
 ### 2-4. その他
 
@@ -177,10 +185,10 @@
 
 | 指標 | 値 |
 |---|---|
-| Rust モジュール数 (lib.rs `pub mod`) | 21 + ベンチ 2 |
-| Tauri IPC コマンド数 | 53 |
+| Rust モジュール数 (lib.rs `pub mod`) | 23 + ベンチ 2 |
+| Tauri IPC コマンド数 | 52 |
 | Vue ページ数 | 4 (+2 helpers) |
-| Vue コンポーネント (subdir 別) | shell 3 / library 12 / creator 12 / marketplace 4 / settings 14 / preview 1 / panic 1 / icons 2 / ui 1 |
-| Composables 数 | 28 |
-| Vitest テストファイル数 | 15 (composables) + 4 (pages) + 5 (components/creator) + 7 (components/library) + 8 (components/settings) + 2 (components/marketplace) + 1 (components/preview) = 42 |
+| Vue コンポーネント (subdir 別) | shell 3 / library 15 / creator 13 / marketplace 6 / settings 14 / preview 1 / panic 1 / icons 2 / ui 1 (合計 56) |
+| Composables 数 | 36 |
+| Vitest テストファイル数 | 19 (composables) + 4 (pages) + 5 (components/creator) + 7 (components/library) + 8 (components/settings) + 2 (components/marketplace) + 1 (components/preview) = 46 |
 | CI ワークフロー数 | 3 (ci / performance / release) |

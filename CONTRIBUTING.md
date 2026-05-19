@@ -10,14 +10,14 @@ Before you dive in, please skim:
 
 ## What kind of contribution?
 
-| Kind | Where to go |
-| --- | --- |
-| Bug report | Open a [GitHub Issue](https://github.com/nishiuriraku/easy-cursor-swap/issues/new) with reproduction steps |
-| Feature idea | Open an Issue first to discuss before coding — saves both of us time |
-| Small fix (typo, broken link, obvious bug) | Open a PR directly, no prior issue needed |
-| Larger change | Open an Issue first, get rough alignment, then PR |
-| Security vulnerability | Use [Private Vulnerability Reporting](https://github.com/nishiuriraku/easy-cursor-swap/security/advisories/new), see [SECURITY.md](SECURITY.md) |
-| New theme for the marketplace | Submit a PR to the separate [`easy-cursor-swap-index`](https://github.com/nishiuriraku/easy-cursor-swap-index) repo |
+| Kind                                       | Where to go                                                                                                                                     |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bug report                                 | Open a [GitHub Issue](https://github.com/nishiuriraku/easy-cursor-swap/issues/new) with reproduction steps                                      |
+| Feature idea                               | Open an Issue first to discuss before coding — saves both of us time                                                                            |
+| Small fix (typo, broken link, obvious bug) | Open a PR directly, no prior issue needed                                                                                                       |
+| Larger change                              | Open an Issue first, get rough alignment, then PR                                                                                               |
+| Security vulnerability                     | Use [Private Vulnerability Reporting](https://github.com/nishiuriraku/easy-cursor-swap/security/advisories/new), see [SECURITY.md](SECURITY.md) |
+| New theme for the marketplace              | Submit a PR to the separate [`easy-cursor-swap-index`](https://github.com/nishiuriraku/easy-cursor-swap-index) repo                             |
 
 ## Development setup
 

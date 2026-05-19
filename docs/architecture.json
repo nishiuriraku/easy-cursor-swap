@@ -1,6 +1,6 @@
 {
   "$schema_version": "0.1.0",
-  "generated_at": "2026-05-18",
+  "generated_at": "2026-05-19",
   "generated_from": [
     "docs/architecture.md",
     "docs/file_inventory.md",
@@ -40,8 +40,8 @@
       "ci_workflows": 3
     },
     "doc_drift_warnings": [
-      "docs/file_inventory.md および CLAUDE.md は『Composables 数 = 28』(2026-05-18 時点) と記述しているが、実測は 36 (architecture.json の measured_counts が canonical)。8 件の差分は pickLocalizedName 以前から prose docs に未掲載: useBulkImportPreviewState / useCreatorMetaState / useExternalUrl / useListbox / useModalLifecycle / usePngBlobCache / useTagChipInput / useThemeCardState。次の docs-only コミット (verify-gate 適用外) で prose docs を実測に同期する予定。",
-      "ui_map.json と相互整合済み: backend.ipc_commands 53 件のうち 3 件 (export_cursorpack / get_theme_previews / get_windows_scheme_previews) は Rust に登録だけされた legacy_unused 状態で、それぞれ status と replaced_by を明示。次の PR で Rust 側からも削除するか、frontend で再利用する決定をすること。",
+      "No known drift as of 2026-05-19 (re-measured). architecture.json/file_inventory.md/CLAUDE.md/README*.md/architecture.html がすべて同期 (modules=23 / IPC=52 / composables=36 / components=56 / commands-submodules=9)。前回の監査 (2026-05-19) で見つかったドリフト群 (CLAUDE.md/README で 21 modules / 53 IPC / 10 sub-modules / 28 composables / 50 components、cursor_build に cancel.rs 列挙、commands/updater 列挙、composables[].ipc_calls 7 件の宣言と実コード乖離、pages/settings.vue の get_app_info/revoke_github_link 未宣言、ui_map.json の \"update_config (Save 時)\" 注釈付き IPC 14 箇所、docs/code_signing_policy.md と architecture.json の config パス誤記、crash dir のケース揺れ、README の v1.0 表記) はすべて本コミットで解消。",
+      "ui_map.json と相互整合済み: backend.ipc_commands 52 件のうち 3 件 (export_cursorpack / get_theme_previews / get_windows_scheme_previews) は Rust に登録だけされた legacy_unused 状態で、それぞれ status と replaced_by を明示。次の PR で Rust 側からも削除するか、frontend で再利用する決定をすること。",
       "新たに食い違いを見つけたら『docs/<file> は X と書いているが実測 Y』の形で追記し、修正コミットと同じ PR で解消する。",
       "数字が docs と食い違ったら grep を信用する。frontend の数字は ui_map.html の live check (末尾) が canonical counter。"
     ]
@@ -52,11 +52,11 @@
     ],
     "filesystem_locations": {
       "user_themes_dir": "~/.custom_cursors/<theme-uuid>/ (アンインストール後も残存)",
-      "config_dir": "~/.custom_cursors/config.json",
+      "config_file": "%LOCALAPPDATA%/EasyCursorSwap/config.json (config.rs:208)",
       "key_storage": "~/.custom_cursors/_keys/ (DPAPI 暗号化された Ed25519)",
       "pending_snapshot": "~/.custom_cursors/_pending_apply.snapshot",
       "initial_snapshot": "~/.custom_cursors/_initial_snapshot.json",
-      "crash_reports": "%LOCALAPPDATA%/easy-cursor-swap/crash/panic-{epoch}.json",
+      "crash_reports": "%LOCALAPPDATA%/EasyCursorSwap/crash/panic-{epoch}.json",
       "registry_root": "HKCU\\Control Panel\\Cursors",
       "registry_schemes": "HKCU\\Control Panel\\Cursors\\Schemes"
     }
@@ -176,9 +176,9 @@
         "name": "commands",
         "file": "src-tauri/src/commands/mod.rs",
         "category": "ipc",
-        "role": "10 サブモジュールの IPC 表玄関。get_command_handlers() が 53 個の handler を tauri::generate_handler! 経由で登録 (うち 3 つは crate::bulk_import::{assets,cursorpack} から再エクスポート)。",
+        "role": "9 サブモジュールの IPC 表玄関。get_command_handlers() が 52 個の handler を tauri::generate_handler! 経由で登録 (うち 3 つは crate::bulk_import::{assets,cursorpack} から再エクスポート)。",
         "submodules": [
-          "commands/cursor_build/ (mod, build, stream, cancel, sign, dto)",
+          "commands/cursor_build/ (mod, build, stream, sign, dto)",
           "commands/cursor_io",
           "commands/keystore",
           "commands/marketplace",
@@ -186,7 +186,6 @@
           "commands/profile",
           "commands/system",
           "commands/theme",
-          "commands/updater",
           "commands/windows_scheme"
         ],
         "depends_on": ["theme", "cursor", "registry", "marketplace", "keystore", "config", "bulk_import", "github", "backup", "crash", "health", "accessibility", "environment", "autostart"]
@@ -456,28 +455,28 @@
         "role": "設定 8 セクション (一般 / 起動 / ライブラリ / セキュリティ / 鍵 / ログ / 更新 / About)",
         "composables": ["useAppSettings", "useKeystore", "useUpdater", "useSettingsSearch", "useAppInfo"],
         "components": ["ConfigRecoveryPanel", "PassphrasePrompt", "SettingsSearchDropdown", "GeneralSection", "StartupSection", "LibrarySection", "SecuritySection", "KeysSection", "LoggingSection", "UpdatesSection", "AboutSection"],
-        "ipc_calls": ["get_config", "update_config", "keystore_info", "keystore_generate", "keystore_delete", "keystore_export", "keystore_import", "list_config_backups", "restore_config_backup", "export_profile", "import_profile", "list_crash_reports", "clear_crash_reports", "submit_crash_reports", "check_update_is_major_jump", "open_log_folder", "open_url", "get_accessibility_conflicts"]
+        "ipc_calls": ["get_config", "update_config", "get_app_info", "keystore_info", "keystore_generate", "keystore_delete", "keystore_export", "keystore_import", "list_config_backups", "restore_config_backup", "export_profile", "import_profile", "list_crash_reports", "clear_crash_reports", "submit_crash_reports", "check_update_is_major_jump", "revoke_github_link", "open_log_folder", "open_url", "get_accessibility_conflicts"]
       }
     ],
     "composables": [
       { "file": "app/composables/useTauri.ts", "name": "useTauri", "role": "invokeTauri<T>(name, args) の IPC ラッパー。ブラウザ専用フォールバックモック付き。" },
       { "file": "app/composables/useThemes.ts", "name": "useThemes", "role": "テーマ一覧の共有リアクティブ singleton + 操作系 IPC (apply/delete/duplicate/repackage/set_theme_favorite/inspect/import) の集約ラッパー。pages/index.vue がもともと直接 invokeTauri していた 7 IPC を本 composable に移譲して page を slim 化 (audit B8-SIZE-001)。", "ipc_calls": ["get_themes", "apply_theme", "delete_theme", "duplicate_theme", "repackage_theme", "set_theme_favorite", "import_cursorpack", "inspect_cursorpack"] },
-      { "file": "app/composables/useAppSettings.ts", "name": "useAppSettings", "role": "get_config / update_config ラッパー + dirty フラグ。", "ipc_calls": ["get_config", "update_config", "export_profile", "import_profile"] },
+      { "file": "app/composables/useAppSettings.ts", "name": "useAppSettings", "role": "get_config / update_config ラッパー + dirty フラグ。`.cursorprofile` の export_profile / import_profile は pages/settings.vue から直接 invokeTauri しているので本 composable には含まれない (audit F7 で本リストから外した)。", "ipc_calls": ["get_config", "update_config"] },
       { "file": "app/composables/useI18n.ts", "name": "useI18n", "role": "t(key, params) + フォールバック + OS ロケール検出。app/locales/{ja,en}.ts をバックエンドとする。" },
       { "file": "app/composables/useKeystore.ts", "name": "useKeystore", "role": "鍵生成 / 削除 / エクスポート / インポート + key_id 表示。", "ipc_calls": ["keystore_info", "keystore_generate", "keystore_delete", "keystore_export", "keystore_import"] },
       { "file": "app/composables/useUiTheme.ts", "name": "useUiTheme", "role": "アプリ自身のライト / ダーク / Auto モード切替。永続化先は localStorage のみで、Rust config (update_config IPC) には一切書き込まない (UI 専用設定を config.json に汚染しない設計)。" },
       { "file": "app/composables/useRoleMatcher.ts", "name": "useRoleMatcher", "role": "エイリアス辞書 + scoreRole + resolveCollisions。17 役割マッチング用の純粋関数群。" },
       { "file": "app/composables/useThemePreviews.ts", "name": "useThemePreviews", "role": "プレビュー画像取得 (役割 × サイズ + ホットスポット + ANI フレーム)。UUID 形式はローカルテーマ、`windows:` プレフィックスはシステムスキームへ分岐。", "ipc_calls": ["get_theme_role_previews", "get_windows_scheme_role_previews"] },
-      { "file": "app/composables/useBulkImport.ts", "name": "useBulkImport", "role": "バルクインポート IPC ラッパー + 進捗購読。", "ipc_calls": ["bulk_resolve_assets", "cancel_bulk_import"] },
+      { "file": "app/composables/useBulkImport.ts", "name": "useBulkImport", "role": "バルクインポート IPC ラッパー + 進捗購読 + `.cursorpack` 解析 (parse_cursorpack_for_creator)。", "ipc_calls": ["bulk_resolve_assets", "cancel_bulk_import", "parse_cursorpack_for_creator"] },
       { "file": "app/composables/useCreatorAssets.ts", "name": "useCreatorAssets", "role": "役割ごとの assignedPng / Hotspot を統合管理。" },
       { "file": "app/composables/useCreatorPickers.ts", "name": "useCreatorPickers", "role": "Creator のファイル / フォルダピッカー UX。" },
       { "file": "app/composables/useCreatorImport.ts", "name": "useCreatorImport", "role": "Creator の単発インポート (import_cursor_file / inspect_ani_file)。" },
-      { "file": "app/composables/useCreatorBulkImportFlow.ts", "name": "useCreatorBulkImportFlow", "role": "バルクインポート preview → confirm のステートマシン。", "ipc_calls": ["parse_cursorpack_for_creator", "bulk_resolve_assets"] },
-      { "file": "app/composables/useCreatorExport.ts", "name": "useCreatorExport", "role": ".cursorpack のストリーミング出力フロー (進捗 + キャンセル) + library/libraryAndApply 経路では完了後の apply_theme まで自走する。", "ipc_calls": ["export_cursorpack_streamed", "cancel_build", "apply_theme"] },
+      { "file": "app/composables/useCreatorBulkImportFlow.ts", "name": "useCreatorBulkImportFlow", "role": "バルクインポート preview → confirm のステートマシン。IPC 呼出は useBulkImport へ delegation するため、直接 invokeTauri するコードはこの composable には無い。", "ipc_calls": [] },
+      { "file": "app/composables/useCreatorExport.ts", "name": "useCreatorExport", "role": ".cursorpack のストリーミング出力フロー (進捗 + キャンセル)。library/libraryAndApply 経路で「保存して適用」を完遂する apply_theme は useThemes 経由で呼出側 (pages/creator.vue) が叩くため、本 composable からは invokeTauri しない。", "ipc_calls": ["export_cursorpack_streamed", "cancel_build"] },
       { "file": "app/composables/useHotspotDefaults.ts", "name": "useHotspotDefaults", "role": "役割別 hotspot のデフォルト座標。" },
       { "file": "app/composables/useHotspotInteraction.ts", "name": "useHotspotInteraction", "role": "Hotspot のドラッグ操作 (純粋関数群)。" },
       { "file": "app/composables/useAniPlayer.ts", "name": "useAniPlayer", "role": "ANI プレビュー再生 (フレームタイマー + キャンセル)。" },
-      { "file": "app/composables/useCursorpackOpener.ts", "name": "useCursorpackOpener", "role": ".cursorpack のダブルクリック / argv ハンドオフフロー。", "ipc_calls": ["take_pending_cursorpack", "inspect_cursorpack", "import_cursorpack"] },
+      { "file": "app/composables/useCursorpackOpener.ts", "name": "useCursorpackOpener", "role": ".cursorpack のダブルクリック / argv ハンドオフフロー。受け取った path のディスパッチのみ担当し、inspect_cursorpack / import_cursorpack の呼出は useThemes 経由で呼出側 (pages/index.vue) が行う。", "ipc_calls": ["take_pending_cursorpack"] },
       { "file": "app/composables/usePngBlobCache.ts", "name": "usePngBlobCache", "role": "Map + in-flight Promise + dispose の汎用キャッシュ機構。useThemePreviews / useMarketplacePreviews / Creator の blob URL キャッシュで共有 (audit C20-DUP-001)。" },
       { "file": "app/composables/useModalLifecycle.ts", "name": "useModalLifecycle", "role": "Teleport modal の body scroll lock (重ね合わせ対応 counter) + Esc 購読 + cleanup。ThemeDetailModal / MarketplaceDetailModal / OssLicenseModal で共有 (audit D28-DUP-001)。" },
       { "file": "app/composables/useListbox.ts", "name": "useListbox", "role": "UiSelect の listbox 状態機械 + キーボードナビ + viewport-aware Teleport 位置計算 (audit F43-SIZE-001)。" },
@@ -486,14 +485,14 @@
       { "file": "app/composables/useTagChipInput.ts", "name": "useTagChipInput", "role": "Tag chip 入力 UI (Enter/カンマで chip 化 + Backspace 削除 + 上限 / 重複ガード)。SubmitThemeDialog の Auto/Manual タブで共有 (audit D29 部分)。" },
       { "file": "app/composables/useCreatorMetaState.ts", "name": "useCreatorMetaState", "role": "Creator メタデータ入力欄 (name / nameEn / author / version / description / shadowEnabled) の 6 ref と reset() を集約。resetCreator() の一行リセットを支える (audit C20-SIZE-001 部分)。" },
       { "file": "app/composables/useBulkImportPreviewState.ts", "name": "useBulkImportPreviewState", "role": "BulkImportPreviewModal の matches/unmatched 三方移動 state machine + props.open 連動の初期マッチ watch + Blob URL ライフサイクル + ApplyPayload 組立を集約。PendingMatch / UnmatchedFile / ApplyPayload 型もここで export (audit C21-SIZE 部分)。" },
-      { "file": "app/composables/useUpdater.ts", "name": "useUpdater", "role": "check / downloadAndInstall / relaunch。", "ipc_calls": ["check_update_is_major_jump"] },
-      { "file": "app/composables/useUpdaterBootstrap.ts", "name": "useUpdaterBootstrap", "role": "起動時 1 回だけ auto_update + 24h クールダウンで check し、ヒット時に Toast 通知。", "ipc_calls": [] },
+      { "file": "app/composables/useUpdater.ts", "name": "useUpdater", "role": "check / downloadAndInstall / relaunch + classifyUpdaterError。本 composable は tauri-apps/plugin-updater プラグイン API を直接叩くため invokeTauri を呼ばない。`check_update_is_major_jump` IPC は useUpdaterBootstrap と pages/settings.vue が呼び出す。", "ipc_calls": [] },
+      { "file": "app/composables/useUpdaterBootstrap.ts", "name": "useUpdaterBootstrap", "role": "起動時 1 回だけ auto_update + 24h クールダウンで check し、ヒット時に Toast 通知。check_update_is_major_jump IPC でメジャーバージョン跨ぎを判定し、跨ぎの場合は自動更新せずに通知のみ行う。", "ipc_calls": ["check_update_is_major_jump"] },
       { "file": "app/composables/useNotify.ts", "name": "useNotify", "role": "Toast 通知 (permission をキャッシュ)。" },
       { "file": "app/composables/sanitizeSvg.ts", "name": "sanitizeSvg", "role": "SVG サニタイズ (<script> / href / on* / javascript: を除去)。v-html 禁止のため必須。" },
       { "file": "app/composables/useAppInfo.ts", "name": "useAppInfo", "role": "get_app_info IPC で取得したアプリ情報 (version、cursors_dir 等) の共有。", "ipc_calls": ["get_app_info"] },
       { "file": "app/composables/useSettingsSearch.ts", "name": "useSettingsSearch", "role": "設定検索カタログ + ja/en 横断 substring 検索 + アンカージャンプ。" },
       { "file": "app/composables/useMarketplacePreviews.ts", "name": "useMarketplacePreviews", "role": "マーケットプレースプレビュー PNG の singleton キャッシュ + in-flight 重複排除 (marketplace_fetch_preview IPC ラッパー)。", "ipc_calls": ["marketplace_fetch_preview"] },
-      { "file": "app/composables/useGithubAuth.ts", "name": "useGithubAuth", "role": "GitHub Device Flow 認証状態の管理。start_device_flow / complete_device_flow / cancel_device_flow / revoke_github_link の IPC ラッパー + 接続済み GitHub アカウント情報のリアクティブ保持。", "ipc_calls": ["start_device_flow", "complete_device_flow", "cancel_device_flow", "revoke_github_link"] },
+      { "file": "app/composables/useGithubAuth.ts", "name": "useGithubAuth", "role": "GitHub Device Flow 認証状態の管理。start_device_flow / complete_device_flow / cancel_device_flow の IPC ラッパー + 接続済み GitHub アカウント情報のリアクティブ保持。revoke_github_link は本 composable には含まれず、pages/settings.vue から直接呼ばれる。", "ipc_calls": ["start_device_flow", "complete_device_flow", "cancel_device_flow"] },
       { "file": "app/composables/useMarketplaceSubmit.ts", "name": "useMarketplaceSubmit", "role": "自動マーケットプレース提出フロー。submit_theme_auto IPC ラッパー + 提出進捗・エラー状態の管理。", "ipc_calls": ["submit_theme_auto"] },
       { "file": "app/composables/pickLocalizedName.ts", "name": "pickLocalizedName", "role": "MarketplaceEntry.name (LocalizedString: string | locale map) を現 locale で 1 つの表示文字列に解決する純関数。Rust crate::theme::LocalizedString::get と 1:1 同期し、Marketplace カード / 詳細モーダル / 検索 / トーストで共有。" }
     ],

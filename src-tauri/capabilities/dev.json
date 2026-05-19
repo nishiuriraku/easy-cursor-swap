@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "dev",
+  "description": "デバッグビルド専用 capability。tauri_plugin_mcp_bridge は src/main.rs で `#[cfg(debug_assertions)]` ガード付きで初期化されるため、release ビルドではプラグイン本体も capability も無効化される。",
+  "platforms": ["windows"],
+  "windows": ["main"],
+  "permissions": ["mcp-bridge:default"]
+}

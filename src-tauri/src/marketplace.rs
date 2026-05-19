@@ -54,27 +54,32 @@ pub struct MarketplaceIndex {
 /// `"name": "EasyCursorSwap Mint"` (plain string) と将来の
 /// `"name": {"ja": "ミント", "en": "Mint", "default": "EasyCursorSwap Mint"}`
 /// (ロケールマップ) の両方を 1 つの struct で deserialize できる。
-/// フロントへ JSON で渡す際は serde が自動で適切な形に serialize する。
+///
+/// **シリアライズ規約**:
+/// - **deserialize** は snake_case (公開 `index.json` のスキーマに合わせる)
+/// - **serialize** は camelCase (フロントへ IPC で渡すとき、TS 側 camelCase 型と
+///   1:1 で揃う。フロント側で `adaptEntry()` のような snake→camel リネームを行わずに
+///   そのまま `MarketplaceEntry` に流し込める)
+///
+/// この非対称 (audit E1 / E2) は serde の directional `rename_all` で表現する。
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
 pub struct MarketplaceEntry {
     pub id: uuid::Uuid,
     pub name: crate::theme::LocalizedString,
     pub author: String,
-    #[serde(rename = "author_github")]
     pub author_github: String,
-    #[serde(rename = "author_pubkey_id")]
     pub author_pubkey_id: String,
     pub sha256: String,
     pub signature: String,
-    #[serde(rename = "download_url")]
     pub download_url: String,
     pub version: String,
-    #[serde(rename = "included_roles", default)]
+    #[serde(default)]
     pub included_roles: Vec<String>,
     #[serde(default)]
     pub tags: Vec<String>,
     pub homepage: Option<String>,
-    #[serde(rename = "download_count", default)]
+    #[serde(default)]
     pub download_count: u64,
     /// Featured 表示用ラベル (例: "new", "popular")。公式 index.json が
     /// 将来このフィールドを含める可能性があるため `serde(default)` で受け取る。
@@ -83,7 +88,7 @@ pub struct MarketplaceEntry {
     /// 公式インデックス側 `previews/<uuid>/` のベース URL。
     /// `MarketplaceDetailModal` がここに `/<role>.png` を結合して PNG を取得する。
     /// 旧スキーマとの互換のため `serde(default)` で `None` フォールバック。
-    #[serde(rename = "preview_base_url", default)]
+    #[serde(default)]
     pub preview_base_url: Option<String>,
 }
 

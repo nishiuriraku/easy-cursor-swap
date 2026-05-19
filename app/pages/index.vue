@@ -12,7 +12,7 @@
 import type { ThemeCardData } from '~/types/theme'
 import { mapLocalSummaryToCard, type IpcThemeSummary } from '~/pages/index.helpers'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 // UiIcon / ThemeCard / ApplyModal は Nuxt の自動インポートで解決される。
 
 type FilterChip = 'all' | 'favorites' | 'recent'
@@ -536,7 +536,9 @@ async function loadThemes(opts: { silent?: boolean } = {}) {
       }),
     ])
 
-    const local: ThemeCardData[] = (localList ?? []).map(mapLocalSummaryToCard)
+    const local: ThemeCardData[] = (localList ?? []).map((s) =>
+      mapLocalSummaryToCard(s, locale.value),
+    )
 
     // EasyCursorSwap が register_scheme で書き込んだスキームはローカルテーマと
     // 名前が一致するので除外する (重複表示防止)。
@@ -595,6 +597,13 @@ function onVisibilityChange() {
   if (typeof document === 'undefined') return
   if (document.visibilityState === 'visible') void loadThemes()
 }
+
+// locale 切替時にカードタイトル / 説明を現在のロケールで再解決する。
+// `loadThemes()` は IPC fetch を含むが get_themes 自体がローカル FS 走査で
+// 軽量、かつ in-flight 共有もあるので silent モードで呼んで OK。
+watch(locale, () => {
+  void loadThemes({ silent: true })
+})
 
 // --- Tauri v2 ウィンドウドラッグ&ドロップイベント購読 ---
 async function setupTauriDrop() {

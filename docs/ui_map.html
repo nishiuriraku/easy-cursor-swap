@@ -821,7 +821,7 @@
       "modals": 14
     },
     "drift_notes": [
-      "現時点では既知のドリフトなし (2026-05-17 architecture.json + file_inventory.md + architecture.md + CLAUDE.md と完全同期)。前回監査で見つかったドリフト群 (MarketplaceCard.vue 不在 / dead frontend_callers 3 件 / phantom IPC 3 件 / 統計数値 6 件) は同コミット内で全て解消済み。",
+      "現時点では既知のドリフトなし (2026-05-19 architecture.json + file_inventory.md + architecture.md + CLAUDE.md と完全同期)。本 JSON が IPC 名フィールドに `\"update_config (Save 時)\"` のような注釈付き文字列を書いていた件 (audit B1, 14 箇所) は同コミット内で全て解消済み。注釈は `action` フィールドに移されている。",
       "本ファイルの数字 (interactions_total / ipc_unique_targets) は ui_map.html を開いた瞬間に live check が再計上して宣言値とミスマッチを検出する canonical counter として機能する。新規ハンドラ・モーダル・キーボードショートカット追加と同じコミットで本 JSON を更新すること。",
       "backend.ipc_commands 52 件のうち 3 件 (export_cursorpack / get_theme_previews / get_windows_scheme_previews) は Rust に登録されているが現行フロントから呼ばれない legacy_unused。本 ui_map では参照しない (= ipc_unique_targets は 49 のまま)。Rust 側で削除するか維持するかの決定は別 PR で。"
     ]
@@ -2206,21 +2206,21 @@
               "trigger": "change",
               "ui": "[UI 言語] <UiSelect> (auto/ja/en)",
               "action": "AppConfig.general.language を更新 (Save 押下で永続化)",
-              "ipc": ["update_config (Save 時)"]
+              "ipc": ["update_config"]
             },
             {
               "id": "general-toast",
               "trigger": "change",
               "ui": "[適用 Toast を表示] SettingsToggle",
               "action": "showApplyToast を切替",
-              "ipc": ["update_config (Save 時)"]
+              "ipc": ["update_config"]
             },
             {
               "id": "general-shadow",
               "trigger": "change",
               "ui": "[影制御] SettingsToggle",
               "action": "applyShadowControl を切替",
-              "ipc": ["update_config (Save 時)"]
+              "ipc": ["update_config"]
             },
             {
               "id": "general-config-restored",
@@ -2241,14 +2241,14 @@
               "trigger": "change",
               "ui": "[Windows 起動時に起動] SettingsToggle",
               "action": "auto_start を切替 → autostart モジュール経由で HKCU\\...\\Run を更新",
-              "ipc": ["update_config (Save 時)"]
+              "ipc": ["update_config"]
             },
             {
               "id": "startup-start-minimized",
               "trigger": "change",
               "ui": "[最小化で起動] SettingsToggle",
               "action": "startMinimized を切替",
-              "ipc": ["update_config (Save 時)"]
+              "ipc": ["update_config"]
             }
           ]
         },
@@ -2262,14 +2262,14 @@
               "trigger": "input",
               "ui": "[総容量警告閾値 GB] 数値入力",
               "action": "totalLimitWarnGb を更新",
-              "ipc": ["update_config (Save 時)"]
+              "ipc": ["update_config"]
             },
             {
               "id": "library-storage-warn",
               "trigger": "change",
               "ui": "[ストレージ警告] SettingsToggle",
               "action": "storageWarnEnabled を切替",
-              "ipc": ["update_config (Save 時)"]
+              "ipc": ["update_config"]
             },
             {
               "id": "library-export-profile",
@@ -2297,14 +2297,14 @@
               "trigger": "change",
               "ui": "[署名済みテーマのみ許可] SettingsToggle",
               "action": "requireSignedThemes を切替",
-              "ipc": ["update_config (Save 時)"]
+              "ipc": ["update_config"]
             },
             {
               "id": "security-warn-unsigned",
               "trigger": "change",
               "ui": "[未署名インポート時に警告] SettingsToggle",
               "action": "warnUnsignedImport を切替",
-              "ipc": ["update_config (Save 時)"]
+              "ipc": ["update_config"]
             }
           ]
         },
@@ -2367,21 +2367,21 @@
               "trigger": "change",
               "ui": "[ログレベル] <UiSelect> (TRACE/DEBUG/INFO/WARN/ERROR)",
               "action": "logLevel を更新",
-              "ipc": ["update_config (Save 時)"]
+              "ipc": ["update_config"]
             },
             {
               "id": "logging-retention",
               "trigger": "input",
               "ui": "[保持日数] 数値入力",
               "action": "retentionDays を更新",
-              "ipc": ["update_config (Save 時)"]
+              "ipc": ["update_config"]
             },
             {
               "id": "logging-max-size",
               "trigger": "input",
               "ui": "[最大サイズ MB] 数値入力",
               "action": "maxSizeMb を更新",
-              "ipc": ["update_config (Save 時)"]
+              "ipc": ["update_config"]
             },
             {
               "id": "logging-open-folder",
@@ -2395,7 +2395,7 @@
               "trigger": "change",
               "ui": "[クラッシュレポート送信] SettingsToggle",
               "action": "crashReporting を切替",
-              "ipc": ["update_config (Save 時)"]
+              "ipc": ["update_config"]
             },
             {
               "id": "logging-submit-crash",
@@ -2423,7 +2423,7 @@
               "trigger": "change",
               "ui": "[自動アップデート] SettingsToggle",
               "action": "autoUpdate を切替 (起動時の useUpdaterBootstrap に作用)",
-              "ipc": ["update_config (Save 時)"]
+              "ipc": ["update_config"]
             },
             {
               "id": "updates-force-recheck",

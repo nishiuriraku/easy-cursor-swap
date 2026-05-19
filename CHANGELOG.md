@@ -49,7 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `useExternalUrl` (`openExternalUrl`) — `open_url` IPC + `window.open` フォールバックの 6 callsite 重複を 1 行 await に圧縮 (AboutSection / OssLicenseModal / SubmitDeviceFlowModal / marketplace.vue / SubmitThemeDialog ×2 / ThemeDetailDrawer)。
   - `useTagChipInput` — `SubmitThemeDialog` Auto/Manual タブ間の tag chip 入力ロジック重複を解消 (D29 部分)。
 - `useThemes` に theme mutation IPC 7 件 (`apply_theme` / `delete_theme` / `duplicate_theme` / `repackage_theme` / `set_theme_favorite` / `inspect_cursorpack` / `import_cursorpack`) のラッパーメソッドを追加。`pages/index.vue` から直接 `invokeTauri` していた経路を composable 経由に集約し、`docs/architecture.json` の `useThemes.ipc_calls` 宣言と実態を一致させた (B8-SIZE-001)。
-- composable 総数: 27 → 35 (新規 8 件)。`docs/architecture.json` の `meta.measured_counts.composables` と composable リストを再測定。
+- composable 総数: 28 → 36 (新規 8 件)。`docs/architecture.json` の `meta.measured_counts.composables` と composable リストを再測定。
 - 監査 🔴 のうち `B10-SIZE-001` / `D29-SIZE-001` / `C20-SIZE-001` の純粋な file split を完遂:
   - `SubmitThemeDialog.vue` (576 行) を `SubmitThemeAutoForm.vue` / `SubmitThemeManualForm.vue` の 2 子コンポーネントに分離 (D29-SIZE-001)。`useMarketplaceSubmit` が singleton ではないため submitter は親で保持し、reactive な値を props で子に渡す設計。
   - `ThemeDetailDrawer.vue` (645 行) を `ThemeDetailDrawerHero.vue` / `Strip.vue` / `Footer.vue` の 3 子コンポーネントに分離 (B10-SIZE-001)。activeRole 内部状態は Hero に閉じ、emit はコンテナを通して props down 単方向。

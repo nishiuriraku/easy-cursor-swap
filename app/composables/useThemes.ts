@@ -14,11 +14,17 @@
  * 複数画面で同じインスタンスを参照したいので Pinia 不使用のシンプル composable で実装。
  */
 import type { ThemeCardData, ThemeKind } from '~/types/theme'
+import type { MarketplaceName } from '~/types/marketplace'
 
 /**
  * Rust 側 theme::types::ThemeSummary に対応する IPC ペイロード。
  * フィールド名は serde 既定 (snake_case) のままで、フロント型 ThemeCardData
  * には mapSummary で camelCase に揃えてコピーする。
+ *
+ * `name` / `description` は Rust 側 `LocalizedString` の生形 (`string | { [locale]: string }`)
+ * で受け取り、`mapSummary` 内で `pickLocalizedName` を介して現在の locale に解決する。
+ * Rust 側で固定ロケールに解決していた頃は英語 UI ユーザーが日本語名のテーマを
+ * "矢印" のように見ることになっていた (audit D1/D2)。
  *
  * 過去にここで description / signed / tags / size_bytes / last_applied_at /
  * schema_version / license / homepage を **取りこぼしていた** ため、
@@ -27,7 +33,7 @@ import type { ThemeCardData, ThemeKind } from '~/types/theme'
  */
 interface IpcThemeSummary {
   id: string
-  name: string
+  name: MarketplaceName
   author: string | null
   version: string
   created_at: string
@@ -40,7 +46,7 @@ interface IpcThemeSummary {
   tags: string[]
   size_bytes: number
   signed: boolean
-  description?: string | null
+  description?: MarketplaceName | null
   schema_version: number
   license?: string | null
   homepage?: string | null
@@ -66,7 +72,11 @@ export interface InspectionResult {
   } | null
 }
 
-const themes = ref<ThemeCardData[]>([])
+// `themesRaw` は IPC から受け取った生データ (LocalizedString 含む) を保持する。
+// `themes` は `themesRaw` + 現在の locale から派生する computed で、locale
+// 切替時に再 fetch せず再描画できる。`refresh()` は raw を更新するだけで、
+// 派生側の computed が自動的に再計算する。
+const themesRaw = ref<IpcThemeSummary[]>([])
 const loading = ref(false)
 const lastError = ref<string | null>(null)
 let inflight: Promise<ThemeCardData[]> | null = null
@@ -76,10 +86,10 @@ export function mapSourceToKind(source: string | undefined): ThemeKind {
   return 'local'
 }
 
-function mapSummary(t: IpcThemeSummary): ThemeCardData {
+function mapSummary(t: IpcThemeSummary, locale: string): ThemeCardData {
   return {
     id: t.id,
-    name: t.name,
+    name: pickLocalizedName(t.name, locale),
     author: t.author,
     version: t.version,
     date: t.created_at,
@@ -91,13 +101,22 @@ function mapSummary(t: IpcThemeSummary): ThemeCardData {
     tags: t.tags,
     sizeBytes: t.size_bytes,
     signed: t.signed,
-    description: t.description ?? null,
+    // description は LocalizedString (string | { [locale]: string }) なので、
+    // 解決後に空文字なら null に正規化して UI 側で説明段落を非表示にする。
+    description: t.description == null ? null : pickLocalizedName(t.description, locale) || null,
     schemaVersion: t.schema_version,
     license: t.license ?? null,
     homepage: t.homepage ?? null,
     lastAppliedAt: t.last_applied_at,
   }
 }
+
+const themes = computed<ThemeCardData[]>(() => {
+  // locale を computed 内で参照することで、`setLocale('en')` 等の言語切替時に
+  // 自動的に themes が再計算され、再 fetch なしで表示名が切り替わる。
+  const { locale } = useI18n()
+  return themesRaw.value.map((t) => mapSummary(t, locale.value))
+})
 
 async function refresh(): Promise<ThemeCardData[]> {
   if (inflight) return inflight
@@ -106,7 +125,7 @@ async function refresh(): Promise<ThemeCardData[]> {
   inflight = (async () => {
     try {
       const list = await invokeTauri<IpcThemeSummary[]>('get_themes')
-      themes.value = (list ?? []).map(mapSummary)
+      themesRaw.value = list ?? []
       return themes.value
     } catch (err) {
       lastError.value = err instanceof Error ? err.message : String(err)

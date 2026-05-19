@@ -123,8 +123,11 @@ fn parse_ani_role(
     // export 用にバイトを展開
     let ani_source_path = if let Some(dir) = ani_extract_dir {
         std::fs::create_dir_all(dir)?;
-        // file_in_zip にはサブディレクトリ含む可能性があるのでファイル名だけ取り出す
-        let fname = Path::new(file_in_zip)
+        // file_in_zip は ZIP エントリ名で外部由来 → `sanitize_archive_path_pub`
+        // 経由でパストラバーサルや絶対パスを拒否し、basename だけを取り出す
+        // (CLAUDE.md "Archive sanitisation" 不変条件の文言と完全一致)。
+        let sanitized = crate::theme::sanitize_archive_path_pub(file_in_zip)?;
+        let fname = sanitized
             .file_name()
             .map(|s| s.to_string_lossy().to_string())
             .unwrap_or_else(|| format!("{}.ani", role_id));

@@ -49,10 +49,11 @@ jobs:
         run: cargo test --lib
 
   # -------------------------------------------------------------
-  # フロントエンド: 型生成 + 型チェック
+  # フロントエンド: 型生成 + 型チェック + Prettier + Vitest
+  # verify-gate.sh と等価のフロント検証一式を CI でも実行する。
   # -------------------------------------------------------------
   frontend:
-    name: Nuxt typecheck
+    name: Nuxt typecheck + Prettier + Vitest
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -72,6 +73,12 @@ jobs:
 
       - name: Vue type check
         run: npx vue-tsc --noEmit
+
+      - name: Prettier --check
+        run: npm run format:check
+
+      - name: Vitest
+        run: npm test
 
   # -------------------------------------------------------------
   # i18n キー差分検出 (ja/en の漏れを検出)

@@ -179,7 +179,10 @@ impl ThemeManager {
 
         Ok(ThemeSummary {
             id: metadata.id,
-            name: metadata.name.get("ja"), // TODO: ロケールに応じて切替
+            // `LocalizedString` を生のまま渡す。Rust 側でロケール解決すると、
+            // フロント側で言語切替したときに再 fetch が必要になるため、解決は
+            // TS 側 `pickLocalizedName(name, locale.value)` に委譲する。
+            name: metadata.name,
             author: metadata.author,
             version: metadata.version,
             created_at: metadata.created_at,
@@ -192,7 +195,7 @@ impl ThemeManager {
             tags,
             size_bytes,
             signed,
-            description: metadata.description.as_ref().map(|d| d.get("ja")),
+            description: metadata.description,
             schema_version: metadata.schema_version,
             license: metadata.license.clone(),
             homepage: metadata.homepage.clone(),

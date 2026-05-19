@@ -6,10 +6,10 @@ EasyCursorSwap writes to the Windows registry, handles user-supplied cursor pack
 
 Only the **latest `0.x` release** receives security fixes during the pre-1.0 phase. Once `1.0.0` ships, this table will be updated.
 
-| Version | Supported          |
-| ------- | ------------------ |
+| Version | Supported                        |
+| ------- | -------------------------------- |
 | 0.x     | :white_check_mark: (latest only) |
-| < 0.1   | :x:                |
+| < 0.1   | :x:                              |
 
 ## Reporting a vulnerability
 
@@ -29,10 +29,10 @@ When filing, please include:
 
 This is a single-maintainer project, so timelines are best-effort:
 
-| Stage | Target |
-| --- | --- |
-| Acknowledgement | within 7 days |
-| Initial assessment / triage | within 14 days |
+| Stage                         | Target                             |
+| ----------------------------- | ---------------------------------- |
+| Acknowledgement               | within 7 days                      |
+| Initial assessment / triage   | within 14 days                     |
 | Coordinated disclosure window | up to 90 days from acknowledgement |
 
 If you don't hear back within 7 days, feel free to send a follow-up via the advisory thread.

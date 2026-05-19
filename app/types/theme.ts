@@ -45,7 +45,7 @@ export interface ThemeCardData {
    */
   lastAppliedAt?: string | null
   /**
-   * theme.json `description` を `"ja"` 解決した文字列。
+   * theme.json `description` を現在のロケールで解決した文字列。
    * `null/undefined` のとき UI は説明段落を非表示にする。
    * Windows システムスキームは `null`。
    */

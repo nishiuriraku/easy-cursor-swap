@@ -134,8 +134,8 @@ easy-cursor-swap/
 ├── src-tauri/                  # Tauri + Rust backend
 │   ├── src/
 │   │   ├── main.rs             # Entry point: tray, health check
-│   │   ├── lib.rs              # Module declarations (21 modules)
-│   │   ├── commands/           # Tauri IPC command handlers (53 endpoints across 10 sub-modules)
+│   │   ├── lib.rs              # Module declarations (23 modules)
+│   │   ├── commands/           # Tauri IPC command handlers (52 endpoints across 9 sub-modules)
 │   │   ├── config.rs           # Config manager (RwLock, schema migration, backups)
 │   │   ├── cursor/             # PNG → .cur / .ani pipeline (6 sizes, hotspot, ANI read/write)
 │   │   ├── registry/           # HKCU registry read/write, Schemes, SPI_SETCURSORS
@@ -194,7 +194,7 @@ See [docs/architecture.md#security](docs/architecture.md#security) for the full 
 
 See [docs/key_rotation.md](docs/key_rotation.md) if you need to rotate your signing key.
 
-## Known Limitations (v1.0)
+## Known Limitations
 
 | Limitation                     | Notes                                                            |
 | ------------------------------ | ---------------------------------------------------------------- |

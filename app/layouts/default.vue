@@ -75,9 +75,58 @@ function onPanicDone(_stage: 1 | 2) {
   window.dispatchEvent(new CustomEvent('easycs:cursors-changed'))
 }
 
-// グローバルパニックホットキー (Ctrl+Alt+Shift+R)
+/**
+ * 設定 `general.panic_hotkey` の文字列 (`Ctrl+Alt+Shift+R` 形式) を
+ * KeyboardEvent マッチャに変換する。Rust 側 `hotkey.rs::parse_hotkey` と同じ
+ * 文字列を解釈し、フォーカス時の JS keydown でも config 由来のホットキーが
+ * 動くようにする (audit F17)。
+ *
+ * 修飾子: Ctrl / Alt / Shift / Win|Meta|Super|Cmd
+ * 主キー: A-Z / 0-9 / F1-F24
+ * 修飾子無しのキーは無効 (誤爆防止のため Rust 側と挙動を揃える)。
+ */
+function parsePanicHotkey(spec: string | undefined | null): {
+  ctrl: boolean
+  alt: boolean
+  shift: boolean
+  meta: boolean
+  key: string
+} | null {
+  if (!spec) return null
+  const parts = spec.split('+').map((p) => p.trim().toLowerCase())
+  if (parts.length < 2) return null
+  let ctrl = false
+  let alt = false
+  let shift = false
+  let meta = false
+  let main: string | null = null
+  for (const p of parts) {
+    if (p === 'ctrl' || p === 'control') ctrl = true
+    else if (p === 'alt') alt = true
+    else if (p === 'shift') shift = true
+    else if (p === 'win' || p === 'meta' || p === 'super' || p === 'cmd') meta = true
+    else if (/^[a-z]$/.test(p)) main = p
+    else if (/^[0-9]$/.test(p)) main = p
+    else if (/^f([1-9]|1[0-9]|2[0-4])$/.test(p)) main = p
+    else return null
+  }
+  if (!main) return null
+  if (!ctrl && !alt && !shift && !meta) return null
+  return { ctrl, alt, shift, meta, key: main }
+}
+
+// グローバルパニックホットキー (config.general.panic_hotkey 由来。既定 Ctrl+Alt+Shift+R)
 function onKeydown(e: KeyboardEvent) {
-  if (e.ctrlKey && e.altKey && e.shiftKey && (e.key === 'R' || e.key === 'r')) {
+  const spec = appConfig.value?.general.panic_hotkey ?? 'Ctrl+Alt+Shift+R'
+  const matcher = parsePanicHotkey(spec)
+  if (!matcher) return
+  if (
+    e.ctrlKey === matcher.ctrl &&
+    e.altKey === matcher.alt &&
+    e.shiftKey === matcher.shift &&
+    e.metaKey === matcher.meta &&
+    e.key.toLowerCase() === matcher.key
+  ) {
     e.preventDefault()
     panicOpen.value = true
   }

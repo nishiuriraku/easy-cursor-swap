@@ -292,8 +292,11 @@ pub struct ExistingTheme {
 pub struct ThemeSummary {
     /// テーマID
     pub id: Uuid,
-    /// テーマ名
-    pub name: String,
+    /// テーマ名 (多言語対応の生データ)。
+    /// フロントエンドは `pickLocalizedName(name, locale)` で表示用文字列を解決する。
+    /// `theme.json` の `name` フィールドをそのまま転送するため、untagged な
+    /// `string | { ja: '...', en: '...', ... }` 形式で JSON 化される。
+    pub name: LocalizedString,
     /// 作者名
     pub author: Option<String>,
     /// テーマバージョン
@@ -321,10 +324,11 @@ pub struct ThemeSummary {
     /// 一覧の「署名」列で Ed25519 / 未署名 のピル色分けに使う。
     /// **検証結果ではない** — 検証は marketplace::verify_signature が別途行う。
     pub signed: bool,
-    /// theme.json `description` を表示用に解決した文字列。
-    /// 現状はロケール `"ja"` 固定 (`name` と同じ TODO)。`None` のとき UI は説明段落を非表示。
+    /// theme.json `description` の生データ (多言語対応)。
+    /// `name` と同じく、フロントエンド側で `pickLocalizedName(description, locale)`
+    /// により現在のロケールで解決する。`None` のとき UI は説明段落を非表示。
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
+    pub description: Option<LocalizedString>,
     /// theme.json `schema_version`。詳細モーダルの PACKAGE セルで表示する。
     pub schema_version: u32,
     /// theme.json `license` (SPDX)。`None` のとき行非表示。
@@ -517,7 +521,7 @@ mod tests {
     fn sample_summary_full() -> ThemeSummary {
         ThemeSummary {
             id: Uuid::nil(),
-            name: "Test Theme".into(),
+            name: LocalizedString::Simple("Test Theme".into()),
             author: Some("Tester".into()),
             version: "1.0.0".into(),
             created_at: "2026-05-12T00:00:00Z".into(),
@@ -530,7 +534,7 @@ mod tests {
             tags: vec!["dark".into()],
             size_bytes: 1024,
             signed: true,
-            description: Some("テスト用説明".into()),
+            description: Some(LocalizedString::Simple("テスト用説明".into())),
             schema_version: 1,
             license: Some("MIT".into()),
             homepage: Some("https://example.test".into()),
@@ -564,10 +568,40 @@ mod tests {
     }
 
     #[test]
+    fn theme_summary_passes_localized_name_through() {
+        // 多言語マップが LocalizedString::Localized として JSON に
+        // そのまま現れることを確認する。フロントが locale 切替できる前提。
+        let s = ThemeSummary {
+            id: Uuid::nil(),
+            name: ja_en_de_map(),
+            author: None,
+            version: "1.0.0".into(),
+            created_at: "2026-05-14T00:00:00Z".into(),
+            is_active: false,
+            is_favorite: false,
+            apply_count: 0,
+            last_applied_at: None,
+            included_roles: vec![],
+            path: "/tmp/x".into(),
+            tags: vec![],
+            size_bytes: 0,
+            signed: false,
+            description: None,
+            schema_version: 1,
+            license: None,
+            homepage: None,
+            source: ThemeSource::Local,
+        };
+        let v = serde_json::to_value(&s).unwrap();
+        assert_eq!(v["name"]["ja"], "日本語名");
+        assert_eq!(v["name"]["en"], "English Name");
+    }
+
+    #[test]
     fn theme_summary_includes_source() {
         let s = ThemeSummary {
             id: Uuid::nil(),
-            name: "Test".into(),
+            name: LocalizedString::Simple("Test".into()),
             author: None,
             version: "1.0.0".into(),
             created_at: "2026-05-14T00:00:00Z".into(),

@@ -6,17 +6,24 @@
  * readonly ガードが効かないバグがあった (2026-05-14 修正)。
  */
 import type { ThemeCardData } from '~/types/theme'
+import type { MarketplaceName } from '~/types/marketplace'
 import { mapSourceToKind } from '~/composables/useThemes'
+import { pickLocalizedName } from '~/composables/pickLocalizedName'
 
 /**
  * Rust 側 `theme::types::ThemeSummary` に対応する IPC ペイロード。
  * フィールド名は serde 既定 (snake_case)。`useThemes.ts` の
  * 同名インターフェースと意図的に重複しているが、Library 画面側は
  * Windows scheme をマージする独自経路を持つため別ファイルで持つ。
+ *
+ * `name` / `description` は Rust 側 `LocalizedString` の生形 (`string | { [locale]: string }`)
+ * で渡ってくる。フロントでカードに乗せる前に `pickLocalizedName` で
+ * 現在の locale に解決する。生で表示すると `{ja: "...", en: "..."}` という
+ * JSON 風のテキストがそのままカードのタイトル欄に出る。
  */
 export interface IpcThemeSummary {
   id: string
-  name: string
+  name: MarketplaceName
   author: string | null
   version: string
   created_at: string
@@ -29,7 +36,7 @@ export interface IpcThemeSummary {
   size_bytes: number
   signed: boolean
   last_applied_at: string | null
-  description?: string | null
+  description?: MarketplaceName | null
   schema_version: number
   license?: string | null
   homepage?: string | null
@@ -37,10 +44,10 @@ export interface IpcThemeSummary {
   source?: string
 }
 
-export function mapLocalSummaryToCard(tt: IpcThemeSummary): ThemeCardData {
+export function mapLocalSummaryToCard(tt: IpcThemeSummary, locale: string): ThemeCardData {
   return {
     id: tt.id,
-    name: tt.name,
+    name: pickLocalizedName(tt.name, locale),
     author: tt.author,
     version: tt.version,
     date: tt.created_at,
@@ -53,7 +60,7 @@ export function mapLocalSummaryToCard(tt: IpcThemeSummary): ThemeCardData {
     sizeBytes: tt.size_bytes,
     signed: tt.signed,
     lastAppliedAt: tt.last_applied_at,
-    description: tt.description ?? null,
+    description: tt.description == null ? null : pickLocalizedName(tt.description, locale) || null,
     schemaVersion: tt.schema_version,
     license: tt.license ?? null,
     homepage: tt.homepage ?? null,

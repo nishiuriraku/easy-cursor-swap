@@ -262,3 +262,14 @@ jobs:
           files: |
             src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*.exe
             src-tauri/target/${{ matrix.target }}/release/bundle/msi/*.msi
+
+      # -----------------------------------------------------------
+      # Updater 鍵ペア / latest.json 整合性チェック (--offline)。
+      # tauri.conf.json の `plugins.updater.pubkey` と signing 公開鍵の一致のみ
+      # 検証する (ネットワーク到達確認は draft release 時点ではエンドポイントが
+      # 未公開なため skip)。万一鍵がずれていれば updater 自動更新が全クライアントで
+      # 失敗するため、release.yml の最後で必ず検証する。
+      # -----------------------------------------------------------
+      - name: Verify updater keypair integrity (offline)
+        shell: pwsh
+        run: node scripts/check-updater-keypair.mjs --offline

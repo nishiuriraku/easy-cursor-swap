@@ -44,14 +44,14 @@
 
 ## Rust 側モジュール (`src-tauri/src/`)
 
-`lib.rs` は 22 個のモジュールを `pub mod` で公開し、`main.rs` から `tauri::Builder` に組み込む。
+`lib.rs` は 23 個のモジュールを `pub mod` で公開し、`main.rs` から `tauri::Builder` に組み込む。
 直近のリファクタで `commands` / `cursor` / `theme` / `bulk_import` / `registry` を **ディレクトリ + サブモジュール構成** に分割済み。多重起動防止は自前 `single_instance.rs` を廃止し `tauri_plugin_single_instance` プラグインに移行。
 
 ### 責務マップ
 
 | カテゴリ | モジュール | 主な役割 |
 |---|---|---|
-| **IPC 表玄関** | `commands/` | 52 個の `#[tauri::command]` を 9 サブモジュールに分割。`mod.rs::get_command_handlers()` が `tauri::generate_handler!` にまとめて渡す。サブモジュール: `theme` / `cursor_build/` (build / cancel / dto / sign / stream の 5 ファイル分割) / `cursor_io` / `keystore` / `marketplace` / `marketplace_submit` / `profile` / `system` / `windows_scheme` |
+| **IPC 表玄関** | `commands/` | 52 個の `#[tauri::command]` を 9 サブモジュールに分割。`mod.rs::get_command_handlers()` が `tauri::generate_handler!` にまとめて渡す。サブモジュール: `theme` / `cursor_build/` (build / dto / sign / stream / mod の 5 ファイル分割; `cancel_build` IPC は `mod.rs` 直下、共有キャンセルレジストリは `cancel_registry.rs`) / `cursor_io` / `keystore` / `marketplace` / `marketplace_submit` / `profile` / `system` / `windows_scheme` |
 | **GitHub API クライアント** | `github/` | OAuth Device Flow + REST API (`mod.rs` / `types.rs` / `device_flow.rs` / `client.rs`)。Marketplace 自動提出フローから利用。`client_id` は build 時に `option_env!("EASY_CURSOR_SWAP_GITHUB_OAUTH_CLIENT_ID")` で注入。 |
 | **設定 / 状態** | `config.rs` | `AppConfig` / `ConfigManager` (RwLock + schema_version (v1 固定) + パースエラー時 `config.corrupt.*.json` 退避) |
 | | `errors.rs` | `AppError` / `AppResult` 共通型 |
@@ -143,32 +143,37 @@ app/
 ├─ pages/          ← トップレベル画面 (Library / Creator / Marketplace / Settings)
 ├─ layouts/        ← default.vue (シェル: AppTitlebar + AppSidebar + slot)
 ├─ components/
-│  ├─ shell/       ← AppTitlebar, AppSidebar, EnvironmentBanner
-│  ├─ library/     ← ThemeCard, ThemeRow, ThemeDetailModal, ThemeDetailDrawer, ApplyModal,
-│  │                ImportConflictDialog, ThemePickerModal, CursorMatrix, LibraryToolbar,
-│  │                LibraryFilterBar, LibraryEmptyState, LibraryDropOverlay
+│  ├─ shell/       ← AppTitlebar, AppSidebar, EnvironmentBanner (3)
+│  ├─ library/     ← ThemeCard, ThemeRow, ThemeDetailModal, ThemeDetailDrawer,
+│  │                ThemeDetailDrawerHero, ThemeDetailDrawerStrip, ThemeDetailDrawerFooter,
+│  │                ApplyModal, ImportConflictDialog, ThemePickerModal, CursorMatrix,
+│  │                LibraryToolbar, LibraryFilterBar, LibraryEmptyState, LibraryDropOverlay (15)
 │  ├─ creator/     ← CreatorStartScreen, CreatorToolbar, CreatorRoleList, CreatorMetadataPane,
-│  │                NewThemeStartModal, SaveDestinationModal, BulkImportButton,
-│  │                BulkImportPreviewModal, BulkImportRoleRow, RoleListItem, SizeStrip, AniThumb
-│  ├─ marketplace/ ← FeaturedCard, SubmitThemeDialog, MarketplaceDetailModal, SubmitDeviceFlowModal
+│  │                CreatorEditorCanvas, NewThemeStartModal, SaveDestinationModal,
+│  │                BulkImportButton, BulkImportPreviewModal, BulkImportRoleRow, RoleListItem,
+│  │                SizeStrip, AniThumb (13)
+│  ├─ marketplace/ ← FeaturedCard, SubmitThemeDialog, SubmitThemeAutoForm, SubmitThemeManualForm,
+│  │                MarketplaceDetailModal, SubmitDeviceFlowModal (6)
 │  ├─ settings/    ← SettingsRow, SettingsToggle, ConfigRecoveryPanel, PassphrasePrompt,
-│  │                SettingsSearchDropdown, GeneralSection, StartupSection,
+│  │                SettingsSearchDropdown, OssLicenseModal, GeneralSection, StartupSection,
 │  │                LibrarySection, SecuritySection, KeysSection, LoggingSection,
-│  │                UpdatesSection, AboutSection
-│  ├─ preview/     ← CursorPreview (theme detail で使うプレビュー)
-│  ├─ panic/       ← PanicFlow (Stage 1 / Stage 2 リカバリ)
-│  ├─ ui/          ← UiSelect (ネイティブ select の白背景を回避)
-│  └─ icons/       ← UiIcon / CursorIcon (render-function ベースで v-html を使わない)
+│  │                UpdatesSection, AboutSection (14)
+│  ├─ preview/     ← CursorPreview (theme detail で使うプレビュー) (1)
+│  ├─ panic/       ← PanicFlow (Stage 1 / Stage 2 リカバリ) (1)
+│  ├─ ui/          ← UiSelect (ネイティブ select の白背景を回避) (1)
+│  └─ icons/       ← UiIcon, CursorIcon (render-function ベースで v-html を使わない) (2)
 ├─ composables/    ← useThemes, useAppSettings, useI18n, useTauri (IPC), useKeystore, useUiTheme,
-│                    useRoleMatcher, useThemePreviews, useBulkImport, useUpdater, useNotify,
-│                    sanitizeSvg, useCreatorAssets, useCreatorPickers, useCreatorImport,
-│                    useCreatorBulkImportFlow, useCreatorExport, useHotspotDefaults,
+│                    useRoleMatcher, useThemePreviews, useBulkImport, useBulkImportPreviewState,
+│                    useUpdater, useUpdaterBootstrap, useNotify, sanitizeSvg, useCreatorAssets,
+│                    useCreatorPickers, useCreatorImport, useCreatorBulkImportFlow,
+│                    useCreatorExport, useCreatorMetaState, useHotspotDefaults,
 │                    useHotspotInteraction, useAniPlayer, useCursorpackOpener,
 │                    useAppInfo, useSettingsSearch, useMarketplacePreviews,
 │                    useGithubAuth (GitHub Device Flow 認証・トークン管理),
 │                    useMarketplaceSubmit (自動 PR 提出フロー),
-│                    useUpdaterBootstrap (起動時 1 回の auto_update チェック),
-│                    pickLocalizedName (Marketplace name の locale 解決) (合計 28)
+│                    pickLocalizedName (Marketplace name の locale 解決),
+│                    useExternalUrl, useListbox, useModalLifecycle, usePngBlobCache,
+│                    useTagChipInput, useThemeCardState (合計 36)
 ├─ types/          ← config.ts, theme.ts, marketplace.ts, githubAuth.ts (Rust struct と 1:1)
 ├─ locales/        ← ja.ts, en.ts (CI で parity チェック)
 ├─ assets/css/     ← tailwind.css (Tailwind v4 entry + @theme + 横断 shared utility) +
@@ -190,9 +195,9 @@ app/
 
 **Rust** (分割完了)
 
-1. ✅ `commands.rs` 1229 行 → `commands/` 9 サブモジュール (うち `cursor_build/` はさらに build / cancel / dto / sign / stream の 5 ファイル分割)
+1. ✅ `commands.rs` 1229 行 → `commands/` 9 サブモジュール (うち `cursor_build/` はさらに build / dto / sign / stream + mod の 5 ファイル分割。共通キャンセルレジストリは `cancel_registry.rs` に独立)
 2. ✅ `cursor.rs` 1289 行 → `cursor/` 5 サブモジュール
-3. ✅ `theme.rs` 1255 行 → `theme/` 3 ファイル
+3. ✅ `theme.rs` 1255 行 → `theme/` 7 ファイル (mod / types / sanitize / listing / preview / apply / package)
 4. ✅ `registry.rs` 1020 行 → `registry/` 4 ファイル (mod / scheme / roles / env)
 5. ✅ `bulk_import.rs` 703 行 → `bulk_import/` 3 ファイル (mod / assets / cursorpack)
 
@@ -229,14 +234,14 @@ pure function を中心に層が薄い。主要モジュール:
 
 ### Frontend (vitest)
 
-`app/composables/__tests__/` に 15 ファイル:
+`app/composables/__tests__/` に 19 ファイル:
 
-- `sanitizeSvg.test.ts`, `settingsSearch.test.ts`, `useAniPlayer.test.ts`, `useCreatorAssets.test.ts`, `useCreatorBulkImportFlow.test.ts`, `useCursorpackOpener.test.ts`, `useGithubAuth.test.ts`, `useHotspotDefaults.test.ts`, `useHotspotInteraction.test.ts`, `useI18n.test.ts`, `useMarketplacePreviews.test.ts`, `useMarketplaceSubmit.test.ts`, `useRoleMatcher.test.ts`, `useThemes.test.ts`, `useUpdaterBootstrap.test.ts`
-- コンポーネントは `app/components/creator/__tests__/BulkImportPreviewModal.test.ts`
+- 主要 composable をカバー: `sanitizeSvg.test.ts`, `settingsSearch.test.ts`, `useAniPlayer.test.ts`, `useCreatorAssets.test.ts`, `useCreatorBulkImportFlow.test.ts`, `useCursorpackOpener.test.ts`, `useGithubAuth.test.ts`, `useHotspotDefaults.test.ts`, `useHotspotInteraction.test.ts`, `useI18n.test.ts`, `useMarketplacePreviews.test.ts`, `useMarketplaceSubmit.test.ts`, `useRoleMatcher.test.ts`, `useThemes.test.ts`, `useUpdaterBootstrap.test.ts`, `pickLocalizedName.test.ts`, `useExternalUrl.test.ts`, `useListbox.test.ts`, `useBulkImportPreviewState.test.ts` 等
+- 加えて pages 4 ファイル (`app/pages/__tests__/*.test.ts`) と components 23 ファイル (`creator` 5 / `library` 7 / `marketplace` 2 / `preview` 1 / `settings` 8)。テスト総数は 46 ファイル / 317 ケース
 
 ### CI (`.github/workflows/`)
 
-- `ci.yml` — 検証ゲート相当
+- `ci.yml` — 検証ゲート (cargo fmt --check / clippy / test --lib + Nuxt typecheck + Prettier --check + Vitest + i18n parity)
 - `performance.yml` — `benches/cursor_build.rs`, `benches/startup.rs` (Criterion)
 - `release.yml` — 署名済みインストーラビルド
 

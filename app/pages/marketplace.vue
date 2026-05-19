@@ -10,7 +10,7 @@
  * - Ed25519 署名検証済みのテーマのみ掲載 (CI 自動検証)
  * - インポートは Rust 側の `import_from_marketplace` (将来実装) に委譲
  */
-import type { MarketplaceEntry, MarketplaceName, MarketplaceTag } from '~/types/marketplace'
+import type { MarketplaceEntry, MarketplaceTag } from '~/types/marketplace'
 import { computeFilteredGrid } from '~/pages/marketplace.helpers'
 
 const { t, locale } = useI18n()
@@ -81,51 +81,22 @@ async function installFromDetail(id: string) {
   }
 }
 
-// --- IPC 経由で受け取る Rust 側スキーマ (snake_case) ---
-interface RustMarketplaceEntry {
-  id: string
-  // Rust 側は LocalizedString (untagged) なので JSON 上は string | { [locale]: string } のどちらも来る。
-  name: MarketplaceName
-  author: string
-  author_github: string
-  author_pubkey_id: string
-  sha256: string
-  signature: string
-  download_url: string
-  version: string
-  included_roles: string[]
-  tags: string[]
-  homepage?: string
-  download_count: number
-  highlight?: 'new' | 'popular' | null
-  preview_base_url?: string
-}
-
+// --- IPC 経由で受け取る Rust 側スキーマ ---
+// Rust 側 `MarketplaceEntry` は `#[serde(rename_all(serialize = "camelCase"))]` で
+// IPC へは camelCase のまま流れてくる (audit E1/E2 解消)。`MarketplaceEntry` 型
+// (camelCase) をそのまま使えるので、以前あった snake_case → camelCase の手動変換
+// `adaptEntry()` は不要になった。
+//
+// `verified: true` の付与だけ Rust 側 IPC ペイロードに含まれない (掲載 = CI 検証済み
+// の含意でフロント側で固定する) ため、薄い helper `withVerified()` で 1 行付与する。
 interface RustMarketplaceIndex {
   schema_version: number
   commit?: string
-  entries: RustMarketplaceEntry[]
+  entries: Omit<MarketplaceEntry, 'verified'>[]
 }
 
-function adaptEntry(e: RustMarketplaceEntry): MarketplaceEntry {
-  return {
-    id: e.id,
-    name: e.name,
-    author: e.author,
-    authorGithub: e.author_github,
-    homepage: e.homepage,
-    sha256: e.sha256,
-    signature: e.signature,
-    authorPubkeyId: e.author_pubkey_id,
-    downloadUrl: e.download_url,
-    version: e.version,
-    downloadCount: e.download_count,
-    includedRoles: e.included_roles,
-    tags: e.tags,
-    highlight: (e.highlight ?? null) as MarketplaceEntry['highlight'],
-    verified: true, // 公式インデックス掲載 = CI で署名検証済み
-    previewBaseUrl: e.preview_base_url,
-  }
+function withVerified(e: Omit<MarketplaceEntry, 'verified'>): MarketplaceEntry {
+  return { ...e, verified: true }
 }
 
 const fetchError = ref<string | null>(null)
@@ -138,7 +109,7 @@ async function loadIndex() {
     if (!idx) {
       throw new Error('empty response')
     }
-    entries.value = idx.entries.map(adaptEntry)
+    entries.value = idx.entries.map(withVerified)
   } catch (e) {
     entries.value = []
     fetchError.value = e instanceof Error ? e.message : String(e)

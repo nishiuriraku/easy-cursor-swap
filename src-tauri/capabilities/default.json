@@ -29,7 +29,6 @@
     "updater:allow-install",
     "updater:allow-download-and-install",
     "process:default",
-    "process:allow-restart",
-    "mcp-bridge:default"
+    "process:allow-restart"
   ]
 }
