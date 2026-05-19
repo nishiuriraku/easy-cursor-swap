@@ -177,6 +177,23 @@ pub async fn submit_theme_auto(
     let parsed_id = uuid::Uuid::parse_str(&theme_id)
         .map_err(|e| AppError::Theme(format!("テーマ ID パース失敗: {}", e)))?;
 
+    // ── lineage ガード ────────────────────────────────────────
+    // 公式インデックス由来テーマ自体 (source = Marketplace) は SubmitThemeDialog の
+    // 提出可能一覧から既に弾かれているが、ユーザーが duplicate_theme で複製してから
+    // 提出してきた場合に備え、Rust 側でも `cloned_from_marketplace_id` を確認する。
+    // 複製してから何段ネストしても `duplicate_theme` が origin を引き継ぐので、
+    // この 1 か所のチェックだけで再提出経路を全て塞げる。
+    let preflight = crate::theme::ThemeManager::load_metadata(parsed_id)?;
+    if let Some(origin) = preflight.cloned_from_marketplace_id {
+        tracing::warn!(
+            "marketplace 由来テーマの再提出を拒否: origin_short={}",
+            crate::logging::short_hash(origin.to_string().as_bytes())
+        );
+        return Err(AppError::Theme(
+            "公式インデックス由来テーマを複製したものは再提出できません".to_string(),
+        ));
+    }
+
     emit_progress(&app, "build");
     let pack_bytes = build_cursorpack_for_submit(parsed_id)?;
     if (pack_bytes.len() as u64) > DEFAULT_MAX_PACK_COMPRESSED_SIZE {

@@ -51,6 +51,12 @@ interface IpcThemeSummary {
   license?: string | null
   homepage?: string | null
   source?: string
+  /**
+   * 公式インデックス由来テーマを duplicate_theme で複製した場合に複製元 (Marketplace 原本) の UUID。
+   * SubmitThemeDialog はこのフィールドが truthy なテーマを提出可能一覧から除外する。
+   * Rust 側でも submit_theme_auto が同じ条件で拒否するので、これは UX 上の選択肢除外。
+   */
+  cloned_from_marketplace_id?: string | null
 }
 
 /**
@@ -108,6 +114,7 @@ function mapSummary(t: IpcThemeSummary, locale: string): ThemeCardData {
     license: t.license ?? null,
     homepage: t.homepage ?? null,
     lastAppliedAt: t.last_applied_at,
+    clonedFromMarketplaceId: t.cloned_from_marketplace_id ?? null,
   }
 }
 

@@ -417,6 +417,11 @@ export default {
     submitBtn: 'Submit to Index',
     submitTitle: 'Submit Theme to Official Index',
     submitHint: 'Submit a theme from your local library to the official index.',
+    /** Badge shown in the theme detail modal for themes duplicated from an official marketplace theme. */
+    clonedFromMarketplaceBadge: 'Cloned from official',
+    /** Toast / banner shown when the user attempts to resubmit a marketplace-derived theme. */
+    clonedFromMarketplaceForbidden:
+      'Themes duplicated from the official index cannot be resubmitted.',
     submitSelectTheme: 'Theme to submit',
     submitSelectPlaceholder: 'Select a theme',
     submitGithubUser: 'GitHub username',

@@ -124,6 +124,7 @@ README の security テーブルは概要、本セクションは **不変条件
 | Marketplace 自動提出の GitHub OAuth トークンは DPAPI で暗号化、scope は `public_repo` 限定 | `keystore.rs::save_github_oauth_token` / `github/device_flow.rs` |
 | ダウンロード前に Content-Length を見て三段階サイズ上限 (50 MB 圧縮 / 200 MB 展開 / 10 MB / image) | `marketplace.rs` / `theme/sanitize.rs` |
 | Marketplace テーマは**読み取り専用**: `repackage_theme` IPC がソース確認し、marketplace 由来のテーマは編集・エクスポート要求を拒否する | `commands/theme.rs::repackage_theme` |
+| Marketplace 由来テーマの**複製テーマ再提出禁止**: `duplicate_theme` が `cloned_from_marketplace_id` lineage を引き継ぎ (孫複製でも常に原本 UUID を指す)、`submit_theme_auto` は同フィールドが `Some` のテーマを拒否する。UI 側 `SubmitThemeDialog` でも選択肢から除外 (二重防御) | `theme/package.rs::duplicate_theme` / `commands/marketplace_submit.rs::submit_theme_auto` / `components/marketplace/SubmitThemeDialog.vue` |
 | プレビュー PNG 取得は URL スキーム + ホスト + ロール名を検証し、500KB を超えるレスポンスは拒否 | `marketplace.rs::fetch_preview` |
 | アーカイブ展開は `sanitize_archive_path` を必ず通す (path traversal / symlink / 絶対パス拒否) | `theme/sanitize.rs::sanitize_archive_path` |
 | PNG 取り込み時に eXIf / iTXt / zTXt メタデータを剥離 | `cursor/image.rs` |

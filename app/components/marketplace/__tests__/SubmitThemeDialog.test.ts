@@ -167,4 +167,54 @@ describe('SubmitThemeDialog Auto tab', () => {
     )
     w.unmount()
   })
+
+  it('excludes marketplace-derived themes (source=marketplace AND clones) from submit options', async () => {
+    // 公式インデックス由来テーマと「その複製 (cloned_from_marketplace_id 持ち)」は
+    // 再提出禁止なので、Auto タブの選択肢に出てはいけない。Rust 側 submit_theme_auto も
+    // 同条件で hard-reject するので、UI は誤操作を未然に防ぐ defense-in-depth として効く。
+    invokeMock.mockResolvedValueOnce([
+      {
+        id: 'local-original',
+        name: 'Local Original',
+        author: 'me',
+        version: '1.0',
+        included_roles: [],
+        is_active: false,
+        // source 未指定 = local。提出可能。
+      },
+      {
+        id: 'mkt-original',
+        name: 'Marketplace Original',
+        author: 'them',
+        version: '1.0',
+        included_roles: [],
+        is_active: false,
+        source: 'marketplace',
+      },
+      {
+        id: 'mkt-clone',
+        name: 'Cloned From Marketplace',
+        author: 'me',
+        version: '1.0',
+        included_roles: [],
+        is_active: false,
+        cloned_from_marketplace_id: 'mkt-original',
+      },
+    ])
+    invokeMock.mockResolvedValueOnce({ has_keypair: true, key_id: 'k', public_key_b64: 'p' })
+    invokeMock.mockResolvedValueOnce({ github_account: null })
+    const w = mountOpen()
+    await flushPromises()
+
+    const trigger = document.body.querySelector('#submit-auto-theme') as HTMLButtonElement | null
+    expect(trigger).toBeTruthy()
+    trigger!.click()
+    await flushPromises()
+
+    const body = document.body.textContent ?? ''
+    expect(body).toContain('Local Original')
+    expect(body).not.toContain('Marketplace Original')
+    expect(body).not.toContain('Cloned From Marketplace')
+    w.unmount()
+  })
 })

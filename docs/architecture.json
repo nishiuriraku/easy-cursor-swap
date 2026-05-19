@@ -1,6 +1,6 @@
 {
   "$schema_version": "0.1.0",
-  "generated_at": "2026-05-19",
+  "generated_at": "2026-05-20",
   "generated_from": [
     "docs/architecture.md",
     "docs/file_inventory.md",
@@ -40,7 +40,7 @@
       "ci_workflows": 3
     },
     "doc_drift_warnings": [
-      "No known drift as of 2026-05-19 (re-measured). architecture.json/file_inventory.md/CLAUDE.md/README*.md/architecture.html がすべて同期 (modules=23 / IPC=52 / composables=36 / components=56 / commands-submodules=9)。前回の監査 (2026-05-19) で見つかったドリフト群 (CLAUDE.md/README で 21 modules / 53 IPC / 10 sub-modules / 28 composables / 50 components、cursor_build に cancel.rs 列挙、commands/updater 列挙、composables[].ipc_calls 7 件の宣言と実コード乖離、pages/settings.vue の get_app_info/revoke_github_link 未宣言、ui_map.json の \"update_config (Save 時)\" 注釈付き IPC 14 箇所、docs/code_signing_policy.md と architecture.json の config パス誤記、crash dir のケース揺れ、README の v1.0 表記) はすべて本コミットで解消。",
+      "No known drift as of 2026-05-20 (re-measured)。本コミットで invariants が 14 → 15 件に増加 (`marketplace_clone_resubmit_forbidden` を追加)。modules=23 / IPC=52 / composables=36 / components=56 / commands-submodules=9 は変化なし。architecture.json/file_inventory.md/CLAUDE.md/README*.md/architecture.html が同期。",
       "ui_map.json と相互整合済み: backend.ipc_commands 52 件のうち 3 件 (export_cursorpack / get_theme_previews / get_windows_scheme_previews) は Rust に登録だけされた legacy_unused 状態で、それぞれ status と replaced_by を明示。次の PR で Rust 側からも削除するか、frontend で再利用する決定をすること。",
       "新たに食い違いを見つけたら『docs/<file> は X と書いているが実測 Y』の形で追記し、修正コミットと同じ PR で解消する。",
       "数字が docs と食い違ったら grep を信用する。frontend の数字は ui_map.html の live check (末尾) が canonical counter。"
@@ -106,6 +106,11 @@
       "id": "marketplace_readonly_themes",
       "rule": "マーケットプレースからインストールしたテーマは読み取り専用。repackage_theme は marketplace 由来テーマの編集・エクスポートを拒否する。",
       "responsible_module": "src-tauri/src/commands/theme.rs (repackage_theme)"
+    },
+    {
+      "id": "marketplace_clone_resubmit_forbidden",
+      "rule": "マーケットプレース由来テーマの複製は公式インデックスに再提出できない。duplicate_theme は theme.json の `cloned_from_marketplace_id: Option<Uuid>` lineage を引き継ぎ (孫複製でも常に原本 UUID を指す)、submit_theme_auto は同フィールドが Some のテーマを拒否する。UI 側 SubmitThemeDialog でも選択肢から除外 (二重防御)。",
+      "responsible_module": "src-tauri/src/theme/package.rs (duplicate_theme)、src-tauri/src/commands/marketplace_submit.rs (submit_theme_auto)、app/components/marketplace/SubmitThemeDialog.vue"
     },
     {
       "id": "marketplace_verify",

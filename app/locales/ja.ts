@@ -416,6 +416,11 @@ export default {
     submitBtn: '公式インデックスに提出',
     submitTitle: '公式インデックスにテーマを提出',
     submitHint: 'ローカルライブラリのテーマを公式インデックスへ申請できます。',
+    /** 公式インデックス由来テーマを複製したテーマに付ける詳細モーダル用バッジ。 */
+    clonedFromMarketplaceBadge: '公式テーマの複製',
+    /** 同テーマを提出しようとしたときのトースト / バナー文言。Rust の submit_theme_auto 拒否文と同義。 */
+    clonedFromMarketplaceForbidden:
+      '公式インデックス由来テーマを複製したものは再提出できません。',
     submitSelectTheme: '提出するテーマ',
     submitSelectPlaceholder: 'テーマを選択',
     submitGithubUser: 'GitHub ユーザー名',

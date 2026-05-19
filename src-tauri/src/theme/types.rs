@@ -196,6 +196,15 @@ pub struct ThemeMetadata {
     /// JSON に書き出さない (`skip_serializing_if`) ことで旧形式の theme.json と完全互換。
     #[serde(default, skip_serializing_if = "is_local_source")]
     pub source: ThemeSource,
+    /// このテーマがマーケットプレース由来テーマの複製である場合、複製元 (Marketplace 原本) の UUID。
+    ///
+    /// `duplicate_theme` で複製元が `ThemeSource::Marketplace` のとき、その UUID をここに記録する。
+    /// 複製の複製 (孫複製) では、親が既に持っていた値をそのまま引き継ぐ (= 常に Marketplace 原本を指す)。
+    /// `submit_theme_auto` はこのフィールドが `Some` のテーマを「公式インデックス再提出」と判定して拒否する。
+    ///
+    /// 旧スキーマとの互換のため `serde(default)` + `Option::None` 省略で書き出さない。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cloned_from_marketplace_id: Option<Uuid>,
 }
 
 /// 多言語対応文字列
@@ -341,6 +350,11 @@ pub struct ThemeSummary {
     /// MARKETPLACE タグ表示と編集/エクスポートボタンの非表示判定に使う。
     #[serde(default)]
     pub source: ThemeSource,
+    /// マーケットプレース由来テーマの複製であれば、その複製元 (Marketplace 原本) の UUID。
+    /// SubmitThemeDialog の提出可能一覧 filter で除外するために露出する。
+    /// 通常の Local テーマ (= Creator で 0 から作成 / .cursorpack 取り込み) は `None`。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cloned_from_marketplace_id: Option<Uuid>,
 }
 
 /// `LocalizedString` の文字列値全てに同じサフィックスを付与した新しい LocalizedString を返す。
@@ -539,6 +553,7 @@ mod tests {
             license: Some("MIT".into()),
             homepage: Some("https://example.test".into()),
             source: ThemeSource::Local,
+            cloned_from_marketplace_id: None,
         }
     }
 
@@ -591,6 +606,7 @@ mod tests {
             license: None,
             homepage: None,
             source: ThemeSource::Local,
+            cloned_from_marketplace_id: None,
         };
         let v = serde_json::to_value(&s).unwrap();
         assert_eq!(v["name"]["ja"], "日本語名");
@@ -619,6 +635,7 @@ mod tests {
             license: None,
             homepage: None,
             source: ThemeSource::Marketplace,
+            cloned_from_marketplace_id: None,
         };
         let v = serde_json::to_value(&s).unwrap();
         assert_eq!(v["source"], "marketplace");
@@ -819,6 +836,7 @@ mod tests {
             signature: None,
             tags: Vec::new(),
             source: ThemeSource::Local,
+            cloned_from_marketplace_id: None,
         };
         let json = serde_json::to_string(&m).unwrap();
         assert!(!json.contains("source"), "Local は省略されるべき: {json}");

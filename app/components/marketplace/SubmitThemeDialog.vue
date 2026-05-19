@@ -29,7 +29,9 @@ const emit = defineEmits<{
 // 許容するので、`entryJson` ではそのまま JSON 化する (`MarketplaceEntry.name` 型と整合)。
 //
 // `source` は Rust `ThemeSource` (serde lowercase) の `"local" | "marketplace"`。
-// 公式インデックス由来テーマを「再提出」させないためにダイアログ側で除外する。
+// `cloned_from_marketplace_id` は duplicate_theme が引き継いだ複製元 UUID。どちらかが truthy
+// なら公式インデックスへの再提出を許してはならないのでダイアログ側でも除外する
+// (Rust submit_theme_auto も同条件で hard-reject するので二重防御)。
 interface ThemeSummary {
   id: string
   name: MarketplaceName
@@ -38,6 +40,7 @@ interface ThemeSummary {
   included_roles: string[]
   is_active: boolean
   source?: string
+  cloned_from_marketplace_id?: string | null
 }
 
 const { info: keystoreInfo, refresh: refreshKeystore } = useKeystore()
@@ -47,9 +50,13 @@ const themes = ref<ThemeSummary[]>([])
 const selectedThemeId = ref<string | null>(null)
 const loading = ref(false)
 
-// 公式インデックス由来 (source === 'marketplace') のテーマは提出対象から除外する。
-// 再提出は二重登録になるため、Auto / Manual 両タブで選択肢自体を隠す。
-const submittableThemes = computed(() => themes.value.filter((th) => th.source !== 'marketplace'))
+// 公式インデックス由来テーマと「その複製」を提出対象から除外する。
+// - `source === 'marketplace'`: 公式 install 直後の原本 (repackage_theme でも拒否される)
+// - `cloned_from_marketplace_id` truthy: duplicate_theme で複製したコピー (どれだけ編集しても再提出は禁止)
+// Auto / Manual 両タブで選択肢自体を隠し、Rust submit_theme_auto も同条件で再度拒否する。
+const submittableThemes = computed(() =>
+  themes.value.filter((th) => th.source !== 'marketplace' && !th.cloned_from_marketplace_id),
+)
 
 // タブ管理
 const tab = ref<'auto' | 'manual'>('auto')
