@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Windows の「マウス ポインターとタッチ」でカーソルサイズを拡大した状態で Library からテーマを「適用」すると、カーソル画像自体は正しく差し替わっているのに `適用に失敗しました: レジストリエラー: SystemParametersInfoW の呼び出しに失敗: ハンドルが無効です。 (0x80070006)` というエラートーストが出る問題を修正。`SPI_SETCURSORS` に同梱される `SPIF_SENDCHANGE` の `WM_SETTINGCHANGE` ブロードキャスト経路で受信側 (シェル / アクセシビリティサービス) のカーネルハンドルがライフサイクル境界で `ERROR_INVALID_HANDLE (6)` を返した場合の偽陽性。レジストリ書き込みは既に完了しているため、既存の `ERROR_INVALID_WINDOW_HANDLE (1400)` と同じく `is_broadcast_false_positive` のホワイトリストに `HRESULT_FROM_WIN32(6) = 0x80070006` を追加し、debug ログ扱いで握りつぶす。ACCESS_DENIED など本物の Win32 エラーは引き続き伝播する。
+
 ## [0.0.1] - 2026-05-18
 
 仮リリース (provisional first release)。配布チャネル / 署名 / Updater 配線の試走を含む早期版で、機能セットは v0.1.0 計画相当だが、SemVer 上は安定 API を未保証として `0.0.x` にとどめている。

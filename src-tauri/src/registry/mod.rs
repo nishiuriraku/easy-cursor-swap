@@ -351,14 +351,21 @@ impl RegistryManager {
     ///
     /// 偽陽性として扱う HRESULT:
     ///  - `0x00000000` (S_OK / GetLastError=0): broadcast timeout (応答しないウィンドウ)
+    ///  - `0x80070006` (`HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE=6)`):
+    ///    `SPI_SETCURSORS` の引数自体は HWND を取らないため、これは内部の
+    ///    `SendMessageTimeout(HWND_BROADCAST, WM_SETTINGCHANGE, …)` で受信側
+    ///    (シェル / アクセシビリティサービス等) のカーネルハンドルがライフサイクル
+    ///    境界で無効化された場合に観測される。`CursorBaseSize` 拡大時に
+    ///    シェルがカーソルキャッシュを再構築している最中で再現しやすい。
     ///  - `0x80070578` (`HRESULT_FROM_WIN32(ERROR_INVALID_WINDOW_HANDLE=1400)`):
     ///    HWND_BROADCAST 中に破棄/初期化途中の HWND を踏んだ場合
     ///    (初回起動直後など、ウィンドウ生成が同時並行している環境で発生)
     #[cfg(windows)]
     fn is_broadcast_false_positive(err: &windows::core::Error) -> bool {
+        const HRESULT_INVALID_HANDLE: i32 = 0x80070006u32 as i32;
         const HRESULT_INVALID_WINDOW_HANDLE: i32 = 0x80070578u32 as i32;
         let code = err.code();
-        code.is_ok() || code.0 == HRESULT_INVALID_WINDOW_HANDLE
+        code.is_ok() || code.0 == HRESULT_INVALID_HANDLE || code.0 == HRESULT_INVALID_WINDOW_HANDLE
     }
 
     /// SystemParametersInfoW を呼び出してカーソル変更を即時反映する
@@ -376,14 +383,18 @@ impl RegistryManager {
                 SPIF_UPDATEINIFILE | SPIF_SENDCHANGE,
             );
             // BOOL=FALSE が返るが実際にはレジストリ書き込みが完了している
-            // 偽陽性のパターンが 2 つある。SPIF_SENDCHANGE が内部で行う
+            // 偽陽性のパターンが 3 つある。SPIF_SENDCHANGE が内部で行う
             // WM_SETTINGCHANGE の HWND_BROADCAST 経路で発生する:
             //   1. GetLastError=0 (HRESULT=0x00000000): 応答しないトップレベル
             //      ウィンドウがあったときの broadcast timeout
-            //   2. GetLastError=1400 (HRESULT=0x80070578 ERROR_INVALID_WINDOW_HANDLE):
+            //   2. GetLastError=6 (HRESULT=0x80070006 ERROR_INVALID_HANDLE):
+            //      ブロードキャスト受信側のカーネルハンドルが境界で無効化された
+            //      とき。`CursorBaseSize` 拡大中にシェルがカーソルキャッシュを
+            //      再構築している場合に再現しやすい。
+            //   3. GetLastError=1400 (HRESULT=0x80070578 ERROR_INVALID_WINDOW_HANDLE):
             //      初回起動直後など、ブロードキャスト先に破棄中・初期化途中の
             //      HWND があったとき
-            // どちらもカーソル自体は反映されるため、debug ログで成功扱いにする。
+            // いずれもカーソル自体は反映されるため、debug ログで成功扱いにする。
             if let Err(e) = result {
                 if Self::is_broadcast_false_positive(&e) {
                     tracing::debug!(
@@ -649,6 +660,16 @@ mod tests {
     }
 
     #[test]
+    fn broadcast_false_positive_accepts_invalid_handle() {
+        // GetLastError=6 → HRESULT_FROM_WIN32 = 0x80070006
+        // 「マウスポインターとタッチ」で CursorBaseSize を拡大中に
+        // テーマ適用するとシェル側がカーソルキャッシュ再構築中で
+        // broadcast 受信側のカーネルハンドルが一瞬無効化されるケース。
+        let err = WinError::new(HRESULT(0x80070006u32 as i32), "");
+        assert!(RegistryManager::is_broadcast_false_positive(&err));
+    }
+
+    #[test]
     fn broadcast_false_positive_accepts_invalid_window_handle() {
         // GetLastError=1400 → HRESULT_FROM_WIN32 = 0x80070578
         let err = WinError::new(HRESULT(0x80070578u32 as i32), "");
@@ -662,6 +683,10 @@ mod tests {
         assert!(!RegistryManager::is_broadcast_false_positive(&err));
         // ERROR_ACCESS_DENIED (5) のような他の Win32 系も伝播させる
         let err = WinError::new(HRESULT(0x80070005u32 as i32), "");
+        assert!(!RegistryManager::is_broadcast_false_positive(&err));
+        // ERROR_INVALID_HANDLE (6) のすぐ隣の値 ERROR_INVALID_DATA (13) は
+        // 偽陽性ではないので伝播させる (HRESULT 0x8007000D)
+        let err = WinError::new(HRESULT(0x8007000Du32 as i32), "");
         assert!(!RegistryManager::is_broadcast_false_positive(&err));
     }
 }
