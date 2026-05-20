@@ -1,6 +1,6 @@
 {
   "$schema_version": "0.1.0",
-  "generated_at": "2026-05-20",
+  "generated_at": "2026-05-21",
   "generated_from": [
     "docs/architecture.md",
     "docs/file_inventory.md",
@@ -36,11 +36,11 @@
       "composables": 36,
       "pages_vue": 4,
       "pages_ts_helpers": 2,
-      "components_total": 61,
+      "components_total": 60,
       "ci_workflows": 3
     },
     "doc_drift_warnings": [
-      "No known drift as of 2026-05-20 (re-measured)。本マージで components.ui が 1 → 5 (合計 57 → 61) に増加 (`UiButton` / `UiAlert` / `UiModal` / `UiConfirmDialog` を新規追加 — 11 モーダル + 6 アラート + 複数 loading ボタンの shared shell に統一)。composables も 35 → 36 (`useFocusTrap` を追加 — Tab cycling + フォーカス復帰)。modules=23 / IPC=52 / commands-submodules=9 は変化なし。architecture.json/architecture.md/file_inventory.md/architecture.html が同期。",
+      "No known drift as of 2026-05-21 (re-measured)。本マージで components.ui が 1 → 5 (合計 57 → 61 → 60) に増加 + その後の二重フッター解消で 1 個削減: `UiButton` / `UiAlert` / `UiModal` / `UiConfirmDialog` を新規追加し、11 モーダル + 6 アラート + 複数 loading ボタンを shared shell に統一。さらに smoke で `ThemeDetailModal` の body 内アクションが `.modal-foot` と二重表示になる UX 問題が判明したため、`ThemeDetailDrawerFooter.vue` を削除して footer 全アクションを UiModal の `#leftNote` / `#actions` slot に移動 (library 15 → 14、合計 61 → 60)。composables も 35 → 36 (`useFocusTrap` を追加 — Tab cycling + フォーカス復帰)。modules=23 / IPC=52 / commands-submodules=9 は変化なし。architecture.json/architecture.md/file_inventory.md/architecture.html が同期。",
       "ui_map.json と相互整合済み: backend.ipc_commands 52 件のうち 3 件 (export_cursorpack / get_theme_previews / get_windows_scheme_previews) は Rust に登録だけされた legacy_unused 状態で、それぞれ status と replaced_by を明示。次の PR で Rust 側からも削除するか、frontend で再利用する決定をすること。",
       "新たに食い違いを見つけたら『docs/<file> は X と書いているが実測 Y』の形で追記し、修正コミットと同じ PR で解消する。",
       "数字が docs と食い違ったら grep を信用する。frontend の数字は ui_map.html の live check (末尾) が canonical counter。"

@@ -146,9 +146,9 @@ app/
 ├─ components/
 │  ├─ shell/       ← AppTitlebar, AppSidebar, EnvironmentBanner (3)
 │  ├─ library/     ← ThemeCard, ThemeRow, ThemeDetailModal, ThemeDetailDrawer,
-│  │                ThemeDetailDrawerHero, ThemeDetailDrawerStrip, ThemeDetailDrawerFooter,
+│  │                ThemeDetailDrawerHero, ThemeDetailDrawerStrip,
 │  │                ApplyModal, ImportConflictDialog, ThemePickerModal, CursorMatrix,
-│  │                LibraryToolbar, LibraryFilterBar, LibraryEmptyState, LibraryDropOverlay (15)
+│  │                LibraryToolbar, LibraryFilterBar, LibraryEmptyState, LibraryDropOverlay (14)
 │  ├─ creator/     ← CreatorStartScreen, CreatorToolbar, CreatorRoleList, CreatorMetadataPane,
 │  │                CreatorEditorCanvas, NewThemeStartModal, SaveDestinationModal,
 │  │                DiscardEditDialog, BulkImportButton, BulkImportPreviewModal,
