@@ -24,7 +24,7 @@ EasyCursorSwap (`package.json` name: `easy-cursor-swap`) — a Windows-only desk
 | **2. Optional for AI / preferred for humans** | `docs/architecture.md` + `docs/file_inventory.md` | AI reads only when narrative / refactor history / why-context is needed.                                                                                                                                   |
 | **3. Humans only (visual viewer)**            | `docs/architecture.html` + `docs/ui_map.html`     | **AI must NOT Read these.** Their embedded JSON is identical to Tier 1; opening them wastes ~53k tokens for zero added information.                                                                        |
 
-**Operational runbooks** (procedure-only): `docs/updater_signing.md` / `authenticode_signing.md` / `distribution.md` / `key_rotation.md` / `author_registration.md` / `code_signing_policy.md`.
+**Operational runbooks** (procedure-only): `docs/release_procedure.md` / `updater_signing.md` / `authenticode_signing.md` / `distribution.md` / `key_rotation.md` / `author_registration.md` / `code_signing_policy.md`.
 
 When documents disagree, **Tier 2 prose is authoritative**; Tier 1 JSON is the structured mirror agents consume. Tier 3 HTML is regenerated from JSON via `node scripts/embed-arch-json.mjs` — never hand-edit.
 
