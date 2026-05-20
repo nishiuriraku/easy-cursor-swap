@@ -100,18 +100,16 @@ const themeOptions = computed(() =>
   <div v-if="props.submitterBusy" class="hint" aria-live="polite">
     {{ props.submitterStageLabel }}
   </div>
-  <div v-if="props.submitterErrorMsg" class="warn-box">
-    <UiIcon name="AlertTriangle" :size="14" />
+  <UiAlert v-if="props.submitterErrorMsg" tone="warn">
     {{ props.submitterErrorMsg }}
-  </div>
+  </UiAlert>
   <div v-if="props.submitDone" class="hint">
     {{ t('marketplace.submitDone') }}
   </div>
 
-  <div v-if="!props.hasKeystore" class="warn-box">
-    <UiIcon name="AlertTriangle" :size="14" />
+  <UiAlert v-if="!props.hasKeystore" tone="warn">
     {{ t('marketplace.submitNoKeystore') }}
-  </div>
+  </UiAlert>
 </template>
 
 <style scoped>
@@ -149,12 +147,5 @@ const themeOptions = computed(() =>
 
 .hint {
   @apply m-0 text-[13px] text-fg-dim;
-}
-
-.warn-box {
-  @apply flex items-center gap-1.5 rounded-[8px] border px-2.5 py-2 text-[12px];
-  background: rgba(245, 194, 107, 0.1);
-  border-color: rgba(245, 194, 107, 0.3);
-  color: var(--amber);
 }
 </style>
