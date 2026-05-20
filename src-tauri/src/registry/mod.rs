@@ -209,8 +209,10 @@ impl RegistryManager {
             .create_subkey("Control Panel\\Cursors\\Schemes")
             .map_err(|e| AppError::Registry(format!("Schemes キー作成失敗: {}", e)))?;
 
+        // winreg 0.56 で `RegValue.bytes` は `Cow<'_, [u8]>` に変更されたため、
+        // 所有データの `Vec<u8>` から `Cow::Owned` に変換する。
         let reg_value = RegValue {
-            bytes,
+            bytes: bytes.into(),
             vtype: REG_EXPAND_SZ,
         };
         schemes_key
