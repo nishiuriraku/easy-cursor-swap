@@ -2,11 +2,15 @@
 /**
  * Creator のメタデータタブ。
  *
- * テーマ名 (ja/en)、作者、バージョン、影フラグ、説明、エクスポート状況、
- * およびエクスポート中の進捗バーを含む。
+ * テーマ名 (ja/en)、作者、バージョン、影フラグ、説明、およびエクスポート中の進捗バーを含む。
  *
- * 純粋なフォーム + 進捗表示なので 6 つの v-model + 数件の read-only props +
- * 2 つの emit (dismiss-export-message, cancel-export) で creator.vue から切り出している。
+ * 純粋なフォーム + 進捗表示なので 6 つの v-model + 数件の read-only props で creator.vue
+ * から切り出している。
+ *
+ * NOTE: 保存成功/失敗トーストは元々ここに置かれていたが、assign タブで保存したときに
+ * `v-if="activeTab === 'metadata'"` でこのコンポーネントが unmount され、トーストが
+ * 描画されなかった。タブに関係なく表示する必要があるため、現在は creator.vue の
+ * page-level (importMessage と同じ位置) に持ち上げている。
  */
 
 const { t } = useI18n()
@@ -29,16 +33,12 @@ interface ExportProgress {
 const props = defineProps<{
   arrowAssigned: boolean
   assignedRoleCount: number
-  exportMessage: string | null
   exportProgress: ExportProgress | null
   exportBusy: boolean
-  failedApplyThemeId: string | null
 }>()
 
 defineEmits<{
-  (e: 'dismiss-export-message'): void
   (e: 'cancel-export'): void
-  (e: 'retry-apply'): void
 }>()
 </script>
 
@@ -108,31 +108,6 @@ defineEmits<{
         </div>
       </div>
     </div>
-
-    <Transition name="fade">
-      <div v-if="exportMessage" class="import-banner" role="status">
-        <UiIcon
-          :name="exportMessage.startsWith(t('creator.exportFailPrefix')) ? 'Alert' : 'Check'"
-          :size="13"
-        />
-        <span>{{ exportMessage }}</span>
-        <button
-          v-if="failedApplyThemeId"
-          class="btn ghost"
-          style="height: 24px; margin-left: auto"
-          @click="$emit('retry-apply')"
-        >
-          {{ t('saveModal.retryApply') }}
-        </button>
-        <button
-          class="btn ghost"
-          :style="failedApplyThemeId ? 'height: 24px' : 'margin-left: auto; height: 24px'"
-          @click="$emit('dismiss-export-message')"
-        >
-          <UiIcon name="X" :size="11" />
-        </button>
-      </div>
-    </Transition>
 
     <!-- ストリームエクスポート中の進捗バー + キャンセルボタン -->
     <Transition name="fade">
@@ -257,28 +232,6 @@ defineEmits<{
 
 /* エクスポート結果ポップアップ。Library の .apply-error と同じく画面下部に固定表示する。
  * メタデータペイン内のレイアウトに影響しないよう viewport 基準で配置。 */
-.import-banner {
-  position: fixed;
-  bottom: 48px;
-  left: 50%;
-  z-index: 90;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 320px;
-  max-width: 80%;
-  padding: 10px 14px;
-  border-radius: 8px;
-  background: rgba(124, 242, 212, 0.1);
-  border: 1px solid var(--accent-line);
-  font-size: 12.5px;
-  color: var(--fg-dim);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  box-shadow: var(--shadow-2);
-}
-
 .export-progress {
   border: 1px solid var(--border);
   border-radius: 10px;
