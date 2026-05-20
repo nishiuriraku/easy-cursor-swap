@@ -2,10 +2,13 @@
 /**
  * テーマ詳細ドロワー (モーダル本体)
  *
- * 3 段構成 → 3 子コンポーネントに委譲:
+ * 2 段構成 → 2 子コンポーネントに委譲:
  *   1. ThemeDetailDrawerHero  — DESCRIPTION ペイン + ROLE COVERAGE ペイン (activeRole 状態を内部で保持)
  *   2. ThemeDetailDrawerStrip — PACKAGE / USAGE / SOURCE の 3 セル strip (純粋表示)
- *   3. ThemeDetailDrawerFooter — アクションレール (apply / edit / duplicate / exportPack / delete を emit)
+ *
+ * 旧 ThemeDetailDrawerFooter のアクションレールは、UiModal の `.modal-foot`
+ * (slots #leftNote / #actions) に直接置く設計に変更したため、本コンポーネント
+ * からは削除。フッターは ThemeDetailModal.vue が組み立てる。
  *
  * 親はグラデ背景の `td-drawer` ラッパーのみ保持し、ロジックは子に分散させる。
  */
@@ -22,16 +25,6 @@ const props = defineProps<{
    */
   previewDetails?: Record<string, RolePreviewDetail> | null
 }>()
-
-const emit = defineEmits<{
-  apply: [id: string]
-  close: []
-  edit: [id: string]
-  duplicate: [id: string]
-  exportPack: [id: string]
-  delete: [id: string]
-  openSource: [id: string]
-}>()
 </script>
 
 <template>
@@ -42,14 +35,6 @@ const emit = defineEmits<{
       :preview-details="props.previewDetails"
     />
     <ThemeDetailDrawerStrip :theme="props.theme" />
-    <ThemeDetailDrawerFooter
-      :theme="props.theme"
-      @apply="emit('apply', $event)"
-      @edit="emit('edit', $event)"
-      @duplicate="emit('duplicate', $event)"
-      @export-pack="emit('exportPack', $event)"
-      @delete="emit('delete', $event)"
-    />
   </div>
 </template>
 
