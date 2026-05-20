@@ -124,10 +124,9 @@ const themeOptions = computed(() =>
       </span>
     </div>
 
-    <div v-if="!props.hasKeystore" class="warn-box">
-      <UiIcon name="AlertTriangle" :size="14" />
+    <UiAlert v-if="!props.hasKeystore" tone="warn">
       {{ t('marketplace.submitNoKeystore') }}
-    </div>
+    </UiAlert>
   </template>
 
   <!-- Step 2: JSON プレビュー -->
@@ -191,12 +190,5 @@ const themeOptions = computed(() =>
 
 :where(html.light) .json-preview {
   background: rgba(15, 20, 35, 0.04);
-}
-
-.warn-box {
-  @apply flex items-center gap-1.5 rounded-[8px] border px-2.5 py-2 text-[12px];
-  background: rgba(245, 194, 107, 0.1);
-  border-color: rgba(245, 194, 107, 0.3);
-  color: var(--amber);
 }
 </style>
