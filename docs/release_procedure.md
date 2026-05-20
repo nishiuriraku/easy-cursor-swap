@@ -97,12 +97,20 @@ git diff --stat
 `[Unreleased]` セクションの **直後** に新エントリを挿入する形で書く
 (`[Unreleased]` のヘッダ自体は残し、中身を新セクションへ移動)。
 
+> **v0.0.4 から** provisional (pre-release) 期を卒業し、ヘッダから
+> `(pre-release)` を外す。`release.yml` の `prerelease: false` 切替と同じ判断。
+> v0.0.3 以前は `## [0.0.X] - YYYY-MM-DD (pre-release)` 形式だったため、
+> 履歴の整合は崩さない (過去エントリは触らない)。
+
 ```markdown
 ## [Unreleased]
 
-## [0.0.X] - YYYY-MM-DD (pre-release)
+## [0.0.X] - YYYY-MM-DD
 
-(1〜2 行のサマリ。「何が中心の release か」を一文で。)
+(1〜2 行のサマリ。「何が中心の release か」を一文で。
+release.yml が CHANGELOG.md の該当セクションを GitHub Release ページに
+そのまま埋め込むため、サマリと各 ### Added/Changed/... 配下の本文は
+ユーザー向けの読み物として書く。)
 
 ### Added
 - ...
@@ -130,6 +138,12 @@ git diff --stat
 git log --oneline --no-merges v0.0.(X-1)..HEAD
 ```
 
+抽出テスト (release.yml と同じ helper を手元で実行して中身を確認):
+
+```bash
+node scripts/release/extract-changelog-section.mjs v0.0.X
+```
+
 ### 5. 検証ゲート
 
 ```bash
@@ -145,7 +159,7 @@ ALL GREEN になるまで何度でも回す。`CHANGELOG.md` は docs-only commi
 git add CHANGELOG.md package.json package-lock.json \
         src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/tauri.conf.json
 
-git commit -m "chore(release): bump version to v0.0.X (pre-release)
+git commit -m "chore(release): bump version to v0.0.X
 
 (本文に主な変更点と verify-gate 結果を記載)
 "
@@ -153,7 +167,7 @@ git commit -m "chore(release): bump version to v0.0.X (pre-release)
 git push -u origin release/v0.0.X
 
 gh pr create --base main --head release/v0.0.X \
-  --title "chore(release): bump version to v0.0.X (pre-release)" \
+  --title "chore(release): bump version to v0.0.X" \
   --body "..."
 ```
 
@@ -178,15 +192,17 @@ git fetch origin main
 # ローカル develop も最新化しておく (releaseブランチが develop 起点だった場合)
 git checkout develop && git pull --ff-only origin main
 
-git tag -a v0.0.X <merge-commit-sha> -m "EasyCursorSwap v0.0.X (pre-release)
+git tag -a v0.0.X <merge-commit-sha> -m "EasyCursorSwap v0.0.X
 
-仮リリース (provisional) 系列の X 番目。SemVer 0.0.x の API 安定保証は
-引き続き未保証。(主な変更を 2〜3 行で要約)
+(主な変更を 2〜3 行で要約。SemVer 0.0.x の API 安定保証は
+依然 best-effort だが、配布形態は stable release として扱う。)
 
 詳細は CHANGELOG.md の [0.0.X] - YYYY-MM-DD セクションを参照。
 
-GitHub Release は releaseDraft: true / prerelease: true でドラフト作成
-される。公開は手動レビュー後。"
+GitHub Release は releaseDraft: true / prerelease: false でドラフト作成
+される。release.yml が CHANGELOG.md の該当セクションを releaseBody に
+注入するため、ドラフトのリリースノートは編集不要なケースが多い。
+公開は手動レビュー後。"
 ```
 
 タグが正しい commit を指していることを確認:
@@ -213,8 +229,8 @@ gh run list --workflow=release.yml --limit 3
 ### 10. GitHub Release を手動 publish
 
 1. <https://github.com/nishiuriraku/easy-cursor-swap/releases> で `v0.0.X` の draft を確認
-2. `Pre-release` チェックを ON にする (0.0.x 系列は必ず pre-release)
-3. リリースノート (CHANGELOG の該当セクションが自動転載される) を必要に応じて編集
+2. **v0.0.4 以降は通常リリース** (`Pre-release` チェックは OFF のまま)。`release.yml` 側でも `prerelease: false` がデフォルト。v0.0.3 以前は ON にしていたが provisional 期を卒業。
+3. リリースノートを確認 — `release.yml` の `Extract CHANGELOG section` step が `CHANGELOG.md` の該当 `[0.0.X]` セクション本文を自動で `releaseBody` 冒頭に挿入する。インストール / 動作要件 / 既知の制限 は `release.yml` の静的テンプレートとして末尾に続く。CHANGELOG 側で書いた内容がそのまま見えるので、編集が必要なのは追加スクショ / GIF を貼る場合だけ。
 4. **Publish release** を押下
 5. Tauri Updater が新版を自動配信開始
 
