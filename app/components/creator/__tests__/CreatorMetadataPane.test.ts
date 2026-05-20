@@ -2,9 +2,11 @@
  * CreatorMetadataPane テスト。
  *
  * 6 つの v-model (metaName/En/Author/Version/Description/shadowEnabled) +
- * 6 つの read-only props (arrowAssigned/assignedRoleCount/exportMessage/
- * exportProgress/exportBusy/failedApplyThemeId) + 3 つの emit (dismiss-export-message /
- * cancel-export/retry-apply) の独立性と表示挙動を確認する。
+ * 4 つの read-only props (arrowAssigned/assignedRoleCount/exportProgress/exportBusy) +
+ * 1 つの emit (cancel-export) の独立性と表示挙動を確認する。
+ *
+ * NOTE: 保存トースト (exportMessage/failedApplyThemeId/dismiss-export-message/retry-apply)
+ * は activeTab に依存せず表示するため creator.vue page-level に移管された。
  */
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
@@ -33,10 +35,8 @@ const baseProps = {
   shadowEnabled: true,
   arrowAssigned: true,
   assignedRoleCount: 5,
-  exportMessage: null as string | null,
   exportProgress: null,
   exportBusy: false,
-  failedApplyThemeId: null as string | null,
 }
 
 describe('CreatorMetadataPane', () => {
@@ -99,24 +99,8 @@ describe('CreatorMetadataPane', () => {
     expect(wrapper.text()).toMatch(/(割り当て済み|Assigned)/)
   })
 
-  it('shows export message banner when exportMessage set', () => {
-    const wrapper = mount(CreatorMetadataPane, {
-      props: { ...baseProps, exportMessage: 'エクスポート完了' },
-      global: { stubs },
-    })
-    expect(wrapper.find('.import-banner').exists()).toBe(true)
-    expect(wrapper.text()).toContain('エクスポート完了')
-  })
-
-  it('emits dismiss-export-message when X clicked', async () => {
-    const wrapper = mount(CreatorMetadataPane, {
-      props: { ...baseProps, exportMessage: 'message' },
-      global: { stubs },
-    })
-    const closeBtn = wrapper.find('.import-banner button')
-    await closeBtn.trigger('click')
-    expect(wrapper.emitted('dismiss-export-message')).toHaveLength(1)
-  })
+  // NOTE: exportMessage banner と dismiss-export-message emit は creator.vue 側へ
+  // 移管されたため、当該 2 ケースのテストは削除した (詳細はファイル冒頭の NOTE 参照)。
 
   it('shows export progress with current/total when stage=role', () => {
     const wrapper = mount(CreatorMetadataPane, {

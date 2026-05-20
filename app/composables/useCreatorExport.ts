@@ -11,6 +11,14 @@
  */
 import type { Ref } from 'vue'
 
+/**
+ * `executeSave` の結果ステータス。creator.vue は `'ok'` のときだけライブラリへ自動遷移する。
+ *  - `'ok'`         : ファイル/ライブラリ保存 (+apply) が全て成功した。
+ *  - `'apply-error'`: ライブラリへの保存自体は成功したが apply に失敗した (retry CTA 表示中)。
+ *  - `'failed'`     : 事前バリデーション失敗 / IPC 例外などの致命的失敗。
+ */
+export type SaveResultStatus = 'ok' | 'apply-error' | 'failed'
+
 /** ストリームエクスポート時の進捗状態 */
 export interface BuildProgress {
   buildId: string
@@ -117,20 +125,26 @@ export function useCreatorExport(deps: CreatorExportDeps) {
   /**
    * SaveDestinationModal の submit を受けて Rust 側 export_cursorpack_streamed を呼ぶ。
    * destination ごとにトーストメッセージを切り替え、apply 失敗時は warning + retry。
+   *
+   * 返り値 `SaveResultStatus` で呼び出し側 (creator.vue) に保存ステータスを伝える。
+   *  - `'ok'`         : 完全成功 — 呼び出し側はライブラリへ自動遷移する判断材料に使う。
+   *  - `'apply-error'`: 保存はOKだが apply 失敗 — retry CTA を残すために遷移しない。
+   *  - `'failed'`     : バリデーション or IPC 例外 — エラートーストを残すために遷移しない。
    */
-  async function executeSave(payload: SaveSubmitPayload) {
+  async function executeSave(payload: SaveSubmitPayload): Promise<SaveResultStatus> {
     if (creatorAssets.assignedRoleCount.value === 0) {
       exportMessage.value = '少なくとも 1 役割に画像を割り当ててください'
-      return
+      return 'failed'
     }
     if (!creatorAssets.arrowAssigned.value) {
       exportMessage.value = 'Arrow ロールは必須です'
-      return
+      return 'failed'
     }
     exportBusy.value = true
     exportMessage.value = null
     exportProgress.value = null
 
+    let status: SaveResultStatus = 'failed'
     let unlisten: (() => void) | null = null
     try {
       const buildId = `build-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -186,18 +200,23 @@ export function useCreatorExport(deps: CreatorExportDeps) {
           result.apply_error,
         )
         failedApplyThemeId.value = result.theme_id
+        status = 'apply-error'
       } else if (result.applied) {
         exportMessage.value = t('saveModal.toastSavedAndApplied')
         failedApplyThemeId.value = null
+        status = 'ok'
       } else if (payload.destination === 'file') {
         exportMessage.value = t('saveModal.toastSavedFile').replace('{path}', payload.filePath!)
         failedApplyThemeId.value = null
+        status = 'ok'
       } else {
         exportMessage.value = t('saveModal.toastSavedLibrary')
         failedApplyThemeId.value = null
+        status = 'ok'
       }
     } catch (err) {
       exportMessage.value = `エクスポート失敗: ${err instanceof Error ? err.message : String(err)}`
+      status = 'failed'
     } finally {
       if (unlisten) unlisten()
       currentBuildId.value = null
@@ -206,6 +225,7 @@ export function useCreatorExport(deps: CreatorExportDeps) {
         if (!exportBusy.value) exportProgress.value = null
       }, 3000)
     }
+    return status
   }
 
   /**

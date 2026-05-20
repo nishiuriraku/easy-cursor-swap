@@ -137,6 +137,17 @@ const discardDialogOpen = ref(false)
 const discardDialogMode = ref<'clear' | 'navigate'>('clear')
 let pendingNavigation: ((proceed: boolean) => void) | null = null
 
+/**
+ * 保存成功直後にライブラリへ自動遷移する際、破棄ダイアログをスキップするためのフラグ。
+ *  - true の間: `onBeforeRouteLeave` は `hasUnsavedEdits` を見ずに即 next() する。
+ *  - 保存直後にだけ立て、遷移完了後に false に戻す (unmount でリセットされるので明示的な
+ *    後始末は不要だが、保存後に同一ページ内へ遷移しない再エントリも考慮して reset する)。
+ */
+const bypassUnsavedGuard = ref(false)
+
+/** 保存後遷移のためにスケジュール済みの setTimeout ハンドル。unmount で確実にクリアする。 */
+let postSaveNavTimer: ReturnType<typeof setTimeout> | null = null
+
 function requestReset() {
   if (!hasUnsavedEdits.value) {
     resetCreator()
@@ -168,6 +179,12 @@ function onDiscardCancel() {
 // サイドバー / ブラウザバック相当の遷移をガードする。
 // Vue Router の onBeforeRouteLeave は next(false) で離脱をキャンセルできる。
 onBeforeRouteLeave((_to, _from, next) => {
+  // 保存直後の自動遷移は破棄ダイアログをスキップする (assigned/メタが残っていても
+  // 既にバックエンドへ保存済みなので破棄リスクは無い)。
+  if (bypassUnsavedGuard.value) {
+    next()
+    return
+  }
   if (!hasUnsavedEdits.value) {
     next()
     return
@@ -389,6 +406,11 @@ onUnmounted(() => {
     unlistenDrop()
     unlistenDrop = null
   }
+  // 保存後遷移用 setTimeout が残っていれば必ず解放 (連続遷移時のリーク対策)。
+  if (postSaveNavTimer) {
+    clearTimeout(postSaveNavTimer)
+    postSaveNavTimer = null
+  }
 })
 
 /**
@@ -541,6 +563,29 @@ const {
 
 function onToolbarSave() {
   saveModalOpen.value = true
+}
+
+/**
+ * SaveDestinationModal の submit を受けて保存実行 → 成功時はライブラリへ自動遷移する。
+ *
+ *  - `executeSave` が 'ok' を返した場合のみ遷移 (apply-error / failed は Creator に留まる)。
+ *  - 直後に router.push すると成功トーストが描画される間もなく Creator が unmount される
+ *    ため、~1 秒の遅延を入れてユーザーがフィードバックを視認できるようにする。
+ *  - 遷移時は破棄確認ダイアログをスキップする (bypassUnsavedGuard を立てる)。
+ */
+async function handleSaveSubmit(
+  payload: import('~/composables/useCreatorExport').SaveSubmitPayload,
+) {
+  saveModalOpen.value = false
+  const status = await executeSave(payload)
+  if (status !== 'ok') return
+  // 保存成功 → ライブラリへ自動遷移。トーストが見える程度の短い遅延を挟む。
+  if (postSaveNavTimer) clearTimeout(postSaveNavTimer)
+  postSaveNavTimer = setTimeout(() => {
+    postSaveNavTimer = null
+    bypassUnsavedGuard.value = true
+    void navigateTo('/')
+  }, 1000)
 }
 
 const {
@@ -856,13 +901,9 @@ async function onFileChange(e: Event) {
         v-model:shadow-enabled="shadowEnabled"
         :arrow-assigned="arrowAssigned"
         :assigned-role-count="assignedRoleCount"
-        :export-message="exportMessage"
         :export-progress="exportProgress"
         :export-busy="exportBusy"
-        :failed-apply-theme-id="failedApplyThemeId"
-        @dismiss-export-message="exportMessage = null"
         @cancel-export="cancelExport"
-        @retry-apply="retryApply"
       />
 
       <!-- 2 カラムグリッド (assign タブのみ) -->
@@ -925,12 +966,7 @@ async function onFileChange(e: Event) {
       :default-destination="saveModalDefault"
       :meta-name="metaName"
       @cancel="saveModalOpen = false"
-      @submit="
-        (payload) => {
-          saveModalOpen = false
-          void executeSave(payload)
-        }
-      "
+      @submit="(payload) => void handleSaveSubmit(payload)"
     />
 
     <!--
@@ -988,6 +1024,37 @@ async function onFileChange(e: Event) {
           class="btn ghost"
           style="margin-left: auto; height: 24px"
           @click="importMessage = null"
+        >
+          <UiIcon name="X" :size="11" />
+        </button>
+      </div>
+    </Transition>
+
+    <!--
+      エクスポート結果トースト。元々は CreatorMetadataPane 内に居たが、
+      assign タブで保存したとき (= metadata pane が v-if で unmount されている時) に
+      トーストが描画されない問題があったため、タブに依存しないこの層に持ち上げた。
+      .import-banner クラスは creator.vue の scoped style で定義済 (importMessage と同 UI)。
+    -->
+    <Transition name="fade">
+      <div v-if="exportMessage" class="import-banner" role="status">
+        <UiIcon
+          :name="exportMessage.startsWith(t('creator.exportFailPrefix')) ? 'Alert' : 'Check'"
+          :size="13"
+        />
+        <span>{{ exportMessage }}</span>
+        <button
+          v-if="failedApplyThemeId"
+          class="btn ghost"
+          style="height: 24px; margin-left: auto"
+          @click="retryApply"
+        >
+          {{ t('saveModal.retryApply') }}
+        </button>
+        <button
+          class="btn ghost"
+          :style="failedApplyThemeId ? 'height: 24px' : 'margin-left: auto; height: 24px'"
+          @click="exportMessage = null"
         >
           <UiIcon name="X" :size="11" />
         </button>

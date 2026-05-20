@@ -99,6 +99,29 @@ jobs:
       - name: npm ci
         run: npm ci
 
+      # -----------------------------------------------------------
+      # CHANGELOG.md の該当バージョンのセクションを抜き出して
+      # tauri-action の releaseBody に埋め込むための準備。
+      # 該当エントリが無い場合はプレースホルダで通し、release CI 自体は止めない
+      # (CHANGELOG 更新漏れに気付くきっかけが「リリースページが寂しい」になる)。
+      # -----------------------------------------------------------
+      - name: Extract CHANGELOG section for ${{ env.RELEASE_TAG }}
+        id: changelog
+        shell: pwsh
+        run: |
+          $tag = "${{ env.RELEASE_TAG }}"
+          $version = $tag -replace '^v',''
+          Write-Host "Extracting CHANGELOG section for $version"
+          $section = node scripts/release/extract-changelog-section.mjs $version
+          if ($LASTEXITCODE -ne 0 -or -not $section) {
+            Write-Warning "CHANGELOG section not found for $version - using placeholder"
+            $section = "## $tag`n`n(CHANGELOG エントリ未登録)"
+          }
+          # GITHUB_OUTPUT に複数行で書き出すためのヒアドキュメント形式
+          "section<<__CHANGELOG_EOF__" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          $section                       | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "__CHANGELOG_EOF__"            | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
       - name: Tauri build (MSI + NSIS, Updater 署名付き)
         uses: tauri-apps/tauri-action@v0
         env:
@@ -114,8 +137,15 @@ jobs:
           tagName: ${{ env.RELEASE_TAG }}
           releaseName: 'EasyCursorSwap ${{ env.RELEASE_TAG }}'
           args: --target ${{ matrix.target }}
+          # releaseBody 構成:
+          #   1) CHANGELOG.md の該当 [X.Y.Z] セクション本文 (動的)
+          #   2) インストール / 自動アップデート / 動作要件 / 既知の制限 (静的)
+          # matrix が x64/arm64 の 2 ジョブ走るが、tauri-action は同じ Draft Release に
+          # 冪等にアップロード/上書きするため、両ジョブで releaseBody が一致していれば衝突しない。
           releaseBody: |
-            ## EasyCursorSwap ${{ env.RELEASE_TAG }}
+            ${{ steps.changelog.outputs.section }}
+
+            ---
 
             ### インストール
             - **MSI x64** (推奨): `EasyCursorSwap_*_x64_ja-JP.msi` / `*_x64_en-US.msi`
@@ -134,9 +164,10 @@ jobs:
             - Windows Server は動作対象外
             - `.ani` の新規生成は未対応
           releaseDraft: true
-          # SemVer 0.0.x はプロジェクト方針として provisional (API 安定保証なし) 扱いのため、
-          # GitHub Release の Pre-release チェックを常に立てる。0.1.0 で stable に切り替える際に false へ戻す。
-          prerelease: true
+          # v0.0.4 で provisional 期を卒業し、stable release として配布する。
+          # SemVer 0.0.x の API 安定保証は依然 best-effort だが、GitHub Release の
+          # Pre-release フラグは降ろし、Updater 経由でも通常版として配信する。
+          prerelease: false
           includeUpdaterJson: true
 
       # -----------------------------------------------------------
