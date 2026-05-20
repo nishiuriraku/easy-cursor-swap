@@ -6,9 +6,9 @@
  * グリッドが乱れる UX 問題があったため、シェブロン押下で中央オーバーレイ
  * のモーダルに切り替えた。
  *
- * - 背景クリック / Esc キーで閉じる
- * - スクロールロック (body に overflow: hidden を一時的に付与)
- * - Teleport で `<body>` 直下にレンダリングして z-index 戦争を回避
+ * 共通 `<UiModal>` シェル (Teleport + バックドロップ + Esc + スクロールロック +
+ * focus trap) にラップを委譲し、ここでは body / footer に詳細表示と閉じる
+ * ボタンだけを差し込む。
  */
 import type { ThemeCardData } from '~/types/theme'
 import type { RolePreviewDetail } from '~/composables/useThemePreviews'
@@ -35,111 +35,51 @@ const emit = defineEmits<{
 
 const isOpen = computed(() => props.theme !== null)
 
-function close() {
-  emit('close')
-}
-
-// Body scroll lock / Esc 購読 / cleanup は useModalLifecycle に委譲。
-// `<Teleport to="body">` 配下のレンダリング階層制御だけ template 側に残す。
-useModalLifecycle({ open: isOpen, onClose: close })
+const headerDescription = computed(() => {
+  if (!props.theme) return ''
+  const datePart = props.theme.date ? ` · ${props.theme.date.slice(0, 10)}` : ''
+  return `@${props.theme.author ?? 'unknown'} · v${props.theme.version}${datePart}`
+})
 </script>
 
 <template>
-  <Teleport to="body">
-    <Transition name="fade">
-      <div
-        v-if="isOpen && theme"
-        class="td-modal-backdrop"
-        role="dialog"
-        aria-modal="true"
-        :aria-label="t('themeDetail.modalAria', { name: theme.name })"
-        @click.self="close"
-      >
-        <div class="td-standalone td-modal-shell" @click.stop>
-          <div class="td-standalone-h">
-            <div>
-              <div class="td-standalone-eyebrow">{{ t('themePicker.detailsEyebrow') }}</div>
-              <h2>{{ theme.name }}</h2>
-              <div class="td-standalone-sub">
-                @{{ theme.author ?? 'unknown' }} · v{{ theme.version }}
-                <template v-if="theme.date"> · {{ theme.date.slice(0, 10) }}</template>
-              </div>
-            </div>
-            <button
-              class="btn icon"
-              :aria-label="t('common.close')"
-              :title="`${t('common.close')} (Esc)`"
-              @click="close"
-            >
-              <UiIcon name="X" :size="13" />
-            </button>
-          </div>
-          <div class="td-modal-body">
-            <ThemeDetailDrawer
-              :theme="theme"
-              :preview-map="previewMap"
-              :preview-details="previewDetails"
-              @apply="(id) => emit('apply', id)"
-              @edit="(id) => emit('edit', id)"
-              @duplicate="(id) => emit('duplicate', id)"
-              @export-pack="(id) => emit('exportPack', id)"
-              @delete="(id) => emit('delete', id)"
-              @close="close"
-            />
-          </div>
-        </div>
-      </div>
-    </Transition>
-  </Teleport>
+  <UiModal
+    :open="isOpen"
+    :title="theme?.name ?? ''"
+    :description="headerDescription"
+    icon="Library"
+    icon-tone="accent"
+    size="lg"
+    :body-padded="false"
+    :aria-labelledby="theme ? `theme-detail-${theme.id}` : undefined"
+    @close="emit('close')"
+  >
+    <ThemeDetailDrawer
+      v-if="theme"
+      :theme="theme"
+      :preview-map="previewMap"
+      :preview-details="previewDetails"
+      @apply="(id) => emit('apply', id)"
+      @edit="(id) => emit('edit', id)"
+      @duplicate="(id) => emit('duplicate', id)"
+      @export-pack="(id) => emit('exportPack', id)"
+      @delete="(id) => emit('delete', id)"
+      @close="emit('close')"
+    />
+
+    <template #actions>
+      <UiButton variant="ghost" @click="emit('close')">
+        {{ t('common.close') }}
+      </UiButton>
+    </template>
+  </UiModal>
 </template>
 
 <style scoped>
 @reference '~/assets/css/tailwind.css';
 
-.td-modal-backdrop {
-  @apply fixed inset-0 z-[100] grid place-items-center bg-[rgba(8,9,14,0.6)] p-8 backdrop-blur-[8px];
-}
-/*
- * シェルは `grid place-items-center` の中で中央寄せされる。
- * 高さはコンテンツに追従し、`max-h` だけで上限を抑える。
- * `td-standalone` 由来の `height: 100%` が乗ると、グリッドトラック全体
- * (viewport - 64px) まで張ってしまい常に最大サイズになるので、レイアウト
- * 系プロパティはこちらに寄せて `td-standalone` は枠線・角丸・影だけに絞る。
- */
-.td-modal-shell {
-  @apply flex h-auto max-h-[calc(100vh-64px)] w-[min(960px,100%)] flex-col overflow-hidden;
-}
-.td-modal-body {
-  @apply min-h-0 flex-1 overflow-y-auto;
-}
 /* モーダル内の drawer は通常のカード文脈ではないので、外側の境界線を消して二重枠を避ける */
-.td-modal-body :deep(.td-drawer) {
+:deep(.td-drawer) {
   background: transparent;
-}
-
-.td-standalone {
-  @apply rounded-[14px] border border-line-hi bg-bg-1;
-  box-shadow: var(--shadow-2);
-}
-.td-standalone-h {
-  @apply flex items-start justify-between gap-3 border-b border-line px-[22px] pb-4 pt-[18px];
-}
-.td-standalone-eyebrow {
-  @apply mb-1 font-mono text-[9.5px] uppercase tracking-[0.16em] text-accent;
-}
-.td-standalone h2 {
-  @apply m-0 font-display text-[20px] font-semibold tracking-[-0.02em];
-}
-.td-standalone-sub {
-  @apply mt-1 font-mono text-[12px] tracking-[0.02em] text-fg-dim;
-}
-
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.18s ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
 }
 </style>
