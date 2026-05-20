@@ -20,6 +20,7 @@ export default {
     save: '保存',
     saving: '保存中...',
     cancel: 'キャンセル',
+    confirm: '確認',
     discard: '変更を破棄',
     import: 'インポート',
     export: 'エクスポート',

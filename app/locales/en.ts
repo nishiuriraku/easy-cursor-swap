@@ -21,6 +21,7 @@ export default {
     save: 'Save',
     saving: 'Saving...',
     cancel: 'Cancel',
+    confirm: 'Confirm',
     discard: 'Discard changes',
     import: 'Import',
     export: 'Export',
