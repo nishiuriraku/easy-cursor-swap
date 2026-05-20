@@ -21,6 +21,7 @@ for all 17 Windows cursor roles, 6 DPI sizes, and Ed25519-signed theme distribut
 - **Creator mode** — Build cursor themes from PNG/SVG images; assign hotspots; export signed `.cursorpack` files
 - **Official index** — Browse and install Ed25519-verified themes from the curated community index
 - **Panic button** — One-click restore to Windows default or the pre-install snapshot, at any time
+- **Cursor size control** — Built-in 15-step slider mirroring Windows Accessibility → Mouse pointer & touch; persists as an OS-wide setting independent of the active theme
 - **Tray resident** — Runs silently in the system tray; optional silent launch on OS startup
 - **Security hardened** — Ed25519 signatures, ZIP bomb protection, magic byte validation, path traversal prevention, SVG sanitisation, PNG metadata stripping
 - **Auto-update** — Background update delivery via signed Tauri Updater; major-version jumps require manual confirmation

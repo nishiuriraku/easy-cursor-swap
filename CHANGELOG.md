@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- マウスポインターのサイズを本アプリから変更できるように。設定 → 一般 → 「カーソルサイズ」セクションに 1〜15 のスライダーを追加し、Windows 設定アプリ「アクセシビリティ → マウスポインターとタッチ → サイズ」と等価な書き換え (`HKCU\Control Panel\Cursors\CursorBaseSize` の DWORD 32〜256) を行う。スライダー位置 → DWORD の変換は Rust 側 (`registry::slider_position_to_base_size`) が single source of truth で、UI からは `set_cursor_base_size` IPC 経由で即時反映 (テーマ適用とは独立した OS 全体設定として扱う)。書き込み後は `SystemParametersInfoW(SPI_SETCURSORS)` でシェルに通知し、`set_cursor_shadow` と同じ broadcast 偽陽性ハンドリングで `CursorBaseSize` 拡大時のシェルキャッシュ再構築由来の `ERROR_INVALID_HANDLE` を吸収する。
+
+### Changed
+
+- `accessibility::AccessibilityConflicts::has_conflicts` の判定から `CursorBaseSize > 32` を除外。本アプリの正規機能になったため「競合」ではなく「現状値」として扱う。値自体は UI スライダーの初期値反映のために `cursor_base_size` フィールドで引き続き返す。これに連動して `ApplyModal` の `conflictCursorBaseSize` 警告も非表示化し、未使用の `apply.conflictCursorBaseSize` i18n キーは両言語から削除した (ja/en 各 1 件減)。
+
 ## [0.0.3] - 2026-05-20 (pre-release)
 
 v0.0.1 / v0.0.2 と同じく仮リリース系列 (provisional, SemVer 0.0.x で API 安定保証なし)。Creator / Marketplace 周りの UX 改善、Library のビジュアル不具合修正、開発体験向上、そして大規模な依存関係リフレッシュ (npm 8 件 + Rust 5 メジャー + ロックファイル 31 件) が中心。HKCU 限定 / 適用トランザクション性 / アーカイブ検閲 / PII レダクション / `v-html` 不採用 の 5 大不変条件はすべて維持。

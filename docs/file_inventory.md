@@ -16,17 +16,17 @@
 |---|---|
 | [main.rs](../src-tauri/src/main.rs) | Tauri アプリのエントリ。tracing 初期化、`StartupCheck::begin()`、AppUserModelID 登録、ConfigManager 初期化、孤児カーソル復旧、pending snapshot リカバリ、`tauri::Builder` 構築 (single-instance プラグイン / 各種 plugin / setup でトレイ・ホットキー)、`build()` + `run(callback)` 形式で `RunEvent::ExitRequested { code: None }` を `prevent_exit` してトレイ常駐させるガード (close ボタン → WebView destroy → プロセス残留 を保証) |
 | [lib.rs](../src-tauri/src/lib.rs) | 23 モジュールの `pub mod` 宣言 |
-| [commands/mod.rs](../src-tauri/src/commands/mod.rs) | 全 Tauri コマンドのハンドラ登録 (`get_command_handlers()` が 52 IPC を `tauri::generate_handler!` に渡す) |
+| [commands/mod.rs](../src-tauri/src/commands/mod.rs) | 全 Tauri コマンドのハンドラ登録 (`get_command_handlers()` が 53 IPC を `tauri::generate_handler!` に渡す) |
 | [errors.rs](../src-tauri/src/errors.rs) | `AppError` (`thiserror`、`Serialize` 派生で IPC 経由 throw 対応) |
 
-### 1-2. IPC コマンド実体 (9 サブモジュール / 52 個)
+### 1-2. IPC コマンド実体 (9 サブモジュール / 53 個)
 
 | ファイル | 主な IPC |
 |---|---|
 | [commands/cursor_build/](../src-tauri/src/commands/cursor_build/) | `mod` (公開 API + 共通ステート + `cancel_build` IPC) / `build` (`export_cursorpack`) / `stream` (`export_cursorpack_streamed`、進捗イベント `build-progress`) / `sign` (Ed25519 署名埋込) / `dto` (DTO 定義)。共有キャンセルレジストリは別 `cancel_registry.rs` に切出済 |
 | [commands/cursor_io.rs](../src-tauri/src/commands/cursor_io.rs) | `take_pending_cursorpack` (起動時 argv からの `.cursorpack` 引き継ぎ。 `extract_cursorpack_arg` / `stash_pending_cursorpack` / `handle_pending_cursorpack` ヘルパー含む) |
 | [commands/theme.rs](../src-tauri/src/commands/theme.rs) | `get_themes` / `get_theme_previews` / `get_theme_role_previews` / `apply_theme` / `set_theme_favorite` / `inspect_cursorpack` / `import_cursorpack` / `delete_theme` / `duplicate_theme` / `repackage_theme` |
-| [commands/system.rs](../src-tauri/src/commands/system.rs) | `reset_to_default` / `reset_to_initial` / `get_environment_report` / `get_config` / `update_config` / `get_app_info` / `list_config_backups` / `restore_config_backup` / `open_url` / `open_log_folder` / `get_accessibility_conflicts` / `check_update_is_major_jump` / `list_crash_reports` / `clear_crash_reports` / `submit_crash_reports` |
+| [commands/system.rs](../src-tauri/src/commands/system.rs) | `reset_to_default` / `reset_to_initial` / `get_environment_report` / `get_config` / `update_config` / `get_app_info` / `list_config_backups` / `restore_config_backup` / `open_url` / `open_log_folder` / `get_accessibility_conflicts` / `set_cursor_base_size` / `check_update_is_major_jump` / `list_crash_reports` / `clear_crash_reports` / `submit_crash_reports` |
 | [commands/keystore.rs](../src-tauri/src/commands/keystore.rs) | `keystore_info` / `keystore_generate` / `keystore_delete` / `keystore_export` / `keystore_import` |
 | [commands/marketplace.rs](../src-tauri/src/commands/marketplace.rs) | `marketplace_fetch_index` / `marketplace_install` / `marketplace_fetch_preview` |
 | [commands/marketplace_submit.rs](../src-tauri/src/commands/marketplace_submit.rs) | `start_device_flow` / `complete_device_flow` / `cancel_device_flow` / `submit_theme_auto` / `revoke_github_link` |
@@ -185,7 +185,7 @@
 | 指標 | 値 |
 |---|---|
 | Rust モジュール数 (lib.rs `pub mod`) | 23 + ベンチ 2 |
-| Tauri IPC コマンド数 | 52 |
+| Tauri IPC コマンド数 | 53 |
 | Vue ページ数 | 4 (+2 helpers) |
 | Vue コンポーネント (subdir 別) | shell 3 / library 15 / creator 14 / marketplace 6 / settings 14 / preview 1 / panic 1 / icons 2 / ui 1 (合計 57) |
 | Composables 数 | 36 |

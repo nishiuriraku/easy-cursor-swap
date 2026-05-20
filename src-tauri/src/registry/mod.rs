@@ -482,6 +482,74 @@ impl RegistryManager {
         Ok(())
     }
 
+    /// `HKCU\Control Panel\Cursors\CursorBaseSize` (REG_DWORD) を書き換えて
+    /// Windows のアクセシビリティ「マウスポインターとタッチ」のサイズスライダーと
+    /// 等価な設定を反映する。
+    ///
+    /// 引数 `size` は書き込む DWORD 値。範囲外の値は
+    /// `clamp_cursor_base_size` で [MIN_CURSOR_BASE_SIZE, MAX_CURSOR_BASE_SIZE]
+    /// (32〜256) にクランプされる。戻り値は実際に書き込まれた値。
+    ///
+    /// レジストリ書き込み後に `SystemParametersInfoW(SPI_SETCURSORS, ...)` で
+    /// シェルを通知する (専用の SPI_SETCURSORBASESIZE は Windows API に存在しないため、
+    /// SPI_SETCURSORS の再走でシェルにカーソルキャッシュの再構築を要求する)。
+    /// broadcast 偽陽性は [`Self::is_broadcast_false_positive`] で吸収する。
+    ///
+    /// 本機能は「テーマ適用」とは独立した設定として扱うため、
+    /// `_pending_apply.snapshot` には参加しない (= cursor 役割の transactional
+    /// apply とは別系統)。テーマを切り替えてもサイズは保持される。
+    #[cfg(windows)]
+    pub fn set_cursor_base_size(size: u32) -> AppResult<u32> {
+        use winreg::enums::*;
+        use winreg::RegKey;
+
+        let clamped = clamp_cursor_base_size(size);
+
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let cursors_key = hkcu
+            .open_subkey_with_flags("Control Panel\\Cursors", KEY_WRITE)
+            .map_err(|e| AppError::Registry(format!("Cursors キーを開けません: {}", e)))?;
+        cursors_key
+            .set_value("CursorBaseSize", &clamped)
+            .map_err(|e| AppError::Registry(format!("CursorBaseSize 書込失敗: {}", e)))?;
+
+        use windows::Win32::UI::WindowsAndMessaging::{
+            SystemParametersInfoW, SPIF_SENDCHANGE, SPIF_UPDATEINIFILE, SPI_SETCURSORS,
+        };
+        unsafe {
+            let result = SystemParametersInfoW(
+                SPI_SETCURSORS,
+                0,
+                None,
+                SPIF_UPDATEINIFILE | SPIF_SENDCHANGE,
+            );
+            // SPI_SETCURSORS と同じ WM_SETTINGCHANGE ブロードキャスト偽陽性が
+            // CursorBaseSize 拡大時にこそ頻発する (シェルがカーソルキャッシュを
+            // 再構築している最中で受信側の HWND が一時的に無効化される)。
+            if let Err(e) = result {
+                if Self::is_broadcast_false_positive(&e) {
+                    tracing::debug!(
+                        "SystemParametersInfoW(SPI_SETCURSORS for size) broadcast 偽陽性 (HRESULT={:#010x}, ignored)",
+                        e.code().0
+                    );
+                } else {
+                    return Err(AppError::Registry(format!(
+                        "SPI_SETCURSORS の呼び出しに失敗: {}",
+                        e
+                    )));
+                }
+            }
+        }
+
+        tracing::info!("CursorBaseSize を {} に設定しました", clamped);
+        Ok(clamped)
+    }
+
+    #[cfg(not(windows))]
+    pub fn set_cursor_base_size(size: u32) -> AppResult<u32> {
+        Ok(clamp_cursor_base_size(size))
+    }
+
     /// 初回起動時のスナップショットを保存する
     pub fn save_initial_snapshot() -> AppResult<()> {
         let cursors_dir = ConfigManager::cursors_dir()?;
@@ -659,6 +727,131 @@ pub fn paths_match_current_registry(expected: &HashMap<String, String>) -> bool 
     })
 }
 
+/// CursorBaseSize DWORD の最小値 (= Windows 既定 32 px)。
+pub const MIN_CURSOR_BASE_SIZE: u32 = 32;
+
+/// CursorBaseSize DWORD の最大値 (= Windows 設定アプリ slider 15 = 256 px)。
+pub const MAX_CURSOR_BASE_SIZE: u32 = 256;
+
+/// Windows 設定アプリ「マウスポインターとタッチ」のサイズスライダーは
+/// 16 px 刻みで CursorBaseSize を変える (32 / 48 / 64 / ... / 256)。
+pub const CURSOR_BASE_SIZE_STEP: u32 = 16;
+
+/// スライダー位置の最小値 (Windows 設定アプリと同じ 1 始まり)。
+pub const MIN_CURSOR_SIZE_SLIDER: u8 = 1;
+
+/// スライダー位置の最大値。`MIN_CURSOR_BASE_SIZE + STEP * (MAX_SLIDER - 1) = 256` を満たす。
+pub const MAX_CURSOR_SIZE_SLIDER: u8 = 15;
+
+/// 任意の入力値を CursorBaseSize として有効な範囲 [32, 256] にクランプする。
+///
+/// 端数 (例: 40) はそのまま許容する — Windows は 16 px 刻み以外でも一応動作するが、
+/// `.cur` の埋め込みサイズ (32/48/64/96/128/256) と一致しないため Windows 側で
+/// 線形補間がかかり、ピクセルアートのカーソルではややぼやけて見える。本アプリの
+/// UI スライダーは 16 px 刻みでしか書かないので通常は埋め込みサイズと一致する。
+pub fn clamp_cursor_base_size(size: u32) -> u32 {
+    size.clamp(MIN_CURSOR_BASE_SIZE, MAX_CURSOR_BASE_SIZE)
+}
+
+/// Windows 設定アプリ流のスライダー位置 (1〜15) を CursorBaseSize DWORD に変換する。
+///
+/// 関係式: `size = MIN_CURSOR_BASE_SIZE + STEP * (slider - 1)`
+/// 例: slider=1 → 32 / slider=2 → 48 / slider=3 → 64 / ... / slider=15 → 256
+///
+/// 範囲外のスライダー位置はクランプ後に変換する (UI が 1〜15 を強制しているが
+/// 念のため backend 側でもサニタイズ)。
+pub fn slider_position_to_base_size(slider: u8) -> u32 {
+    let s = slider.clamp(MIN_CURSOR_SIZE_SLIDER, MAX_CURSOR_SIZE_SLIDER);
+    MIN_CURSOR_BASE_SIZE + CURSOR_BASE_SIZE_STEP * u32::from(s - 1)
+}
+
+/// CursorBaseSize DWORD を最も近いスライダー位置 (1〜15) に変換する。
+///
+/// 16 px 刻みに揃っていない値 (例: 40) は四捨五入で最近接スライダーにスナップする。
+/// 範囲外の値はクランプ後に変換する。UI で「OS の現在値をスライダーに反映する」
+/// 用途。
+pub fn base_size_to_slider_position(size: u32) -> u8 {
+    let clamped = clamp_cursor_base_size(size);
+    // 四捨五入: +STEP/2 してから整数除算
+    let offset = clamped - MIN_CURSOR_BASE_SIZE;
+    let slider_zero = (offset + CURSOR_BASE_SIZE_STEP / 2) / CURSOR_BASE_SIZE_STEP;
+    let slider = slider_zero as u8 + MIN_CURSOR_SIZE_SLIDER;
+    slider.clamp(MIN_CURSOR_SIZE_SLIDER, MAX_CURSOR_SIZE_SLIDER)
+}
+
+#[cfg(test)]
+mod size_helpers_tests {
+    use super::*;
+
+    /// スライダー位置 → DWORD の境界値と全有効値のテスト。
+    /// Windows 設定アプリの仕様 (1=32, 15=256) と一致することを保証する。
+    #[test]
+    fn slider_to_base_size_covers_full_range() {
+        assert_eq!(slider_position_to_base_size(1), 32);
+        assert_eq!(slider_position_to_base_size(2), 48);
+        assert_eq!(slider_position_to_base_size(3), 64);
+        assert_eq!(slider_position_to_base_size(5), 96);
+        assert_eq!(slider_position_to_base_size(7), 128);
+        assert_eq!(slider_position_to_base_size(15), 256);
+    }
+
+    /// 範囲外スライダーは MIN/MAX にクランプされる。
+    #[test]
+    fn slider_to_base_size_clamps_out_of_range() {
+        assert_eq!(slider_position_to_base_size(0), 32);
+        assert_eq!(slider_position_to_base_size(16), 256);
+        assert_eq!(slider_position_to_base_size(u8::MAX), 256);
+    }
+
+    /// DWORD → スライダーの境界値ラウンドトリップ。
+    #[test]
+    fn base_size_to_slider_round_trip_at_aligned_values() {
+        for s in MIN_CURSOR_SIZE_SLIDER..=MAX_CURSOR_SIZE_SLIDER {
+            let size = slider_position_to_base_size(s);
+            assert_eq!(
+                base_size_to_slider_position(size),
+                s,
+                "slider {} round-trip via size {}",
+                s,
+                size
+            );
+        }
+    }
+
+    /// 16 px 刻みに揃っていない中間値は四捨五入で最近接スライダーにスナップする。
+    #[test]
+    fn base_size_to_slider_snaps_to_nearest() {
+        // 32 .. 40 → slider 1 (32 寄り)
+        assert_eq!(base_size_to_slider_position(32), 1);
+        assert_eq!(base_size_to_slider_position(39), 1);
+        // 40 は 32 と 48 の中点、四捨五入で 48 = slider 2
+        assert_eq!(base_size_to_slider_position(40), 2);
+        assert_eq!(base_size_to_slider_position(47), 2);
+        assert_eq!(base_size_to_slider_position(48), 2);
+        // 56 は 48 と 64 の中点 → slider 3
+        assert_eq!(base_size_to_slider_position(56), 3);
+    }
+
+    /// 範囲外 DWORD はクランプ後に変換される。
+    #[test]
+    fn base_size_to_slider_clamps_out_of_range() {
+        assert_eq!(base_size_to_slider_position(0), 1);
+        assert_eq!(base_size_to_slider_position(31), 1);
+        assert_eq!(base_size_to_slider_position(257), 15);
+        assert_eq!(base_size_to_slider_position(u32::MAX), 15);
+    }
+
+    /// clamp_cursor_base_size の境界。
+    #[test]
+    fn clamp_at_boundaries() {
+        assert_eq!(clamp_cursor_base_size(0), 32);
+        assert_eq!(clamp_cursor_base_size(32), 32);
+        assert_eq!(clamp_cursor_base_size(48), 48);
+        assert_eq!(clamp_cursor_base_size(256), 256);
+        assert_eq!(clamp_cursor_base_size(1000), 256);
+    }
+}
+
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;
@@ -785,5 +978,87 @@ mod tests {
         );
 
         // _cleanup の Drop でテストスキームは削除される。
+    }
+
+    /// テスト終了時に CursorBaseSize を元の値に戻す RAII ガード。
+    /// CursorBaseSize は単一値で UUID 分離できないため、テスト前に読み取った
+    /// 値を保存し、Drop で必ず復元する。テスト機のユーザー設定を破壊しない
+    /// ためのセーフティ。
+    struct CursorBaseSizeCleanup {
+        original: Option<u32>,
+    }
+
+    impl CursorBaseSizeCleanup {
+        fn capture() -> Self {
+            use winreg::enums::*;
+            use winreg::RegKey;
+            let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+            let original = hkcu
+                .open_subkey("Control Panel\\Cursors")
+                .ok()
+                .and_then(|k| k.get_value::<u32, _>("CursorBaseSize").ok());
+            Self { original }
+        }
+    }
+
+    impl Drop for CursorBaseSizeCleanup {
+        fn drop(&mut self) {
+            use winreg::enums::*;
+            use winreg::RegKey;
+            let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+            if let Ok(cursors_key) =
+                hkcu.open_subkey_with_flags("Control Panel\\Cursors", KEY_WRITE)
+            {
+                match self.original {
+                    Some(v) => {
+                        let _ = cursors_key.set_value("CursorBaseSize", &v);
+                    }
+                    None => {
+                        // テスト前に値が無かった場合は削除して状態を元に戻す
+                        let _ = cursors_key.delete_value("CursorBaseSize");
+                    }
+                }
+            }
+        }
+    }
+
+    /// `set_cursor_base_size` が HKCU\Control Panel\Cursors\CursorBaseSize を
+    /// DWORD として書き込み、`clamp_cursor_base_size` でクランプされた値が
+    /// 実際にレジストリへ反映されることを end-to-end で確認する。
+    ///
+    /// 範囲外入力 (1000) を渡しても 256 にクランプされ、戻り値とレジストリ値が
+    /// 一致することも検証する。HKCU のみ書込、Drop で元の値に復元するため
+    /// テスト機のユーザー設定を壊さない。
+    #[test]
+    fn set_cursor_base_size_writes_dword_round_trip() {
+        use winreg::enums::*;
+        use winreg::RegKey;
+
+        let _cleanup = CursorBaseSizeCleanup::capture();
+
+        // 通常値の round-trip
+        let written =
+            RegistryManager::set_cursor_base_size(64).expect("set_cursor_base_size(64) failed");
+        assert_eq!(written, 64, "clamp 内なので入力値がそのまま返るべき");
+
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let cursors_key = hkcu
+            .open_subkey("Control Panel\\Cursors")
+            .expect("Cursors キーが開けない");
+        let raw: u32 = cursors_key
+            .get_value("CursorBaseSize")
+            .expect("CursorBaseSize が読み戻せない");
+        assert_eq!(raw, 64, "レジストリに DWORD として書き込まれているべき");
+
+        // 範囲外 → クランプ
+        let written =
+            RegistryManager::set_cursor_base_size(1000).expect("set_cursor_base_size(1000) failed");
+        assert_eq!(written, MAX_CURSOR_BASE_SIZE);
+        let raw: u32 = cursors_key
+            .get_value("CursorBaseSize")
+            .expect("CursorBaseSize が読み戻せない");
+        assert_eq!(raw, MAX_CURSOR_BASE_SIZE);
+
+        // _cleanup の Drop で元の値に復元される。
     }
 }

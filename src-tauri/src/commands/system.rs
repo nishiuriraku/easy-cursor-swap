@@ -274,6 +274,29 @@ pub fn get_accessibility_conflicts() -> AccessibilityConflicts {
     AccessibilityConflicts::detect()
 }
 
+/// マウスポインターのサイズ (HKCU\Control Panel\Cursors\CursorBaseSize) を設定する。
+///
+/// Windows 設定アプリの「アクセシビリティ → マウスポインターとタッチ → サイズ」
+/// スライダーと等価な操作。引数 `size` は DWORD 値で、`set_cursor_base_size` 側で
+/// 32〜256 にクランプされる。戻り値は実際に書き込まれた値 (クランプ後)。
+///
+/// フロントエンドは Settings ページの一般セクションのスライダー (1〜15) を
+/// `32 + 16 * (slider - 1)` で DWORD に変換してから呼ぶ。実換算式は Rust 側
+/// (`registry::slider_position_to_base_size`) が single source of truth。
+#[tauri::command]
+pub fn set_cursor_base_size(app: AppHandle, size: u32) -> Result<u32, AppError> {
+    tracing::info!("set_cursor_base_size 要求: size={}", size);
+    let written = RegistryManager::set_cursor_base_size(size)?;
+    // cursor_watcher は HWND_MESSAGE 上に作られた message-only window で
+    // WM_SETTINGCHANGE のブロードキャストを受け取れないため、SPI_SETCURSORS で
+    // 反映した変更を UI に伝える 'cursor-changed' を明示発火する
+    // (reset_with_cleanup と同じ理由)。
+    if let Err(err) = app.emit("cursor-changed", ()) {
+        tracing::warn!("set_cursor_base_size: cursor-changed emit 失敗: {}", err);
+    }
+    Ok(written)
+}
+
 /// 現行バージョンから新バージョンへの更新がメジャー跨ぎかどうかを返す。
 ///
 /// フロントエンドはアップデート確認時にこれを呼び出し、`true` の場合は

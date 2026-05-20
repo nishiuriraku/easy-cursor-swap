@@ -59,6 +59,67 @@ const general = ref({
   hideMainOnLaunch: false,
   crashReporting: false,
 })
+
+// マウスポインターのサイズ。Windows 設定アプリ「マウスポインターとタッチ」と
+// 等価なスライダー (1〜15)。値は Rust 側 (HKCU\Control Panel\Cursors\CursorBaseSize)
+// が single source of truth で、本 UI は変更を即時 IPC で反映する (dirty/save フローには
+// 乗せない — テーマ適用とは独立した OS 全体設定のため)。
+//
+// スライダー位置 ↔ DWORD の換算式は `registry::slider_position_to_base_size` と
+// 1:1 で同期: `dword = 32 + 16 * (slider - 1)` (slider=1 → 32, slider=15 → 256)。
+const CURSOR_SIZE_MIN_DWORD = 32
+const CURSOR_SIZE_STEP_DWORD = 16
+const CURSOR_SIZE_MIN_SLIDER = 1
+const CURSOR_SIZE_MAX_SLIDER = 15
+
+const cursorSizeSlider = ref<number>(CURSOR_SIZE_MIN_SLIDER)
+const cursorSizeBusy = ref(false)
+const cursorSizeError = ref<string | null>(null)
+
+function dwordToSlider(dword: number): number {
+  const clamped = Math.max(
+    CURSOR_SIZE_MIN_DWORD,
+    Math.min(CURSOR_SIZE_MIN_DWORD + CURSOR_SIZE_STEP_DWORD * (CURSOR_SIZE_MAX_SLIDER - 1), dword),
+  )
+  // 四捨五入で最近接スライダー位置に snap
+  const offset = clamped - CURSOR_SIZE_MIN_DWORD
+  const zeroBased = Math.round(offset / CURSOR_SIZE_STEP_DWORD)
+  return CURSOR_SIZE_MIN_SLIDER + zeroBased
+}
+
+function sliderToDword(slider: number): number {
+  const clamped = Math.max(CURSOR_SIZE_MIN_SLIDER, Math.min(CURSOR_SIZE_MAX_SLIDER, slider))
+  return CURSOR_SIZE_MIN_DWORD + CURSOR_SIZE_STEP_DWORD * (clamped - 1)
+}
+
+/** スライダー確定時 (`@change`): DWORD に変換して即時 IPC 反映する。 */
+async function onCursorSizeCommit(next: number) {
+  cursorSizeBusy.value = true
+  cursorSizeError.value = null
+  try {
+    const written = await invokeTauri<number>('set_cursor_base_size', {
+      size: sliderToDword(next),
+    })
+    // Rust 側でクランプされた値を slider に反映 (snap)
+    cursorSizeSlider.value = dwordToSlider(written)
+  } catch (err) {
+    cursorSizeError.value = err instanceof Error ? err.message : String(err)
+    // 失敗時は OS 側を再取得してロールバック表示
+    await refreshCursorSizeFromOs()
+  } finally {
+    cursorSizeBusy.value = false
+  }
+}
+
+async function refreshCursorSizeFromOs() {
+  try {
+    const a11y = await invokeTauri<{ cursor_base_size: number }>('get_accessibility_conflicts')
+    cursorSizeSlider.value = dwordToSlider(a11y?.cursor_base_size ?? CURSOR_SIZE_MIN_DWORD)
+  } catch {
+    // 取得失敗時は既定 (slider=1) のまま
+    cursorSizeSlider.value = CURSOR_SIZE_MIN_SLIDER
+  }
+}
 const startup = ref({
   autoStart: true,
   startMinimized: true,
@@ -540,6 +601,7 @@ onMounted(async () => {
   applyConfigToLocal()
   await refreshKeystore()
   await loadCrashReports()
+  await refreshCursorSizeFromOs()
   // 起動時の同期完了を watch で検出してローカル参照に反映
   watch(appConfig, applyConfigToLocal)
 })
@@ -637,6 +699,13 @@ function selectSection(id: SectionId) {
           v-model:language="general.language"
           v-model:show-apply-toast="general.showApplyToast"
           v-model:apply-shadow-control="general.applyShadowControl"
+          :cursor-size-slider="cursorSizeSlider"
+          :cursor-size-min="CURSOR_SIZE_MIN_SLIDER"
+          :cursor-size-max="CURSOR_SIZE_MAX_SLIDER"
+          :cursor-size-px="sliderToDword(cursorSizeSlider)"
+          :cursor-size-busy="cursorSizeBusy"
+          :cursor-size-error="cursorSizeError"
+          @update:cursor-size-slider="onCursorSizeCommit"
           @config-restored="onConfigRestored"
         />
 

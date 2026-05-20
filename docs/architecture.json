@@ -32,7 +32,7 @@
     },
     "measured_counts": {
       "rust_modules_in_lib_rs": 23,
-      "tauri_ipc_commands": 52,
+      "tauri_ipc_commands": 53,
       "composables": 35,
       "pages_vue": 4,
       "pages_ts_helpers": 2,
@@ -40,8 +40,8 @@
       "ci_workflows": 3
     },
     "doc_drift_warnings": [
-      "No known drift as of 2026-05-21 (re-measured)。本マージで components.creator が 13 → 14 (合計 56 → 57) に増加 (`DiscardEditDialog` を追加 — Creator の Clear ボタン / 画面遷移時の編集破棄確認ダイアログ)。先行コミット (develop) で composables が 36 → 35 件に減少済 (`useTagChipInput` を削除、`SubmitThemeDialog` に inline 化)。modules=23 / IPC=52 / commands-submodules=9 は変化なし。architecture.json/architecture.md/file_inventory.md/architecture.html が同期。",
-      "ui_map.json と相互整合済み: backend.ipc_commands 52 件のうち 3 件 (export_cursorpack / get_theme_previews / get_windows_scheme_previews) は Rust に登録だけされた legacy_unused 状態で、それぞれ status と replaced_by を明示。次の PR で Rust 側からも削除するか、frontend で再利用する決定をすること。",
+      "No known drift as of 2026-05-21 (re-measured)。本マージで IPC=52 → 53 に増加 (`set_cursor_base_size` を `commands/system.rs` に追加 — Settings 一般セクションのスライダー (1〜15) から DWORD (32〜256) を計算して `HKCU\\Control Panel\\Cursors\\CursorBaseSize` を書き換える独立設定。Windows アクセシビリティ「マウスポインターとタッチ」のサイズスライダーと等価)。`accessibility::AccessibilityConflicts::detect()` の `has_conflicts` 判定から CursorBaseSize 競合を除外 (本アプリの正規機能になったため)。modules=23 / commands-submodules=9 / composables=35 / components_total=57 は変化なし。architecture.json/architecture.md/file_inventory.md/architecture.html が同期。",
+      "ui_map.json と相互整合済み: backend.ipc_commands 53 件のうち 3 件 (export_cursorpack / get_theme_previews / get_windows_scheme_previews) は Rust に登録だけされた legacy_unused 状態で、それぞれ status と replaced_by を明示。次の PR で Rust 側からも削除するか、frontend で再利用する決定をすること。",
       "新たに食い違いを見つけたら『docs/<file> は X と書いているが実測 Y』の形で追記し、修正コミットと同じ PR で解消する。",
       "数字が docs と食い違ったら grep を信用する。frontend の数字は ui_map.html の live check (末尾) が canonical counter。"
     ]
@@ -399,7 +399,8 @@
       { "name": "check_update_is_major_jump", "category": "system", "file": "src-tauri/src/commands/system.rs", "frontend_callers": ["useUpdater"] },
       { "name": "open_url", "category": "system", "file": "src-tauri/src/commands/system.rs", "frontend_callers": ["pages/marketplace.vue", "components/settings/AboutSection.vue"] },
       { "name": "open_log_folder", "category": "system", "file": "src-tauri/src/commands/system.rs", "frontend_callers": ["components/settings/LoggingSection.vue"] },
-      { "name": "get_accessibility_conflicts", "category": "system", "file": "src-tauri/src/commands/system.rs", "frontend_callers": ["pages/settings.vue"] },
+      { "name": "get_accessibility_conflicts", "category": "system", "file": "src-tauri/src/commands/system.rs", "frontend_callers": ["pages/settings.vue", "components/library/ApplyModal.vue"] },
+      { "name": "set_cursor_base_size", "category": "system", "file": "src-tauri/src/commands/system.rs", "frontend_callers": ["pages/settings.vue", "components/settings/GeneralSection.vue"] },
       { "name": "list_crash_reports", "category": "system", "file": "src-tauri/src/commands/system.rs", "frontend_callers": ["components/settings/LoggingSection.vue"] },
       { "name": "clear_crash_reports", "category": "system", "file": "src-tauri/src/commands/system.rs", "frontend_callers": ["components/settings/LoggingSection.vue"] },
       { "name": "submit_crash_reports", "category": "system", "file": "src-tauri/src/commands/system.rs", "frontend_callers": ["components/settings/LoggingSection.vue"] },
@@ -460,7 +461,7 @@
         "role": "設定 8 セクション (一般 / 起動 / ライブラリ / セキュリティ / 鍵 / ログ / 更新 / About)",
         "composables": ["useAppSettings", "useKeystore", "useUpdater", "useSettingsSearch", "useAppInfo"],
         "components": ["ConfigRecoveryPanel", "PassphrasePrompt", "SettingsSearchDropdown", "GeneralSection", "StartupSection", "LibrarySection", "SecuritySection", "KeysSection", "LoggingSection", "UpdatesSection", "AboutSection"],
-        "ipc_calls": ["get_config", "update_config", "get_app_info", "keystore_info", "keystore_generate", "keystore_delete", "keystore_export", "keystore_import", "list_config_backups", "restore_config_backup", "export_profile", "import_profile", "list_crash_reports", "clear_crash_reports", "submit_crash_reports", "check_update_is_major_jump", "revoke_github_link", "open_log_folder", "open_url", "get_accessibility_conflicts"]
+        "ipc_calls": ["get_config", "update_config", "get_app_info", "keystore_info", "keystore_generate", "keystore_delete", "keystore_export", "keystore_import", "list_config_backups", "restore_config_backup", "export_profile", "import_profile", "list_crash_reports", "clear_crash_reports", "submit_crash_reports", "check_update_is_major_jump", "revoke_github_link", "open_log_folder", "open_url", "get_accessibility_conflicts", "set_cursor_base_size"]
       }
     ],
     "composables": [
