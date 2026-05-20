@@ -229,138 +229,124 @@ onMounted(async () => {
 </script>
 
 <template>
-  <Teleport to="body">
-    <div
-      v-if="open"
-      class="modal-page"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="submit-dialog-title"
-      @click.self="close"
-    >
-      <div class="modal submit-modal" @click.stop>
-        <div class="modal-head">
-          <div class="modal-icon" aria-hidden="true"><UiIcon name="Upload" :size="18" /></div>
-          <div style="flex: 1; min-width: 0">
-            <h2 id="submit-dialog-title">{{ t('marketplace.submitTitle') }}</h2>
-          </div>
-          <button type="button" class="btn icon" :aria-label="t('common.close')" @click="close">
-            <UiIcon name="X" :size="14" />
-          </button>
-        </div>
-
-        <div class="modal-body submit-body">
-          <!-- タブバー -->
-          <div class="submit-mode-label">{{ t('marketplace.submitMode') }}</div>
-          <div
-            class="tabs"
-            style="border: none; background: transparent; padding: 0; height: auto"
-            role="tablist"
-          >
-            <button
-              type="button"
-              :class="['tab', { active: tab === 'auto' }]"
-              @click="tab = 'auto'"
-            >
-              {{ t('marketplace.submitModeAuto') }}
-            </button>
-            <button
-              type="button"
-              :class="['tab', { active: tab === 'manual' }]"
-              @click="tab = 'manual'"
-            >
-              {{ t('marketplace.submitModeManual') }}
-            </button>
-          </div>
-
-          <SubmitThemeAutoForm
-            v-if="tab === 'auto'"
-            :themes="submittableThemes"
-            :selected-theme-id="selectedThemeId"
-            :tags="tags"
-            :allowed-tags="ALLOWED_MARKETPLACE_TAGS"
-            :has-keystore="keystoreInfo.has_keypair"
-            :github-account="githubAccount"
-            :submitter-busy="submitter.busy.value"
-            :submitter-stage-label="submitterStageLabel"
-            :submitter-error-msg="submitter.errorMsg.value"
-            :submit-done="submitDone !== null"
-            @update:selected-theme-id="(v) => (selectedThemeId = v)"
-            @toggle-tag="toggleTag"
-          />
-
-          <SubmitThemeManualForm
-            v-else
-            :themes="submittableThemes"
-            :selected-theme-id="selectedThemeId"
-            :tags="tags"
-            :allowed-tags="ALLOWED_MARKETPLACE_TAGS"
-            :has-keystore="keystoreInfo.has_keypair"
-            :step="step"
-            :github-username="githubUsername"
-            :download-url="downloadUrl"
-            :entry-json="entryJson"
-            @update:selected-theme-id="(v) => (selectedThemeId = v)"
-            @update:github-username="(v) => (githubUsername = v)"
-            @update:download-url="(v) => (downloadUrl = v)"
-            @toggle-tag="toggleTag"
-          />
-        </div>
-
-        <div class="modal-foot">
-          <!-- 自動タブのフッター -->
-          <template v-if="tab === 'auto'">
-            <button class="btn" @click="close">{{ t('common.cancel') }}</button>
-            <button
-              v-if="!submitDone"
-              class="btn primary"
-              :disabled="!selectedThemeId || submitter.busy.value"
-              @click="onAutoSubmitClick"
-            >
-              {{
-                githubAccount
-                  ? t('marketplace.submitAutoSubmitBtn')
-                  : t('marketplace.submitAutoLinkBtn')
-              }}
-            </button>
-            <button v-else class="btn primary" @click="openPr">
-              <UiIcon name="Globe" :size="14" />
-              {{ t('marketplace.submitOpenPrBtn') }}
-            </button>
-          </template>
-
-          <!-- 手動タブのフッター -->
-          <template v-else>
-            <span class="left-note">step {{ step === 'select' ? '1' : '2' }} / 2</span>
-            <div class="actions">
-              <button v-if="step === 'select'" class="btn" @click="close">
-                {{ t('common.cancel') }}
-              </button>
-              <button
-                v-if="step === 'select'"
-                class="btn primary"
-                :disabled="!canProceed"
-                @click="step = 'preview'"
-              >
-                {{ t('marketplace.submitPreviewBtn') }}
-              </button>
-
-              <button v-if="step === 'preview'" class="btn" @click="step = 'select'">
-                {{ t('common.back') }}
-              </button>
-              <button v-if="step === 'preview'" class="btn ghost" @click="copyJson">
-                {{ copyDone ? t('common.copied') : t('common.copyJson') }}
-              </button>
-              <button v-if="step === 'preview'" class="btn primary" @click="openGitHub">
-                <UiIcon name="Globe" :size="14" />
-                {{ t('marketplace.submitOpenGithub') }}
-              </button>
-            </div>
-          </template>
-        </div>
+  <UiModal
+    :open="open"
+    :title="t('marketplace.submitTitle')"
+    icon="Upload"
+    size="lg"
+    :busy="submitter.busy.value"
+    @close="close"
+  >
+    <div class="submit-body">
+      <!-- タブバー -->
+      <div class="submit-mode-label">{{ t('marketplace.submitMode') }}</div>
+      <div
+        class="tabs"
+        style="border: none; background: transparent; padding: 0; height: auto"
+        role="tablist"
+      >
+        <button
+          type="button"
+          :class="['tab', { active: tab === 'auto' }]"
+          @click="tab = 'auto'"
+        >
+          {{ t('marketplace.submitModeAuto') }}
+        </button>
+        <button
+          type="button"
+          :class="['tab', { active: tab === 'manual' }]"
+          @click="tab = 'manual'"
+        >
+          {{ t('marketplace.submitModeManual') }}
+        </button>
       </div>
+
+        <SubmitThemeAutoForm
+        v-if="tab === 'auto'"
+        :themes="submittableThemes"
+        :selected-theme-id="selectedThemeId"
+        :tags="tags"
+        :allowed-tags="ALLOWED_MARKETPLACE_TAGS"
+        :has-keystore="keystoreInfo.has_keypair"
+        :github-account="githubAccount"
+        :submitter-busy="submitter.busy.value"
+        :submitter-stage-label="submitterStageLabel"
+        :submitter-error-msg="submitter.errorMsg.value"
+        :submit-done="submitDone !== null"
+        @update:selected-theme-id="(v) => (selectedThemeId = v)"
+        @toggle-tag="toggleTag"
+      />
+
+      <SubmitThemeManualForm
+        v-else
+        :themes="submittableThemes"
+        :selected-theme-id="selectedThemeId"
+        :tags="tags"
+        :allowed-tags="ALLOWED_MARKETPLACE_TAGS"
+        :has-keystore="keystoreInfo.has_keypair"
+        :step="step"
+        :github-username="githubUsername"
+        :download-url="downloadUrl"
+        :entry-json="entryJson"
+        @update:selected-theme-id="(v) => (selectedThemeId = v)"
+        @update:github-username="(v) => (githubUsername = v)"
+        @update:download-url="(v) => (downloadUrl = v)"
+        @toggle-tag="toggleTag"
+      />
     </div>
-  </Teleport>
+
+    <template v-if="tab === 'manual'" #leftNote>
+      step {{ step === 'select' ? '1' : '2' }} / 2
+    </template>
+
+    <template #actions>
+      <!-- 自動タブのフッター -->
+      <template v-if="tab === 'auto'">
+        <UiButton variant="ghost" @click="close">{{ t('common.cancel') }}</UiButton>
+        <UiButton
+          v-if="!submitDone"
+          variant="primary"
+          :disabled="!selectedThemeId || submitter.busy.value"
+          :loading="submitter.busy.value"
+          @click="onAutoSubmitClick"
+        >
+          {{
+            githubAccount
+              ? t('marketplace.submitAutoSubmitBtn')
+              : t('marketplace.submitAutoLinkBtn')
+          }}
+        </UiButton>
+        <UiButton v-else variant="primary" icon-left="Globe" @click="openPr">
+          {{ t('marketplace.submitOpenPrBtn') }}
+        </UiButton>
+      </template>
+
+      <!-- 手動タブのフッター -->
+      <template v-else>
+        <UiButton v-if="step === 'select'" variant="ghost" @click="close">
+          {{ t('common.cancel') }}
+        </UiButton>
+        <UiButton
+          v-if="step === 'select'"
+          variant="primary"
+          :disabled="!canProceed"
+          @click="step = 'preview'"
+        >
+          {{ t('marketplace.submitPreviewBtn') }}
+        </UiButton>
+
+        <UiButton v-if="step === 'preview'" variant="ghost" @click="step = 'select'">
+          {{ t('common.back') }}
+        </UiButton>
+        <UiButton v-if="step === 'preview'" variant="ghost" @click="copyJson">
+          {{ copyDone ? t('common.copied') : t('common.copyJson') }}
+        </UiButton>
+        <UiButton v-if="step === 'preview'" variant="primary" icon-left="Globe" @click="openGitHub">
+          {{ t('marketplace.submitOpenGithub') }}
+        </UiButton>
+      </template>
+    </template>
+  </UiModal>
 
   <!-- Device Flow モーダル (自動タブ) -->
   <SubmitDeviceFlowModal v-model:open="deviceFlowOpen" @ready="onDeviceFlowReady" />
@@ -369,17 +355,11 @@ onMounted(async () => {
 <style scoped>
 @reference '~/assets/css/tailwind.css';
 
-/* 共有 modal 系 (.modal-page / .modal / .modal-head / .modal-body / .modal-foot) と
- * .input / .btn は tailwind.css の top-level shared utility に集約済み。
+/* 共有 modal shell は UiModal (.modal-page / .modal / .modal-head / .modal-body / .modal-foot) に統一済み。
  * フィールドレイアウト + タグ chip + JSON プレビュー枠は子コンポーネントの scoped style に移譲。 */
 
-.submit-modal {
-  @apply flex w-[640px] max-w-[92vw] flex-col;
-  max-height: 80vh;
-}
-
 .submit-body {
-  @apply flex max-h-[60vh] flex-col gap-3 overflow-y-auto;
+  @apply flex flex-col gap-3;
 }
 
 .submit-mode-label {
