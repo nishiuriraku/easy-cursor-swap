@@ -67,131 +67,112 @@ const overridesCount = computed(() => props.theme.includedRoles.length)
 const inheritCount = computed(() => 17 - overridesCount.value)
 const overridesPct = computed(() => Math.round((overridesCount.value / 17) * 100))
 const inheritPct = computed(() => 100 - overridesPct.value)
-
-function onBackdropClick(e: MouseEvent) {
-  // 内側のクリックは伝播してもキャンセルしない
-  if (e.target === e.currentTarget && !props.busy) {
-    emit('cancel')
-  }
-}
 </script>
 
 <template>
-  <div
-    class="modal-page"
-    role="dialog"
-    aria-modal="true"
+  <UiModal
+    :open="true"
+    :title="t('apply.title', { name: theme.name })"
+    :description="t('apply.description')"
+    icon="Pkg"
+    size="md"
+    :busy="busy"
     aria-labelledby="apply-modal-title"
-    @click="onBackdropClick"
+    @close="emit('cancel')"
   >
-    <div class="modal" @click.stop>
-      <!-- ヘッダー -->
-      <div class="modal-head">
-        <div class="modal-icon" aria-hidden="true"><UiIcon name="Pkg" :size="20" /></div>
-        <div style="flex: 1; min-width: 0">
-          <h2 id="apply-modal-title">{{ t('apply.title', { name: theme.name }) }}</h2>
-          <p>{{ t('apply.description') }}</p>
-        </div>
-        <span v-if="signedKeyId" class="tag ok">
-          <UiIcon name="Shield" :size="11" />{{ t('apply.signedTag') }}
-        </span>
-      </div>
+    <template #headExtra>
+      <span v-if="signedKeyId" class="tag ok">
+        <UiIcon name="Shield" :size="11" />{{ t('apply.signedTag') }}
+      </span>
+    </template>
 
-      <!-- アクセシビリティ競合警告 -->
-      <div v-if="conflictMessages.length > 0" class="a11y-banner" role="alert">
-        <UiIcon name="AlertTriangle" :size="14" />
-        <div>
-          <strong>{{ t('apply.conflictTitle') }}</strong>
-          <ul>
-            <li v-for="(msg, i) in conflictMessages" :key="i">{{ msg }}</li>
-          </ul>
+    <UiAlert v-if="conflictMessages.length > 0" tone="warn" :title="t('apply.conflictTitle')">
+      <ul class="a11y-list">
+        <li v-for="(msg, i) in conflictMessages" :key="i">{{ msg }}</li>
+      </ul>
+    </UiAlert>
+
+    <div class="kvlist">
+      <div class="kv">
+        <label>{{ t('apply.themeLabel') }}</label>
+        <div class="val">
+          {{ theme.name }}
+          <span class="sub">v{{ theme.version }} · @{{ theme.author ?? 'unknown' }}</span>
         </div>
       </div>
 
-      <!-- 本体 KV リスト -->
-      <div class="modal-body">
-        <div class="kvlist">
-          <div class="kv">
-            <label>{{ t('apply.themeLabel') }}</label>
-            <div class="val">
-              {{ theme.name }}
-              <span class="sub">v{{ theme.version }} · @{{ theme.author ?? 'unknown' }}</span>
-            </div>
+      <div class="kv">
+        <label>{{ t('apply.coverage') }}</label>
+        <div class="val" style="display: flex; align-items: center; gap: 10px">
+          <div class="bar-pair" style="flex: 1; max-width: 180px">
+            <i class="a" :style="{ width: overridesPct + '%' }" />
+            <i class="b" :style="{ width: inheritPct + '%' }" />
           </div>
+          <span style="font-family: var(--font-mono); font-size: 11px; color: var(--fg-dim)">
+            <span style="color: var(--accent)">{{ overridesCount }}</span>
+            {{ t('apply.overrides') }} ·
+            <span style="color: var(--violet)">{{ inheritCount }}</span>
+            {{ t('apply.inherit') }}
+          </span>
+        </div>
+      </div>
 
-          <div class="kv">
-            <label>{{ t('apply.coverage') }}</label>
-            <div class="val" style="display: flex; align-items: center; gap: 10px">
-              <div class="bar-pair" style="flex: 1; max-width: 180px">
-                <i class="a" :style="{ width: overridesPct + '%' }" />
-                <i class="b" :style="{ width: inheritPct + '%' }" />
-              </div>
-              <span style="font-family: var(--font-mono); font-size: 11px; color: var(--fg-dim)">
-                <span style="color: var(--accent)">{{ overridesCount }}</span>
-                {{ t('apply.overrides') }} ·
-                <span style="color: var(--violet)">{{ inheritCount }}</span>
-                {{ t('apply.inherit') }}
-              </span>
-            </div>
-          </div>
-
-          <div class="kv">
-            <label>{{ t('apply.rolesLabel') }}</label>
-            <div class="val">
-              <div class="mini-row">
-                <div
-                  v-for="role in CURSOR_ROLES"
-                  :key="role.id"
-                  :class="['mini', { empty: !theme.includedRoles.includes(role.id) }]"
-                  :title="role.jp"
-                >
-                  <template v-if="theme.includedRoles.includes(role.id)">
-                    <img
-                      v-if="previewMap && previewMap[role.id]"
-                      :src="previewMap[role.id]"
-                      :alt="role.jp"
-                      class="mini-img"
-                    />
-                    <CursorIcon v-else :role="role.id" :size="14" />
-                  </template>
-                  <UiIcon v-else name="Plus" :size="10" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="kv">
-            <label>{{ t('apply.snapshot') }}</label>
+      <div class="kv">
+        <label>{{ t('apply.rolesLabel') }}</label>
+        <div class="val">
+          <div class="mini-row">
             <div
-              class="val"
-              style="font-family: var(--font-mono); font-size: 12px; color: var(--fg-dim)"
+              v-for="role in CURSOR_ROLES"
+              :key="role.id"
+              :class="['mini', { empty: !theme.includedRoles.includes(role.id) }]"
+              :title="role.jp"
             >
-              ~/.custom_cursors/_pending_apply.snapshot
+              <template v-if="theme.includedRoles.includes(role.id)">
+                <img
+                  v-if="previewMap && previewMap[role.id]"
+                  :src="previewMap[role.id]"
+                  :alt="role.jp"
+                  class="mini-img"
+                />
+                <CursorIcon v-else :role="role.id" :size="14" />
+              </template>
+              <UiIcon v-else name="Plus" :size="10" />
             </div>
           </div>
         </div>
       </div>
 
-      <!-- フッター -->
-      <div class="modal-foot">
-        <div class="left-note">
-          <UiIcon name="Shield" :size="12" style="color: var(--accent)" />
-          <span v-if="signedKeyId">{{ t('apply.signedNotice', { keyId: signedKeyId }) }}</span>
-          <span v-else style="color: var(--rose)">{{ t('apply.unsignedNotice') }}</span>
-        </div>
-        <div class="actions">
-          <button class="btn ghost" :disabled="busy" @click="emit('cancel')">
-            {{ t('common.cancel') }}
-          </button>
-          <button class="btn primary" :disabled="busy" @click="emit('confirm', theme.id)">
-            <span v-if="busy" class="spinner" style="width: 13px; height: 13px" />
-            <UiIcon v-else name="Check" :size="13" />
-            {{ busy ? t('apply.confirming') : t('apply.confirm') }}
-          </button>
+      <div class="kv">
+        <label>{{ t('apply.snapshot') }}</label>
+        <div
+          class="val"
+          style="font-family: var(--font-mono); font-size: 12px; color: var(--fg-dim)"
+        >
+          ~/.custom_cursors/_pending_apply.snapshot
         </div>
       </div>
     </div>
-  </div>
+
+    <template #leftNote>
+      <UiIcon name="Shield" :size="12" style="color: var(--accent)" />
+      <span v-if="signedKeyId">{{ t('apply.signedNotice', { keyId: signedKeyId }) }}</span>
+      <span v-else style="color: var(--rose)">{{ t('apply.unsignedNotice') }}</span>
+    </template>
+
+    <template #actions>
+      <UiButton variant="ghost" :disabled="busy" @click="emit('cancel')">
+        {{ t('common.cancel') }}
+      </UiButton>
+      <UiButton
+        variant="primary"
+        :loading="busy"
+        icon-left="Check"
+        @click="emit('confirm', theme.id)"
+      >
+        {{ busy ? t('apply.confirming') : t('apply.confirm') }}
+      </UiButton>
+    </template>
+  </UiModal>
 </template>
 
 <style scoped>
@@ -252,18 +233,7 @@ function onBackdropClick(e: MouseEvent) {
   image-rendering: crisp-edges;
 }
 
-.a11y-banner {
-  @apply mx-5 mb-3 mt-0 flex items-start gap-2.5 rounded-md border px-3 py-2.5 text-[12px] leading-[1.5];
-  background: rgba(245, 158, 11, 0.1);
-  border-color: rgba(245, 158, 11, 0.35);
-  color: var(--warning, #f59e0b);
-}
-
-.a11y-banner strong {
-  @apply mb-1 block text-[12px];
-}
-
-.a11y-banner ul {
-  @apply m-0 pl-4 text-fg;
+.a11y-list {
+  @apply m-0 pl-4;
 }
 </style>
