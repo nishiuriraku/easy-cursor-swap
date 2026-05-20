@@ -5,9 +5,12 @@
  * - unassignRole で matches → unmatched へ戻ること
  * - pickRoleFromUnmatched で unmatched → matches へ移動すること
  * - 割当済ロールを未マッチから選ぶと swap が起きること (既存ファイルが未マッチに戻る)
+ *
+ * UiModal が `<Teleport to="body">` を使うため、テンプレート上のボタン操作は
+ * `document.querySelector` 経由で取得する。
  */
-import { describe, it, expect } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { describe, it, expect, afterEach } from 'vitest'
+import { mount, type VueWrapper } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import BulkImportPreviewModal from '../BulkImportPreviewModal.vue'
 import type { ResolvedAsset } from '~/composables/useBulkImport'
@@ -42,13 +45,25 @@ function makeAsset(sourceFile: string, width = 64): ResolvedAsset {
   }
 }
 
+let currentWrapper: VueWrapper | null = null
+
+afterEach(() => {
+  currentWrapper?.unmount()
+  currentWrapper = null
+})
+
 describe('BulkImportPreviewModal apply payload', () => {
   it('apply emit の payload に applyImmediately キーは含まない', async () => {
     const wrapper = mount(BulkImportPreviewModal, {
       props: baseProps,
+      attachTo: document.body,
       global: { stubs },
     })
-    await wrapper.find('button.primary').trigger('click')
+    currentWrapper = wrapper
+    const applyBtn = document.querySelector('.modal-foot button.primary') as HTMLButtonElement | null
+    expect(applyBtn).not.toBeNull()
+    applyBtn!.click()
+    await nextTick()
     const events = wrapper.emitted('apply')
     expect(events).toHaveLength(1)
     const payload = events![0]![0] as Record<string, unknown>
@@ -59,11 +74,12 @@ describe('BulkImportPreviewModal apply payload', () => {
   })
 
   it('フッターに data-test="apply-immediately" を持つ要素は描画されない', () => {
-    const wrapper = mount(BulkImportPreviewModal, {
+    currentWrapper = mount(BulkImportPreviewModal, {
       props: baseProps,
+      attachTo: document.body,
       global: { stubs },
     })
-    expect(wrapper.find('[data-test="apply-immediately"]').exists()).toBe(false)
+    expect(document.querySelector('[data-test="apply-immediately"]')).toBeNull()
   })
 })
 
