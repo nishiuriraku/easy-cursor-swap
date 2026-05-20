@@ -137,9 +137,19 @@ impl MarketplaceClient {
 
     /// 公式インデックスを取得する。
     pub async fn fetch_index() -> AppResult<MarketplaceIndex> {
+        Self::fetch_index_from(INDEX_URL).await
+    }
+
+    /// 任意の URL からインデックスを取得する (テストでは mockito の URL を注入する)。
+    ///
+    /// `fetch_index` の本体実装をここに置き、本番経路は `INDEX_URL` を渡す薄い
+    /// ラッパーにすることで、公開 API シグネチャを変えずに HTTP I/O を差し替え
+    /// 可能にする。`pub(crate)` に閉じているので、フロントエンドに無用な公開
+    /// 表面は増えない。
+    pub(crate) async fn fetch_index_from(url: &str) -> AppResult<MarketplaceIndex> {
         let client = Self::http()?;
         let body = client
-            .get(INDEX_URL)
+            .get(url)
             .send()
             .await
             .map_err(|e| AppError::Theme(format!("インデックス取得失敗: {}", e)))?
@@ -637,5 +647,86 @@ mod tests {
         }"#;
         let record: AuthorRecord = serde_json::from_str(json).unwrap();
         assert_eq!(record.github_username, "");
+    }
+
+    /// `fetch_index_from` のハッピーパス。200 + 有効な index.json を返す mockito
+    /// サーバーを立て、レスポンスが `MarketplaceIndex` に正しく deserialize される
+    /// ことを確認する。reqwest 0.13 + rustls feature wiring の最低限の通電試験。
+    #[tokio::test]
+    async fn fetch_index_parses_minimal_valid_payload() {
+        let mut server = mockito::Server::new_async().await;
+        let body = r#"{
+            "schema_version": 1,
+            "commit": "deadbeef",
+            "entries": [
+                {
+                    "id": "6d364941-c605-4def-801a-14ebb401936f",
+                    "name": "Mint",
+                    "author": "alice",
+                    "author_github": "alice",
+                    "author_pubkey_id": "abcd",
+                    "sha256": "00",
+                    "signature": "AA==",
+                    "download_url": "https://example.com/pack",
+                    "version": "1.0.0"
+                }
+            ]
+        }"#;
+        let _m = server
+            .mock("GET", "/index.json")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(body)
+            .create_async()
+            .await;
+
+        let url = format!("{}/index.json", server.url());
+        let index = MarketplaceClient::fetch_index_from(&url).await.unwrap();
+        assert_eq!(index.schema_version, 1);
+        assert_eq!(index.commit.as_deref(), Some("deadbeef"));
+        assert_eq!(index.entries.len(), 1);
+        assert_eq!(index.entries[0].author_github, "alice");
+    }
+
+    /// HTTP 500 が返ったときに `AppError::Theme` でエラー伝播することを確認する。
+    /// `error_for_status` の経路が正しく `AppError` にマッピングされているか
+    /// (= サイレントに成功扱いになっていないか) の回帰防御。
+    #[tokio::test]
+    async fn fetch_index_returns_error_on_5xx() {
+        let mut server = mockito::Server::new_async().await;
+        let _m = server
+            .mock("GET", "/index.json")
+            .with_status(500)
+            .with_body("internal error")
+            .create_async()
+            .await;
+
+        let url = format!("{}/index.json", server.url());
+        let err = MarketplaceClient::fetch_index_from(&url).await.unwrap_err();
+        assert!(
+            matches!(err, AppError::Theme(_)),
+            "5xx は AppError::Theme で返るべき: {:?}",
+            err
+        );
+    }
+
+    /// レスポンス本文が壊れた JSON の場合、`serde_json` 側のエラーがそのまま
+    /// `AppError` に変換されて返ること。本番では `?` 経由で `From<serde_json::Error>`
+    /// が走るので、テスト側でも同じパスを通す。
+    #[tokio::test]
+    async fn fetch_index_returns_error_on_malformed_json() {
+        let mut server = mockito::Server::new_async().await;
+        let _m = server
+            .mock("GET", "/index.json")
+            .with_status(200)
+            .with_body("{ not json")
+            .create_async()
+            .await;
+
+        let url = format!("{}/index.json", server.url());
+        let err = MarketplaceClient::fetch_index_from(&url).await.unwrap_err();
+        // serde_json::Error → AppError は `?` で実装されている経路。具体的な
+        // variant は実装に依存するが、Ok ではないことが回帰防御として重要。
+        let _ = err;
     }
 }

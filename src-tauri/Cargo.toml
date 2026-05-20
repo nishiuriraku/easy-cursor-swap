@@ -65,8 +65,8 @@ image = { version = "0.25", features = ["png", "ico"] }
 winreg = "0.56"
 
 [target.'cfg(windows)'.dependencies]
-# windows 0.62 で `WNDCLASSW` / `RegisterClassW` が `Win32_Graphics_Gdi` feature
-# (WNDCLASSW.hbrBackground が HBRUSH を持つため) の背後に gating された。
+# windows >= 0.62 では `WNDCLASSW` / `RegisterClassW` が `Win32_Graphics_Gdi` feature
+# (WNDCLASSW.hbrBackground が HBRUSH を持つため) の背後に gating されている。
 # `cursor_watcher.rs` / `hotkey.rs` がメッセージ専用 HWND_MESSAGE ウィンドウを
 # 作成するために WNDCLASSW を使用しているので、Gdi feature を有効化する。
 windows = { version = "0.62", features = [

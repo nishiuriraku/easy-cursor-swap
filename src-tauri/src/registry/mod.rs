@@ -33,6 +33,22 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+use winreg::enums::RegType;
+use winreg::RegValue;
+
+/// 所有 `Vec<u8>` から `winreg::RegValue` を構築する小さなヘルパー。
+///
+/// winreg 0.56+ の `RegValue.bytes` は `Cow<'_, [u8]>`; `Vec<u8>` から `.into()` で
+/// `Cow::Owned` に変換する。`Cow::Owned` はバッキングストアを所有するので返り値の
+/// ライフタイムは `'static`。この変換ロジックを 1 箇所に閉じ込めることで、winreg
+/// 側の API 形状が将来また変わったときも修正点を限定できる。
+#[inline]
+fn to_reg_value(bytes: Vec<u8>, vtype: RegType) -> RegValue<'static> {
+    RegValue {
+        bytes: bytes.into(),
+        vtype,
+    }
+}
 
 /// レジストリのスナップショット（適用トランザクション用）
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -192,7 +208,6 @@ impl RegistryManager {
     ) -> AppResult<()> {
         use winreg::enums::*;
         use winreg::RegKey;
-        use winreg::RegValue;
 
         let safe_name = sanitize_scheme_name(scheme_name);
         if safe_name.is_empty() {
@@ -209,12 +224,9 @@ impl RegistryManager {
             .create_subkey("Control Panel\\Cursors\\Schemes")
             .map_err(|e| AppError::Registry(format!("Schemes キー作成失敗: {}", e)))?;
 
-        // winreg 0.56 で `RegValue.bytes` は `Cow<'_, [u8]>` に変更されたため、
-        // 所有データの `Vec<u8>` から `Cow::Owned` に変換する。
-        let reg_value = RegValue {
-            bytes: bytes.into(),
-            vtype: REG_EXPAND_SZ,
-        };
+        // REG_EXPAND_SZ で UTF-16 LE バイト列を書き込む。winreg 版差を吸収する
+        // `Vec<u8>` → `Cow<'_, [u8]>` 変換は `to_reg_value` ヘルパに集約してある。
+        let reg_value = to_reg_value(bytes, REG_EXPAND_SZ);
         schemes_key
             .set_raw_value(&safe_name, &reg_value)
             .map_err(|e| AppError::Registry(format!("Schemes 書き込み失敗: {}", e)))?;
@@ -690,5 +702,88 @@ mod tests {
         // 偽陽性ではないので伝播させる (HRESULT 0x8007000D)
         let err = WinError::new(HRESULT(0x8007000Du32 as i32), "");
         assert!(!RegistryManager::is_broadcast_false_positive(&err));
+    }
+
+    /// 失敗時にも必ず HKCU の Schemes 値を掃除するための RAII ガード。
+    /// アサート失敗で panic しても `Drop` が走るので、ローカルマシンに
+    /// テストスキームが残らない。
+    struct SchemeCleanup {
+        name: String,
+    }
+
+    impl Drop for SchemeCleanup {
+        fn drop(&mut self) {
+            use winreg::enums::*;
+            use winreg::RegKey;
+            let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+            if let Ok(schemes_key) =
+                hkcu.open_subkey_with_flags("Control Panel\\Cursors\\Schemes", KEY_WRITE)
+            {
+                let _ = schemes_key.delete_value(&self.name);
+            }
+        }
+    }
+
+    /// `register_scheme` が `HKCU\Control Panel\Cursors\Schemes` に書き込んだ値を
+    /// 読み戻して、型 (`REG_EXPAND_SZ`) とバイト列が `encode_utf16_with_nul` で
+    /// 生成した期待値と一致することを確認する。
+    ///
+    /// このテストは `to_reg_value` ヘルパ (= `Vec<u8>` → `Cow::Owned` 変換) を
+    /// 実 HKCU に対して end-to-end で行使する唯一の動線。`Cow::Borrowed` への
+    /// 退行や bytes 順序の取り違えが将来発生したら CI でここが落ちる。
+    ///
+    /// HKCU のみ書き込み、`Drop` で必ず掃除する。HKLM には一切触らない。
+    #[test]
+    fn register_scheme_writes_expand_sz_round_trip() {
+        use winreg::enums::*;
+        use winreg::RegKey;
+
+        // UUID 化で同時並行テストとの衝突を避ける。先頭プレフィックスでテスト
+        // 用と分かる名前にしておけば、Drop が走らず残留した場合の手動掃除も簡単。
+        let scheme_name = format!("ecs_test_scheme_{}", uuid::Uuid::new_v4());
+        let _cleanup = SchemeCleanup {
+            name: scheme_name.clone(),
+        };
+
+        // 17 役割のうち一部だけ埋めた cursor_paths を渡す。中身のパスは
+        // ファイルが存在しなくても registry 書き込み自体は通る (Windows 側で
+        // 参照される時点で初めてファイル存在チェックが走るため)。
+        let mut paths = HashMap::new();
+        paths.insert(
+            "Arrow".to_string(),
+            PathBuf::from("C:\\test\\round_trip\\arrow.cur"),
+        );
+        paths.insert(
+            "Hand".to_string(),
+            PathBuf::from("C:\\test\\round_trip\\hand.cur"),
+        );
+
+        // 書き込み。
+        RegistryManager::register_scheme(&scheme_name, &paths).expect("register_scheme failed");
+
+        // 期待値: `build_scheme_value` の出力を UTF-16 LE + NUL でエンコードした
+        // バイト列がそのまま REG_EXPAND_SZ として格納されているはず。
+        let expected_value_str = build_scheme_value(&paths);
+        let expected_bytes = encode_utf16_with_nul(&expected_value_str);
+
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let schemes_key = hkcu
+            .open_subkey("Control Panel\\Cursors\\Schemes")
+            .expect("Schemes キーが開けない");
+        let raw = schemes_key
+            .get_raw_value(&scheme_name)
+            .expect("書き込んだ値が読み戻せない");
+
+        assert_eq!(
+            raw.vtype, REG_EXPAND_SZ,
+            "REG_EXPAND_SZ で書き込まれているべき"
+        );
+        assert_eq!(
+            raw.bytes.as_ref(),
+            expected_bytes.as_slice(),
+            "書き込まれたバイト列が encode_utf16_with_nul の出力と一致するべき"
+        );
+
+        // _cleanup の Drop でテストスキームは削除される。
     }
 }
