@@ -24,7 +24,7 @@ const props = withDefaults(
     description?: string
     icon?: string
     iconTone?: 'accent' | 'danger' | 'warn' | 'success'
-    size?: 'sm' | 'md' | 'lg'
+    size?: 'sm' | 'md' | 'lg' | 'xl'
     closeOnBackdrop?: boolean
     closeOnEsc?: boolean
     busy?: boolean
@@ -133,6 +133,9 @@ function onBackdrop(e: MouseEvent) {
 }
 .modal.size-lg {
   @apply w-[720px];
+}
+.modal.size-xl {
+  @apply w-[960px];
 }
 
 /* Icon tone overrides (default = accent, already styled by .modal-icon). */
