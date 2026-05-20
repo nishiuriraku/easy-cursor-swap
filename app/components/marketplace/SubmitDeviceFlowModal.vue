@@ -58,55 +58,35 @@ async function onCancel() {
 </script>
 
 <template>
-  <Teleport to="body">
-    <div
-      v-if="open"
-      class="modal-page"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="df-modal-title"
-      @click.self="onCancel"
-    >
-      <div class="modal df-modal" @click.stop>
-        <div class="modal-head">
-          <div class="modal-icon" aria-hidden="true">
-            <UiIcon name="Globe" :size="18" />
-          </div>
-          <h2 id="df-modal-title" style="flex: 1; min-width: 0">
-            {{ t('marketplace.deviceFlowTitle') }}
-          </h2>
-        </div>
+  <UiModal
+    :open="open"
+    :title="t('marketplace.deviceFlowTitle')"
+    icon="Globe"
+    size="md"
+    @close="onCancel"
+  >
+    <p class="hint">{{ t('marketplace.deviceFlowHint') }}</p>
+    <div class="code-box" aria-live="polite">{{ userCode ?? '...' }}</div>
+    <UiAlert v-if="status === 'expired'" tone="danger">
+      {{ t('marketplace.deviceFlowExpired') }}
+    </UiAlert>
+    <UiAlert v-if="status === 'denied'" tone="danger">
+      {{ t('marketplace.deviceFlowDenied') }}
+    </UiAlert>
 
-        <div class="modal-body">
-          <p class="hint">{{ t('marketplace.deviceFlowHint') }}</p>
-          <div class="code-box" aria-live="polite">{{ userCode ?? '...' }}</div>
-          <div v-if="status === 'expired'" class="warn">
-            {{ t('marketplace.deviceFlowExpired') }}
-          </div>
-          <div v-if="status === 'denied'" class="warn">
-            {{ t('marketplace.deviceFlowDenied') }}
-          </div>
-        </div>
-
-        <div class="modal-foot">
-          <button class="btn" @click="onCancel">
-            {{ t('marketplace.deviceFlowCancel') }}
-          </button>
-          <button class="btn primary" :disabled="!verificationUri" @click="openGithub">
-            {{ t('marketplace.deviceFlowOpenBtn') }}
-          </button>
-        </div>
-      </div>
-    </div>
-  </Teleport>
+    <template #actions>
+      <UiButton variant="ghost" @click="onCancel">
+        {{ t('marketplace.deviceFlowCancel') }}
+      </UiButton>
+      <UiButton variant="primary" :disabled="!verificationUri" @click="openGithub">
+        {{ t('marketplace.deviceFlowOpenBtn') }}
+      </UiButton>
+    </template>
+  </UiModal>
 </template>
 
 <style scoped>
 @reference '~/assets/css/tailwind.css';
-
-.df-modal {
-  @apply flex w-[480px] max-w-[92vw] flex-col;
-}
 
 .hint {
   @apply m-0 text-[13px] text-fg-dim;
@@ -118,12 +98,5 @@ async function onCancel() {
 
 :where(html.light) .code-box {
   background: rgba(15, 20, 35, 0.04);
-}
-
-.warn {
-  @apply rounded-[8px] border px-2.5 py-2 text-[12px];
-  background: rgba(245, 100, 100, 0.1);
-  border-color: rgba(245, 100, 100, 0.3);
-  color: var(--red, #e55);
 }
 </style>
