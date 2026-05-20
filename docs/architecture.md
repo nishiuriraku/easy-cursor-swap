@@ -161,7 +161,8 @@ app/
 │  │                UpdatesSection, AboutSection (14)
 │  ├─ preview/     ← CursorPreview (theme detail で使うプレビュー) (1)
 │  ├─ panic/       ← PanicFlow (Stage 1 / Stage 2 リカバリ) (1)
-│  ├─ ui/          ← UiSelect (ネイティブ select の白背景を回避) (1)
+│  ├─ ui/          ← UiSelect (ネイティブ select の白背景を回避), UiButton, UiAlert,
+│  │                UiModal (shared modal shell + focus trap), UiConfirmDialog (5)
 │  └─ icons/       ← UiIcon, CursorIcon (render-function ベースで v-html を使わない) (2)
 ├─ composables/    ← useThemes, useAppSettings, useI18n, useTauri (IPC), useKeystore, useUiTheme,
 │                    useRoleMatcher, useThemePreviews, useBulkImport, useBulkImportPreviewState,
@@ -173,8 +174,8 @@ app/
 │                    useGithubAuth (GitHub Device Flow 認証・トークン管理),
 │                    useMarketplaceSubmit (自動 PR 提出フロー),
 │                    pickLocalizedName (Marketplace name の locale 解決),
-│                    useExternalUrl, useListbox, useModalLifecycle, usePngBlobCache,
-│                    useThemeCardState (合計 35)
+│                    useExternalUrl, useListbox, useModalLifecycle, useFocusTrap,
+│                    usePngBlobCache, useThemeCardState (合計 36)
 ├─ types/          ← config.ts, theme.ts, marketplace.ts, githubAuth.ts (Rust struct と 1:1)
 ├─ locales/        ← ja.ts, en.ts (CI で parity チェック)
 ├─ assets/css/     ← tailwind.css (Tailwind v4 entry + @theme + 横断 shared utility) +

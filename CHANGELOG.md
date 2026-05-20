@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- 共通 UI コンポーネント `app/components/ui/` を整備し、フロントエンド全体のモーダル / アラート / ボタン経路を統一: `UiModal` (Teleport + focus trap + body scroll lock を `useModalLifecycle` + `useFocusTrap` で内包), `UiConfirmDialog` (cancel/confirm 専用ラッパ), `UiAlert` (info/success/warn/danger インラインバナー), `UiButton` (`.btn` の Vue ラッパ + loading/icon ハンドリング) の 4 SFC + composable `useFocusTrap.ts` を追加。これに伴い `ApplyModal` / `ImportConflictDialog` / `DiscardEditDialog` / `NewThemeStartModal` / `SaveDestinationModal` / `BulkImportPreviewModal` / `ThemeDetailModal` / `ThemePickerModal` / `MarketplaceDetailModal` / `SubmitThemeDialog` / `SubmitDeviceFlowModal` / `OssLicenseModal` / `PassphrasePrompt` の 11 モーダルが `UiModal` shell に統一され、`.a11y-banner` (ApplyModal) / `ConfigRecoveryPanel` / `KeysSection` / `UpdatesSection` / `SubmitThemeAutoForm` / `SubmitThemeManualForm` / `SubmitDeviceFlowModal` の警告ボックスが `UiAlert` 経由になった。これにより 11 モーダルすべてに focus trap が初導入され、Esc / backdrop / Tab 循環の挙動が完全に一貫。`components_total` 57 → 61 (`ui` グループ 1 → 5)、`composables` 35 → 36。
+
 ## [0.0.3] - 2026-05-20 (pre-release)
 
 v0.0.1 / v0.0.2 と同じく仮リリース系列 (provisional, SemVer 0.0.x で API 安定保証なし)。Creator / Marketplace 周りの UX 改善、Library のビジュアル不具合修正、開発体験向上、そして大規模な依存関係リフレッシュ (npm 8 件 + Rust 5 メジャー + ロックファイル 31 件) が中心。HKCU 限定 / 適用トランザクション性 / アーカイブ検閲 / PII レダクション / `v-html` 不採用 の 5 大不変条件はすべて維持。

@@ -114,7 +114,7 @@
 | [preview/](../app/components/preview/) | `CursorPreview` (theme detail で使うプレビュー) |
 | [panic/](../app/components/panic/) | `PanicFlow` (ステージ選択 + ライブログ + 17 ロールグリッド) |
 | [icons/](../app/components/icons/) | `UiIcon` + `UI_ICONS`、`CursorIcon` + `CURSOR_ICONS` — render 関数で v-html 回避 |
-| [ui/](../app/components/ui/) | `UiSelect` (ネイティブ select の白背景を回避) |
+| [ui/](../app/components/ui/) (5) | `UiSelect` (ネイティブ select の白背景を回避) / `UiButton` (.btn shared utility の Vue ラッパ + loading/icon ハンドリング) / `UiAlert` (info/success/warn/danger インラインバナー) / `UiModal` (Teleport + focus trap + useModalLifecycle を内包する shared modal shell) / `UiConfirmDialog` (UiModal + UiButton を compose した cancel/confirm 専用ダイアログ) |
 
 ### 2-3. Composables (36 個)
 
@@ -153,6 +153,7 @@
 | [useExternalUrl.ts](../app/composables/useExternalUrl.ts) | `open_url` IPC + `window.open` フォールバックの 1 行 API。6 callsite で重複していた try/catch を集約 |
 | [useListbox.ts](../app/composables/useListbox.ts) | `UiSelect` の listbox 状態機械 + キーボードナビ + viewport-aware Teleport 位置計算 |
 | [useModalLifecycle.ts](../app/composables/useModalLifecycle.ts) | Teleport modal の body scroll lock (重ね合わせ対応 counter) + Esc 購読 + cleanup |
+| [useFocusTrap.ts](../app/composables/useFocusTrap.ts) | モーダル / ダイアログ用 focus trap (Tab/Shift+Tab wrap + 初期 focus + active=false で直前の要素へ復帰)。`UiModal` から利用 |
 | [usePngBlobCache.ts](../app/composables/usePngBlobCache.ts) | Map + in-flight Promise + dispose の汎用キャッシュ機構 (useThemePreviews / useMarketplacePreviews / Creator の blob URL キャッシュで共有) |
 | [useThemeCardState.ts](../app/composables/useThemeCardState.ts) | `ThemeCard` / `ThemeRow` の 5 ブロック並行重複 (preview fetch / kind 判定 / displayDate / 詳細遷移 / お気に入り) を共通化 |
 
