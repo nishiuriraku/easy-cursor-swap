@@ -49,7 +49,7 @@ const headerDescription = computed(() => {
     :description="headerDescription"
     icon="Library"
     icon-tone="accent"
-    size="lg"
+    size="xl"
     :body-padded="false"
     :aria-labelledby="theme ? `theme-detail-${theme.id}` : undefined"
     @close="emit('close')"

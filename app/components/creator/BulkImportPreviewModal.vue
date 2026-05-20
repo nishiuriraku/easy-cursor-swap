@@ -112,7 +112,7 @@ defineExpose({ matches, unmatched, unassignRole, pickRoleFromUnmatched, unassign
     :open="open"
     :title="t('bulkImport.previewTitle')"
     icon="Import"
-    size="lg"
+    size="xl"
     @close="emit('cancel')"
   >
     <div class="bi-source">{{ sourceLabel }} — {{ summaryLine }}</div>
