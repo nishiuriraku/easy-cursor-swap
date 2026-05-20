@@ -62,7 +62,7 @@ tracing-appender = "0.2"
 image = { version = "0.25", features = ["png", "ico"] }
 
 # --- Windows API ---
-winreg = "0.55"
+winreg = "0.56"
 
 [target.'cfg(windows)'.dependencies]
 # windows 0.62 で `WNDCLASSW` / `RegisterClassW` が `Win32_Graphics_Gdi` feature
