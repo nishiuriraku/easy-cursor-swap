@@ -48,96 +48,59 @@ function cancel() {
 </script>
 
 <template>
-  <div v-if="open" class="nt-overlay" @click.self="cancel" @keydown.esc="cancel">
-    <div class="nt-modal" role="dialog" aria-modal="true" :aria-label="t('newTheme.title')">
-      <header class="nt-head">
-        <div>
-          <div class="nt-eyebrow">CREATOR · NEW</div>
-          <h3>{{ t('newTheme.title') }}</h3>
+  <UiModal
+    :open="open"
+    :title="t('newTheme.title')"
+    :description="t('newTheme.description')"
+    icon="Plus"
+    size="md"
+    @close="cancel"
+  >
+    <div class="nt-choices">
+      <button class="nt-choice primary" @click="pickFiles">
+        <div class="nt-choice-icon">
+          <UiIcon name="Import" :size="22" />
         </div>
-        <button class="btn ghost" :aria-label="t('common.close')" @click="cancel">✕</button>
-      </header>
-
-      <div class="nt-body">
-        <p class="nt-desc">{{ t('newTheme.description') }}</p>
-
-        <div class="nt-choices">
-          <button class="nt-choice primary" @click="pickFiles">
-            <div class="nt-choice-icon">
-              <UiIcon name="Import" :size="22" />
-            </div>
-            <div class="nt-choice-body">
-              <div class="nt-choice-title">{{ t('newTheme.choiceFiles') }}</div>
-              <div class="nt-choice-sub">{{ t('newTheme.choiceFilesSub') }}</div>
-            </div>
-          </button>
-
-          <button class="nt-choice" @click="pickFolder">
-            <div class="nt-choice-icon">
-              <UiIcon name="Library" :size="22" />
-            </div>
-            <div class="nt-choice-body">
-              <div class="nt-choice-title">{{ t('newTheme.choiceFolder') }}</div>
-              <div class="nt-choice-sub">{{ t('newTheme.choiceFolderSub') }}</div>
-            </div>
-          </button>
-
-          <button class="nt-choice" @click="startEmpty">
-            <div class="nt-choice-icon">
-              <UiIcon name="Brush" :size="22" />
-            </div>
-            <div class="nt-choice-body">
-              <div class="nt-choice-title">{{ t('newTheme.choiceEmpty') }}</div>
-              <div class="nt-choice-sub">{{ t('newTheme.choiceEmptySub') }}</div>
-            </div>
-          </button>
+        <div class="nt-choice-body">
+          <div class="nt-choice-title">{{ t('newTheme.choiceFiles') }}</div>
+          <div class="nt-choice-sub">{{ t('newTheme.choiceFilesSub') }}</div>
         </div>
+      </button>
 
-        <p class="nt-tip">
-          <UiIcon name="Shield" :size="11" />
-          {{ t('newTheme.tip') }}
-        </p>
-      </div>
+      <button class="nt-choice" @click="pickFolder">
+        <div class="nt-choice-icon">
+          <UiIcon name="Library" :size="22" />
+        </div>
+        <div class="nt-choice-body">
+          <div class="nt-choice-title">{{ t('newTheme.choiceFolder') }}</div>
+          <div class="nt-choice-sub">{{ t('newTheme.choiceFolderSub') }}</div>
+        </div>
+      </button>
 
-      <footer class="nt-foot">
-        <button class="btn ghost" @click="cancel">{{ t('common.cancel') }}</button>
-      </footer>
+      <button class="nt-choice" @click="startEmpty">
+        <div class="nt-choice-icon">
+          <UiIcon name="Brush" :size="22" />
+        </div>
+        <div class="nt-choice-body">
+          <div class="nt-choice-title">{{ t('newTheme.choiceEmpty') }}</div>
+          <div class="nt-choice-sub">{{ t('newTheme.choiceEmptySub') }}</div>
+        </div>
+      </button>
     </div>
-  </div>
+
+    <template #leftNote>
+      <UiIcon name="Shield" :size="12" />
+      <span>{{ t('newTheme.tip') }}</span>
+    </template>
+
+    <template #actions>
+      <UiButton variant="ghost" @click="cancel">{{ t('common.cancel') }}</UiButton>
+    </template>
+  </UiModal>
 </template>
 
 <style scoped>
 @reference '~/assets/css/tailwind.css';
-
-.nt-overlay {
-  @apply fixed inset-0 z-[100] flex items-center justify-center bg-[rgba(10,11,15,0.7)] backdrop-blur-[2px];
-}
-.nt-modal {
-  @apply flex max-h-[90vh] w-[min(560px,96vw)] flex-col rounded-[12px] border border-line shadow-[0_30px_60px_rgba(0,0,0,0.45)];
-  background: var(--bg-1, #14161c);
-}
-.nt-head,
-.nt-foot {
-  @apply flex items-start justify-between px-5 py-3.5;
-}
-.nt-head {
-  @apply border-b border-line;
-}
-.nt-foot {
-  @apply items-center justify-end border-t border-line;
-}
-.nt-head h3 {
-  @apply mb-0 ml-0 mr-0 mt-1 text-[16px] font-semibold;
-}
-.nt-eyebrow {
-  @apply font-mono text-[10px] tracking-[0.16em] text-accent;
-}
-.nt-body {
-  @apply overflow-y-auto px-5 pb-[18px] pt-3.5;
-}
-.nt-desc {
-  @apply m-0 mb-3.5 text-[12.5px] leading-[1.55] text-fg-dim;
-}
 
 .nt-choices {
   @apply flex flex-col gap-2.5;
@@ -173,9 +136,5 @@ function cancel() {
 }
 .nt-choice-sub {
   @apply text-[11.5px] leading-[1.5] text-fg-mute;
-}
-
-.nt-tip {
-  @apply m-0 mt-3.5 flex items-center gap-1.5 text-[11px] text-fg-mute;
 }
 </style>
