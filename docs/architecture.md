@@ -124,6 +124,7 @@ README の security テーブルは概要、本セクションは **不変条件
 | Marketplace 自動提出の GitHub OAuth トークンは DPAPI で暗号化、scope は `public_repo` 限定 | `keystore.rs::save_github_oauth_token` / `github/device_flow.rs` |
 | ダウンロード前に Content-Length を見て三段階サイズ上限 (50 MB 圧縮 / 200 MB 展開 / 10 MB / image) | `marketplace.rs` / `theme/sanitize.rs` |
 | Marketplace テーマは**読み取り専用**: `repackage_theme` IPC がソース確認し、marketplace 由来のテーマは編集・エクスポート要求を拒否する | `commands/theme.rs::repackage_theme` |
+| Marketplace 由来テーマの**複製テーマ再提出禁止**: `duplicate_theme` が `cloned_from_marketplace_id` lineage を引き継ぎ (孫複製でも常に原本 UUID を指す)、`submit_theme_auto` は同フィールドが `Some` のテーマを拒否する。UI 側 `SubmitThemeDialog` でも選択肢から除外 (二重防御) | `theme/package.rs::duplicate_theme` / `commands/marketplace_submit.rs::submit_theme_auto` / `components/marketplace/SubmitThemeDialog.vue` |
 | プレビュー PNG 取得は URL スキーム + ホスト + ロール名を検証し、500KB を超えるレスポンスは拒否 | `marketplace.rs::fetch_preview` |
 | アーカイブ展開は `sanitize_archive_path` を必ず通す (path traversal / symlink / 絶対パス拒否) | `theme/sanitize.rs::sanitize_archive_path` |
 | PNG 取り込み時に eXIf / iTXt / zTXt メタデータを剥離 | `cursor/image.rs` |
@@ -150,8 +151,8 @@ app/
 │  │                LibraryToolbar, LibraryFilterBar, LibraryEmptyState, LibraryDropOverlay (15)
 │  ├─ creator/     ← CreatorStartScreen, CreatorToolbar, CreatorRoleList, CreatorMetadataPane,
 │  │                CreatorEditorCanvas, NewThemeStartModal, SaveDestinationModal,
-│  │                BulkImportButton, BulkImportPreviewModal, BulkImportRoleRow, RoleListItem,
-│  │                SizeStrip, AniThumb (13)
+│  │                DiscardEditDialog, BulkImportButton, BulkImportPreviewModal,
+│  │                BulkImportRoleRow, RoleListItem, SizeStrip, AniThumb (14)
 │  ├─ marketplace/ ← FeaturedCard, SubmitThemeDialog, SubmitThemeAutoForm, SubmitThemeManualForm,
 │  │                MarketplaceDetailModal, SubmitDeviceFlowModal (6)
 │  ├─ settings/    ← SettingsRow, SettingsToggle, ConfigRecoveryPanel, PassphrasePrompt,
@@ -173,7 +174,7 @@ app/
 │                    useMarketplaceSubmit (自動 PR 提出フロー),
 │                    pickLocalizedName (Marketplace name の locale 解決),
 │                    useExternalUrl, useListbox, useModalLifecycle, usePngBlobCache,
-│                    useTagChipInput, useThemeCardState (合計 36)
+│                    useThemeCardState (合計 35)
 ├─ types/          ← config.ts, theme.ts, marketplace.ts, githubAuth.ts (Rust struct と 1:1)
 ├─ locales/        ← ja.ts, en.ts (CI で parity チェック)
 ├─ assets/css/     ← tailwind.css (Tailwind v4 entry + @theme + 横断 shared utility) +
@@ -186,7 +187,7 @@ app/
 | Page | 主な composable / Component | 主な IPC |
 |---|---|---|
 | `index.vue` (Library) | useThemes, useCursorpackOpener, useThemePreviews, ThemeCard / ThemeRow, ApplyModal, ImportConflictDialog, ThemePickerModal | `get_themes`, `apply_theme`, `import_cursorpack`, `inspect_cursorpack`, `delete_theme`, `duplicate_theme`, `repackage_theme`, `list_windows_schemes`, `apply_windows_scheme`, `get_windows_scheme_role_previews`, `export_windows_scheme_as_cursorpack`, `set_theme_favorite`, `take_pending_cursorpack` |
-| `creator.vue` | useCreatorAssets, useCreatorPickers, useCreatorImport, useCreatorBulkImportFlow, useCreatorExport, useRoleMatcher, useBulkImport, useKeystore, useHotspotDefaults, useHotspotInteraction, useAniPlayer, sanitizeSvg, NewThemeStartModal, BulkImportPreviewModal | `parse_cursorpack_for_creator`, `bulk_resolve_assets`, `cancel_bulk_import`, `export_cursorpack_streamed`, `cancel_build`, `repackage_theme`, `apply_theme`, `keystore_info` |
+| `creator.vue` | useCreatorAssets, useCreatorPickers, useCreatorImport, useCreatorBulkImportFlow, useCreatorExport, useRoleMatcher, useBulkImport, useKeystore, useHotspotDefaults, useHotspotInteraction, useAniPlayer, sanitizeSvg, NewThemeStartModal, BulkImportPreviewModal, DiscardEditDialog (Clear / 画面遷移ガード) | `parse_cursorpack_for_creator`, `bulk_resolve_assets`, `cancel_bulk_import`, `export_cursorpack_streamed`, `cancel_build`, `repackage_theme`, `apply_theme`, `keystore_info` |
 | `marketplace.vue` | useThemes, useMarketplacePreviews, useGithubAuth, useMarketplaceSubmit, FeaturedCard, MarketplaceDetailModal, SubmitThemeDialog, SubmitDeviceFlowModal | `marketplace_fetch_index`, `marketplace_install`, `marketplace_fetch_preview`, `keystore_info`, `start_device_flow`, `complete_device_flow`, `cancel_device_flow`, `submit_theme_auto`, `revoke_github_link`, `open_url` |
 | `settings.vue` | useAppSettings, useKeystore, useUpdater, useSettingsSearch, ConfigRecoveryPanel, PassphrasePrompt, SettingsSearchDropdown, GeneralSection 〜 AboutSection の 8 セクション | `get_config`, `update_config`, `keystore_*`, `list_config_backups`, `restore_config_backup`, `export_profile`, `import_profile`, `list_crash_reports`, `clear_crash_reports`, `submit_crash_reports`, `check_update_is_major_jump` |
 | `PanicFlow.vue` (modal) | useNotify | `reset_to_default`, `reset_to_initial` |

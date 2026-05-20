@@ -167,7 +167,7 @@ mod tests {
         let av = argv(&["app.exe", "file:///C:/foo.cursorpack"]);
         let cwd = std::env::current_dir().unwrap();
         assert!(extract_cursorpack_arg(&av, &cwd).is_none());
-        let av2 = argv(&["app.exe", "cursor-forge://x.cursorpack"]);
+        let av2 = argv(&["app.exe", "easy-cursor-swap://x.cursorpack"]);
         assert!(extract_cursorpack_arg(&av2, &cwd).is_none());
     }
 

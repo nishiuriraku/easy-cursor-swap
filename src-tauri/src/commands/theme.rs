@@ -241,6 +241,7 @@ mod tests {
             signature: None,
             tags: Vec::new(),
             source,
+            cloned_from_marketplace_id: None,
         };
         std::fs::create_dir_all(dir).unwrap();
         std::fs::write(

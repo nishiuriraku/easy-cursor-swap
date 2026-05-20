@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- マーケットプレイス「公式インデックスに提出」モーダルのタグ入力を、自由入力 chip 方式から allow-list の toggle chip 方式に変更。`easy-cursor-swap-index/schemas/index-entry.json` の enum (`pixel`, `minimal`, `animated`, `dark`, `light`, `anime`, `retro`, `neon`) に固定し、Auto / Manual 両タブから 8 個の chip をクリックでトグルする UI に。タイポによる Ajv バリデーション失敗 PR を未然に防ぐ。`app/types/marketplace.ts` に `ALLOWED_MARKETPLACE_TAGS` 定数を追加し、専用 composable だった `useTagChipInput.ts` は呼出元が 1 箇所のため削除して `SubmitThemeDialog.vue` に inline 化 (composables 36 → 35)。
+
 ## [0.0.2] - 2026-05-19 (pre-release)
 
 v0.0.1 と同じく仮リリース系列 (provisional, SemVer 0.0.x で API 安定保証なし)。Marketplace 提出フローのバグ修正と、Windows カーソルサイズ拡大時に発生していたレジストリ書き込み偽陽性の修正が中心。

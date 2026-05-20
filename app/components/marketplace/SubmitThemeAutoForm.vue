@@ -23,9 +23,8 @@ const props = defineProps<{
   themes: ThemeSummary[]
   selectedThemeId: string | null
   tags: string[]
-  tagInput: string
+  allowedTags: readonly string[]
   hasKeystore: boolean
-  maxTags: number
   githubAccount: GithubAccount | null
   submitterBusy: boolean
   submitterStageLabel: string
@@ -35,10 +34,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:selectedThemeId': [v: string | null]
-  'update:tagInput': [v: string]
-  'commit-tag': []
-  'remove-tag': [i: number]
-  'tag-keydown': [e: KeyboardEvent]
+  'toggle-tag': [tag: string]
 }>()
 
 const { t, locale } = useI18n()
@@ -72,36 +68,28 @@ const themeOptions = computed(() =>
   </div>
 
   <div class="field">
-    <label for="submit-auto-tags">{{ t('marketplace.submitTagsLabel') }}</label>
-    <div class="tag-input-row">
-      <span v-for="(tg, i) in props.tags" :key="`${tg}-${i}`" class="tag-chip">
+    <span class="field-label">{{ t('marketplace.submitTagsLabel') }}</span>
+    <div class="tag-toggle-grid" role="group" :aria-label="t('marketplace.submitTagsLabel')">
+      <button
+        v-for="tg in props.allowedTags"
+        :key="tg"
+        type="button"
+        :class="['tag-toggle', { selected: props.tags.includes(tg) }]"
+        :aria-pressed="props.tags.includes(tg)"
+        :aria-label="t('marketplace.submitTagsToggleAria', { tag: tg })"
+        @click="emit('toggle-tag', tg)"
+      >
+        <UiIcon :name="props.tags.includes(tg) ? 'Check' : 'Plus'" :size="11" />
         {{ tg }}
-        <button
-          type="button"
-          class="tag-chip-x"
-          :aria-label="t('marketplace.submitTagRemoveAria', { tag: tg })"
-          @click="emit('remove-tag', i)"
-        >
-          <UiIcon name="X" :size="10" />
-        </button>
-      </span>
-      <input
-        id="submit-auto-tags"
-        :value="props.tagInput"
-        type="text"
-        class="tag-input"
-        :placeholder="
-          props.tags.length === 0
-            ? t('marketplace.submitTagsPlaceholder')
-            : t('marketplace.submitTagsPlaceholderAdd')
-        "
-        :disabled="props.tags.length >= props.maxTags"
-        @input="emit('update:tagInput', ($event.target as HTMLInputElement).value)"
-        @keydown="emit('tag-keydown', $event)"
-        @blur="emit('commit-tag')"
-      />
+      </button>
     </div>
-    <span class="field-note">{{ t('marketplace.submitTagsNote') }}</span>
+    <span class="field-note">
+      {{ t('marketplace.submitTagsNote') }}
+      &middot;
+      {{
+        t('marketplace.submitTagsCount', { n: props.tags.length, total: props.allowedTags.length })
+      }}
+    </span>
   </div>
 
   <div v-if="props.githubAccount" class="hint">
@@ -133,6 +121,7 @@ const themeOptions = computed(() =>
   @apply flex flex-col gap-1;
 }
 
+.field-label,
 .field label {
   @apply text-[12px] font-medium text-fg-mute;
 }
@@ -141,34 +130,21 @@ const themeOptions = computed(() =>
   @apply text-[11px] text-fg-mute;
 }
 
-.tag-input-row {
-  @apply flex flex-wrap items-center gap-1.5 rounded-md border border-line px-2 py-1.5;
-  background: rgba(255, 255, 255, 0.03);
-  min-height: 34px;
+.tag-toggle-grid {
+  @apply grid grid-cols-3 gap-1.5;
 }
-.tag-input-row:focus-within {
+
+.tag-toggle {
+  @apply inline-flex cursor-pointer items-center justify-center gap-1 rounded-full border border-line bg-transparent px-2.5 py-1 text-[12px] text-fg-dim transition-colors;
+}
+.tag-toggle:hover {
   border-color: var(--accent-line);
+  color: var(--fg);
 }
-:where(html.light) .tag-input-row {
-  background: rgba(15, 20, 35, 0.025);
-}
-.tag-chip {
-  @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11.5px];
+.tag-toggle.selected {
   background: var(--accent-dim);
+  border-color: var(--accent-line);
   color: var(--accent);
-}
-.tag-chip-x {
-  @apply inline-flex cursor-pointer items-center justify-center border-0 bg-transparent p-0 text-current;
-  line-height: 0;
-}
-.tag-chip-x:hover {
-  opacity: 0.75;
-}
-.tag-input {
-  @apply min-w-[120px] flex-1 border-0 bg-transparent p-0 text-[12.5px] text-fg outline-none;
-}
-.tag-input::placeholder {
-  color: var(--fg-mute);
 }
 
 .hint {

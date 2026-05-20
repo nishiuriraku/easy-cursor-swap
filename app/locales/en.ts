@@ -198,6 +198,16 @@ export default {
     dropSub: 'PNG / SVG / CUR / ICO / ANI / .cursorpack are accepted',
     recentRoleCount: '{count}/17 roles',
     untitledThemeName: 'Untitled Theme',
+    discardDialog: {
+      titleClear: 'Discard your edits?',
+      titleNavigate: 'Leave Creator?',
+      messageClear:
+        'Your assets and metadata are unsaved. Clearing will discard them permanently.',
+      messageNavigate:
+        'Your assets and metadata are unsaved. Leaving this screen will discard the changes.',
+      warning: 'Unsaved changes cannot be recovered',
+      confirm: 'Discard and continue',
+    },
   },
   panic: {
     title: 'Run Reset',
@@ -417,6 +427,11 @@ export default {
     submitBtn: 'Submit to Index',
     submitTitle: 'Submit Theme to Official Index',
     submitHint: 'Submit a theme from your local library to the official index.',
+    /** Badge shown in the theme detail modal for themes duplicated from an official marketplace theme. */
+    clonedFromMarketplaceBadge: 'Cloned from official',
+    /** Toast / banner shown when the user attempts to resubmit a marketplace-derived theme. */
+    clonedFromMarketplaceForbidden:
+      'Themes duplicated from the official index cannot be resubmitted.',
     submitSelectTheme: 'Theme to submit',
     submitSelectPlaceholder: 'Select a theme',
     submitGithubUser: 'GitHub username',
@@ -425,10 +440,9 @@ export default {
     submitDownloadUrlPlaceholder: 'https://github.com/you/repo/releases/.../theme.cursorpack',
     submitDownloadUrlNote: 'Enter the direct URL to your cursorpack uploaded to a GitHub Release or CDN.',
     submitTagsLabel: 'Tags (optional)',
-    submitTagsPlaceholder: 'e.g. pixel, dark, minimal',
-    submitTagsPlaceholderAdd: 'Type a tag and press Enter',
-    submitTagsNote: 'Press Enter or comma to confirm. Up to 8 tags, 24 chars each.',
-    submitTagRemoveAria: 'Remove tag {tag}',
+    submitTagsNote: 'Click to toggle.',
+    submitTagsToggleAria: 'Toggle tag {tag}',
+    submitTagsCount: '{n} / {total} selected',
     submitNoKeystore: 'No signing key found. Please generate one in Settings → Keys.',
     submitPreviewBtn: 'Preview submission',
     submitPreviewHint: 'Review the submission, then click "Open submission page on GitHub" to continue.',
@@ -444,7 +458,6 @@ export default {
     addToLibrary: 'Add to Library',
     alreadyInstalled: 'Already installed',
     installing: 'Installing…',
-    downloads: 'Downloads',
     openMarketplaceDetailAria: 'Open details for {name}',
     // Auto-submit flow (Phase 10)
     submitMode: 'Submission mode',

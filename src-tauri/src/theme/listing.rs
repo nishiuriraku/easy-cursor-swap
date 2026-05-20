@@ -200,6 +200,7 @@ impl ThemeManager {
             license: metadata.license.clone(),
             homepage: metadata.homepage.clone(),
             source: metadata.source,
+            cloned_from_marketplace_id: metadata.cloned_from_marketplace_id,
         })
     }
 

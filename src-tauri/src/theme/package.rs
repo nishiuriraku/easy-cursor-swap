@@ -5,7 +5,6 @@
 //!
 //! `theme/mod.rs` から分割 (2026-05-18, refactor/yellow-items)。
 
-use super::listing::set_metadata_source;
 use super::sanitize::sanitize_archive_path;
 use super::types::{
     self, clone_with_suffix, copy_dir_recursive, zip_dir_recursive, CursorDefinition,
@@ -99,6 +98,7 @@ impl ThemeManager {
             signature: None,
             tags: Vec::new(),
             source: crate::theme::types::ThemeSource::Local,
+            cloned_from_marketplace_id: None,
         };
 
         if let Some(parent) = output_path.parent() {
@@ -524,6 +524,36 @@ impl ThemeManager {
         let original_name = metadata.name.clone();
         metadata.name = clone_with_suffix(&original_name, " (Copy)");
 
+        // ── Marketplace 系譜 (lineage) の決定 ─────────────────────────────
+        // 要件: 公式インデックス由来のテーマは「複製して編集」までは許すが、
+        // 公式インデックスへの「再提出」は塞ぐ。そのため複製先テーマには
+        // 「複製元 (Marketplace 原本) の UUID」を `cloned_from_marketplace_id`
+        // として保持し、`submit_theme_auto` が Some を見たら拒否する。
+        //
+        // 期待挙動 (cargo test marketplace_lineage で固定):
+        //   (a) source = Marketplace の原本 A を複製 → B.cloned_from_marketplace_id = Some(A.id)
+        //   (b) (a) で生まれた B (= Local だが系譜あり) を複製 → C も Some(A.id) を保持
+        //   (c) ピュア Local の D を複製 → E.cloned_from_marketplace_id = None
+        //
+        // ヒント:
+        //   - 複製元の系譜判定には `metadata.source.is_marketplace()` と
+        //     `metadata.cloned_from_marketplace_id` (= 複製元が以前から持っていた origin) の両方を見る。
+        //   - 「複製の複製」で系譜が切れないように、Marketplace 原本でない場合は既存の
+        //     `cloned_from_marketplace_id` を fallback で引き継ぐ。
+        //   - `source_id` (= 複製元の UUID) は (a) のケースで origin として記録する値。
+        let inherited_origin: Option<Uuid> = if metadata.source.is_marketplace() {
+            // (a) Marketplace 原本を複製: その UUID 自体を origin として記録
+            Some(source_id)
+        } else {
+            // (b) 既存 lineage を引き継ぐ (孫複製でも常に Marketplace 原本 A を指す)
+            // (c) ピュア Local の複製は None のまま透過
+            metadata.cloned_from_marketplace_id
+        };
+        metadata.cloned_from_marketplace_id = inherited_origin;
+        // 複製先は常に Local source にリセット (Marketplace 由来テーマを複製したコピーは編集可能にする)。
+        // 系譜マーカーは上で別途残しているので、ここで `source` を Local に落としても再提出ガードは効く。
+        metadata.source = types::ThemeSource::Local;
+
         let target_dir = cursors_dir.join(new_id.to_string());
         copy_dir_recursive(&source_dir, &target_dir)?;
         std::fs::write(
@@ -531,10 +561,12 @@ impl ThemeManager {
             serde_json::to_vec_pretty(&metadata)?,
         )?;
 
-        // 複製先は常に Local にリセット (Marketplace 由来テーマを複製したコピーは編集可能にする)
-        set_metadata_source(&target_dir, types::ThemeSource::Local)?;
-
-        tracing::info!("テーマ {} を {} として複製しました", source_id, new_id);
+        tracing::info!(
+            "テーマ {} を {} として複製しました (lineage={:?})",
+            source_id,
+            new_id,
+            metadata.cloned_from_marketplace_id
+        );
         Ok(new_id)
     }
 
@@ -595,6 +627,7 @@ mod tests {
             signature: None,
             tags: Vec::new(),
             source: types::ThemeSource::Local,
+            cloned_from_marketplace_id: None,
         };
         let cursors: HashMap<String, Vec<u8>> = HashMap::new();
 
@@ -663,6 +696,7 @@ mod tests {
             signature: None,
             tags: Vec::new(),
             source: types::ThemeSource::Local,
+            cloned_from_marketplace_id: None,
         };
         // ani は "RIFF" マジックで始まるダミー、cur は "CUR1" ダミー
         let mut cursors: HashMap<String, Vec<u8>> = HashMap::new();
@@ -756,6 +790,7 @@ mod tests {
             signature: None,
             tags: vec![],
             source: types::ThemeSource::Local,
+            cloned_from_marketplace_id: None,
         };
         let mut cursors = std::collections::HashMap::new();
         cursors.insert("Arrow".to_string(), cur_bytes);
@@ -775,5 +810,128 @@ mod tests {
             image::load_from_memory_with_format(&preview_bytes, image::ImageFormat::Png).unwrap();
         assert_eq!(img.width(), 64);
         assert_eq!(img.height(), 64);
+    }
+
+    // ── duplicate_theme の lineage 継承テスト ─────────────────────────
+    //
+    // 「公式インデックスからダウンロードしたものをコピーして編集できるが、再提出は禁止」
+    // 要件の核となる挙動を 3 ケースで固定する。`submit_theme_auto` は
+    // `cloned_from_marketplace_id.is_some()` を見て拒否するので、ここでの継承が壊れると
+    // 再提出ガード全体が崩れる。
+
+    fn write_seed_theme(dir: &std::path::Path, id: Uuid, with_source: types::ThemeSource) {
+        std::fs::create_dir_all(dir).unwrap();
+        let metadata = ThemeMetadata {
+            schema_version: 1,
+            id,
+            name: LocalizedString::Simple("Seed".into()),
+            version: "1.0.0".into(),
+            created_at: "2026-05-20T00:00:00Z".into(),
+            requires_os_shadow: false,
+            cursors: HashMap::new(),
+            author: None,
+            license: None,
+            homepage: None,
+            description: None,
+            min_app_version: None,
+            signature: None,
+            tags: Vec::new(),
+            source: with_source,
+            cloned_from_marketplace_id: None,
+        };
+        std::fs::write(
+            dir.join("theme.json"),
+            serde_json::to_vec_pretty(&metadata).unwrap(),
+        )
+        .unwrap();
+    }
+
+    fn read_back(dir: &std::path::Path, id: Uuid) -> ThemeMetadata {
+        let p = dir.join(id.to_string()).join("theme.json");
+        serde_json::from_str(&std::fs::read_to_string(p).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn duplicate_of_marketplace_records_origin() {
+        // (a) Marketplace 原本 A を複製 → B.cloned_from_marketplace_id == Some(A.id)
+        // かつ B.source は Local にリセットされる (= 編集可能)。
+        let _g = crate::config::cursors_dir_override_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let temp = tempfile::TempDir::new().unwrap();
+        std::env::set_var("CUSTOM_CURSORS_DIR_OVERRIDE", temp.path());
+        let a_id = Uuid::new_v4();
+        write_seed_theme(
+            &temp.path().join(a_id.to_string()),
+            a_id,
+            types::ThemeSource::Marketplace,
+        );
+
+        let b_id = ThemeManager::duplicate_theme(a_id).unwrap();
+        let b = read_back(temp.path(), b_id);
+        std::env::remove_var("CUSTOM_CURSORS_DIR_OVERRIDE");
+
+        assert_eq!(
+            b.cloned_from_marketplace_id,
+            Some(a_id),
+            "Marketplace 原本の複製は origin を A.id として記録すべき"
+        );
+        assert!(
+            matches!(b.source, types::ThemeSource::Local),
+            "複製先 source は常に Local にリセットされる"
+        );
+    }
+
+    #[test]
+    fn duplicate_of_clone_keeps_origin() {
+        // (b) (a) で生まれた B を複製 → C.cloned_from_marketplace_id も Some(A.id)
+        // つまり「複製の複製」でも常に Marketplace 原本 A を指し続け、系譜が切れない。
+        let _g = crate::config::cursors_dir_override_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let temp = tempfile::TempDir::new().unwrap();
+        std::env::set_var("CUSTOM_CURSORS_DIR_OVERRIDE", temp.path());
+        let a_id = Uuid::new_v4();
+        write_seed_theme(
+            &temp.path().join(a_id.to_string()),
+            a_id,
+            types::ThemeSource::Marketplace,
+        );
+        let b_id = ThemeManager::duplicate_theme(a_id).unwrap();
+        let c_id = ThemeManager::duplicate_theme(b_id).unwrap();
+        let c = read_back(temp.path(), c_id);
+        std::env::remove_var("CUSTOM_CURSORS_DIR_OVERRIDE");
+
+        assert_eq!(
+            c.cloned_from_marketplace_id,
+            Some(a_id),
+            "孫複製でも origin は常に Marketplace 原本 A を指すべき"
+        );
+    }
+
+    #[test]
+    fn duplicate_of_pure_local_has_no_lineage() {
+        // (c) ピュア Local の D を複製 → E.cloned_from_marketplace_id == None
+        // つまり Marketplace と無関係に生成 / 取り込んだテーマは引き続き再提出可能。
+        let _g = crate::config::cursors_dir_override_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let temp = tempfile::TempDir::new().unwrap();
+        std::env::set_var("CUSTOM_CURSORS_DIR_OVERRIDE", temp.path());
+        let d_id = Uuid::new_v4();
+        write_seed_theme(
+            &temp.path().join(d_id.to_string()),
+            d_id,
+            types::ThemeSource::Local,
+        );
+
+        let e_id = ThemeManager::duplicate_theme(d_id).unwrap();
+        let e = read_back(temp.path(), e_id);
+        std::env::remove_var("CUSTOM_CURSORS_DIR_OVERRIDE");
+
+        assert!(
+            e.cloned_from_marketplace_id.is_none(),
+            "ピュア Local 由来の複製に origin が混入してはいけない"
+        );
     }
 }

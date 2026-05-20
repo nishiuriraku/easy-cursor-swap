@@ -64,4 +64,11 @@ export interface ThemeCardData {
    * クリック時は `open_url` IPC 経由で外部ブラウザに渡す。
    */
   homepage?: string | null
+  /**
+   * 公式インデックス由来テーマを `duplicate_theme` で複製した場合に複製元の UUID。
+   * SubmitThemeDialog はこのフィールドが truthy なテーマを提出選択肢から除外し、
+   * 詳細モーダルでは「公式テーマの複製」バッジ表示判定にも使う。
+   * 通常の Local テーマ (Creator 新規 / .cursorpack 取り込み) は `null/undefined`。
+   */
+  clonedFromMarketplaceId?: string | null
 }

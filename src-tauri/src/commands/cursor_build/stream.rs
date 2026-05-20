@@ -118,6 +118,7 @@ pub fn export_cursorpack_streamed(
         signature: None,
         tags: Vec::new(),
         source: crate::theme::types::ThemeSource::Local,
+        cloned_from_marketplace_id: None,
     };
 
     // 3) 署名。sign.rs に共通化済み (export_cursorpack と同じロジック)。

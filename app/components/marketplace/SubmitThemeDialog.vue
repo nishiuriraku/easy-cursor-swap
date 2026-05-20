@@ -12,6 +12,7 @@
  */
 import type { GithubAccount, SubmitStage } from '~/types/githubAuth'
 import type { MarketplaceName } from '~/types/marketplace'
+import { ALLOWED_MARKETPLACE_TAGS } from '~/types/marketplace'
 
 const { t } = useI18n()
 
@@ -29,7 +30,9 @@ const emit = defineEmits<{
 // 許容するので、`entryJson` ではそのまま JSON 化する (`MarketplaceEntry.name` 型と整合)。
 //
 // `source` は Rust `ThemeSource` (serde lowercase) の `"local" | "marketplace"`。
-// 公式インデックス由来テーマを「再提出」させないためにダイアログ側で除外する。
+// `cloned_from_marketplace_id` は duplicate_theme が引き継いだ複製元 UUID。どちらかが truthy
+// なら公式インデックスへの再提出を許してはならないのでダイアログ側でも除外する
+// (Rust submit_theme_auto も同条件で hard-reject するので二重防御)。
 interface ThemeSummary {
   id: string
   name: MarketplaceName
@@ -38,6 +41,7 @@ interface ThemeSummary {
   included_roles: string[]
   is_active: boolean
   source?: string
+  cloned_from_marketplace_id?: string | null
 }
 
 const { info: keystoreInfo, refresh: refreshKeystore } = useKeystore()
@@ -47,9 +51,13 @@ const themes = ref<ThemeSummary[]>([])
 const selectedThemeId = ref<string | null>(null)
 const loading = ref(false)
 
-// 公式インデックス由来 (source === 'marketplace') のテーマは提出対象から除外する。
-// 再提出は二重登録になるため、Auto / Manual 両タブで選択肢自体を隠す。
-const submittableThemes = computed(() => themes.value.filter((th) => th.source !== 'marketplace'))
+// 公式インデックス由来テーマと「その複製」を提出対象から除外する。
+// - `source === 'marketplace'`: 公式 install 直後の原本 (repackage_theme でも拒否される)
+// - `cloned_from_marketplace_id` truthy: duplicate_theme で複製したコピー (どれだけ編集しても再提出は禁止)
+// Auto / Manual 両タブで選択肢自体を隠し、Rust submit_theme_auto も同条件で再度拒否する。
+const submittableThemes = computed(() =>
+  themes.value.filter((th) => th.source !== 'marketplace' && !th.cloned_from_marketplace_id),
+)
 
 // タブ管理
 const tab = ref<'auto' | 'manual'>('auto')
@@ -60,16 +68,19 @@ const deviceFlowOpen = ref(false)
 const submitter = useMarketplaceSubmit()
 const submitDone = ref<{ prUrl: string } | null>(null)
 
-// マーケットプレイス用タグ入力 (自動・手動共通)。Enter / カンマ / セミコロンで chip 化。
-const {
-  tagInput,
-  tags,
-  commitTag,
-  onTagKeydown,
-  removeTag,
-  reset: resetTags,
-  maxTags: MAX_TAGS,
-} = useTagChipInput()
+// 公式インデックスが受理するタグの allow-list を toggle で選択させる。
+// 自由入力をやめたので Enter / カンマ / Backspace 等のハンドラは不要。
+const tags = ref<string[]>([])
+
+function toggleTag(tag: string): void {
+  const i = tags.value.indexOf(tag)
+  if (i >= 0) tags.value.splice(i, 1)
+  else tags.value.push(tag)
+}
+
+function resetTags(): void {
+  tags.value = []
+}
 
 const STAGE_LABEL_KEY: Record<SubmitStage, string> = {
   build: 'marketplace.submitStageBuild',
@@ -99,7 +110,6 @@ async function loadGithubAccount() {
 
 async function runAutoSubmit() {
   if (!selectedThemeId.value) return
-  if (tagInput.value.trim().length > 0) commitTag()
   submitDone.value = null
   try {
     const r = await submitter.submit(selectedThemeId.value, tags.value)
@@ -268,19 +278,15 @@ onMounted(async () => {
             :themes="submittableThemes"
             :selected-theme-id="selectedThemeId"
             :tags="tags"
-            :tag-input="tagInput"
+            :allowed-tags="ALLOWED_MARKETPLACE_TAGS"
             :has-keystore="keystoreInfo.has_keypair"
-            :max-tags="MAX_TAGS"
             :github-account="githubAccount"
             :submitter-busy="submitter.busy.value"
             :submitter-stage-label="submitterStageLabel"
             :submitter-error-msg="submitter.errorMsg.value"
             :submit-done="submitDone !== null"
             @update:selected-theme-id="(v) => (selectedThemeId = v)"
-            @update:tag-input="(v) => (tagInput = v)"
-            @commit-tag="commitTag"
-            @remove-tag="removeTag"
-            @tag-keydown="onTagKeydown"
+            @toggle-tag="toggleTag"
           />
 
           <SubmitThemeManualForm
@@ -288,20 +294,16 @@ onMounted(async () => {
             :themes="submittableThemes"
             :selected-theme-id="selectedThemeId"
             :tags="tags"
-            :tag-input="tagInput"
+            :allowed-tags="ALLOWED_MARKETPLACE_TAGS"
             :has-keystore="keystoreInfo.has_keypair"
-            :max-tags="MAX_TAGS"
             :step="step"
             :github-username="githubUsername"
             :download-url="downloadUrl"
             :entry-json="entryJson"
             @update:selected-theme-id="(v) => (selectedThemeId = v)"
-            @update:tag-input="(v) => (tagInput = v)"
             @update:github-username="(v) => (githubUsername = v)"
             @update:download-url="(v) => (downloadUrl = v)"
-            @commit-tag="commitTag"
-            @remove-tag="removeTag"
-            @tag-keydown="onTagKeydown"
+            @toggle-tag="toggleTag"
           />
         </div>
 

@@ -18,8 +18,15 @@ default-run = "easy-cursor-swap"
 name = "app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[features]
+# `npm run tauri:dev` 時のみ `--features devtools` 経由で有効化される。
+# release ビルド (`tauri build`) では渡されないため、配布バイナリには
+# WebView2 DevTools 関連コードが一切リンクされない (バイナリサイズ削減 +
+# 署名済み配布物の Inspect 経路封印)。
+devtools = ["tauri/devtools"]
+
 [build-dependencies]
-tauri-build = { version = "2.6.0", features = [] }
+tauri-build = { version = "2.6.2", features = [] }
 # build.rs でリポジトリルートの .env からビルド時 env を読み込むため。
 # CI では .env を置かず GitHub Actions の env で渡されるので、これは
 # あくまでローカル開発の利便性向上が目的。
@@ -27,7 +34,7 @@ dotenvy = "0.15"
 
 [dependencies]
 # --- Tauri コア ---
-tauri = { version = "2.11.0", features = ["tray-icon"] }
+tauri = { version = "2.11.2", features = ["tray-icon"] }
 # MCP テスト用プラグイン。crate は常にリンクされるが、main.rs で `cfg(debug_assertions)` で
 # 初期化を gate しているので release バイナリでは起動しない (capabilities の permission 解決
 # は build 時に行われるため、crate を optional 化すると default features ビルドで permission
@@ -55,10 +62,14 @@ tracing-appender = "0.2"
 image = { version = "0.25", features = ["png", "ico"] }
 
 # --- Windows API ---
-winreg = "0.55"
+winreg = "0.56"
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.61", features = [
+# windows >= 0.62 では `WNDCLASSW` / `RegisterClassW` が `Win32_Graphics_Gdi` feature
+# (WNDCLASSW.hbrBackground が HBRUSH を持つため) の背後に gating されている。
+# `cursor_watcher.rs` / `hotkey.rs` がメッセージ専用 HWND_MESSAGE ウィンドウを
+# 作成するために WNDCLASSW を使用しているので、Gdi feature を有効化する。
+windows = { version = "0.62", features = [
   "Win32_UI_WindowsAndMessaging",
   "Win32_System_SystemInformation",
   "Win32_System_Threading",
@@ -67,19 +78,20 @@ windows = { version = "0.61", features = [
   "Win32_Security_Cryptography",
   "Win32_UI_Input_KeyboardAndMouse",
   "Win32_System_Environment",
+  "Win32_Graphics_Gdi",
   "Wdk_System_SystemServices",
 ] }
 
 # --- ユーティリティ ---
 uuid = { version = "1", features = ["v4", "serde"] }
-zip = "2"
+zip = "5"
 chrono = { version = "0.4", features = ["serde"] }
 dirs = "6.0"
 thiserror = "2"
 
 # --- Phase 9: Marketplace / セキュリティ ---
 # rustls 経由で OS のネイティブ TLS スタックを回避し、依存ツリーを軽量化。
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "blocking"] }
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "json", "blocking", "form", "query"] }
 sha2 = "0.10"
 hex = "0.4"
 ed25519-dalek = "2"
@@ -93,8 +105,8 @@ chacha20poly1305 = "0.10"
 minisign-verify = "0.2"
 
 [dev-dependencies]
-criterion = { version = "0.5", default-features = false, features = ["html_reports"] }
-mockito = "1.5"
+criterion = { version = "0.7", default-features = false, features = ["html_reports"] }
+mockito = "1.7"
 tempfile = "3"
 # `#[tokio::test]` のためだけに必要。本体コード (src/) は同期 + tauri ランタイム
 # 経由なので tokio 直接利用はなく、dev-dependencies に閉じる。

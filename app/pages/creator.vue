@@ -22,7 +22,7 @@ const { info: keystoreInfo, refresh: refreshKeystore } = useKeystore()
 const hasKeystoreSigning = computed(() => keystoreInfo.value.has_keypair)
 
 type RoleStatus = 'filled' | 'empty'
-type ResampleMode = 'lanczos' | 'nearest' | 'auto'
+type ResampleMode = 'lanczos' | 'nearest'
 
 const SIZES = [32, 48, 64, 96, 128, 256] as const
 type TabId = 'assign' | 'metadata'
@@ -92,7 +92,7 @@ const perSizeHotspot = ref(false)
 const sourceThemeId = ref<string | null>(null)
 /** SaveDestinationModal の開閉と初期 destination 制御 */
 const saveModalOpen = ref(false)
-const saveModalDefault = ref<'file' | 'library' | 'libraryAndApply'>('file')
+const saveModalDefault = ref<'file' | 'library' | 'libraryAndApply'>('library')
 
 /**
  * 役割ごとのインポート済みアセットを `useCreatorAssets` 経由で集約管理する。
@@ -113,6 +113,69 @@ const {
   description: metaDescription,
   shadowEnabled,
 } = metaState
+
+/**
+ * 編集破棄ダイアログのガード判定。
+ * 編集ステージにいて、アセット割り当て または メタ入力 のどちらかがあれば true。
+ * Clear ボタン / 画面遷移どちらの経路でもこの判定でダイアログ表示を分岐する。
+ */
+const hasUnsavedEdits = computed(() => {
+  if (stage.value !== 'editing') return false
+  if (assignedRoleCount.value > 0) return true
+  return metaState.isDirty.value
+})
+
+/**
+ * 編集破棄ダイアログの開閉と「破棄後に何をするか」を保持する。
+ * - mode='clear':   confirm 後に resetCreator() を実行
+ * - mode='navigate': confirm 後に Vue Router の next() を実行 (cancel 時は next(false))
+ *
+ * `pendingNavigation` は onBeforeRouteLeave から渡された next() のサンクで、
+ * confirm / cancel 経路の両方で必ず呼び切る (放置すると router がフリーズする)。
+ */
+const discardDialogOpen = ref(false)
+const discardDialogMode = ref<'clear' | 'navigate'>('clear')
+let pendingNavigation: ((proceed: boolean) => void) | null = null
+
+function requestReset() {
+  if (!hasUnsavedEdits.value) {
+    resetCreator()
+    return
+  }
+  discardDialogMode.value = 'clear'
+  pendingNavigation = null
+  discardDialogOpen.value = true
+}
+
+function onDiscardConfirm() {
+  discardDialogOpen.value = false
+  const navigation = pendingNavigation
+  pendingNavigation = null
+  if (navigation) {
+    navigation(true)
+  } else {
+    resetCreator()
+  }
+}
+
+function onDiscardCancel() {
+  discardDialogOpen.value = false
+  const navigation = pendingNavigation
+  pendingNavigation = null
+  if (navigation) navigation(false)
+}
+
+// サイドバー / ブラウザバック相当の遷移をガードする。
+// Vue Router の onBeforeRouteLeave は next(false) で離脱をキャンセルできる。
+onBeforeRouteLeave((_to, _from, next) => {
+  if (!hasUnsavedEdits.value) {
+    next()
+    return
+  }
+  discardDialogMode.value = 'navigate'
+  pendingNavigation = (proceed) => next(proceed)
+  discardDialogOpen.value = true
+})
 
 // --- 一括インポート ---
 const bulkImport = useBulkImport()
@@ -583,7 +646,7 @@ function resetCreator() {
   }
   activeRoleId.value = 'Arrow'
   sourceThemeId.value = null
-  saveModalDefault.value = 'file'
+  saveModalDefault.value = 'library'
   saveModalOpen.value = false
   activeSize.value = 64
   metaState.reset()
@@ -764,7 +827,7 @@ async function onFileChange(e: Event) {
         :has-keystore-signing="hasKeystoreSigning"
         :export-busy="exportBusy"
         :arrow-assigned="arrowAssigned"
-        @reset="resetCreator"
+        @reset="requestReset"
         @save="onToolbarSave"
         @bulk-auto="pickBulkAuto"
         @bulk-folder="pickBulkFolder"
@@ -884,6 +947,18 @@ async function onFileChange(e: Event) {
       :show-footer-cancel="false"
       @update:model-value="onThemePickerSelect"
       @cancel="onThemePickerCancel"
+    />
+
+    <!--
+      編集破棄ダイアログ。Clear ボタン (mode='clear') と onBeforeRouteLeave
+      による画面遷移 (mode='navigate') の両方で再利用する。
+      hasUnsavedEdits=false のときは開かない (requestReset / route guard が直接実行)。
+    -->
+    <DiscardEditDialog
+      :open="discardDialogOpen"
+      :mode="discardDialogMode"
+      @confirm="onDiscardConfirm"
+      @cancel="onDiscardCancel"
     />
 
     <!--

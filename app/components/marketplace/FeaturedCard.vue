@@ -47,10 +47,6 @@ const emit = defineEmits<{
   showDetails: [id: string]
 }>()
 
-function fmtNumber(n: number): string {
-  return n.toLocaleString('ja-JP')
-}
-
 function highlightLabel(h: MarketplaceEntry['highlight']): string {
   if (h === 'new') return t('marketplace.featuredNew')
   if (h === 'popular') return t('marketplace.featuredPopular')
@@ -99,7 +95,6 @@ function onCardKeydown(e: KeyboardEvent) {
         <span v-if="entry.verified" class="tag ok featured-tag">
           <UiIcon name="Shield" :size="9" />
         </span>
-        <span class="m">↓ {{ fmtNumber(entry.downloadCount) }}</span>
         <span v-if="entry.highlight" class="m" style="color: var(--accent)">
           {{ highlightLabel(entry.highlight) }}
         </span>

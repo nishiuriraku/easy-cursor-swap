@@ -127,6 +127,7 @@ fn build_one(
         signature: None,
         tags: Vec::new(),
         source: ThemeSource::Local,
+        cloned_from_marketplace_id: None,
     };
 
     let output_path = output_dir.join(format!("{}.cursorpack", folder));

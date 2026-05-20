@@ -8,7 +8,8 @@
 //!   cargo bench --bench cursor_build --manifest-path src-tauri/Cargo.toml
 
 use app_lib::cursor::{build_cur_from_png, clear_resize_cache, ResizeMethod};
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
+use std::hint::black_box;
 
 /// ベンチ用 PNG (32×32 単色)。
 /// build_cur_from_png は Magic Byte をチェックするため、本物の PNG が必要。

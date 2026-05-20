@@ -35,7 +35,12 @@ export interface MarketplaceEntry {
   /** 直接ダウンロード URL */
   downloadUrl: string
   version: string
-  /** ダウンロード回数 (CI 集計値) */
+  /**
+   * ダウンロード回数。
+   * 現状 raw.githubusercontent.com 直 DL のためカウント供給源が無く、index.json では常に 0。
+   * UI からは非表示 (FeaturedCard / MarketplaceDetailModal とも DL 数表示を撤去)。
+   * Rust 側 (`MarketplaceEntry.download_count`) と index スキーマには互換のため残してある。
+   */
   downloadCount: number
   /** プレビュー用の役割 ID 一覧 */
   includedRoles: string[]
@@ -54,3 +59,24 @@ export interface MarketplaceEntry {
 }
 
 export type MarketplaceTag = 'all' | 'pixel' | 'minimal' | 'animated' | 'dark'
+
+/**
+ * 公式インデックスが受理するタグの enum (allow-list)。
+ *
+ * Source of truth: `easy-cursor-swap-index/schemas/index-entry.json#tags.items.enum`
+ * このリストを変更する際は index repo のスキーマも同時に更新すること (drift 注意)。
+ *
+ * `MarketplaceTag` (filter UI 側) は `'all'` を含む UI 専用拡張のため、こちらとは別概念。
+ */
+export const ALLOWED_MARKETPLACE_TAGS = [
+  'pixel',
+  'minimal',
+  'animated',
+  'dark',
+  'light',
+  'anime',
+  'retro',
+  'neon',
+] as const
+
+export type AllowedMarketplaceTag = (typeof ALLOWED_MARKETPLACE_TAGS)[number]

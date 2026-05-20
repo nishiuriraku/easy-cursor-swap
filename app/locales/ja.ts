@@ -197,6 +197,16 @@ export default {
     dropSub: 'PNG / SVG / CUR / ICO / ANI / .cursorpack を受け付けます',
     recentRoleCount: '{count}/17 役割',
     untitledThemeName: 'Untitled Theme',
+    discardDialog: {
+      titleClear: '編集内容を破棄しますか?',
+      titleNavigate: 'クリエイターを離れますか?',
+      messageClear:
+        '現在編集中のアセットとメタデータは保存されておらず、クリアすると失われます。',
+      messageNavigate:
+        '現在編集中のアセットとメタデータは保存されていません。画面を離れると編集内容は失われます。',
+      warning: '保存していない変更は復元できません',
+      confirm: '破棄して続行',
+    },
   },
   panic: {
     title: 'リセットを実行',
@@ -416,6 +426,11 @@ export default {
     submitBtn: '公式インデックスに提出',
     submitTitle: '公式インデックスにテーマを提出',
     submitHint: 'ローカルライブラリのテーマを公式インデックスへ申請できます。',
+    /** 公式インデックス由来テーマを複製したテーマに付ける詳細モーダル用バッジ。 */
+    clonedFromMarketplaceBadge: '公式テーマの複製',
+    /** 同テーマを提出しようとしたときのトースト / バナー文言。Rust の submit_theme_auto 拒否文と同義。 */
+    clonedFromMarketplaceForbidden:
+      '公式インデックス由来テーマを複製したものは再提出できません。',
     submitSelectTheme: '提出するテーマ',
     submitSelectPlaceholder: 'テーマを選択',
     submitGithubUser: 'GitHub ユーザー名',
@@ -424,10 +439,9 @@ export default {
     submitDownloadUrlPlaceholder: 'https://github.com/あなたのユーザー名/リポジトリ/releases/.../テーマ.cursorpack',
     submitDownloadUrlNote: 'cursorpack をアップロードした GitHub Release 等の直リンクを入力してください',
     submitTagsLabel: 'タグ (任意)',
-    submitTagsPlaceholder: '例: pixel, dark, minimal',
-    submitTagsPlaceholderAdd: '追加するタグを入力 (Enter)',
-    submitTagsNote: 'Enter / カンマで確定。最大 8 個、各 24 文字以内。',
-    submitTagRemoveAria: 'タグ {tag} を削除',
+    submitTagsNote: 'クリックで選択 / 解除。',
+    submitTagsToggleAria: 'タグ {tag} を切り替え',
+    submitTagsCount: '{n} / {total} 個選択中',
     submitNoKeystore: '署名鍵が未生成です。設定 → 鍵管理で生成してください。',
     submitPreviewBtn: '申請内容を確認',
     submitPreviewHint: '申請内容を確認し「GitHub で申請ページを開く」をクリックしてください。',
@@ -443,7 +457,6 @@ export default {
     addToLibrary: 'ライブラリに追加',
     alreadyInstalled: 'インストール済み',
     installing: 'インストール中…',
-    downloads: 'ダウンロード',
     openMarketplaceDetailAria: '{name} の詳細を開く',
     // Auto-submit flow (Phase 10)
     submitMode: '提出モード',

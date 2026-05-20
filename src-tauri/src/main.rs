@@ -323,6 +323,17 @@ fn main() {
         .setup(move |app| {
             let handle = app.handle().clone();
 
+            // 開発時のみ DevTools を自動で開く (Cargo feature `devtools` + debug ビルド時のみ)。
+            // `tauri dev --features devtools` 経由でのみ有効化され、`tauri build` には
+            // 一切リンクされないので配布バイナリの Inspect 経路は塞がれたまま。
+            #[cfg(all(debug_assertions, feature = "devtools"))]
+            {
+                use tauri::Manager;
+                if let Some(w) = app.get_webview_window("main") {
+                    w.open_devtools();
+                }
+            }
+
             // 初回起動時の argv に .cursorpack があれば PendingCursorpack に積む。
             // フロントは take_pending_cursorpack IPC でマウント後にプルする。
             let argv: Vec<String> = std::env::args().collect();
