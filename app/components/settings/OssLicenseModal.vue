@@ -6,11 +6,14 @@
  * 「アプリのトップレベル依存」「主要 Tauri プラグイン」「Rust の主要 crate」のみ。
  * すべて MIT / Apache-2.0 / BSD-3-Clause のいずれかなので個別ライセンス全文表示は省略し、
  * 各エントリの URL から確認できるようにする。
+ *
+ * 共通の `<UiModal>` shell を使用し、backdrop / Esc / focus trap / scroll lock は
+ * shell 側に委譲する。
  */
 
 const { t } = useI18n()
 
-const props = defineProps<{
+defineProps<{
   open: boolean
 }>()
 const emit = defineEmits<{
@@ -101,88 +104,53 @@ const openExternal = openExternalUrl
 function close() {
   emit('close')
 }
-
-// Body scroll lock + Esc 購読 + cleanup は useModalLifecycle に委譲。
-useModalLifecycle({ open: toRef(props, 'open'), onClose: close })
 </script>
 
 <template>
-  <Teleport to="body">
-    <div
-      v-if="open"
-      class="modal-page"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="oss-modal-title"
-      @click.self="close"
-    >
-      <div class="modal oss-modal" @click.stop>
-        <div class="modal-head">
-          <div class="modal-icon" aria-hidden="true"><UiIcon name="Pkg" :size="18" /></div>
-          <div style="flex: 1; min-width: 0">
-            <h2 id="oss-modal-title">{{ t('settings.ossModalTitle') }}</h2>
-            <p class="oss-desc">{{ t('settings.ossModalDesc') }}</p>
-          </div>
-          <button type="button" class="btn icon" :aria-label="t('common.close')" @click="close">
-            <UiIcon name="X" :size="14" />
+  <UiModal
+    :open="open"
+    :title="t('settings.ossModalTitle')"
+    :description="t('settings.ossModalDesc')"
+    icon="Pkg"
+    size="md"
+    @close="close"
+  >
+    <section>
+      <h3 class="oss-section-title">{{ t('settings.ossSectionFrontend') }}</h3>
+      <ul class="oss-list">
+        <li v-for="dep in FRONTEND_DEPS" :key="dep.name" class="oss-row">
+          <button class="oss-name" type="button" @click="openExternal(dep.url)">
+            {{ dep.name }}
           </button>
-        </div>
+          <span class="oss-license">{{ dep.license }}</span>
+        </li>
+      </ul>
+    </section>
 
-        <div class="modal-body oss-body">
-          <section>
-            <h3 class="oss-section-title">{{ t('settings.ossSectionFrontend') }}</h3>
-            <ul class="oss-list">
-              <li v-for="dep in FRONTEND_DEPS" :key="dep.name" class="oss-row">
-                <button class="oss-name" type="button" @click="openExternal(dep.url)">
-                  {{ dep.name }}
-                </button>
-                <span class="oss-license">{{ dep.license }}</span>
-              </li>
-            </ul>
-          </section>
+    <section>
+      <h3 class="oss-section-title">{{ t('settings.ossSectionBackend') }}</h3>
+      <ul class="oss-list">
+        <li v-for="dep in BACKEND_DEPS" :key="dep.name" class="oss-row">
+          <button class="oss-name" type="button" @click="openExternal(dep.url)">
+            {{ dep.name }}
+          </button>
+          <span class="oss-license">{{ dep.license }}</span>
+        </li>
+      </ul>
+    </section>
 
-          <section>
-            <h3 class="oss-section-title">{{ t('settings.ossSectionBackend') }}</h3>
-            <ul class="oss-list">
-              <li v-for="dep in BACKEND_DEPS" :key="dep.name" class="oss-row">
-                <button class="oss-name" type="button" @click="openExternal(dep.url)">
-                  {{ dep.name }}
-                </button>
-                <span class="oss-license">{{ dep.license }}</span>
-              </li>
-            </ul>
-          </section>
+    <p class="oss-foot">
+      {{ t('settings.ossModalFootnote') }}
+    </p>
 
-          <p class="oss-foot">
-            {{ t('settings.ossModalFootnote') }}
-          </p>
-        </div>
-      </div>
-    </div>
-  </Teleport>
+    <template #actions>
+      <UiButton variant="ghost" @click="close">{{ t('common.close') }}</UiButton>
+    </template>
+  </UiModal>
 </template>
 
 <style scoped>
 @reference '~/assets/css/tailwind.css';
-
-.oss-modal {
-  width: 560px;
-  max-width: 96vw;
-  max-height: 86vh;
-  display: flex;
-  flex-direction: column;
-}
-
-.oss-desc {
-  @apply m-0 mt-0.5 text-[12px] text-fg-mute;
-}
-
-.oss-body {
-  @apply overflow-y-auto px-5 py-4;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
 
 .oss-section-title {
   @apply m-0 mb-2 text-[12px] font-semibold uppercase tracking-wider text-fg-mute;
@@ -217,5 +185,13 @@ useModalLifecycle({ open: toRef(props, 'open'), onClose: close })
 
 .oss-foot {
   @apply m-0 text-[11.5px] text-fg-mute;
+}
+
+/* セクション間ギャップ (旧 .oss-body の gap:18px 相当) */
+section + section {
+  margin-top: 18px;
+}
+.oss-foot {
+  margin-top: 18px;
 }
 </style>
