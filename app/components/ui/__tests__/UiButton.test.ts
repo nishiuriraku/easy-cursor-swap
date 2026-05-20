@@ -5,7 +5,12 @@ import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import UiButton from '../UiButton.vue'
 
-const stubs = { UiIcon: { template: '<span data-testid="icon" :data-name="name"></span>', props: ['name', 'size'] } }
+const stubs = {
+  UiIcon: {
+    template: '<span data-testid="icon" :data-name="name"></span>',
+    props: ['name', 'size'],
+  },
+}
 
 describe('UiButton', () => {
   it('renders default variant', () => {
@@ -16,7 +21,11 @@ describe('UiButton', () => {
   })
 
   it('applies variant class', () => {
-    const w = mount(UiButton, { props: { variant: 'primary' }, slots: { default: 'Go' }, global: { stubs } })
+    const w = mount(UiButton, {
+      props: { variant: 'primary' },
+      slots: { default: 'Go' },
+      global: { stubs },
+    })
     expect(w.find('button').classes()).toContain('primary')
   })
 
@@ -27,20 +36,34 @@ describe('UiButton', () => {
   })
 
   it('renders icon left when iconLeft is set', () => {
-    const w = mount(UiButton, { props: { iconLeft: 'Check' }, slots: { default: 'OK' }, global: { stubs } })
+    const w = mount(UiButton, {
+      props: { iconLeft: 'Check' },
+      slots: { default: 'OK' },
+      global: { stubs },
+    })
     const icons = w.findAll('[data-testid="icon"]')
     expect(icons[0].attributes('data-name')).toBe('Check')
   })
 
   it('replaces iconLeft with spinner when loading', () => {
-    const w = mount(UiButton, { props: { iconLeft: 'Check', loading: true }, slots: { default: 'OK' }, global: { stubs } })
+    const w = mount(UiButton, {
+      props: { iconLeft: 'Check', loading: true },
+      slots: { default: 'OK' },
+      global: { stubs },
+    })
     expect(w.find('.spinner').exists()).toBe(true)
-    expect(w.findAll('[data-testid="icon"]').filter(i => i.attributes('data-name') === 'Check')).toHaveLength(0)
+    expect(
+      w.findAll('[data-testid="icon"]').filter((i) => i.attributes('data-name') === 'Check'),
+    ).toHaveLength(0)
     expect(w.find('button').attributes('disabled')).toBeDefined()
   })
 
   it('is disabled when disabled prop is true', () => {
-    const w = mount(UiButton, { props: { disabled: true }, slots: { default: 'X' }, global: { stubs } })
+    const w = mount(UiButton, {
+      props: { disabled: true },
+      slots: { default: 'X' },
+      global: { stubs },
+    })
     expect(w.find('button').attributes('disabled')).toBeDefined()
   })
 
@@ -51,7 +74,11 @@ describe('UiButton', () => {
   })
 
   it('does not emit click when disabled', async () => {
-    const w = mount(UiButton, { props: { disabled: true }, slots: { default: 'X' }, global: { stubs } })
+    const w = mount(UiButton, {
+      props: { disabled: true },
+      slots: { default: 'X' },
+      global: { stubs },
+    })
     await w.find('button').trigger('click')
     expect(w.emitted('click')).toBeUndefined()
   })

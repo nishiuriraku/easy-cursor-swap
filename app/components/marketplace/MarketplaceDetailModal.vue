@@ -74,13 +74,7 @@ function onInstall() {
 </script>
 
 <template>
-  <UiModal
-    :open="isOpen"
-    :title="displayName"
-    :description="subtitle"
-    size="lg"
-    @close="close"
-  >
+  <UiModal :open="isOpen" :title="displayName" :description="subtitle" size="lg" @close="close">
     <template v-if="entry" #headExtra>
       <span v-if="entry.verified" class="tag ok md-verified" :aria-label="ariaLabel">
         <UiIcon name="Shield" :size="10" />
@@ -114,13 +108,9 @@ function onInstall() {
         </div>
         <div v-if="entry.homepage" class="md-row">
           <span class="md-k">Homepage</span>
-          <a
-            :href="entry.homepage"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="md-v link"
-            >{{ entry.homepage }}</a
-          >
+          <a :href="entry.homepage" target="_blank" rel="noopener noreferrer" class="md-v link">{{
+            entry.homepage
+          }}</a>
         </div>
       </div>
     </template>

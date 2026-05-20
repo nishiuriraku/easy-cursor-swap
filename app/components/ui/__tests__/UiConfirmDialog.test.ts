@@ -21,7 +21,12 @@ function mountDialog(props: Record<string, unknown>) {
 
 describe('UiConfirmDialog', () => {
   it('renders title and message when open', async () => {
-    const w = mountDialog({ open: true, title: 'Sure?', message: 'This cannot be undone.', confirmLabel: 'Yes' })
+    const w = mountDialog({
+      open: true,
+      title: 'Sure?',
+      message: 'This cannot be undone.',
+      confirmLabel: 'Yes',
+    })
     await w.vm.$nextTick()
     const page = document.querySelector('.modal-page')
     expect(page?.textContent).toContain('Sure?')
@@ -31,7 +36,9 @@ describe('UiConfirmDialog', () => {
   it('emits confirm when confirm button clicked', async () => {
     const w = mountDialog({ open: true, title: 't', message: 'm', confirmLabel: 'Go' })
     await w.vm.$nextTick()
-    const btn = document.querySelector('.modal-foot .actions button:last-child') as HTMLButtonElement
+    const btn = document.querySelector(
+      '.modal-foot .actions button:last-child',
+    ) as HTMLButtonElement
     btn.click()
     expect(w.emitted('confirm')).toHaveLength(1)
   })
@@ -39,14 +46,22 @@ describe('UiConfirmDialog', () => {
   it('emits cancel when cancel button clicked', async () => {
     const w = mountDialog({ open: true, title: 't', message: 'm', confirmLabel: 'Go' })
     await w.vm.$nextTick()
-    const btn = document.querySelector('.modal-foot .actions button:first-child') as HTMLButtonElement
+    const btn = document.querySelector(
+      '.modal-foot .actions button:first-child',
+    ) as HTMLButtonElement
     btn.click()
     expect(w.emitted('cancel')).toHaveLength(1)
     expect(w.emitted('update:open')?.[0]).toEqual([false])
   })
 
   it('uses danger variant for tone=danger', async () => {
-    const w = mountDialog({ open: true, title: 't', message: 'm', confirmLabel: 'X', tone: 'danger' })
+    const w = mountDialog({
+      open: true,
+      title: 't',
+      message: 'm',
+      confirmLabel: 'X',
+      tone: 'danger',
+    })
     await w.vm.$nextTick()
     const confirmBtn = document.querySelector('.modal-foot .actions button:last-child')
     expect(confirmBtn?.className).toContain('danger')

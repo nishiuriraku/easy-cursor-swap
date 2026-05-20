@@ -60,7 +60,9 @@ describe('BulkImportPreviewModal apply payload', () => {
       global: { stubs },
     })
     currentWrapper = wrapper
-    const applyBtn = document.querySelector('.modal-foot button.primary') as HTMLButtonElement | null
+    const applyBtn = document.querySelector(
+      '.modal-foot button.primary',
+    ) as HTMLButtonElement | null
     expect(applyBtn).not.toBeNull()
     applyBtn!.click()
     await nextTick()

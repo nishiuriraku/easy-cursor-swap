@@ -117,23 +117,18 @@ void props.accent
               @{{ t.author ?? 'unknown' }} · v{{ t.version }} · {{ t.includedRoles.length }}/17
             </div>
           </div>
-          <UiIcon
-            v-if="modelValue === t.id"
-            name="Check"
-            :size="14"
-            style="color: var(--accent)"
-          />
+          <UiIcon v-if="modelValue === t.id" name="Check" :size="14" style="color: var(--accent)" />
         </li>
       </ul>
     </div>
 
-    <template v-if="(props.showClear ?? true)" #leftNote>
+    <template v-if="props.showClear ?? true" #leftNote>
       <UiButton variant="ghost" @click="clear">
         {{ t('themePicker.clear') }}
       </UiButton>
     </template>
 
-    <template v-if="(props.showFooterCancel ?? true)" #actions>
+    <template v-if="props.showFooterCancel ?? true" #actions>
       <UiButton variant="ghost" @click="emit('cancel')">
         {{ t('common.cancel') }}
       </UiButton>

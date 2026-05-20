@@ -27,10 +27,7 @@ function focusableIn(container: HTMLElement): HTMLElement[] {
   )
 }
 
-export function useFocusTrap(
-  containerRef: Ref<HTMLElement | null>,
-  active: Ref<boolean>,
-): void {
+export function useFocusTrap(containerRef: Ref<HTMLElement | null>, active: Ref<boolean>): void {
   let previousActive: HTMLElement | null = null
 
   function onKeydown(e: KeyboardEvent) {

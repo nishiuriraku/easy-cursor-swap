@@ -245,11 +245,7 @@ onMounted(async () => {
         style="border: none; background: transparent; padding: 0; height: auto"
         role="tablist"
       >
-        <button
-          type="button"
-          :class="['tab', { active: tab === 'auto' }]"
-          @click="tab = 'auto'"
-        >
+        <button type="button" :class="['tab', { active: tab === 'auto' }]" @click="tab = 'auto'">
           {{ t('marketplace.submitModeAuto') }}
         </button>
         <button
@@ -261,7 +257,7 @@ onMounted(async () => {
         </button>
       </div>
 
-        <SubmitThemeAutoForm
+      <SubmitThemeAutoForm
         v-if="tab === 'auto'"
         :themes="submittableThemes"
         :selected-theme-id="selectedThemeId"

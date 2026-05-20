@@ -194,22 +194,12 @@ defineExpose({ matches, unmatched, unassignRole, pickRoleFromUnmatched, unassign
         <span class="ui-radio-label">{{ t('bulkImport.metadataKeep') }}</span>
       </label>
       <label class="ui-radio" :class="{ 'is-checked': metadataChoice === 'overwrite' }">
-        <input
-          v-model="metadataChoice"
-          type="radio"
-          name="bi-metadata-choice"
-          value="overwrite"
-        />
+        <input v-model="metadataChoice" type="radio" name="bi-metadata-choice" value="overwrite" />
         <span class="ui-radio-mark" aria-hidden="true" />
         <span class="ui-radio-label">{{ t('bulkImport.metadataOverwrite') }}</span>
       </label>
       <label class="ui-radio" :class="{ 'is-checked': metadataChoice === 'name-only' }">
-        <input
-          v-model="metadataChoice"
-          type="radio"
-          name="bi-metadata-choice"
-          value="name-only"
-        />
+        <input v-model="metadataChoice" type="radio" name="bi-metadata-choice" value="name-only" />
         <span class="ui-radio-mark" aria-hidden="true" />
         <span class="ui-radio-label">{{ t('bulkImport.metadataNameOnly') }}</span>
       </label>
