@@ -563,6 +563,41 @@ impl RegistryManager {
             slider_pos
         );
 
+        // (2.5) 各カーソル役割パスを「同じバイト列で」再書込する。
+        //
+        // SystemParametersInfoW(SPI_SETCURSORS) はカーソル設定の差分を検知できた場合
+        // のみカーソルを再ラスタライズする。CursorBaseSize 単独変更だと Windows 11
+        // 22H2+ で「役割パスは同一だから変更なし」とショートカット判断され、視覚的に
+        // サイズが変わらない症状が出る (theme::apply_cursors は役割パスが変わるので
+        // 同じ SPI_SETCURSORS でも問題なく動作する)。
+        //
+        // 各役割の raw value を読み、そのまま set_raw_value で書き戻すことで Windows
+        // カーネルに「Cursors キーで何かが変わった」フラグを立てさせ、後続の
+        // SPI_SETCURSORS が確実に全カーソルを CursorBaseSize に応じて再ラスタライズ
+        // するよう促す。
+        //
+        // raw value 経由で REG_EXPAND_SZ の型情報と UTF-16 LE バイト列を完全保存する
+        // ため、`%SystemRoot%` 等の環境変数参照を含む Windows 既定パスも壊れない。
+        // 個別役割の失敗は best-effort (続行) — 17 個全部失敗しても (3) で従来通りの
+        // refresh は試みる。
+        let mut refresh_count: usize = 0;
+        for role in CursorRole::all() {
+            let name = role.registry_name();
+            match cursors_key.get_raw_value(name) {
+                Ok(raw) => {
+                    if let Err(e) = cursors_key.set_raw_value(name, &raw) {
+                        tracing::debug!("role '{}' 再書込失敗 (続行): {}", name, e);
+                    } else {
+                        refresh_count += 1;
+                    }
+                }
+                Err(_) => {
+                    // 値が存在しない役割は Windows 既定継承 — 再書込不要
+                }
+            }
+        }
+        tracing::debug!("カーソル役割再書込: {}/17", refresh_count);
+
         // (3) SystemParametersInfoW(SPI_SETCURSORS) で kernel に再ロード指示
         use windows::Win32::UI::WindowsAndMessaging::{
             SystemParametersInfoW, SPIF_SENDCHANGE, SPIF_UPDATEINIFILE, SPI_SETCURSORS,
