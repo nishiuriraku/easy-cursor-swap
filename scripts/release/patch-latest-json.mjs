@@ -8,6 +8,12 @@
  *       `npx tauri signer sign` を再走させて .sig を作り直し、
  *       latest.json の中身を新内容で更新する必要がある。
  *
+ * Note (2026-05-21): SignPath Foundation OSS 一次申請は外部認知不足で保留中
+ *       (docs/authenticode_signing.md 参照)。release.yml はこのスクリプトを
+ *       `signpath-check.outputs.enabled == 'true'` の条件付きでのみ実行する
+ *       ため、現状は呼び出されない。再申請承認後に SIGNPATH_* secret を投入
+ *       すると自動的に再活性化される。スクリプト本体は変更不要。
+ *
  * Usage:
  *   node scripts/release/patch-latest-json.mjs <bundle-dir>
  *

@@ -1,12 +1,18 @@
 # Code Signing Policy
 
 EasyCursorSwap (easy-cursor-swap) は [SignPath Foundation](https://signpath.org/) が
-提供する OSS 向け Authenticode コードサイニング証明書で、Windows インストーラー
-(`.exe` / `.msi`) およびその中に含まれる主要 PE ファイルを署名しています。
+提供する OSS 向け Authenticode コードサイニング証明書での Windows インストーラー
+(`.exe` / `.msi`) 署名運用を目指しています。
+
+> **現状 (2026-05-21):** SignPath Foundation OSS 一次申請は **保留** となりました。
+> 理由は外部認知シグナル (GitHub stars / 紹介記事 / 言及など) の不足で、本ポリシー
+> 文書や技術要件には問題なしとの判定です。当面は **無署名 + SmartScreen 警告案内**
+> の運用を継続し、外部認知が育った段階で再申請します。詳細とロードマップは
+> [docs/authenticode_signing.md](authenticode_signing.md) を参照してください。
 
 本ポリシーは SignPath Foundation の OSS 適格要件
 ([signpath.org/terms.html](https://signpath.org/terms.html)) を満たすための
-公開ドキュメントです。
+公開ドキュメントであり、再申請時にもそのまま参照されます。
 
 ---
 
@@ -19,7 +25,7 @@ EasyCursorSwap (easy-cursor-swap) は [SignPath Foundation](https://signpath.org
 | License               | MIT ([LICENSE](../LICENSE))                                 |
 | Distribution channel  | GitHub Releases (signed installers) + Tauri Updater         |
 | Marketplace index     | https://github.com/nishiuriraku/easy-cursor-swap-index      |
-| Authenticode provider | SignPath Foundation (OSS) — request via signpath.org/apply  |
+| Authenticode provider | **申請保留中** — SignPath Foundation OSS、2026-05-21 一次申請が外部認知不足で保留、再申請準備中 ([docs/authenticode_signing.md](authenticode_signing.md)) |
 
 ---
 
@@ -104,7 +110,7 @@ EasyCursorSwap は Windows レジストリの **`HKCU\Control Panel\Cursors` 以
 | Targets               | `x86_64-pc-windows-msvc`, `aarch64-pc-windows-msvc`      |
 | Output bundles        | NSIS (`.exe`) + MSI (`.msi`), per-user installer         |
 | Updater signing       | Ed25519 (minisign) — see [updater_signing.md](updater_signing.md) |
-| Authenticode signing  | SignPath Foundation OSS — submission via API token       |
+| Authenticode signing  | **未設定** (SignPath Foundation 申請保留中 — 再申請準備中)、`release.yml` の SignPath ステップは SIGNPATH_* secret 未設定時に skip される設計 |
 
 ソースコードは MIT ライセンスで完全公開されており、第三者がローカルで同一バイナリを
 再現できることを目標としています。再現性に影響する変更は CHANGELOG に明記します。
@@ -136,4 +142,4 @@ EasyCursorSwap は Windows レジストリの **`HKCU\Control Panel\Cursors` 以
 セキュリティ上の懸念や署名済みバイナリへの疑義は GitHub Issues ではなく
 [`SECURITY.md`](../SECURITY.md) の手順に従って報告してください。
 
-最終更新: 2026-05-16
+最終更新: 2026-05-21 (SignPath Foundation 一次申請保留を反映)

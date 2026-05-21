@@ -12,7 +12,7 @@ Domain-specific guidance lives in nested files (auto-loaded when working under t
 EasyCursorSwap (`package.json` name: `easy-cursor-swap`) — a Windows-only desktop app for managing custom mouse cursor themes. Tauri v2 + Nuxt 4 + Rust hybrid. The project lives at the repo root (no `easy-cursor-swap/` subdirectory).
 
 - **Target:** Windows 10 22H2+ / Windows 11, x64 (ARM64 planned)
-- **Distribution:** NSIS / MSI installers signed via SignPath; Tauri Updater with Ed25519-signed releases
+- **Distribution:** NSIS / MSI installers (Authenticode signing pending — SignPath Foundation OSS application was deferred 2026-05-21 for insufficient external visibility; `release.yml` SignPath step is wired and skip-guarded so it activates automatically when SIGNPATH\_\* secrets are configured after reapproval); Tauri Updater with Ed25519-signed releases (active)
 
 ## Documentation map
 

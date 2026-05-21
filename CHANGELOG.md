@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Authenticode コード署名 (SignPath Foundation OSS) の一次申請が 2026-05-21
+  に保留扱いとなった。理由は外部認知シグナル (GitHub stars / 紹介記事 / 言及)
+  の不足で、`docs/code_signing_policy.md` のポリシー文書や `release.yml` の
+  技術配線には問題なしとの判定。当面は **無署名 + SmartScreen 警告案内** の
+  現状運用を継続し、外部認知が育った段階で再申請する (3〜6 か月後を想定)。
+  Tauri Updater の Ed25519 (minisign) 署名は引き続き有効でアップデート差分の
+  改ざん防止は維持される。`release.yml` の SignPath ステップは SIGNPATH\_\*
+  secret 未設定時に自動 skip する設計のため CI は影響を受けず、再承認時には
+  secret 投入だけで自動的に有効化される。`docs/authenticode_signing.md` に
+  一次審査の結果記録と再申請ロードマップ (外部認知シグナル蓄積策、Certum
+  Open Source への暫定切替案など) を追記。README / README.ja / Wiki の
+  Usage-Guide-JA も「signed via SignPath Foundation」の虚偽記載を撤去し、
+  現状を正しく案内する文面に更新。
+
 ## [0.0.4] - 2026-05-20
 
 v0.0.x 系列で初の **stable release** (provisional 期を卒業)。`release.yml` の `prerelease` フラグも `false` に切り替え、GitHub Release / Tauri Updater 経由のいずれでも通常版として配信されるようになった。SemVer 0.0.x の API 安定保証は依然 best-effort だが、配布形態としては stable。Creator の保存後フローの小改善と、リリースパイプラインの自動化が中心。HKCU 限定 / 適用トランザクション性 / アーカイブ検閲 / PII レダクション / `v-html` 不採用 の 5 大不変条件はすべて維持。
