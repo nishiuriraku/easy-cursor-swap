@@ -596,14 +596,48 @@ function onSearchBlur() {
   setTimeout(() => closeSearchDropdown(), 0)
 }
 
+/**
+ * Windows 側 (アクセシビリティ「マウスポインターとタッチ」スライダー / コントロール
+ * パネル / 他アプリ) でカーソルサイズが変更されたあと、本アプリへフォーカスが戻った
+ * タイミングで OS 状態を再取得してスライダーへ反映する。
+ *
+ * index.vue の外部カーソル変更検知と同じ 2 経路 (focus / visibilitychange) を使う:
+ *  - `focus` (window): 別ウィンドウから戻ってきたとき
+ *  - `visibilitychange` (document): タブ非表示 → 表示時。focus と相補。
+ *
+ * 連発しても `get_accessibility_conflicts` は軽量なので debounce 不要。
+ */
+function onWindowFocus() {
+  void refreshCursorSizeFromOs()
+}
+function onVisibilityChange() {
+  if (typeof document === 'undefined') return
+  if (document.visibilityState === 'visible') void refreshCursorSizeFromOs()
+}
+
 onMounted(async () => {
   await loadConfig()
   applyConfigToLocal()
   await refreshKeystore()
   await loadCrashReports()
   await refreshCursorSizeFromOs()
+  if (typeof window !== 'undefined') {
+    window.addEventListener('focus', onWindowFocus)
+  }
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', onVisibilityChange)
+  }
   // 起動時の同期完了を watch で検出してローカル参照に反映
   watch(appConfig, applyConfigToLocal)
+})
+
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('focus', onWindowFocus)
+  }
+  if (typeof document !== 'undefined') {
+    document.removeEventListener('visibilitychange', onVisibilityChange)
+  }
 })
 
 // 任意のローカル変更を dirty フラグ化 (applyConfigToLocal 実行中は除外)

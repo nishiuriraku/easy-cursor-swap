@@ -9,7 +9,14 @@
 //!  - CursorIndicator: `HKCU\Control Panel\Mouse\MouseSonar` (REG_SZ "0"/"1")
 //!  - ContrastScheme: `HKCU\Control Panel\Accessibility\HighContrast\Flags`
 //!    の bit 0 (HCF_HIGHCONTRASTON = 1)
-//!  - CursorBaseSize: `HKCU\Control Panel\Cursors\CursorBaseSize` (DWORD, 32 がデフォルト)
+//!  - CursorBaseSize: 以下の順で読む (上で取得できたものを採用):
+//!    1. `HKCU\SOFTWARE\Microsoft\Accessibility\CursorSize` (DWORD 1-15, slider 値) →
+//!       `registry::slider_position_to_base_size` で DWORD に変換。Windows 11 Settings の
+//!       「マウスポインターとタッチ」スライダーが canonical に書く値。
+//!    2. `HKCU\Control Panel\Cursors\CursorBaseSize` (DWORD 32-256) — 旧 Control Panel API
+//!       および本アプリの永続化先。古い Windows ビルドで Accessibility 側が書かれない
+//!       ケースの fallback。
+//!    3. どちらも未設定なら 32 (= Windows 既定 = slider 1)。
 //!
 //! 取得失敗時は競合なしとして扱う (フェイルセーフ: 警告は出さない)。
 //!
@@ -82,12 +89,59 @@ fn read_high_contrast() -> bool {
         .unwrap_or(false)
 }
 
-/// `HKCU\Control Panel\Cursors\CursorBaseSize` を読む。失敗時はデフォルト 32。
+/// 現在のカーソル基準サイズ (DWORD 32-256) を取得する。Windows 11 Settings が
+/// canonical に書く `Accessibility\CursorSize` (slider 1-15) を優先し、本アプリ
+/// および旧 Control Panel API が書く `CursorBaseSize` を fallback として読む。
+///
+/// 順序は [`resolve_cursor_base_size`] で純粋関数として表現する (テスト容易化)。
 fn read_cursor_base_size() -> u32 {
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-    hkcu.open_subkey(r"Control Panel\Cursors")
+    let accessibility_slider = hkcu
+        .open_subkey(r"SOFTWARE\Microsoft\Accessibility")
+        .and_then(|k| k.get_value::<u32, _>("CursorSize"))
+        .ok();
+    let cursor_base_size = hkcu
+        .open_subkey(r"Control Panel\Cursors")
         .and_then(|k| k.get_value::<u32, _>("CursorBaseSize"))
-        .unwrap_or(DEFAULT_CURSOR_BASE_SIZE)
+        .ok();
+    resolve_cursor_base_size(accessibility_slider, cursor_base_size)
+}
+
+/// 2 つのレジストリ値から canonical な CursorBaseSize (DWORD) を決定する純粋関数。
+///
+/// 優先順位:
+/// 1. `Accessibility\CursorSize` (slider 1-15) があれば、その slider 値を
+///    `slider_position_to_base_size` で DWORD に変換して返す。Windows 11 Settings の
+///    「マウスポインターとタッチ」スライダーが canonical に書く値。
+/// 2. `CursorBaseSize` (DWORD 32-256) があれば、`clamp_cursor_base_size` で
+///    レンジに clamp して返す。旧 Control Panel API および本アプリの永続化先。
+/// 3. どちらも `None` なら Windows 既定 (32px / slider 1) を返す。
+///
+/// なぜ Accessibility 優先か: Windows 11 Settings UI は `Accessibility\CursorSize` を
+/// 確実に書くが、`CursorBaseSize` の書込は Windows ビルドによって不安定。両方が同期されて
+/// いるケースでも値は一致するため、Accessibility 優先で読めば「Windows 側でだけ変えた」
+/// 状態が正しくスライダーに反映される。
+fn resolve_cursor_base_size(
+    accessibility_slider: Option<u32>,
+    cursor_base_size: Option<u32>,
+) -> u32 {
+    use crate::registry::{
+        clamp_cursor_base_size, slider_position_to_base_size, MAX_CURSOR_SIZE_SLIDER,
+        MIN_CURSOR_SIZE_SLIDER,
+    };
+
+    if let Some(slider) = accessibility_slider {
+        // slider レンジ外の値 (registry 破損 / 未来仕様の拡張) も安全に扱う。
+        let clamped = slider.clamp(
+            u32::from(MIN_CURSOR_SIZE_SLIDER),
+            u32::from(MAX_CURSOR_SIZE_SLIDER),
+        ) as u8;
+        return slider_position_to_base_size(clamped);
+    }
+    if let Some(size) = cursor_base_size {
+        return clamp_cursor_base_size(size);
+    }
+    DEFAULT_CURSOR_BASE_SIZE
 }
 
 #[cfg(test)]
@@ -153,5 +207,49 @@ mod tests {
         // cursor_base_size の値は引き続き返される (UI スライダーの初期値用)。
         // 32 (既定) より小さい値は read 側のフォールバックで 32 になるはず。
         assert!(c.cursor_base_size >= DEFAULT_CURSOR_BASE_SIZE);
+    }
+
+    /// `resolve_cursor_base_size` の優先順位契約: Accessibility 優先 → CursorBaseSize fallback → 32 既定。
+    ///
+    /// この契約が崩れると「Windows 設定アプリで slider 15 にしたのにアプリでは
+    /// 1 と表示される」回帰が再発するので、固定で守る。
+    #[test]
+    fn resolve_prefers_accessibility_slider() {
+        // slider=15 (Accessibility 側) と CursorBaseSize=32 (古い既定) が併存している
+        // 典型ケース: Windows 設定アプリでスライダーを動かしただけの状態。
+        // → Accessibility=15 を採用して 256 を返す。
+        assert_eq!(resolve_cursor_base_size(Some(15), Some(32)), 256);
+        // 中間スライダー位置 (6) も DWORD に変換される: 32 + 16 * (6-1) = 112。
+        assert_eq!(resolve_cursor_base_size(Some(6), None), 112);
+        // slider=1 (= 32px) → 32。
+        assert_eq!(resolve_cursor_base_size(Some(1), Some(128)), 32);
+    }
+
+    #[test]
+    fn resolve_falls_back_to_cursor_base_size_when_accessibility_missing() {
+        // Accessibility 側が未設定 → CursorBaseSize を採用。
+        assert_eq!(resolve_cursor_base_size(None, Some(64)), 64);
+        assert_eq!(resolve_cursor_base_size(None, Some(256)), 256);
+        // CursorBaseSize がレンジ外でも clamp される。
+        assert_eq!(resolve_cursor_base_size(None, Some(0)), 32);
+        assert_eq!(resolve_cursor_base_size(None, Some(1000)), 256);
+    }
+
+    #[test]
+    fn resolve_uses_default_when_both_missing() {
+        // 両方未設定 = Windows 既定 (32px / slider 1)。
+        assert_eq!(
+            resolve_cursor_base_size(None, None),
+            DEFAULT_CURSOR_BASE_SIZE
+        );
+    }
+
+    #[test]
+    fn resolve_clamps_accessibility_out_of_range() {
+        // registry 破損 / 未来仕様拡張で slider が 0 や 16+ になっていても安全。
+        assert_eq!(resolve_cursor_base_size(Some(0), None), 32);
+        assert_eq!(resolve_cursor_base_size(Some(99), None), 256);
+        // u32::MAX のような壊滅値も clamp で吸収。
+        assert_eq!(resolve_cursor_base_size(Some(u32::MAX), None), 256);
     }
 }
