@@ -134,7 +134,6 @@ export default {
     conflictTitle: 'Conflict with accessibility features',
     conflictMouseSonar: 'Mouse Sonar (Ctrl-press indicator) is enabled. The Ctrl-press indicator will not change after applying.',
     conflictHighContrast: 'High Contrast mode is enabled. The OS may override your theme with system cursors.',
-    conflictCursorBaseSize: 'Cursor size is enlarged to {size} (default 32). Your theme may render at a different size than intended.',
   },
   creator: {
     breadcrumb: 'Creator',
@@ -258,6 +257,11 @@ export default {
     // General
     descGeneral: 'Language, notifications, and launch behavior — the basics.',
     groupDisplayLanguage: 'Display language',
+    groupCursorSize: 'Cursor size',
+    cursorSizeLabel: 'Mouse pointer size',
+    cursorSizeDesc: 'Resize the mouse pointer system-wide (HKCU\\Control Panel\\Cursors\\CursorBaseSize). Equivalent to Accessibility → Mouse pointer & touch → Size.',
+    cursorSizeReadout: '{px} px',
+    cursorSizeError: 'Failed to change size: {error}',
     groupNotifications: 'Notifications',
     showApplyToastLabel: 'Toast on apply result',
     showApplyToastDesc: 'Show a Windows toast with apply result',

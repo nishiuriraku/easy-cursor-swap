@@ -7,9 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- マウスポインターのサイズを本アプリから変更できるように。設定 → 一般 → 「カーソルサイズ」セクションに 1〜15 のスライダーを追加し、Windows 設定アプリ「アクセシビリティ → マウスポインターとタッチ → サイズ」と等価な書き換え (`HKCU\Control Panel\Cursors\CursorBaseSize` の DWORD 32〜256) を行う。スライダー位置 → DWORD の変換は Rust 側 (`registry::slider_position_to_base_size`) が single source of truth で、UI からは `set_cursor_base_size` IPC 経由で即時反映 (テーマ適用とは独立した OS 全体設定として扱う)。書き込み後は `SystemParametersInfoW(SPI_SETCURSORS)` でシェルに通知し、`set_cursor_shadow` と同じ broadcast 偽陽性ハンドリングで `CursorBaseSize` 拡大時のシェルキャッシュ再構築由来の `ERROR_INVALID_HANDLE` を吸収する。
+
 ### Changed
 
 - 共通 UI コンポーネント `app/components/ui/` を整備し、フロントエンド全体のモーダル / アラート / ボタン経路を統一: `UiModal` (Teleport + focus trap + body scroll lock を `useModalLifecycle` + `useFocusTrap` で内包), `UiConfirmDialog` (cancel/confirm 専用ラッパ), `UiAlert` (info/success/warn/danger インラインバナー), `UiButton` (`.btn` の Vue ラッパ + loading/icon ハンドリング) の 4 SFC + composable `useFocusTrap.ts` を追加。これに伴い `ApplyModal` / `ImportConflictDialog` / `DiscardEditDialog` / `NewThemeStartModal` / `SaveDestinationModal` / `BulkImportPreviewModal` / `ThemeDetailModal` / `ThemePickerModal` / `MarketplaceDetailModal` / `SubmitThemeDialog` / `SubmitDeviceFlowModal` / `OssLicenseModal` / `PassphrasePrompt` の 11 モーダルが `UiModal` shell に統一され、`.a11y-banner` (ApplyModal) / `ConfigRecoveryPanel` / `KeysSection` / `UpdatesSection` / `SubmitThemeAutoForm` / `SubmitThemeManualForm` / `SubmitDeviceFlowModal` の警告ボックスが `UiAlert` 経由になった。これにより 11 モーダルすべてに focus trap が初導入され、Esc / backdrop / Tab 循環の挙動が完全に一貫。さらに smoke test で判明した `ThemeDetailModal` の二重フッター UX 問題 (body 内アクション行 + .modal-foot の Close ボタンが重複) を解消し、`ThemeDetailDrawerFooter.vue` を削除して footer アクションを UiModal の `#leftNote` / `#actions` slot に直接配置。`components_total` 57 → 60 (`ui` 1 → 5、`library` 15 → 14)、`composables` 35 → 36。
+- `accessibility::AccessibilityConflicts::has_conflicts` の判定から `CursorBaseSize > 32` を除外。本アプリの正規機能になったため「競合」ではなく「現状値」として扱う。値自体は UI スライダーの初期値反映のために `cursor_base_size` フィールドで引き続き返す。これに連動して `ApplyModal` の `conflictCursorBaseSize` 警告も非表示化し、未使用の `apply.conflictCursorBaseSize` i18n キーは両言語から削除した (ja/en 各 1 件減)。
 
 ## [0.0.3] - 2026-05-20 (pre-release)
 

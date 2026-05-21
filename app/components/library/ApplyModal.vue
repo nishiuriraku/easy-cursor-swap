@@ -31,9 +31,8 @@ const conflictMessages = computed(() => {
   const out: string[] = []
   if (conflicts.value.mouse_sonar_enabled) out.push(t('apply.conflictMouseSonar'))
   if (conflicts.value.high_contrast_enabled) out.push(t('apply.conflictHighContrast'))
-  if (conflicts.value.cursor_base_size > 32) {
-    out.push(t('apply.conflictCursorBaseSize', { size: conflicts.value.cursor_base_size }))
-  }
+  // cursor_base_size は v0.1+ で Settings → 一般 → カーソルサイズの正規機能になったため、
+  // 警告対象から除外する。has_conflicts も accessibility.rs 側で同様に除外済み。
   return out
 })
 

@@ -133,7 +133,6 @@ export default {
     conflictTitle: 'アクセシビリティ機能との競合',
     conflictMouseSonar: 'マウスソナー (Ctrl 押下でカーソル位置を表示) が有効です。テーマ適用後も Ctrl 押下時の表示は変わりません。',
     conflictHighContrast: 'ハイコントラストモードが有効です。OS 既定のシステムカーソルに置き換えられる場合があります。',
-    conflictCursorBaseSize: 'カーソルサイズが {size} に拡大されています (既定 32)。テーマのデザイン意図と異なるサイズで表示される可能性があります。',
   },
   creator: {
     breadcrumb: 'Creator',
@@ -257,6 +256,11 @@ export default {
     // 一般
     descGeneral: '言語、通知、起動時の挙動など、アプリ全体の基本設定。',
     groupDisplayLanguage: '表示言語',
+    groupCursorSize: 'カーソルサイズ',
+    cursorSizeLabel: 'マウスポインターのサイズ',
+    cursorSizeDesc: 'Windows 全体のマウスポインターサイズを変更します (HKCU\\Control Panel\\Cursors\\CursorBaseSize)。アクセシビリティ → マウスポインターとタッチ → サイズと等価。',
+    cursorSizeReadout: '{px} px',
+    cursorSizeError: 'サイズ変更に失敗しました: {error}',
     groupNotifications: '通知',
     showApplyToastLabel: '適用結果のトースト表示',
     showApplyToastDesc: 'Windows トースト通知で適用結果を告知',

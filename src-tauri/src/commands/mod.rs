@@ -92,6 +92,7 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         system::open_url,
         system::open_log_folder,
         system::get_accessibility_conflicts,
+        system::set_cursor_base_size,
         system::list_crash_reports,
         system::clear_crash_reports,
         system::submit_crash_reports,

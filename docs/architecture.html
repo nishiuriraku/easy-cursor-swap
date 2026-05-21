@@ -966,7 +966,7 @@
     },
     "measured_counts": {
       "rust_modules_in_lib_rs": 23,
-      "tauri_ipc_commands": 52,
+      "tauri_ipc_commands": 53,
       "composables": 36,
       "pages_vue": 4,
       "pages_ts_helpers": 2,
@@ -974,8 +974,8 @@
       "ci_workflows": 3
     },
     "doc_drift_warnings": [
-      "No known drift as of 2026-05-21 (re-measured)。本マージで components.ui が 1 → 5 (合計 57 → 61 → 60) に増加 + その後の二重フッター解消で 1 個削減: `UiButton` / `UiAlert` / `UiModal` / `UiConfirmDialog` を新規追加し、11 モーダル + 6 アラート + 複数 loading ボタンを shared shell に統一。さらに smoke で `ThemeDetailModal` の body 内アクションが `.modal-foot` と二重表示になる UX 問題が判明したため、`ThemeDetailDrawerFooter.vue` を削除して footer 全アクションを UiModal の `#leftNote` / `#actions` slot に移動 (library 15 → 14、合計 61 → 60)。composables も 35 → 36 (`useFocusTrap` を追加 — Tab cycling + フォーカス復帰)。modules=23 / IPC=52 / commands-submodules=9 は変化なし。architecture.json/architecture.md/file_inventory.md/architecture.html が同期。",
-      "ui_map.json と相互整合済み: backend.ipc_commands 52 件のうち 3 件 (export_cursorpack / get_theme_previews / get_windows_scheme_previews) は Rust に登録だけされた legacy_unused 状態で、それぞれ status と replaced_by を明示。次の PR で Rust 側からも削除するか、frontend で再利用する決定をすること。",
+      "No known drift as of 2026-05-21 (re-measured)。本マージで (1) IPC=52 → 53 に増加 (`set_cursor_base_size` を `commands/system.rs` に追加 — Settings 一般セクションのスライダー (1〜15) から DWORD (32〜256) を計算して `HKCU\\Control Panel\\Cursors\\CursorBaseSize` を書き換える独立設定)。`accessibility::AccessibilityConflicts::detect()` の `has_conflicts` 判定から CursorBaseSize 競合を除外。(2) components.ui が 1 → 5 に増加 + library が 15 → 14 に減少 (`UiButton` / `UiAlert` / `UiModal` / `UiConfirmDialog` を新規追加し 11 モーダル + 6 アラート + 複数 loading ボタンを shared shell に統一。さらに smoke で `ThemeDetailModal` の body 内アクションが `.modal-foot` と二重表示になる UX 問題が判明したため、`ThemeDetailDrawerFooter.vue` を削除して footer 全アクションを UiModal の `#leftNote` / `#actions` slot に移動)。composables も 35 → 36 (`useFocusTrap` を追加 — Tab cycling + フォーカス復帰)。modules=23 / commands-submodules=9 / components_total=60 が現状値。architecture.json/architecture.md/file_inventory.md/architecture.html が同期。",
+      "ui_map.json と相互整合済み: backend.ipc_commands 53 件のうち 3 件 (export_cursorpack / get_theme_previews / get_windows_scheme_previews) は Rust に登録だけされた legacy_unused 状態で、それぞれ status と replaced_by を明示。次の PR で Rust 側からも削除するか、frontend で再利用する決定をすること。",
       "新たに食い違いを見つけたら『docs/<file> は X と書いているが実測 Y』の形で追記し、修正コミットと同じ PR で解消する。",
       "数字が docs と食い違ったら grep を信用する。frontend の数字は ui_map.html の live check (末尾) が canonical counter。"
     ]
@@ -1333,7 +1333,8 @@
       { "name": "check_update_is_major_jump", "category": "system", "file": "src-tauri/src/commands/system.rs", "frontend_callers": ["useUpdater"] },
       { "name": "open_url", "category": "system", "file": "src-tauri/src/commands/system.rs", "frontend_callers": ["pages/marketplace.vue", "components/settings/AboutSection.vue"] },
       { "name": "open_log_folder", "category": "system", "file": "src-tauri/src/commands/system.rs", "frontend_callers": ["components/settings/LoggingSection.vue"] },
-      { "name": "get_accessibility_conflicts", "category": "system", "file": "src-tauri/src/commands/system.rs", "frontend_callers": ["pages/settings.vue"] },
+      { "name": "get_accessibility_conflicts", "category": "system", "file": "src-tauri/src/commands/system.rs", "frontend_callers": ["pages/settings.vue", "components/library/ApplyModal.vue"] },
+      { "name": "set_cursor_base_size", "category": "system", "file": "src-tauri/src/commands/system.rs", "frontend_callers": ["pages/settings.vue", "components/settings/GeneralSection.vue"] },
       { "name": "list_crash_reports", "category": "system", "file": "src-tauri/src/commands/system.rs", "frontend_callers": ["components/settings/LoggingSection.vue"] },
       { "name": "clear_crash_reports", "category": "system", "file": "src-tauri/src/commands/system.rs", "frontend_callers": ["components/settings/LoggingSection.vue"] },
       { "name": "submit_crash_reports", "category": "system", "file": "src-tauri/src/commands/system.rs", "frontend_callers": ["components/settings/LoggingSection.vue"] },
@@ -1394,7 +1395,7 @@
         "role": "設定 8 セクション (一般 / 起動 / ライブラリ / セキュリティ / 鍵 / ログ / 更新 / About)",
         "composables": ["useAppSettings", "useKeystore", "useUpdater", "useSettingsSearch", "useAppInfo"],
         "components": ["ConfigRecoveryPanel", "PassphrasePrompt", "SettingsSearchDropdown", "GeneralSection", "StartupSection", "LibrarySection", "SecuritySection", "KeysSection", "LoggingSection", "UpdatesSection", "AboutSection"],
-        "ipc_calls": ["get_config", "update_config", "get_app_info", "keystore_info", "keystore_generate", "keystore_delete", "keystore_export", "keystore_import", "list_config_backups", "restore_config_backup", "export_profile", "import_profile", "list_crash_reports", "clear_crash_reports", "submit_crash_reports", "check_update_is_major_jump", "revoke_github_link", "open_log_folder", "open_url", "get_accessibility_conflicts"]
+        "ipc_calls": ["get_config", "update_config", "get_app_info", "keystore_info", "keystore_generate", "keystore_delete", "keystore_export", "keystore_import", "list_config_backups", "restore_config_backup", "export_profile", "import_profile", "list_crash_reports", "clear_crash_reports", "submit_crash_reports", "check_update_is_major_jump", "revoke_github_link", "open_log_folder", "open_url", "get_accessibility_conflicts", "set_cursor_base_size"]
       }
     ],
     "composables": [
