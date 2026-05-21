@@ -490,9 +490,26 @@ impl RegistryManager {
     /// `clamp_cursor_base_size` で [MIN_CURSOR_BASE_SIZE, MAX_CURSOR_BASE_SIZE]
     /// (32〜256) にクランプされる。戻り値は実際に書き込まれた値。
     ///
-    /// レジストリ書き込み後に `SystemParametersInfoW(SPI_SETCURSORS, ...)` で
-    /// シェルを通知する (専用の SPI_SETCURSORBASESIZE は Windows API に存在しないため、
-    /// SPI_SETCURSORS の再走でシェルにカーソルキャッシュの再構築を要求する)。
+    /// ## なぜ 3 段階の通知が必要か
+    ///
+    /// Windows 設定アプリの「マウスポインターとタッチ」スライダーが内部で行っているのと
+    /// 同じ通知シーケンスを再現する。`SystemParametersInfoW(SPI_SETCURSORS, ...)` 単体では
+    /// シェル / WebView2 / 一部サードパーティアプリでカーソルが視覚的に更新されない
+    /// ケースが OS バージョン (特に Win11 22H2+) で報告されている:
+    ///
+    /// 1. **`HKCU\SOFTWARE\Microsoft\Accessibility\CursorSize`** にスライダー位置 (1〜15) を
+    ///    DWORD で書く。Settings アプリが UI の状態保持用に書いている値で、これが欠けると
+    ///    Settings 側の表示と乖離する。
+    /// 2. **`HKCU\Control Panel\Cursors\CursorBaseSize`** に DWORD (32〜256) を書く。
+    ///    USER32 の cursor renderer がカーソル画像のラスタライズ時に参照する canonical 値。
+    /// 3. **`SystemParametersInfoW(SPI_SETCURSORS, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE)`** を
+    ///    呼ぶ。kernel に「カーソルキャッシュを破棄して registry から再ロードしろ」と
+    ///    指示する。SPIF_SENDCHANGE で WM_SETTINGCHANGE が broadcast されるが、lParam は
+    ///    OS 実装依存。
+    /// 4. **`SendNotifyMessageW(HWND_BROADCAST, WM_SETTINGCHANGE, 0, L"Cursors")`** を
+    ///    明示的に送る (non-blocking)。step 3 の broadcast を無視するアプリ (lParam が
+    ///    異なる場合がある) にも「Cursors セクションを再読み込み」を強制する。
+    ///
     /// broadcast 偽陽性は [`Self::is_broadcast_false_positive`] で吸収する。
     ///
     /// 本機能は「テーマ適用」とは独立した設定として扱うため、
@@ -504,8 +521,32 @@ impl RegistryManager {
         use winreg::RegKey;
 
         let clamped = clamp_cursor_base_size(size);
+        let slider_pos = base_size_to_slider_position(clamped);
 
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+
+        // (1) HKCU\SOFTWARE\Microsoft\Accessibility\CursorSize にスライダー位置を書く。
+        //     キー自体が存在しない環境 (clean install 直後 etc.) もあるので create_subkey で
+        //     不存在時は作成する。失敗してもメインの書込 (step 2) は続行する (best-effort)。
+        match hkcu.create_subkey("SOFTWARE\\Microsoft\\Accessibility") {
+            Ok((a11y_key, _disp)) => {
+                let slider_dword: u32 = u32::from(slider_pos);
+                if let Err(e) = a11y_key.set_value("CursorSize", &slider_dword) {
+                    tracing::warn!(
+                        "Accessibility\\CursorSize 書込失敗 (best-effort、続行): {}",
+                        e
+                    );
+                }
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "Accessibility キー open/create 失敗 (best-effort、続行): {}",
+                    e
+                );
+            }
+        }
+
+        // (2) HKCU\Control Panel\Cursors\CursorBaseSize を書く (canonical 値)。
         let cursors_key = hkcu
             .open_subkey_with_flags("Control Panel\\Cursors", KEY_WRITE)
             .map_err(|e| AppError::Registry(format!("Cursors キーを開けません: {}", e)))?;
@@ -513,6 +554,16 @@ impl RegistryManager {
             .set_value("CursorBaseSize", &clamped)
             .map_err(|e| AppError::Registry(format!("CursorBaseSize 書込失敗: {}", e)))?;
 
+        // 書込検証 (PII redact なし: DWORD 値そのものは PII でない、UI 設定値)
+        let read_back: Option<u32> = cursors_key.get_value("CursorBaseSize").ok();
+        tracing::info!(
+            "CursorBaseSize 書込: target={} read_back={:?} slider={}",
+            clamped,
+            read_back,
+            slider_pos
+        );
+
+        // (3) SystemParametersInfoW(SPI_SETCURSORS) で kernel に再ロード指示
         use windows::Win32::UI::WindowsAndMessaging::{
             SystemParametersInfoW, SPIF_SENDCHANGE, SPIF_UPDATEINIFILE, SPI_SETCURSORS,
         };
@@ -526,13 +577,15 @@ impl RegistryManager {
             // SPI_SETCURSORS と同じ WM_SETTINGCHANGE ブロードキャスト偽陽性が
             // CursorBaseSize 拡大時にこそ頻発する (シェルがカーソルキャッシュを
             // 再構築している最中で受信側の HWND が一時的に無効化される)。
-            if let Err(e) = result {
-                if Self::is_broadcast_false_positive(&e) {
+            match &result {
+                Ok(()) => tracing::debug!("SPI_SETCURSORS 成功"),
+                Err(e) if Self::is_broadcast_false_positive(e) => {
                     tracing::debug!(
-                        "SystemParametersInfoW(SPI_SETCURSORS for size) broadcast 偽陽性 (HRESULT={:#010x}, ignored)",
+                        "SPI_SETCURSORS broadcast 偽陽性 (HRESULT={:#010x}, ignored)",
                         e.code().0
                     );
-                } else {
+                }
+                Err(e) => {
                     return Err(AppError::Registry(format!(
                         "SPI_SETCURSORS の呼び出しに失敗: {}",
                         e
@@ -541,8 +594,50 @@ impl RegistryManager {
             }
         }
 
-        tracing::info!("CursorBaseSize を {} に設定しました", clamped);
+        // (4) 明示的に WM_SETTINGCHANGE(lParam=L"Cursors") を broadcast。
+        //     SPIF_SENDCHANGE が送る broadcast の lParam は OS 実装依存で、
+        //     L"Cursors" を待ち受けるアプリ (shell / WebView2 含む) が無視する
+        //     ケースがあるため、明示送信で完全に上書きする。
+        //     SendNotifyMessageW は非ブロッキングで失敗してもログに留めるだけ
+        //     (registry 書込は既に完了しているため、broadcast 失敗で IPC 全体を
+        //     失敗扱いにはしない)。
+        Self::broadcast_setting_change_cursors();
+
         Ok(clamped)
+    }
+
+    /// `WM_SETTINGCHANGE(lParam=L"Cursors")` を `HWND_BROADCAST` 宛に非ブロッキングで送る。
+    /// `set_cursor_base_size` step 4 の実装本体。
+    #[cfg(windows)]
+    fn broadcast_setting_change_cursors() {
+        use std::ffi::OsStr;
+        use std::os::windows::ffi::OsStrExt;
+        use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
+        use windows::Win32::UI::WindowsAndMessaging::{
+            SendNotifyMessageW, HWND_BROADCAST, WM_SETTINGCHANGE,
+        };
+        // NUL-terminated UTF-16 で "Cursors" を作る。
+        let section: Vec<u16> = OsStr::new("Cursors")
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
+        // SAFETY: section の生存期間は SendNotifyMessageW 呼び出し中のみ必要
+        // (non-blocking とはいえ Windows は message を queue にコピーするまで lParam を
+        // 解釈するため、コール完了まで `section` は drop されない)。
+        let _ = unsafe {
+            SendNotifyMessageW(
+                HWND_BROADCAST,
+                WM_SETTINGCHANGE,
+                WPARAM(0),
+                LPARAM(section.as_ptr() as isize),
+            )
+        };
+        // HWND_BROADCAST は実用上ノードのカーネルセマンティクスで個別の HWND を
+        // 返さないため、ここでは値ではなく副作用 (各 top-level window への post) のみ確認。
+        tracing::debug!("WM_SETTINGCHANGE(lParam=L\"Cursors\") broadcast 送信");
+        // 型 import の dead-code 警告抑止 (SendNotifyMessageW のシグネチャと
+        // ジェネリック解決で HWND/WPARAM/LPARAM が必要)。
+        let _phantom: (Option<HWND>, WPARAM, LPARAM) = (None, WPARAM(0), LPARAM(0));
     }
 
     #[cfg(not(windows))]
@@ -980,12 +1075,12 @@ mod tests {
         // _cleanup の Drop でテストスキームは削除される。
     }
 
-    /// テスト終了時に CursorBaseSize を元の値に戻す RAII ガード。
-    /// CursorBaseSize は単一値で UUID 分離できないため、テスト前に読み取った
-    /// 値を保存し、Drop で必ず復元する。テスト機のユーザー設定を破壊しない
-    /// ためのセーフティ。
+    /// テスト終了時に CursorBaseSize と Accessibility\CursorSize を元に戻す RAII ガード。
+    /// 両方の値は単一値で UUID 分離できないため、テスト前に読み取った値を保存し、
+    /// Drop で必ず復元する。テスト機のユーザー設定を破壊しないためのセーフティ。
     struct CursorBaseSizeCleanup {
-        original: Option<u32>,
+        cursor_base_size: Option<u32>,
+        accessibility_cursor_size: Option<u32>,
     }
 
     impl CursorBaseSizeCleanup {
@@ -993,11 +1088,18 @@ mod tests {
             use winreg::enums::*;
             use winreg::RegKey;
             let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-            let original = hkcu
+            let cursor_base_size = hkcu
                 .open_subkey("Control Panel\\Cursors")
                 .ok()
                 .and_then(|k| k.get_value::<u32, _>("CursorBaseSize").ok());
-            Self { original }
+            let accessibility_cursor_size = hkcu
+                .open_subkey("SOFTWARE\\Microsoft\\Accessibility")
+                .ok()
+                .and_then(|k| k.get_value::<u32, _>("CursorSize").ok());
+            Self {
+                cursor_base_size,
+                accessibility_cursor_size,
+            }
         }
     }
 
@@ -1009,26 +1111,42 @@ mod tests {
             if let Ok(cursors_key) =
                 hkcu.open_subkey_with_flags("Control Panel\\Cursors", KEY_WRITE)
             {
-                match self.original {
+                match self.cursor_base_size {
                     Some(v) => {
                         let _ = cursors_key.set_value("CursorBaseSize", &v);
                     }
                     None => {
-                        // テスト前に値が無かった場合は削除して状態を元に戻す
                         let _ = cursors_key.delete_value("CursorBaseSize");
+                    }
+                }
+            }
+            if let Ok(a11y_key) =
+                hkcu.open_subkey_with_flags("SOFTWARE\\Microsoft\\Accessibility", KEY_WRITE)
+            {
+                match self.accessibility_cursor_size {
+                    Some(v) => {
+                        let _ = a11y_key.set_value("CursorSize", &v);
+                    }
+                    None => {
+                        let _ = a11y_key.delete_value("CursorSize");
                     }
                 }
             }
         }
     }
 
-    /// `set_cursor_base_size` が HKCU\Control Panel\Cursors\CursorBaseSize を
-    /// DWORD として書き込み、`clamp_cursor_base_size` でクランプされた値が
-    /// 実際にレジストリへ反映されることを end-to-end で確認する。
+    /// `set_cursor_base_size` が以下を end-to-end で実施することを確認する:
     ///
-    /// 範囲外入力 (1000) を渡しても 256 にクランプされ、戻り値とレジストリ値が
-    /// 一致することも検証する。HKCU のみ書込、Drop で元の値に復元するため
-    /// テスト機のユーザー設定を壊さない。
+    /// 1. `HKCU\Control Panel\Cursors\CursorBaseSize` に DWORD でクランプ済値を書く
+    /// 2. `HKCU\SOFTWARE\Microsoft\Accessibility\CursorSize` にスライダー位置 (1〜15) を書く
+    /// 3. 範囲外入力でも (1) でクランプされ (2) のスライダー位置も対応する
+    ///
+    /// (3) と (4) の SystemParametersInfoW / WM_SETTINGCHANGE broadcast は副作用なので
+    /// unit test で直接検証できないが、registry 書込まで完走することで本番動線の
+    /// 大半をカバーする。
+    ///
+    /// HKCU のみ書込、Drop で 2 キー両方を元の値に復元するためテスト機の
+    /// ユーザー設定を壊さない。
     #[test]
     fn set_cursor_base_size_writes_dword_round_trip() {
         use winreg::enums::*;
@@ -1036,7 +1154,7 @@ mod tests {
 
         let _cleanup = CursorBaseSizeCleanup::capture();
 
-        // 通常値の round-trip
+        // 通常値の round-trip (slider=3 = 64px)
         let written =
             RegistryManager::set_cursor_base_size(64).expect("set_cursor_base_size(64) failed");
         assert_eq!(written, 64, "clamp 内なので入力値がそのまま返るべき");
@@ -1048,7 +1166,22 @@ mod tests {
         let raw: u32 = cursors_key
             .get_value("CursorBaseSize")
             .expect("CursorBaseSize が読み戻せない");
-        assert_eq!(raw, 64, "レジストリに DWORD として書き込まれているべき");
+        assert_eq!(
+            raw, 64,
+            "CursorBaseSize が DWORD として書き込まれているべき"
+        );
+
+        // Accessibility\CursorSize にも slider 位置 3 が書かれているはず
+        let a11y_key = hkcu
+            .open_subkey("SOFTWARE\\Microsoft\\Accessibility")
+            .expect("Accessibility キーが開けない (set_cursor_base_size が作成しているはず)");
+        let slider_raw: u32 = a11y_key
+            .get_value("CursorSize")
+            .expect("Accessibility\\CursorSize が読み戻せない");
+        assert_eq!(
+            slider_raw, 3,
+            "Accessibility\\CursorSize に slider 位置 3 が書き込まれているべき (64px ↔ slider 3)"
+        );
 
         // 範囲外 → クランプ
         let written =
@@ -1058,7 +1191,15 @@ mod tests {
             .get_value("CursorBaseSize")
             .expect("CursorBaseSize が読み戻せない");
         assert_eq!(raw, MAX_CURSOR_BASE_SIZE);
+        let slider_raw: u32 = a11y_key
+            .get_value("CursorSize")
+            .expect("Accessibility\\CursorSize が読み戻せない");
+        assert_eq!(
+            slider_raw,
+            u32::from(MAX_CURSOR_SIZE_SLIDER),
+            "256px は slider 15 に対応するべき"
+        );
 
-        // _cleanup の Drop で元の値に復元される。
+        // _cleanup の Drop で両方の値が元に戻る。
     }
 }
