@@ -554,8 +554,19 @@ impl RegistryManager {
         }
 
         // (2) HKCU\Control Panel\Cursors\CursorBaseSize を書く (canonical 値)。
+        //
+        // **KEY_READ | KEY_WRITE 両方が必須**:
+        //   - `set_value("CursorBaseSize", ...)` には KEY_WRITE
+        //   - 直後の read-back 検証 (`get_value`) と、(4) `apply_system_cursors_at_size`
+        //     内の各役割パス取得 (`get_value`) に KEY_READ が必要
+        //
+        // KEY_WRITE 単独だと `set_value` は成功する一方、同じハンドルでの `get_value` が
+        // permission denied で Err になり、本コードは `.ok()` / `Err(_) => continue` で
+        // 握り潰すため「書込は成功、読取は静かに失敗」という悪い fail mode に陥る。
+        // この結果、過去3回 (41574f7 / cee1398 / d96296c) の修整は本命の機構を実装した
+        // にもかかわらず効かなかった (`SetSystemCursor 適用: 0/14`、`read_back=None`)。
         let cursors_key = hkcu
-            .open_subkey_with_flags("Control Panel\\Cursors", KEY_WRITE)
+            .open_subkey_with_flags("Control Panel\\Cursors", KEY_READ | KEY_WRITE)
             .map_err(|e| AppError::Registry(format!("Cursors キーを開けません: {}", e)))?;
         cursors_key
             .set_value("CursorBaseSize", &clamped)

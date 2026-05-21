@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - カーソルサイズスライダーを動かしても、現在表示中のカーソルが視覚的にリサイズされない不具合を修正。原因は `SystemParametersInfoW(SPI_SETCURSORS)` が `HKCU\Control Panel\Cursors\CursorBaseSize` の DWORD 変更を実行時に再評価しないため、現在キャッシュされているカーソルがそのまま残ること。修正として Windows 設定アプリの「マウスポインターとタッチ」スライダーが内部で行っているのと同じ経路 — `LoadImageW(file, IMAGE_CURSOR, target_size, target_size, LR_LOADFROMFILE)` で明示サイズのカーソルを生成 → `SetSystemCursor(hcursor, OCR_*)` で kernel の cursor table を直接差し替え — を `registry::RegistryManager::apply_system_cursors_at_size` として実装し、`set_cursor_base_size` から DWORD 書込・`SPI_SETCURSORS` の後に呼ぶようにした。これにより全アプリ・全 HDC で即時にカーソルが指定サイズに切り替わる。`OCR_*` 定数が存在する 14 種の標準役割 (Arrow / Help / AppStarting / Wait / Crosshair / IBeam / No / Size×6 / UpArrow / Hand) が対象で、`NWPen` / `Pin` / `Person` の 3 種は `OCR_*` がないため即時反映対象外 (DWORD 永続化のみ、次回テーマ適用 / ログオン時に反映)。レジストリ書込は HKCU 限定のまま、UAC 不要。
+- 上記カーソルサイズ反映機構が、新規実装後も依然として「DWORD 書込は成功するが `read_back=None` / `SetSystemCursor 適用: 0/14`」となり視覚反映しない不具合を再修正。真の根本原因は `set_cursor_base_size` 内で `HKCU\Control Panel\Cursors` を `KEY_WRITE` 単独で開いていたこと — Win32 レジストリ API のアクセス権は読/書独立で、`set_value` は通るが同じハンドルでの `get_value` / `get_raw_value` が `PermissionDenied` で静かに失敗し、続く read-back 検証と `apply_system_cursors_at_size` 内の役割パス取得がすべて空振りしていた。`open_subkey_with_flags("Control Panel\\Cursors", KEY_READ | KEY_WRITE)` に変更して両方の操作を1つのハンドルで通せるようにし、これで DWORD 書込・read-back・14 役割の `LoadImageW`+`SetSystemCursor` 一括差し替えが全て成立する。HKCU 限定 / UAC 不要 / トランザクション独立は維持。
 
 ## [0.0.3] - 2026-05-20 (pre-release)
 
