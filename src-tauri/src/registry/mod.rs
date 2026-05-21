@@ -490,25 +490,32 @@ impl RegistryManager {
     /// `clamp_cursor_base_size` で [MIN_CURSOR_BASE_SIZE, MAX_CURSOR_BASE_SIZE]
     /// (32〜256) にクランプされる。戻り値は実際に書き込まれた値。
     ///
-    /// ## なぜ 3 段階の通知が必要か
+    /// ## 反映機構: なぜ SetSystemCursor が必要か
     ///
-    /// Windows 設定アプリの「マウスポインターとタッチ」スライダーが内部で行っているのと
-    /// 同じ通知シーケンスを再現する。`SystemParametersInfoW(SPI_SETCURSORS, ...)` 単体では
-    /// シェル / WebView2 / 一部サードパーティアプリでカーソルが視覚的に更新されない
-    /// ケースが OS バージョン (特に Win11 22H2+) で報告されている:
+    /// `CursorBaseSize` を書いて `SPI_SETCURSORS` を呼ぶだけでは、Windows 11 22H2+ で
+    /// **実行中セッションのカーソルが視覚的にリサイズされない**。`SPI_SETCURSORS` は
+    /// 役割パスの差分しか検知しないため、`CursorBaseSize` の DWORD 値が変わっても
+    /// 現在のキャッシュ済みカーソルを破棄しないからである。
+    ///
+    /// Windows 設定アプリの「マウスポインターとタッチ」スライダーが内部で行っている
+    /// 本命の経路は `LoadImageW(file, IMAGE_CURSOR, cx, cy, LR_LOADFROMFILE)` で
+    /// 明示サイズのカーソルを生成し、`SetSystemCursor(hCursor, OCR_*)` で kernel の
+    /// cursor table を直接差し替えること。これが唯一、全アプリ・全 HDC で即時反映する。
+    ///
+    /// 本関数はこの全シーケンスを再現する:
     ///
     /// 1. **`HKCU\SOFTWARE\Microsoft\Accessibility\CursorSize`** にスライダー位置 (1〜15) を
-    ///    DWORD で書く。Settings アプリが UI の状態保持用に書いている値で、これが欠けると
-    ///    Settings 側の表示と乖離する。
-    /// 2. **`HKCU\Control Panel\Cursors\CursorBaseSize`** に DWORD (32〜256) を書く。
-    ///    USER32 の cursor renderer がカーソル画像のラスタライズ時に参照する canonical 値。
+    ///    DWORD で書く (Settings アプリの UI 状態保持用、best-effort)。
+    /// 2. **`HKCU\Control Panel\Cursors\CursorBaseSize`** に DWORD (32〜256) を書く
+    ///    (永続化 — 次回ログオン時にもサイズが保たれるため必須)。
     /// 3. **`SystemParametersInfoW(SPI_SETCURSORS, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE)`** を
-    ///    呼ぶ。kernel に「カーソルキャッシュを破棄して registry から再ロードしろ」と
-    ///    指示する。SPIF_SENDCHANGE で WM_SETTINGCHANGE が broadcast されるが、lParam は
-    ///    OS 実装依存。
-    /// 4. **`SendNotifyMessageW(HWND_BROADCAST, WM_SETTINGCHANGE, 0, L"Cursors")`** を
-    ///    明示的に送る (non-blocking)。step 3 の broadcast を無視するアプリ (lParam が
-    ///    異なる場合がある) にも「Cursors セクションを再読み込み」を強制する。
+    ///    呼ぶ (Win10 旧版や `LoadImageW` 経路をフォールバックとして使うアプリへの互換)。
+    /// 4. **[`Self::apply_system_cursors_at_size`]** で 14 種の OCR_* 役割について
+    ///    `LoadImageW` + `SetSystemCursor` を実行 — これが視覚反映の本命。
+    ///    NWPen / Pin / Person の3役割は OCR_* 定数が存在しないので即時反映対象外
+    ///    (DWORD だけ書かれ、次回テーマ適用 / ログオン時に反映される)。
+    /// 5. **`SendNotifyMessageW(HWND_BROADCAST, WM_SETTINGCHANGE, 0, L"Cursors")`** を
+    ///    明示送信 (Settings セクション再読み込みを期待するアプリへの最終通知)。
     ///
     /// broadcast 偽陽性は [`Self::is_broadcast_false_positive`] で吸収する。
     ///
@@ -563,42 +570,14 @@ impl RegistryManager {
             slider_pos
         );
 
-        // (2.5) 各カーソル役割パスを「同じバイト列で」再書込する。
-        //
-        // SystemParametersInfoW(SPI_SETCURSORS) はカーソル設定の差分を検知できた場合
-        // のみカーソルを再ラスタライズする。CursorBaseSize 単独変更だと Windows 11
-        // 22H2+ で「役割パスは同一だから変更なし」とショートカット判断され、視覚的に
-        // サイズが変わらない症状が出る (theme::apply_cursors は役割パスが変わるので
-        // 同じ SPI_SETCURSORS でも問題なく動作する)。
-        //
-        // 各役割の raw value を読み、そのまま set_raw_value で書き戻すことで Windows
-        // カーネルに「Cursors キーで何かが変わった」フラグを立てさせ、後続の
-        // SPI_SETCURSORS が確実に全カーソルを CursorBaseSize に応じて再ラスタライズ
-        // するよう促す。
-        //
-        // raw value 経由で REG_EXPAND_SZ の型情報と UTF-16 LE バイト列を完全保存する
-        // ため、`%SystemRoot%` 等の環境変数参照を含む Windows 既定パスも壊れない。
-        // 個別役割の失敗は best-effort (続行) — 17 個全部失敗しても (3) で従来通りの
-        // refresh は試みる。
-        let mut refresh_count: usize = 0;
-        for role in CursorRole::all() {
-            let name = role.registry_name();
-            match cursors_key.get_raw_value(name) {
-                Ok(raw) => {
-                    if let Err(e) = cursors_key.set_raw_value(name, &raw) {
-                        tracing::debug!("role '{}' 再書込失敗 (続行): {}", name, e);
-                    } else {
-                        refresh_count += 1;
-                    }
-                }
-                Err(_) => {
-                    // 値が存在しない役割は Windows 既定継承 — 再書込不要
-                }
-            }
-        }
-        tracing::debug!("カーソル役割再書込: {}/17", refresh_count);
+        // cursors_key は (4) の SetSystemCursor 用にもう一度だけ使う必要があるので
+        // ここでは drop しない。
 
-        // (3) SystemParametersInfoW(SPI_SETCURSORS) で kernel に再ロード指示
+        // (3) SystemParametersInfoW(SPI_SETCURSORS) で kernel に再ロード指示。
+        //     これは Win10 旧版や、cursor scheme 経由でカーソルを取得する一部
+        //     レガシーアプリ向けの互換経路。Win11 22H2+ では (4) の SetSystemCursor が
+        //     視覚反映の本命なので、本ステップは「broadcast 偽陽性以外のエラーは
+        //     ログ出力にとどめて続行」する形に緩和する (registry 書込は完了済み)。
         use windows::Win32::UI::WindowsAndMessaging::{
             SystemParametersInfoW, SPIF_SENDCHANGE, SPIF_UPDATEINIFILE, SPI_SETCURSORS,
         };
@@ -609,9 +588,6 @@ impl RegistryManager {
                 None,
                 SPIF_UPDATEINIFILE | SPIF_SENDCHANGE,
             );
-            // SPI_SETCURSORS と同じ WM_SETTINGCHANGE ブロードキャスト偽陽性が
-            // CursorBaseSize 拡大時にこそ頻発する (シェルがカーソルキャッシュを
-            // 再構築している最中で受信側の HWND が一時的に無効化される)。
             match &result {
                 Ok(()) => tracing::debug!("SPI_SETCURSORS 成功"),
                 Err(e) if Self::is_broadcast_false_positive(e) => {
@@ -621,15 +597,32 @@ impl RegistryManager {
                     );
                 }
                 Err(e) => {
-                    return Err(AppError::Registry(format!(
-                        "SPI_SETCURSORS の呼び出しに失敗: {}",
-                        e
-                    )));
+                    tracing::warn!("SPI_SETCURSORS 失敗 (続行 — SetSystemCursor が本命): {}", e);
                 }
             }
         }
 
-        // (4) 明示的に WM_SETTINGCHANGE(lParam=L"Cursors") を broadcast。
+        // (4) **本命**: LoadImageW + SetSystemCursor で全 OCR_* 役割を明示サイズで再ロード。
+        //     これが Windows 設定アプリのスライダーが内部で行っている経路で、
+        //     `SPI_SETCURSORS` で再ラスタライズされないキャッシュ済みカーソルを kernel の
+        //     cursor table から直接差し替える唯一の方法。
+        match Self::apply_system_cursors_at_size(&cursors_key, clamped) {
+            Ok(applied) => {
+                tracing::info!(
+                    "SetSystemCursor 適用: {}/14 OCR_* 役割 @ {}px",
+                    applied,
+                    clamped
+                );
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "SetSystemCursor 一括適用失敗 (続行 — registry 書込は完了済み): {}",
+                    e
+                );
+            }
+        }
+
+        // (5) 明示的に WM_SETTINGCHANGE(lParam=L"Cursors") を broadcast。
         //     SPIF_SENDCHANGE が送る broadcast の lParam は OS 実装依存で、
         //     L"Cursors" を待ち受けるアプリ (shell / WebView2 含む) が無視する
         //     ケースがあるため、明示送信で完全に上書きする。
@@ -639,6 +632,108 @@ impl RegistryManager {
         Self::broadcast_setting_change_cursors();
 
         Ok(clamped)
+    }
+
+    /// `CursorBaseSize` 書込後の本命: 14 種の OCR_* 役割について `LoadImageW` で
+    /// `target_size` ピクセルのカーソルを生成し、`SetSystemCursor` で kernel の
+    /// cursor table を直接差し替える。
+    ///
+    /// `SPI_SETCURSORS` は実行時に `CursorBaseSize` の DWORD 値を再評価しないため、
+    /// 視覚反映を即時実現する唯一の経路がこれ。Windows 設定アプリの
+    /// 「マウスポインターとタッチ」スライダーが内部で行っているのと同じ動作。
+    ///
+    /// 戻り値は `SetSystemCursor` が成功した役割の数 (期待値: 14)。
+    /// `NWPen` / `Pin` / `Person` は対応する `OCR_*` 定数が存在しないため
+    /// 即時反映できず、サイレントスキップする (DWORD 永続化済みなので次回テーマ
+    /// 適用 / ログオン時に反映される)。
+    ///
+    /// 個別役割の `LoadImageW` / `SetSystemCursor` 失敗は best-effort (debug ログ
+    /// のみ、続行)。`LR_SHARED` は使わない — `SetSystemCursor` は HCURSOR の
+    /// 所有権を OS に移譲して関数内で destroy する仕様のため、`LR_LOADFROMFILE`
+    /// 単独で都度ロードする。
+    #[cfg(windows)]
+    fn apply_system_cursors_at_size(
+        cursors_key: &winreg::RegKey,
+        target_size: u32,
+    ) -> AppResult<usize> {
+        use windows::core::PCWSTR;
+        use windows::Win32::UI::WindowsAndMessaging::{
+            LoadImageW, SetSystemCursor, HCURSOR, IMAGE_CURSOR, LR_LOADFROMFILE,
+        };
+
+        let mut applied: usize = 0;
+        for role in CursorRole::all() {
+            let ocr_id = match role_to_ocr_id(*role) {
+                Some(id) => id,
+                None => {
+                    tracing::debug!(
+                        "role '{}' は OCR_* マッピングなし — SetSystemCursor スキップ",
+                        role.registry_name()
+                    );
+                    continue;
+                }
+            };
+
+            // 値が存在しない役割は Windows 既定継承なので、レジストリの空文字列も
+            // 「ファイルパスなし」として扱いスキップ。
+            let raw_path: String = match cursors_key.get_value(role.registry_name()) {
+                Ok(s) => s,
+                Err(_) => continue,
+            };
+            if raw_path.is_empty() {
+                continue;
+            }
+
+            // REG_EXPAND_SZ で書かれた %SystemRoot% を実パスに展開。
+            let expanded = expand_env_vars(&raw_path);
+
+            // UTF-16 NUL 終端の wide string に変換 (LoadImageW のシグネチャ要件)。
+            let wide: Vec<u16> = expanded.encode_utf16().chain(std::iter::once(0)).collect();
+
+            // LoadImageW: HMODULE=None (=ファイルからロード), name=ファイルパス,
+            // type=IMAGE_CURSOR, cx/cy=target_size (明示サイズ), fuLoad=LR_LOADFROMFILE。
+            // 失敗 (パス不正 / ファイル無し / .ani サイズ非対応など) は debug ログで続行。
+            let handle = unsafe {
+                LoadImageW(
+                    None,
+                    PCWSTR(wide.as_ptr()),
+                    IMAGE_CURSOR,
+                    target_size as i32,
+                    target_size as i32,
+                    LR_LOADFROMFILE,
+                )
+            };
+            let raw_handle = match handle {
+                Ok(h) => h,
+                Err(e) => {
+                    tracing::debug!(
+                        "LoadImageW 失敗 role='{}' (続行): {}",
+                        role.registry_name(),
+                        e
+                    );
+                    continue;
+                }
+            };
+
+            // HANDLE -> HCURSOR (windows-rs では別 newtype のため明示変換)。
+            // SAFETY: LoadImageW が IMAGE_CURSOR で返した handle は HCURSOR として扱える。
+            let hcursor = HCURSOR(raw_handle.0);
+
+            // SetSystemCursor: 成功時は hcursor の所有権を OS 側に移譲し、関数内で
+            // destroy されるため呼出側で destroy 不要 (= ここで二重 free しない)。
+            match unsafe { SetSystemCursor(hcursor, ocr_id) } {
+                Ok(()) => applied += 1,
+                Err(e) => {
+                    tracing::debug!(
+                        "SetSystemCursor 失敗 role='{}' (続行): {}",
+                        role.registry_name(),
+                        e
+                    );
+                }
+            }
+        }
+
+        Ok(applied)
     }
 
     /// `WM_SETTINGCHANGE(lParam=L"Cursors")` を `HWND_BROADCAST` 宛に非ブロッキングで送る。
@@ -909,6 +1004,45 @@ pub fn base_size_to_slider_position(size: u32) -> u8 {
     slider.clamp(MIN_CURSOR_SIZE_SLIDER, MAX_CURSOR_SIZE_SLIDER)
 }
 
+/// `CursorRole` を `SetSystemCursor` 用の `OCR_*` 定数 (= `SYSTEM_CURSOR_ID`) に
+/// マップする。`NWPen` / `Pin` / `Person` には対応する `OCR_*` が存在しないため
+/// `None` を返す (= `SetSystemCursor` で即時反映できない)。
+///
+/// マッピング根拠: Windows SDK の `winuser.h` で定義されている 14 種の `OCR_*` 定数
+/// (`OCR_NORMAL` / `OCR_IBEAM` / `OCR_WAIT` / `OCR_CROSS` / `OCR_UP` / `OCR_SIZE*` ×6 /
+/// `OCR_NO` / `OCR_HAND` / `OCR_APPSTARTING` / `OCR_HELP`)。
+///
+/// `windows` crate (0.62) は各定数を `SYSTEM_CURSOR_ID(u32)` newtype として export
+/// しているので、`SetSystemCursor` のシグネチャ `(HCURSOR, SYSTEM_CURSOR_ID) -> Result<()>`
+/// にそのまま渡せる。
+#[cfg(windows)]
+fn role_to_ocr_id(
+    role: CursorRole,
+) -> Option<windows::Win32::UI::WindowsAndMessaging::SYSTEM_CURSOR_ID> {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        OCR_APPSTARTING, OCR_CROSS, OCR_HAND, OCR_HELP, OCR_IBEAM, OCR_NO, OCR_NORMAL, OCR_SIZEALL,
+        OCR_SIZENESW, OCR_SIZENS, OCR_SIZENWSE, OCR_SIZEWE, OCR_UP, OCR_WAIT,
+    };
+    Some(match role {
+        CursorRole::Arrow => OCR_NORMAL,
+        CursorRole::Help => OCR_HELP,
+        CursorRole::AppStarting => OCR_APPSTARTING,
+        CursorRole::Wait => OCR_WAIT,
+        CursorRole::Crosshair => OCR_CROSS,
+        CursorRole::IBeam => OCR_IBEAM,
+        CursorRole::No => OCR_NO,
+        CursorRole::SizeNS => OCR_SIZENS,
+        CursorRole::SizeWE => OCR_SIZEWE,
+        CursorRole::SizeNWSE => OCR_SIZENWSE,
+        CursorRole::SizeNESW => OCR_SIZENESW,
+        CursorRole::SizeAll => OCR_SIZEALL,
+        CursorRole::UpArrow => OCR_UP,
+        CursorRole::Hand => OCR_HAND,
+        // OCR_* 定数が存在しない3役割は即時反映対象外。
+        CursorRole::NWPen | CursorRole::Pin | CursorRole::Person => return None,
+    })
+}
+
 #[cfg(test)]
 mod size_helpers_tests {
     use super::*;
@@ -969,6 +1103,59 @@ mod size_helpers_tests {
         assert_eq!(base_size_to_slider_position(31), 1);
         assert_eq!(base_size_to_slider_position(257), 15);
         assert_eq!(base_size_to_slider_position(u32::MAX), 15);
+    }
+
+    /// `role_to_ocr_id` のマッピング契約:
+    /// - 14 種の標準カーソル役割は OCR_* 定数にマップされる (Some)
+    /// - NWPen / Pin / Person は対応する OCR_* が存在しない (None)
+    ///
+    /// この契約が変わると `apply_system_cursors_at_size` の挙動 (即時反映できる
+    /// 役割数) が変わるため、回帰検出の意味で固定する。
+    #[cfg(windows)]
+    #[test]
+    fn role_to_ocr_id_covers_expected_roles() {
+        // OCR_* マッピングが存在する 14 役割
+        for role in [
+            CursorRole::Arrow,
+            CursorRole::Help,
+            CursorRole::AppStarting,
+            CursorRole::Wait,
+            CursorRole::Crosshair,
+            CursorRole::IBeam,
+            CursorRole::No,
+            CursorRole::SizeNS,
+            CursorRole::SizeWE,
+            CursorRole::SizeNWSE,
+            CursorRole::SizeNESW,
+            CursorRole::SizeAll,
+            CursorRole::UpArrow,
+            CursorRole::Hand,
+        ] {
+            assert!(
+                role_to_ocr_id(role).is_some(),
+                "{:?} は OCR_* にマップされるべき",
+                role
+            );
+        }
+        // OCR_* マッピングがない 3 役割 (Windows 10+ の追加 / 手書きペン専用)
+        for role in [CursorRole::NWPen, CursorRole::Pin, CursorRole::Person] {
+            assert!(
+                role_to_ocr_id(role).is_none(),
+                "{:?} には OCR_* 定数が存在しないので None を返すべき",
+                role
+            );
+        }
+        // 全 17 役割で合計 14 + 3 = 17 — 抜け漏れがないこと
+        let mapped = CursorRole::all()
+            .iter()
+            .filter(|r| role_to_ocr_id(**r).is_some())
+            .count();
+        let unmapped = CursorRole::all()
+            .iter()
+            .filter(|r| role_to_ocr_id(**r).is_none())
+            .count();
+        assert_eq!(mapped, 14, "OCR_* にマップされる役割は 14 種であるべき");
+        assert_eq!(unmapped, 3, "OCR_* にマップされない役割は 3 種であるべき");
     }
 
     /// clamp_cursor_base_size の境界。
@@ -1142,30 +1329,41 @@ mod tests {
         fn drop(&mut self) {
             use winreg::enums::*;
             use winreg::RegKey;
+
+            // 元の DWORD 値があれば set_cursor_base_size 経由で「完全復元」する。
+            // これは DWORD 書込 + SetSystemCursor までフルパイプラインを通すので、
+            // 視覚的にもユーザーの元のサイズに戻る (テスト機の cursors を 256px のまま
+            // 放置しないため重要 — SetSystemCursor の効果はセッション終了まで残る)。
+            //
+            // 元値が None (= 未設定 = Windows 既定 32px 相当) のときは値そのものは
+            // 削除しつつ、視覚反映のために 32px で SetSystemCursor を流す。
+            let restored_size = self.cursor_base_size.unwrap_or(MIN_CURSOR_BASE_SIZE);
+            let _ = RegistryManager::set_cursor_base_size(restored_size);
+
+            // set_cursor_base_size は値を書く動作なので、「元から値が無かった」
+            // ケースでは書込んだ値を削除し直す (= 真の原状回復)。
             let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-            if let Ok(cursors_key) =
-                hkcu.open_subkey_with_flags("Control Panel\\Cursors", KEY_WRITE)
-            {
-                match self.cursor_base_size {
-                    Some(v) => {
-                        let _ = cursors_key.set_value("CursorBaseSize", &v);
-                    }
-                    None => {
-                        let _ = cursors_key.delete_value("CursorBaseSize");
-                    }
+            if self.cursor_base_size.is_none() {
+                if let Ok(cursors_key) =
+                    hkcu.open_subkey_with_flags("Control Panel\\Cursors", KEY_WRITE)
+                {
+                    let _ = cursors_key.delete_value("CursorBaseSize");
                 }
             }
-            if let Ok(a11y_key) =
-                hkcu.open_subkey_with_flags("SOFTWARE\\Microsoft\\Accessibility", KEY_WRITE)
-            {
-                match self.accessibility_cursor_size {
-                    Some(v) => {
-                        let _ = a11y_key.set_value("CursorSize", &v);
-                    }
-                    None => {
-                        let _ = a11y_key.delete_value("CursorSize");
-                    }
+            if self.accessibility_cursor_size.is_none() {
+                if let Ok(a11y_key) =
+                    hkcu.open_subkey_with_flags("SOFTWARE\\Microsoft\\Accessibility", KEY_WRITE)
+                {
+                    let _ = a11y_key.delete_value("CursorSize");
                 }
+            } else if let (Some(orig), Ok(a11y_key)) = (
+                self.accessibility_cursor_size,
+                hkcu.open_subkey_with_flags("SOFTWARE\\Microsoft\\Accessibility", KEY_WRITE),
+            ) {
+                // set_cursor_base_size は base_size_to_slider_position で再計算する
+                // ため、四捨五入で元のスライダー位置とズレるケースがありうる。
+                // 元のスライダー値を正確に書き戻す。
+                let _ = a11y_key.set_value("CursorSize", &orig);
             }
         }
     }
