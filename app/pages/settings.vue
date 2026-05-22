@@ -75,6 +75,16 @@ const CURSOR_SIZE_MAX_SLIDER = 15
 const cursorSizeSlider = ref<number>(CURSOR_SIZE_MIN_SLIDER)
 const cursorSizeBusy = ref(false)
 const cursorSizeError = ref<string | null>(null)
+// Windows 側の生の Accessibility\CursorSize (slider 1-15)。`cursorSizeSlider` は
+// CursorBaseSize から算出された slider 位置だが、こちらは Accessibility key の直値。
+// eoa pipeline 状態 (== Windows Settings でサイズが拡大されている状態) の検出に使う。
+const cursorSizeSliderRaw = ref<number>(1)
+// Windows 側の生の Accessibility\CursorType (0=白, 1=黒, 2=反転, 3=白拡大時, 6=カスタム ...)。
+// gate 判定には使わないが UI メッセージのバリエーション切替に使う。
+const cursorTypeRaw = ref<number>(0)
+// eoa pipeline 起動中の判定: `cursorSizeSliderRaw != 1`。
+// 本アプリの slider はこのとき disabled にする (spec: case E + CursorSize gate)。
+const cursorAccessibilityActive = computed(() => cursorSizeSliderRaw.value !== 1)
 
 function dwordToSlider(dword: number): number {
   const clamped = Math.max(
@@ -113,11 +123,19 @@ async function onCursorSizeCommit(next: number) {
 
 async function refreshCursorSizeFromOs() {
   try {
-    const a11y = await invokeTauri<{ cursor_base_size: number }>('get_accessibility_conflicts')
+    const a11y = await invokeTauri<{
+      cursor_base_size: number
+      cursor_size_slider: number
+      cursor_type: number
+    }>('get_accessibility_conflicts')
     cursorSizeSlider.value = dwordToSlider(a11y?.cursor_base_size ?? CURSOR_SIZE_MIN_DWORD)
+    cursorSizeSliderRaw.value = a11y?.cursor_size_slider ?? 1
+    cursorTypeRaw.value = a11y?.cursor_type ?? 0
   } catch {
-    // 取得失敗時は既定 (slider=1) のまま
+    // 取得失敗時は既定 (slider=1, type=0) のまま
     cursorSizeSlider.value = CURSOR_SIZE_MIN_SLIDER
+    cursorSizeSliderRaw.value = 1
+    cursorTypeRaw.value = 0
   }
 }
 const startup = ref({
@@ -598,13 +616,44 @@ function onSearchBlur() {
 
 /**
  * GeneralSection の「OS から再取得」リンクから明示的に呼ばれる手動 refresh。
- * 自動的な focus / visibilitychange トリガーは 2026-05-22 のアーキテクチャ刷新で
- * 撤去された (Win↔アプリ往復でカーソルが徐々に肥大化するフィードバックループ回避)。
- * ユーザーが Windows 設定アプリ側でサイズを変えたあと、明示的にアプリ側へ取り込みたい
- * ときだけ使う。
  */
 function onRefreshCursorSizeFromOs() {
   void refreshCursorSizeFromOs()
+}
+
+/**
+ * GeneralSection の「Windows 設定を開く」ボタンから呼ばれる。eoa pipeline 解除のために
+ * Windows のアクセシビリティ設定 (マウスポインターとタッチ) へ deep-link する。
+ */
+async function onOpenWindowsCursorSettings() {
+  try {
+    await invokeTauri('open_url', { url: 'ms-settings:easeofaccess-cursor' })
+  } catch (err) {
+    console.warn('[Settings] open ms-settings:easeofaccess-cursor failed:', err)
+  }
+}
+
+/**
+ * Windows 側 (アクセシビリティ「マウスポインターとタッチ」スライダー / コントロール
+ * パネル / 他アプリ) でカーソルサイズが変更されたあと、本アプリへフォーカスが戻った
+ * タイミングで OS 状態を再取得し、`cursorAccessibilityActive` を更新する。
+ *
+ * 2026-05-22 の case B+ 刷新で一度撤去したが、続く 2026-05-23 の case E 採用で
+ * 撤去の元になっていた「徐々に大きくなる」現象は eoa pipeline 起因と判明したため、
+ * 再導入しても再発しない:
+ *  - eoa active 時は UI が disabled → ユーザーは slider 操作できない → ループ起点なし
+ *  - eoa inactive 時は CursorSize==1 → 我々の write が標準 pipeline で完結 →
+ *    Windows が auto-correct する経路がない
+ *
+ * Windows Settings 経由で CursorSize=1 に戻ったあと、focus 戻りで自動的に slider が
+ * enabled に切替わる UX を提供するためにも必要。
+ */
+function onWindowFocus() {
+  void refreshCursorSizeFromOs()
+}
+function onVisibilityChange() {
+  if (typeof document === 'undefined') return
+  if (document.visibilityState === 'visible') void refreshCursorSizeFromOs()
 }
 
 onMounted(async () => {
@@ -612,12 +661,27 @@ onMounted(async () => {
   applyConfigToLocal()
   await refreshKeystore()
   await loadCrashReports()
-  // OS 側の cursor size 初期値を **起動時 1 回だけ** 取得する。それ以降は
-  // アプリの slider 値が source of truth。ユーザーが Windows 側で変えた値を
-  // 取り込みたい場合は GeneralSection の「OS から再取得」リンクで明示 trigger。
   await refreshCursorSizeFromOs()
+  // eoa pipeline 解除 (= Windows Settings で size=1) を検出するため、focus 戻り /
+  // visibilitychange を購読して自動再同期する。case E + CursorSize gate により、
+  // 過去発生した「徐々に大きくなる」ループは再発しない (詳細は onWindowFocus の docstring)。
+  if (typeof window !== 'undefined') {
+    window.addEventListener('focus', onWindowFocus)
+  }
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', onVisibilityChange)
+  }
   // 起動時の同期完了を watch で検出してローカル参照に反映
   watch(appConfig, applyConfigToLocal)
+})
+
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('focus', onWindowFocus)
+  }
+  if (typeof document !== 'undefined') {
+    document.removeEventListener('visibilitychange', onVisibilityChange)
+  }
 })
 
 // 任意のローカル変更を dirty フラグ化 (applyConfigToLocal 実行中は除外)
@@ -719,8 +783,12 @@ function selectSection(id: SectionId) {
           :cursor-size-px="sliderToDword(cursorSizeSlider)"
           :cursor-size-busy="cursorSizeBusy"
           :cursor-size-error="cursorSizeError"
+          :cursor-accessibility-active="cursorAccessibilityActive"
+          :cursor-current-windows-slider="cursorSizeSliderRaw"
+          :cursor-current-windows-type="cursorTypeRaw"
           @update:cursor-size-slider="onCursorSizeCommit"
           @refresh-cursor-size-from-os="onRefreshCursorSizeFromOs"
+          @open-windows-cursor-settings="onOpenWindowsCursorSettings"
           @config-restored="onConfigRestored"
         />
 

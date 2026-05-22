@@ -263,6 +263,11 @@ export default {
     cursorSizeReadout: '{px} px',
     cursorSizeError: 'Failed to change size: {error}',
     cursorSizeRefreshFromOs: 'Sync from Windows',
+    cursorSizeEoaSizeMessage:
+      'Mouse pointer size is enlarged in Windows (currently {currentSlider}). The in-app slider is disabled. Reset Windows size to 1 to re-enable this slider.',
+    cursorSizeEoaStyleMessage:
+      'Mouse pointer style (type={type}) limits in-app size adjustment. Switch the style to White / Black / Inverted.',
+    cursorSizeOpenWindowsSettings: 'Open Windows settings',
     groupNotifications: 'Notifications',
     showApplyToastLabel: 'Toast on apply result',
     showApplyToastDesc: 'Show a Windows toast with apply result',

@@ -262,6 +262,11 @@ export default {
     cursorSizeReadout: '{px} px',
     cursorSizeError: 'サイズ変更に失敗しました: {error}',
     cursorSizeRefreshFromOs: 'OS から再取得',
+    cursorSizeEoaSizeMessage:
+      'Windows でマウスポインターのサイズが拡大 (現在: {currentSlider}) されているため、本アプリでの調整は利用できません。Windows の設定でサイズを 1 に戻すと、本アプリでの調整が再度有効になります。',
+    cursorSizeEoaStyleMessage:
+      'Windows のマウスポインタースタイル (type={type}) によって本アプリでの調整が制限されています。スタイルを「白 / 黒 / 反転」に変更してください。',
+    cursorSizeOpenWindowsSettings: 'Windows の設定を開く',
     groupNotifications: '通知',
     showApplyToastLabel: '適用結果のトースト表示',
     showApplyToastDesc: 'Windows トースト通知で適用結果を告知',

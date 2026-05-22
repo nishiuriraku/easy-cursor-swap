@@ -514,10 +514,42 @@ impl RegistryManager {
     /// 本機能は「テーマ適用」とは独立した設定として扱うため、
     /// `_pending_apply.snapshot` には参加しない (= cursor 役割の transactional
     /// apply とは別系統)。テーマを切り替えてもサイズは保持される。
+    ///
+    /// ## Defensive guard: Windows accessibility eoa pipeline 状態の検出
+    ///
+    /// 本関数は冒頭で `HKCU\SOFTWARE\Microsoft\Accessibility\CursorSize` を読み、値が
+    /// 1 以外ならば即時 [`AppError::Registry`] を返す。Windows Accessibility のスライダー
+    /// が 2 以上に設定されていると Windows は eoa pipeline (動的生成された
+    /// `*_eoa.cur` ファイルを `%LOCALAPPDATA%\Microsoft\Windows\Cursors\` に置く経路)
+    /// を使用しており、本関数の `LoadImageW` + `SetSystemCursor` 経路では視覚反映できない
+    /// ためである。UI 側でも `cursor_size_slider != 1` のとき slider を `disabled` に
+    /// するが、IPC が他経路から呼ばれた場合の安全網として Rust 側でも拒否する。
     #[cfg(windows)]
     pub fn set_cursor_base_size(size: u32) -> AppResult<u32> {
         use winreg::enums::*;
         use winreg::RegKey;
+
+        // (0) Defensive guard: Windows accessibility eoa pipeline がアクティブな
+        //     状態 (CursorSize > 1) では本関数を呼ばない。通常は UI 側で slider を
+        //     disabled にして防御するが、IPC が他経路から直接呼ばれた場合 / UI に
+        //     bug があった場合の安全網。
+        //
+        //     eoa active 中は cursor file paths が `%LOCALAPPDATA%\Microsoft\Windows\Cursors\`
+        //     配下の動的生成 .cur に切替わっており、CursorBaseSize 書込や
+        //     LoadImageW + SetSystemCursor では視覚反映できない。Windows Settings UI
+        //     経由でしか操作できないため、ここで Err を返す。
+        let current_slider: u32 = RegKey::predef(HKEY_CURRENT_USER)
+            .open_subkey(r"SOFTWARE\Microsoft\Accessibility")
+            .and_then(|k| k.get_value("CursorSize"))
+            .unwrap_or(1u32);
+        if current_slider != 1 {
+            return Err(AppError::Registry(format!(
+                "Windows accessibility cursor pipeline is active (CursorSize={}); refuse to \
+                 write to avoid interference with eoa pipeline. User must reset to size 1 via \
+                 Windows Accessibility Settings before in-app slider can apply.",
+                current_slider
+            )));
+        }
 
         let clamped = clamp_cursor_base_size(size);
         let slider_pos = base_size_to_slider_position(clamped);
@@ -1103,7 +1135,18 @@ mod size_helpers_tests {
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, OnceLock};
     use windows::core::{Error as WinError, HRESULT};
+
+    /// `CursorBaseSize` / `Accessibility\CursorSize` は UUID 分離できないグローバル
+    /// レジストリ値。これらを触るテスト (`set_cursor_base_size_*`) は並列実行すると
+    /// 互いに干渉するため、このミューテックスを先頭で取得してシリアライズする。
+    fn cursor_size_test_lock() -> std::sync::MutexGuard<'static, ()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+    }
 
     /// `is_broadcast_false_positive` は SPIF_SENDCHANGE 起因の偽陽性を
     /// 拾い、それ以外の Win32 エラーは伝播させる必要がある。
@@ -1316,7 +1359,19 @@ mod tests {
         use winreg::enums::*;
         use winreg::RegKey;
 
+        // グローバル registry 値を触るテストは並列実行不可。ロックでシリアライズ。
+        let _lock = cursor_size_test_lock();
         let _cleanup = CursorBaseSizeCleanup::capture();
+
+        // defensive guard を通過するために CursorSize=1 (eoa pipeline 非アクティブ) を
+        // 事前にセットする。_cleanup::drop で元の値に復元される。
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let (a11y_pre, _) = hkcu
+            .create_subkey("SOFTWARE\\Microsoft\\Accessibility")
+            .expect("Accessibility キー作成失敗");
+        a11y_pre
+            .set_value("CursorSize", &1u32)
+            .expect("CursorSize=1 書込失敗");
 
         // 通常値の round-trip (slider=3 = 64px)
         let written =
@@ -1348,6 +1403,10 @@ mod tests {
         );
 
         // 範囲外 → クランプ
+        // defensive guard 用に CursorSize=1 を再セット (上の呼出で slider=3 が書込まれた)
+        a11y_pre
+            .set_value("CursorSize", &1u32)
+            .expect("CursorSize=1 (2回目) 書込失敗");
         let written =
             RegistryManager::set_cursor_base_size(1000).expect("set_cursor_base_size(1000) failed");
         assert_eq!(written, MAX_CURSOR_BASE_SIZE);
@@ -1365,5 +1424,37 @@ mod tests {
         );
 
         // _cleanup の Drop で両方の値が元に戻る。
+    }
+
+    /// defensive guard: `Accessibility\CursorSize != 1` のとき
+    /// `set_cursor_base_size` が Err を返すことを確認する。
+    ///
+    /// テスト前に Accessibility/CursorSize=4 をセットし、テスト後に
+    /// `CursorBaseSizeCleanup::drop` で復元 (= 既存 guard が同じ key を扱うため流用)。
+    #[test]
+    fn set_cursor_base_size_rejects_when_accessibility_active() {
+        use winreg::enums::*;
+        use winreg::RegKey;
+
+        // グローバル registry 値を触るテストは並列実行不可。ロックでシリアライズ。
+        let _lock = cursor_size_test_lock();
+        let _cleanup = CursorBaseSizeCleanup::capture();
+
+        // Accessibility\CursorSize = 4 を事前にセット (eoa pipeline 状態を模擬)
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let (a11y_key, _) = hkcu
+            .create_subkey("SOFTWARE\\Microsoft\\Accessibility")
+            .expect("Accessibility キー作成失敗");
+        a11y_key
+            .set_value("CursorSize", &4u32)
+            .expect("CursorSize=4 書込失敗");
+
+        // この状態で set_cursor_base_size を呼ぶと Err になるべき
+        let result = RegistryManager::set_cursor_base_size(96);
+        assert!(
+            matches!(result, Err(AppError::Registry(_))),
+            "Accessibility\\CursorSize != 1 のとき set_cursor_base_size は Err を返すべき, got {:?}",
+            result
+        );
     }
 }

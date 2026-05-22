@@ -74,7 +74,7 @@
 | [hotkey.rs](../src-tauri/src/hotkey.rs) | `RegisterHotKey` で `Ctrl+Alt+Shift+R` → `panic-hotkey` イベント |
 | [autostart.rs](../src-tauri/src/autostart.rs) | `HKCU\...\Run` 登録、MSIX 検出時は no-op で `startupTask` に委譲 |
 | [appusermodel.rs](../src-tauri/src/appusermodel.rs) | `SetCurrentProcessExplicitAppUserModelID("dev.easycursorswap.app")` |
-| [accessibility.rs](../src-tauri/src/accessibility.rs) | `CursorIndicator` / `ContrastScheme` / `CursorBaseSize` 競合検出 |
+| [accessibility.rs](../src-tauri/src/accessibility.rs) | `CursorIndicator` / `ContrastScheme` / `CursorBaseSize` 競合検出 + `Accessibility\CursorSize` (slider 1-15) / `Accessibility\CursorType` (0/1/2/3/6/...) を IPC レスポンス用に取得 (eoa pipeline 状態を frontend 側で `cursor_size_slider != 1` で判定する) |
 | [environment.rs](../src-tauri/src/environment.rs) | RDP / Citrix / Server 検出 (`SM_REMOTESESSION` + `InstallationType`) |
 | [logging.rs](../src-tauri/src/logging.rs) | `tracing-appender` 日次ローテ + 14 日 + 100MB 上限 + `redact_path` / `short_hash` |
 

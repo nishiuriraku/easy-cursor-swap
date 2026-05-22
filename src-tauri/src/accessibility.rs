@@ -43,6 +43,18 @@ pub struct AccessibilityConflicts {
     /// 本アプリで設定可能になったため競合判定からは除外したが、UI スライダーの
     /// 初期値反映のために値自体は引き続き返す。
     pub cursor_base_size: u32,
+    /// `HKCU\SOFTWARE\Microsoft\Accessibility\CursorSize` (slider 1-15) の生値。
+    /// `cursor_base_size` は DWORD だが、こちらは slider 位置そのもの。フロント側は
+    /// `cursor_size_slider != 1` で「Windows accessibility が cursor を支配している」
+    /// 状態を判定し、本アプリのスライダーを disabled にする。
+    /// 失敗時は 1 (= factory state)。
+    pub cursor_size_slider: u8,
+    /// `HKCU\SOFTWARE\Microsoft\Accessibility\CursorType` の生値。
+    /// 0=白 (default), 1=黒, 2=反転, 3=白でサイズ拡大時, 6=カスタムカラー (実測)。
+    /// 将来の Windows アップデートで値域が増える可能性あり。UI メッセージのバリエーション
+    /// 切替で使用 (gate 判定は `cursor_size_slider` 単独で行う)。
+    /// 失敗時は 0。
+    pub cursor_type: u8,
     /// 競合があるか (mouse_sonar / high_contrast のいずれかが有効)
     pub has_conflicts: bool,
 }
@@ -57,6 +69,8 @@ impl AccessibilityConflicts {
         let mouse_sonar_enabled = read_mouse_sonar();
         let high_contrast_enabled = read_high_contrast();
         let cursor_base_size = read_cursor_base_size();
+        let cursor_size_slider = read_accessibility_cursor_size_slider();
+        let cursor_type = read_accessibility_cursor_type();
 
         // CursorBaseSize は本アプリの正規機能となったため競合判定から除外。
         let has_conflicts = mouse_sonar_enabled || high_contrast_enabled;
@@ -65,6 +79,8 @@ impl AccessibilityConflicts {
             mouse_sonar_enabled,
             high_contrast_enabled,
             cursor_base_size,
+            cursor_size_slider,
+            cursor_type,
             has_conflicts,
         }
     }
@@ -144,6 +160,36 @@ fn resolve_cursor_base_size(
     DEFAULT_CURSOR_BASE_SIZE
 }
 
+/// `HKCU\SOFTWARE\Microsoft\Accessibility\CursorSize` (slider 1-15) を読む。
+/// 失敗時はファクトリ状態 1。範囲外は clamp する。
+fn read_accessibility_cursor_size_slider() -> u8 {
+    use crate::registry::{MAX_CURSOR_SIZE_SLIDER, MIN_CURSOR_SIZE_SLIDER};
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let raw: u32 = hkcu
+        .open_subkey(r"SOFTWARE\Microsoft\Accessibility")
+        .and_then(|k| k.get_value("CursorSize"))
+        .unwrap_or(u32::from(MIN_CURSOR_SIZE_SLIDER));
+    raw.clamp(
+        u32::from(MIN_CURSOR_SIZE_SLIDER),
+        u32::from(MAX_CURSOR_SIZE_SLIDER),
+    ) as u8
+}
+
+/// `HKCU\SOFTWARE\Microsoft\Accessibility\CursorType` を読む。
+/// 失敗時は 0 (= 白、ファクトリ)。u8 範囲外は u8::MAX に飽和。
+fn read_accessibility_cursor_type() -> u8 {
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let raw: u32 = hkcu
+        .open_subkey(r"SOFTWARE\Microsoft\Accessibility")
+        .and_then(|k| k.get_value("CursorType"))
+        .unwrap_or(0);
+    if raw > u32::from(u8::MAX) {
+        u8::MAX
+    } else {
+        raw as u8
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -154,6 +200,8 @@ mod tests {
             mouse_sonar_enabled: false,
             high_contrast_enabled: false,
             cursor_base_size: 32,
+            cursor_size_slider: 1,
+            cursor_type: 0,
             has_conflicts: false,
         };
         assert!(!c.has_conflicts);
@@ -170,6 +218,8 @@ mod tests {
                 mouse_sonar_enabled: false,
                 high_contrast_enabled: false,
                 cursor_base_size: size,
+                cursor_size_slider: 1,
+                cursor_type: 0,
                 has_conflicts: false,
             };
             assert!(
@@ -207,6 +257,23 @@ mod tests {
         // cursor_base_size の値は引き続き返される (UI スライダーの初期値用)。
         // 32 (既定) より小さい値は read 側のフォールバックで 32 になるはず。
         assert!(c.cursor_base_size >= DEFAULT_CURSOR_BASE_SIZE);
+    }
+
+    /// `detect` で新規追加された `cursor_size_slider` と `cursor_type` がレンジ内に
+    /// 収まることを確認。値は実機依存だが、いずれの環境でも 1..=15 と 0..=255 の
+    /// 範囲には収まるはず。`read_*` 関数の clamp ロジック動作確認。
+    #[test]
+    fn detect_returns_in_range_accessibility_fields() {
+        use crate::registry::{MAX_CURSOR_SIZE_SLIDER, MIN_CURSOR_SIZE_SLIDER};
+        let c = AccessibilityConflicts::detect();
+        assert!(
+            (MIN_CURSOR_SIZE_SLIDER..=MAX_CURSOR_SIZE_SLIDER).contains(&c.cursor_size_slider),
+            "cursor_size_slider が範囲外: {}",
+            c.cursor_size_slider
+        );
+        // cursor_type は u8 全域 (0..=255) を許容するため上限テストはなし。
+        // 失敗時 0 の規約だけ確認 — `c.cursor_type` がアクセスできる (panic しない) ことで十分。
+        let _ = c.cursor_type;
     }
 
     /// `resolve_cursor_base_size` の優先順位契約: Accessibility 優先 → CursorBaseSize fallback → 32 既定。

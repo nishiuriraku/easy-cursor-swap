@@ -25,6 +25,14 @@ const props = defineProps<{
   cursorSizePx: number
   cursorSizeBusy: boolean
   cursorSizeError: string | null
+  /** Windows 側で eoa pipeline (CursorSize > 1) がアクティブか。
+   *  true のとき本コンポーネントは slider を disabled にし、解除ガイドのバナーを表示する。 */
+  cursorAccessibilityActive: boolean
+  /** Windows 側の現在の slider 位置 (1-15)。バナーメッセージに displayed する。 */
+  cursorCurrentWindowsSlider: number
+  /** Windows 側の現在の CursorType (0=白, 1=黒, 2=反転, 3/6/...=eoa 起動)。
+   *  メッセージのバリエーション切替に使用。 */
+  cursorCurrentWindowsType: number
 }>()
 
 const emit = defineEmits<{
@@ -33,6 +41,8 @@ const emit = defineEmits<{
   (e: 'update:cursor-size-slider', value: number): void
   /** ユーザーが「OS から再取得」を押したとき。親が refreshCursorSizeFromOs を呼ぶ。 */
   (e: 'refresh-cursor-size-from-os'): void
+  /** ユーザーが「Windows 設定を開く」を押したとき。親が ms-settings:easeofaccess-cursor を起動する。 */
+  (e: 'open-windows-cursor-settings'): void
 }>()
 
 // ドラッグ中の視覚フィードバック用にローカル ref を持つ。親側の値が変わったら同期する。
@@ -49,6 +59,21 @@ const localPxPreview = computed(() => {
   const step = 16
   const min = 32
   return min + step * (localSlider.value - props.cursorSizeMin)
+})
+
+// eoa active 時のバナーメッセージを切替える。
+// CursorSize > 1 (= サイズ拡大が原因) と CursorType != 0 (= スタイルが原因) を区別する。
+const eoaMessage = computed(() => {
+  if (props.cursorCurrentWindowsSlider > 1) {
+    return t('settings.cursorSizeEoaSizeMessage', {
+      currentSlider: props.cursorCurrentWindowsSlider,
+    })
+  }
+  // CursorSize == 1 だが eoa active のケース (本仕様 gate では発火しないが将来 known
+  // limitation 緩和時に有効化)。
+  return t('settings.cursorSizeEoaStyleMessage', {
+    type: props.cursorCurrentWindowsType,
+  })
 })
 
 function onSliderInput(ev: Event) {
@@ -98,6 +123,16 @@ function onSliderChange(ev: Event) {
     <div class="prop-section">
       <div class="prop-head">{{ t('settings.groupCursorSize') }}</div>
       <div class="prop-body">
+        <UiAlert v-if="cursorAccessibilityActive" variant="info" class="cursor-size-eoa-banner">
+          <p class="cursor-size-eoa-message">{{ eoaMessage }}</p>
+          <button
+            type="button"
+            class="cursor-size-open-windows-settings"
+            @click="$emit('open-windows-cursor-settings')"
+          >
+            {{ t('settings.cursorSizeOpenWindowsSettings') }}
+          </button>
+        </UiAlert>
         <SettingsRow
           anchor="cursorSize"
           :label="t('settings.cursorSizeLabel')"
@@ -110,7 +145,7 @@ function onSliderChange(ev: Event) {
               :max="cursorSizeMax"
               step="1"
               :value="localSlider"
-              :disabled="cursorSizeBusy"
+              :disabled="cursorSizeBusy || cursorAccessibilityActive"
               :aria-label="t('settings.cursorSizeLabel')"
               :aria-valuemin="cursorSizeMin"
               :aria-valuemax="cursorSizeMax"
@@ -234,5 +269,22 @@ function onSliderChange(ev: Event) {
 }
 .cursor-size-refresh-link:disabled {
   @apply cursor-not-allowed opacity-50;
+}
+.cursor-size-eoa-banner {
+  @apply mb-3;
+}
+.cursor-size-eoa-message {
+  @apply m-0 mb-2 text-[12px] leading-relaxed;
+}
+.cursor-size-open-windows-settings {
+  @apply inline-flex items-center text-[12px] underline decoration-dotted underline-offset-2 transition-colors;
+  color: var(--text-primary, currentColor);
+  background: transparent;
+  border: none;
+  padding: 2px 4px;
+  cursor: pointer;
+}
+.cursor-size-open-windows-settings:hover {
+  @apply opacity-80;
 }
 </style>
