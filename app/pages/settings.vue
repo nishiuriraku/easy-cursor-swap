@@ -597,22 +597,14 @@ function onSearchBlur() {
 }
 
 /**
- * Windows 側 (アクセシビリティ「マウスポインターとタッチ」スライダー / コントロール
- * パネル / 他アプリ) でカーソルサイズが変更されたあと、本アプリへフォーカスが戻った
- * タイミングで OS 状態を再取得してスライダーへ反映する。
- *
- * index.vue の外部カーソル変更検知と同じ 2 経路 (focus / visibilitychange) を使う:
- *  - `focus` (window): 別ウィンドウから戻ってきたとき
- *  - `visibilitychange` (document): タブ非表示 → 表示時。focus と相補。
- *
- * 連発しても `get_accessibility_conflicts` は軽量なので debounce 不要。
+ * GeneralSection の「OS から再取得」リンクから明示的に呼ばれる手動 refresh。
+ * 自動的な focus / visibilitychange トリガーは 2026-05-22 のアーキテクチャ刷新で
+ * 撤去された (Win↔アプリ往復でカーソルが徐々に肥大化するフィードバックループ回避)。
+ * ユーザーが Windows 設定アプリ側でサイズを変えたあと、明示的にアプリ側へ取り込みたい
+ * ときだけ使う。
  */
-function onWindowFocus() {
+function onRefreshCursorSizeFromOs() {
   void refreshCursorSizeFromOs()
-}
-function onVisibilityChange() {
-  if (typeof document === 'undefined') return
-  if (document.visibilityState === 'visible') void refreshCursorSizeFromOs()
 }
 
 onMounted(async () => {
@@ -620,24 +612,12 @@ onMounted(async () => {
   applyConfigToLocal()
   await refreshKeystore()
   await loadCrashReports()
+  // OS 側の cursor size 初期値を **起動時 1 回だけ** 取得する。それ以降は
+  // アプリの slider 値が source of truth。ユーザーが Windows 側で変えた値を
+  // 取り込みたい場合は GeneralSection の「OS から再取得」リンクで明示 trigger。
   await refreshCursorSizeFromOs()
-  if (typeof window !== 'undefined') {
-    window.addEventListener('focus', onWindowFocus)
-  }
-  if (typeof document !== 'undefined') {
-    document.addEventListener('visibilitychange', onVisibilityChange)
-  }
   // 起動時の同期完了を watch で検出してローカル参照に反映
   watch(appConfig, applyConfigToLocal)
-})
-
-onUnmounted(() => {
-  if (typeof window !== 'undefined') {
-    window.removeEventListener('focus', onWindowFocus)
-  }
-  if (typeof document !== 'undefined') {
-    document.removeEventListener('visibilitychange', onVisibilityChange)
-  }
 })
 
 // 任意のローカル変更を dirty フラグ化 (applyConfigToLocal 実行中は除外)
@@ -740,6 +720,7 @@ function selectSection(id: SectionId) {
           :cursor-size-busy="cursorSizeBusy"
           :cursor-size-error="cursorSizeError"
           @update:cursor-size-slider="onCursorSizeCommit"
+          @refresh-cursor-size-from-os="onRefreshCursorSizeFromOs"
           @config-restored="onConfigRestored"
         />
 

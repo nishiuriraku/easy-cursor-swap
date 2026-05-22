@@ -31,6 +31,8 @@ const emit = defineEmits<{
   (e: 'config-restored'): void
   /** スライダー値が確定したとき (`@change` 相当)。親が IPC を発火する。 */
   (e: 'update:cursor-size-slider', value: number): void
+  /** ユーザーが「OS から再取得」を押したとき。親が refreshCursorSizeFromOs を呼ぶ。 */
+  (e: 'refresh-cursor-size-from-os'): void
 }>()
 
 // ドラッグ中の視覚フィードバック用にローカル ref を持つ。親側の値が変わったら同期する。
@@ -122,6 +124,16 @@ function onSliderChange(ev: Event) {
             </span>
           </div>
         </SettingsRow>
+        <div class="cursor-size-refresh">
+          <button
+            type="button"
+            class="cursor-size-refresh-link"
+            :disabled="cursorSizeBusy"
+            @click="$emit('refresh-cursor-size-from-os')"
+          >
+            {{ t('settings.cursorSizeRefreshFromOs') }}
+          </button>
+        </div>
         <p v-if="cursorSizeError" class="cursor-size-error" role="alert">
           {{ t('settings.cursorSizeError', { error: cursorSizeError }) }}
         </p>
@@ -205,5 +217,22 @@ function onSliderChange(ev: Event) {
   padding: 8px 12px;
   background: rgba(255, 100, 100, 0.08);
   border: 1px solid rgba(255, 100, 100, 0.2);
+}
+.cursor-size-refresh {
+  @apply mt-2 flex justify-end;
+}
+.cursor-size-refresh-link {
+  @apply inline-flex items-center text-[12px] underline decoration-dotted underline-offset-2 transition-colors;
+  color: var(--text-secondary, currentColor);
+  background: transparent;
+  border: none;
+  padding: 2px 4px;
+  cursor: pointer;
+}
+.cursor-size-refresh-link:hover:not(:disabled) {
+  color: var(--text-primary, currentColor);
+}
+.cursor-size-refresh-link:disabled {
+  @apply cursor-not-allowed opacity-50;
 }
 </style>

@@ -490,34 +490,26 @@ impl RegistryManager {
     /// `clamp_cursor_base_size` で [MIN_CURSOR_BASE_SIZE, MAX_CURSOR_BASE_SIZE]
     /// (32〜256) にクランプされる。戻り値は実際に書き込まれた値。
     ///
-    /// ## 反映機構: なぜ SetSystemCursor が必要か
+    /// ## 反映機構: SetSystemCursor を経由した一方向書込み
     ///
-    /// `CursorBaseSize` を書いて `SPI_SETCURSORS` を呼ぶだけでは、Windows 11 22H2+ で
-    /// **実行中セッションのカーソルが視覚的にリサイズされない**。`SPI_SETCURSORS` は
-    /// 役割パスの差分しか検知しないため、`CursorBaseSize` の DWORD 値が変わっても
-    /// 現在のキャッシュ済みカーソルを破棄しないからである。
+    /// 本関数はアプリを single source of truth として、Windows レジストリとカーネル
+    /// カーソルテーブルに **書込みのみ** を行う。`SPI_SETCURSORS` や明示
+    /// `WM_SETTINGCHANGE(L"Cursors")` の broadcast は **意図的に行わない** —
+    /// それらは自分自身の [`cursor_watcher`][crate::cursor_watcher] が echo として
+    /// 受信し、focus 戻り時の auto-refresh と組み合わせると Win↔アプリ往復で
+    /// カーソルが徐々に肥大化する双方向同期ループを引き起こすため
+    /// (詳細は `docs/superpowers/specs/2026-05-22-cursor-size-architecture-redesign.md`)。
     ///
-    /// Windows 設定アプリの「マウスポインターとタッチ」スライダーが内部で行っている
-    /// 本命の経路は `LoadImageW(file, IMAGE_CURSOR, cx, cy, LR_LOADFROMFILE)` で
-    /// 明示サイズのカーソルを生成し、`SetSystemCursor(hCursor, OCR_*)` で kernel の
-    /// cursor table を直接差し替えること。これが唯一、全アプリ・全 HDC で即時反映する。
-    ///
-    /// 本関数はこの全シーケンスを再現する:
+    /// シーケンス:
     ///
     /// 1. **`HKCU\SOFTWARE\Microsoft\Accessibility\CursorSize`** にスライダー位置 (1〜15) を
     ///    DWORD で書く (Settings アプリの UI 状態保持用、best-effort)。
     /// 2. **`HKCU\Control Panel\Cursors\CursorBaseSize`** に DWORD (32〜256) を書く
-    ///    (永続化 — 次回ログオン時にもサイズが保たれるため必須)。
-    /// 3. **`SystemParametersInfoW(SPI_SETCURSORS, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE)`** を
-    ///    呼ぶ (Win10 旧版や `LoadImageW` 経路をフォールバックとして使うアプリへの互換)。
-    /// 4. **[`Self::apply_system_cursors_at_size`]** で 14 種の OCR_* 役割について
-    ///    `LoadImageW` + `SetSystemCursor` を実行 — これが視覚反映の本命。
-    ///    NWPen / Pin / Person の3役割は OCR_* 定数が存在しないので即時反映対象外
-    ///    (DWORD だけ書かれ、次回テーマ適用 / ログオン時に反映される)。
-    /// 5. **`SendNotifyMessageW(HWND_BROADCAST, WM_SETTINGCHANGE, 0, L"Cursors")`** を
-    ///    明示送信 (Settings セクション再読み込みを期待するアプリへの最終通知)。
-    ///
-    /// broadcast 偽陽性は [`Self::is_broadcast_false_positive`] で吸収する。
+    ///    (永続化 — 次回ログオン時にもサイズが保たれる)。
+    /// 3. **[`Self::apply_system_cursors_at_size`]** で 14 種の OCR_* 役割について
+    ///    `LoadImageW` + `SetSystemCursor` を実行 — 全アプリ・全 HDC で即時視覚反映。
+    ///    `NWPen` / `Pin` / `Person` の 3 役割は OCR_* 定数が存在しないため即時反映対象外
+    ///    (永続化のみ。次回テーマ適用 / ログオン時に反映される)。
     ///
     /// 本機能は「テーマ適用」とは独立した設定として扱うため、
     /// `_pending_apply.snapshot` には参加しない (= cursor 役割の transactional
@@ -584,39 +576,10 @@ impl RegistryManager {
         // cursors_key は (4) の SetSystemCursor 用にもう一度だけ使う必要があるので
         // ここでは drop しない。
 
-        // (3) SystemParametersInfoW(SPI_SETCURSORS) で kernel に再ロード指示。
-        //     これは Win10 旧版や、cursor scheme 経由でカーソルを取得する一部
-        //     レガシーアプリ向けの互換経路。Win11 22H2+ では (4) の SetSystemCursor が
-        //     視覚反映の本命なので、本ステップは「broadcast 偽陽性以外のエラーは
-        //     ログ出力にとどめて続行」する形に緩和する (registry 書込は完了済み)。
-        use windows::Win32::UI::WindowsAndMessaging::{
-            SystemParametersInfoW, SPIF_SENDCHANGE, SPIF_UPDATEINIFILE, SPI_SETCURSORS,
-        };
-        unsafe {
-            let result = SystemParametersInfoW(
-                SPI_SETCURSORS,
-                0,
-                None,
-                SPIF_UPDATEINIFILE | SPIF_SENDCHANGE,
-            );
-            match &result {
-                Ok(()) => tracing::debug!("SPI_SETCURSORS 成功"),
-                Err(e) if Self::is_broadcast_false_positive(e) => {
-                    tracing::debug!(
-                        "SPI_SETCURSORS broadcast 偽陽性 (HRESULT={:#010x}, ignored)",
-                        e.code().0
-                    );
-                }
-                Err(e) => {
-                    tracing::warn!("SPI_SETCURSORS 失敗 (続行 — SetSystemCursor が本命): {}", e);
-                }
-            }
-        }
-
-        // (4) **本命**: LoadImageW + SetSystemCursor で全 OCR_* 役割を明示サイズで再ロード。
-        //     これが Windows 設定アプリのスライダーが内部で行っている経路で、
-        //     `SPI_SETCURSORS` で再ラスタライズされないキャッシュ済みカーソルを kernel の
-        //     cursor table から直接差し替える唯一の方法。
+        // (3) LoadImageW + SetSystemCursor で全 OCR_* 役割を明示サイズで再ロード。
+        //     視覚反映の本命経路。これだけで全アプリ・全 HDC のカーソルが即時に
+        //     指定サイズへ差し替わる。SPI_SETCURSORS や WM_SETTINGCHANGE の broadcast は
+        //     意図的に行わない (docstring 参照)。
         match Self::apply_system_cursors_at_size(&cursors_key, clamped) {
             Ok(applied) => {
                 tracing::info!(
@@ -632,15 +595,6 @@ impl RegistryManager {
                 );
             }
         }
-
-        // (5) 明示的に WM_SETTINGCHANGE(lParam=L"Cursors") を broadcast。
-        //     SPIF_SENDCHANGE が送る broadcast の lParam は OS 実装依存で、
-        //     L"Cursors" を待ち受けるアプリ (shell / WebView2 含む) が無視する
-        //     ケースがあるため、明示送信で完全に上書きする。
-        //     SendNotifyMessageW は非ブロッキングで失敗してもログに留めるだけ
-        //     (registry 書込は既に完了しているため、broadcast 失敗で IPC 全体を
-        //     失敗扱いにはしない)。
-        Self::broadcast_setting_change_cursors();
 
         Ok(clamped)
     }
@@ -745,40 +699,6 @@ impl RegistryManager {
         }
 
         Ok(applied)
-    }
-
-    /// `WM_SETTINGCHANGE(lParam=L"Cursors")` を `HWND_BROADCAST` 宛に非ブロッキングで送る。
-    /// `set_cursor_base_size` step 4 の実装本体。
-    #[cfg(windows)]
-    fn broadcast_setting_change_cursors() {
-        use std::ffi::OsStr;
-        use std::os::windows::ffi::OsStrExt;
-        use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
-        use windows::Win32::UI::WindowsAndMessaging::{
-            SendNotifyMessageW, HWND_BROADCAST, WM_SETTINGCHANGE,
-        };
-        // NUL-terminated UTF-16 で "Cursors" を作る。
-        let section: Vec<u16> = OsStr::new("Cursors")
-            .encode_wide()
-            .chain(std::iter::once(0))
-            .collect();
-        // SAFETY: section の生存期間は SendNotifyMessageW 呼び出し中のみ必要
-        // (non-blocking とはいえ Windows は message を queue にコピーするまで lParam を
-        // 解釈するため、コール完了まで `section` は drop されない)。
-        let _ = unsafe {
-            SendNotifyMessageW(
-                HWND_BROADCAST,
-                WM_SETTINGCHANGE,
-                WPARAM(0),
-                LPARAM(section.as_ptr() as isize),
-            )
-        };
-        // HWND_BROADCAST は実用上ノードのカーネルセマンティクスで個別の HWND を
-        // 返さないため、ここでは値ではなく副作用 (各 top-level window への post) のみ確認。
-        tracing::debug!("WM_SETTINGCHANGE(lParam=L\"Cursors\") broadcast 送信");
-        // 型 import の dead-code 警告抑止 (SendNotifyMessageW のシグネチャと
-        // ジェネリック解決で HWND/WPARAM/LPARAM が必要)。
-        let _phantom: (Option<HWND>, WPARAM, LPARAM) = (None, WPARAM(0), LPARAM(0));
     }
 
     #[cfg(not(windows))]

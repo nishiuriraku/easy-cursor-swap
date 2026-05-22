@@ -261,6 +261,7 @@ export default {
     cursorSizeDesc: 'Windows 全体のマウスポインターサイズを変更します (HKCU\\Control Panel\\Cursors\\CursorBaseSize)。アクセシビリティ → マウスポインターとタッチ → サイズと等価。',
     cursorSizeReadout: '{px} px',
     cursorSizeError: 'サイズ変更に失敗しました: {error}',
+    cursorSizeRefreshFromOs: 'OS から再取得',
     groupNotifications: '通知',
     showApplyToastLabel: '適用結果のトースト表示',
     showApplyToastDesc: 'Windows トースト通知で適用結果を告知',

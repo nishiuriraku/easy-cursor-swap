@@ -262,6 +262,7 @@ export default {
     cursorSizeDesc: 'Resize the mouse pointer system-wide (HKCU\\Control Panel\\Cursors\\CursorBaseSize). Equivalent to Accessibility → Mouse pointer & touch → Size.',
     cursorSizeReadout: '{px} px',
     cursorSizeError: 'Failed to change size: {error}',
+    cursorSizeRefreshFromOs: 'Sync from Windows',
     groupNotifications: 'Notifications',
     showApplyToastLabel: 'Toast on apply result',
     showApplyToastDesc: 'Show a Windows toast with apply result',

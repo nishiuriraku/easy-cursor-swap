@@ -39,7 +39,7 @@
 | ファイル | 機能 |
 |---|---|
 | [config.rs](../src-tauri/src/config.rs) | `AppConfig` の RwLock + schema_version (v1 固定) + `config.corrupt.{epoch}.json` 退避 |
-| [registry/mod.rs](../src-tauri/src/registry/mod.rs) | `HKCU\Control Panel\Cursors` 読み書き、`SPI_SETCURSORS` / `SPI_SETCURSORSHADOW`、`LoadImageW` + `SetSystemCursor`(OCR_* × 14) によるカーソル即時リサイズ (`apply_system_cursors_at_size`)、トランザクション + `_pending_apply.snapshot`、`save_initial_snapshot` / `check_pending_snapshot` / `reset_to_windows_default` |
+| [registry/mod.rs](../src-tauri/src/registry/mod.rs) | `HKCU\Control Panel\Cursors` 読み書き、theme apply の `SPI_SETCURSORS` 通知 (`notify_cursor_change`) + `SPI_SETCURSORSHADOW` (`set_cursor_shadow`)、`LoadImageW` + `SetSystemCursor`(OCR_* × 14) によるカーソル即時リサイズ (`apply_system_cursors_at_size`、cursor size 変更経路は broadcast を意図的に行わない)、トランザクション + `_pending_apply.snapshot`、`save_initial_snapshot` / `check_pending_snapshot` / `reset_to_windows_default` |
 | [registry/roles.rs](../src-tauri/src/registry/roles.rs) | 17 役割の絶対パス書き込みロジック、`compute_apply_values` 純粋関数 |
 | [registry/scheme.rs](../src-tauri/src/registry/scheme.rs) | `Schemes` への REG_EXPAND_SZ 登録、`build_scheme_value` / `sanitize_scheme_name` |
 | [registry/env.rs](../src-tauri/src/registry/env.rs) | レジストリ環境変数操作補助 |
