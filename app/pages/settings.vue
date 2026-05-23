@@ -60,10 +60,12 @@ const general = ref({
   crashReporting: false,
 })
 
-// マウスポインターのサイズ。Windows 設定アプリ「マウスポインターとタッチ」と
-// 等価なスライダー (1〜15)。値は Rust 側 (HKCU\Control Panel\Cursors\CursorBaseSize)
-// が single source of truth で、本 UI は変更を即時 IPC で反映する (dirty/save フローには
-// 乗せない — テーマ適用とは独立した OS 全体設定のため)。
+// マウスポインターのサイズ (1〜15 スライダー)。Windows 設定アプリ「マウスポインターとタッチ」
+// と同じ HKCU\Control Panel\Cursors\CursorBaseSize を更新するが、Accessibility\CursorSize は
+// 書かない invariant のため、Windows 設定 UI 側スライダー位置とは意図的に同期しない
+// (specs/2026-05-23-cursor-size-redesign-v2)。値は Rust 側が single source of truth で、
+// 本 UI は変更を即時 IPC で反映する (dirty/save フローには乗せない — テーマ適用とは
+// 独立した OS 全体設定のため)。
 //
 // スライダー位置 ↔ DWORD の換算式は `registry::slider_position_to_base_size` と
 // 1:1 で同期: `dword = 32 + 16 * (slider - 1)` (slider=1 → 32, slider=15 → 256)。

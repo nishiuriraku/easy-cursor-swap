@@ -48,6 +48,9 @@ flowchart LR
 - 🟦 青枠 `CursorBaseSize` — アプリの書込先。OS も書く場合があるが、アプリは自由に書き換えてよい。
 - 🟥 赤枠 `Accessibility\*` — OS (Windows Settings UI) の専用領域。アプリは **絶対に書かない**。書くと eoa pipeline が誤起動し、対応する `*_eoa.cur` ファイルが存在しないためカーソルが破綻する。
 
+**重要な設計プロパティ (Non-goal)**:
+- Windows 設定 UI 側のスライダー位置と本アプリのスライダー位置は **意図的に同期しない**。例えば Windows Settings UI で「1」を選んだままアプリで 80px (= slider 4 相当) に設定すると、Windows Settings UI は「1」、アプリは「4」を表示し続ける (CursorBaseSize=80 / Accessibility\CursorSize=1)。この表示ズレは ロックアウトバグ (v1) を回避する代償として受容する設計判断であり、初期要件「Windows サイズと合わせたい」は **初期値読込時のみ** 達成される (起動時 / "OS から再取得" 押下時に Windows 側の現在値で初期化する)。詳細は `docs/superpowers/specs/2026-05-23-cursor-size-redesign-v2.md` の "Non-goals" セクション参照。
+
 ---
 
 ## 2. 標準 pipeline vs eoa pipeline

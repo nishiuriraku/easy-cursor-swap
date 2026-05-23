@@ -483,8 +483,10 @@ impl RegistryManager {
     }
 
     /// `HKCU\Control Panel\Cursors\CursorBaseSize` (REG_DWORD) を書き換えて
-    /// Windows のアクセシビリティ「マウスポインターとタッチ」のサイズスライダーと
-    /// 等価な設定を反映する。
+    /// マウスポインターサイズを更新する。Windows 設定 UI 側「マウスポインターとタッチ」
+    /// スライダーが触る canonical キーと同じ key を書くが、`Accessibility\*` の併存値は
+    /// 書かない (v2 invariant — specs/2026-05-23-cursor-size-redesign-v2)。よって両者の
+    /// スライダー位置は意図的に同期しない。
     ///
     /// 引数 `size` は書き込む DWORD 値。範囲外の値は
     /// `clamp_cursor_base_size` で [MIN_CURSOR_BASE_SIZE, MAX_CURSOR_BASE_SIZE]

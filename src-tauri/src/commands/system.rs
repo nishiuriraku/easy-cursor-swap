@@ -329,8 +329,13 @@ pub fn get_accessibility_conflicts() -> AccessibilityConflicts {
 /// マウスポインターのサイズ (HKCU\Control Panel\Cursors\CursorBaseSize) を設定する。
 ///
 /// Windows 設定アプリの「アクセシビリティ → マウスポインターとタッチ → サイズ」
-/// スライダーと等価な操作。引数 `size` は DWORD 値で、`set_cursor_base_size` 側で
-/// 32〜256 にクランプされる。戻り値は実際に書き込まれた値 (クランプ後)。
+/// スライダーが触る canonical キー (`CursorBaseSize`) と同じ key を更新するが、
+/// `Accessibility\CursorSize` (Windows 設定 UI 専用領域) は書かない invariant のため、
+/// Windows 設定 UI 側スライダー位置とは意図的に同期しない
+/// (specs/2026-05-23-cursor-size-redesign-v2)。
+///
+/// 引数 `size` は DWORD 値で、`set_cursor_base_size` 側で 32〜256 にクランプされる。
+/// 戻り値は実際に書き込まれた値 (クランプ後)。
 ///
 /// フロントエンドは Settings ページの一般セクションのスライダー (1〜15) を
 /// `32 + 16 * (slider - 1)` で DWORD に変換してから呼ぶ。実換算式は Rust 側

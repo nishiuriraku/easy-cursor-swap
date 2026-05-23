@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- マウスポインターのサイズを本アプリから変更できるように。設定 → 一般 → 「カーソルサイズ」セクションに 1〜15 のスライダーを追加し、Windows 設定アプリ「アクセシビリティ → マウスポインターとタッチ → サイズ」と等価な書き換え (`HKCU\Control Panel\Cursors\CursorBaseSize` の DWORD 32〜256) を行う。スライダー位置 → DWORD の変換は Rust 側 (`registry::slider_position_to_base_size`) が single source of truth で、UI からは `set_cursor_base_size` IPC 経由で即時反映 (テーマ適用とは独立した OS 全体設定として扱う)。書き込み後は `SystemParametersInfoW(SPI_SETCURSORS)` でシェルに通知し、`set_cursor_shadow` と同じ broadcast 偽陽性ハンドリングで `CursorBaseSize` 拡大時のシェルキャッシュ再構築由来の `ERROR_INVALID_HANDLE` を吸収する。
+- マウスポインターのサイズを本アプリから変更できるように。設定 → 一般 → 「カーソルサイズ」セクションに 1〜15 のスライダーを追加し、`HKCU\Control Panel\Cursors\CursorBaseSize` (DWORD 32〜256) を更新する。スライダー位置 → DWORD の変換は Rust 側 (`registry::slider_position_to_base_size`) が single source of truth で、UI からは `set_cursor_base_size` IPC 経由で即時反映する (テーマ適用とは独立した OS 全体設定として扱う)。視覚反映は `LoadImageW` + `SetSystemCursor` (OCR\_\* × 14 役割) で行い、`SystemParametersInfoW(SPI_SETCURSORS)` の broadcast は意図的に行わない (`cursor_watcher` が自分自身の broadcast を echo して focus 戻り時に二重反映ループを起こすため)。アプリは `HKCU\SOFTWARE\Microsoft\Accessibility\*` namespace を**書かない** (Windows Settings UI 専用の領域を侵さない invariant)。Windows アクセシビリティでサイズが拡大されているとき (`Accessibility\CursorSize > 1`) はアプリスライダーを `disabled` にし、Windows Settings (`ms-settings:easeofaccess-cursor`) への deep-link を表示する。Windows 設定 UI 側のスライダー位置と本アプリのスライダー位置は意図的に同期しない (詳細は `docs/cursor_size_architecture.md`)。
 
 ### Changed
 

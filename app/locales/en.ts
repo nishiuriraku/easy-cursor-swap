@@ -259,7 +259,7 @@ export default {
     groupDisplayLanguage: 'Display language',
     groupCursorSize: 'Cursor size',
     cursorSizeLabel: 'Mouse pointer size',
-    cursorSizeDesc: 'Resize the mouse pointer system-wide (HKCU\\Control Panel\\Cursors\\CursorBaseSize). Equivalent to Accessibility → Mouse pointer & touch → Size.',
+    cursorSizeDesc: 'Resize the mouse pointer system-wide (HKCU\\Control Panel\\Cursors\\CursorBaseSize). Disabled while Windows accessibility has enlarged the cursor.',
     cursorSizeReadout: '{px} px',
     cursorSizeError: 'Failed to change size: {error}',
     cursorSizeRefreshFromOs: 'Sync from Windows',
