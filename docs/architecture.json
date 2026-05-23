@@ -40,7 +40,7 @@
       "ci_workflows": 3
     },
     "doc_drift_warnings": [
-      "No known drift as of 2026-05-23 (re-measured)。直前コミット (62f29de) 以降の差分は `accessibility.rs` / `registry/mod.rs` / `pages/settings.vue` / `components/settings/GeneralSection.vue` / `locales/{ja,en}.ts` 内部のみ — カーソルサイズ機能を Windows 11 Accessibility eoa pipeline に対応 (案 E + CursorSize gate、spec: docs/superpowers/specs/2026-05-23-cursor-size-eoa-aware-ui.md)。(1) `AccessibilityConflicts` に `cursor_size_slider` / `cursor_type` の 2 フィールド追加。(2) `set_cursor_base_size` 冒頭に CursorSize != 1 時の defensive guard 追加 (返り値が `Err(AppError::Registry)` に変化する可能性あり)。(3) `pages/settings.vue` で focus / visibilitychange listener を限定再導入 (2026-05-22 刷新で一度撤去したが、徐々に大きくなる症状が eoa pipeline 起因と判明したため安全)。(4) `GeneralSection.vue` に eoa active 時の UiAlert バナー + 「Windows の設定を開く」deep-link ボタン追加 (`ms-settings:easeofaccess-cursor`)。(5) i18n 3 件追加 552 → 555 (parity 維持)。IPC 数 53 / Rust modules 23 / commands submodules 9 / composables 36 / components_total 60 はいずれも不変 (フィールド追加は IPC 既存の get_accessibility_conflicts の戻り値内のみ)。architecture.json/architecture.md/file_inventory.md/architecture.html が同期。",
+      "No known drift as of 2026-05-23 (re-measured after cursor-size redesign v2). 直前の `c3863aa` で導入された case E gate は維持しつつ、本パッチで write path から `HKCU\\SOFTWARE\\Microsoft\\Accessibility\\CursorSize` の書込を完全削除 (新規 invariant `cursor_size_app_writes_only_cursorbasesize` 参照)。`accessibility::resolve_cursor_base_size` の優先順位も変更: Accessibility は slider > 1 のときのみ採用、それ以外は CursorBaseSize を信頼。round-trip が成立し、アプリスライダーが eoa pipeline を起動してロックアウトする現象が物理的に発生不可能になった。IPC 数 53 / Rust modules 23 / commands submodules 9 / composables 36 / components_total 60 はいずれも不変。architecture.json / architecture.md / file_inventory.md / architecture.html が同期。spec: docs/superpowers/specs/2026-05-23-cursor-size-redesign-v2.md (local)。",
       "ui_map.json と相互整合済み: backend.ipc_commands 53 件のうち 3 件 (export_cursorpack / get_theme_previews / get_windows_scheme_previews) は Rust に登録だけされた legacy_unused 状態で、それぞれ status と replaced_by を明示。次の PR で Rust 側からも削除するか、frontend で再利用する決定をすること。",
       "新たに食い違いを見つけたら『docs/<file> は X と書いているが実測 Y』の形で追記し、修正コミットと同じ PR で解消する。",
       "数字が docs と食い違ったら grep を信用する。frontend の数字は ui_map.html の live check (末尾) が canonical counter。"
@@ -141,6 +141,11 @@
       "id": "key_export_passphrase",
       "rule": "鍵エクスポートは XChaCha20-Poly1305 + Argon2id によるパスフレーズ暗号化 (.cfkey 形式)。",
       "responsible_module": "src-tauri/src/keystore.rs"
+    },
+    {
+      "id": "cursor_size_app_writes_only_cursorbasesize",
+      "rule": "in-app カーソルサイズスライダーは `HKCU\\Control Panel\\Cursors\\CursorBaseSize` のみを書く。`HKCU\\SOFTWARE\\Microsoft\\Accessibility\\*` namespace は Windows Settings UI の専用領域で、アプリは絶対に書かない (書くと Win11 eoa pipeline が起動してアプリスライダーがロックアウトされる)。spec: docs/superpowers/specs/2026-05-23-cursor-size-redesign-v2.md",
+      "responsible_module": "src-tauri/src/registry/mod.rs (set_cursor_base_size)、src-tauri/src/accessibility.rs (resolve_cursor_base_size)"
     }
   ],
   "backend": {

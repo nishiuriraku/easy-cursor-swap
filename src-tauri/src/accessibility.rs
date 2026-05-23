@@ -125,18 +125,19 @@ fn read_cursor_base_size() -> u32 {
 
 /// 2 つのレジストリ値から canonical な CursorBaseSize (DWORD) を決定する純粋関数。
 ///
-/// 優先順位:
-/// 1. `Accessibility\CursorSize` (slider 1-15) があれば、その slider 値を
-///    `slider_position_to_base_size` で DWORD に変換して返す。Windows 11 Settings の
-///    「マウスポインターとタッチ」スライダーが canonical に書く値。
-/// 2. `CursorBaseSize` (DWORD 32-256) があれば、`clamp_cursor_base_size` で
-///    レンジに clamp して返す。旧 Control Panel API および本アプリの永続化先。
-/// 3. どちらも `None` なら Windows 既定 (32px / slider 1) を返す。
+/// 優先順位 (v2 / 2026-05-23 redesign):
+/// 1. `Accessibility\CursorSize > 1` のとき: eoa pipeline がアクティブ。slider 値を
+///    `slider_position_to_base_size` で DWORD に変換して返す (UI は disabled 表示)。
+/// 2. `CursorSize == 1` または `None` のとき: 標準 pipeline。`CursorBaseSize` を採用し
+///    `clamp_cursor_base_size` でレンジ clamp。本アプリの slider が書く永続化先。
+/// 3. `CursorBaseSize` も `None` なら Windows 既定 (32px) を返す。
 ///
-/// なぜ Accessibility 優先か: Windows 11 Settings UI は `Accessibility\CursorSize` を
-/// 確実に書くが、`CursorBaseSize` の書込は Windows ビルドによって不安定。両方が同期されて
-/// いるケースでも値は一致するため、Accessibility 優先で読めば「Windows 側でだけ変えた」
-/// 状態が正しくスライダーに反映される。
+/// **なぜ slider=1 で fall through するか:**
+/// アプリの slider は `set_cursor_base_size` 経由で **CursorBaseSize のみ** を書く
+/// (Accessibility\CursorSize は OS の Settings UI のみが書く invariant)。よって
+/// `CursorSize=1 + CursorBaseSize=80` (アプリで 80px 設定後) のような並存ケースは
+/// **正常状態**であり、CursorBaseSize を信頼するのが正しい。v1 では slider=1 でも
+/// Accessibility 優先で 32px に戻っていたため、アプリ slider の round-trip が壊れていた。
 fn resolve_cursor_base_size(
     accessibility_slider: Option<u32>,
     cursor_base_size: Option<u32>,
@@ -146,14 +147,17 @@ fn resolve_cursor_base_size(
         MIN_CURSOR_SIZE_SLIDER,
     };
 
+    // eoa pipeline active (slider > 1) のときのみ Accessibility 値を採用する。
     if let Some(slider) = accessibility_slider {
-        // slider レンジ外の値 (registry 破損 / 未来仕様の拡張) も安全に扱う。
-        let clamped = slider.clamp(
-            u32::from(MIN_CURSOR_SIZE_SLIDER),
-            u32::from(MAX_CURSOR_SIZE_SLIDER),
-        ) as u8;
-        return slider_position_to_base_size(clamped);
+        if slider > u32::from(MIN_CURSOR_SIZE_SLIDER) {
+            let clamped = slider.clamp(
+                u32::from(MIN_CURSOR_SIZE_SLIDER),
+                u32::from(MAX_CURSOR_SIZE_SLIDER),
+            ) as u8;
+            return slider_position_to_base_size(clamped);
+        }
     }
+    // 標準 pipeline: CursorBaseSize を採用。
     if let Some(size) = cursor_base_size {
         return clamp_cursor_base_size(size);
     }
@@ -276,20 +280,24 @@ mod tests {
         let _ = c.cursor_type;
     }
 
-    /// `resolve_cursor_base_size` の優先順位契約: Accessibility 優先 → CursorBaseSize fallback → 32 既定。
+    /// `resolve_cursor_base_size` の優先順位契約 (v2):
+    /// - `Accessibility\CursorSize > 1` のときのみ Accessibility を採用 (eoa pipeline active)。
+    /// - `CursorSize == 1` または `None` のときは `CursorBaseSize` を採用 (standard pipeline)。
+    /// - 両方とも `None` なら 32 既定。
     ///
-    /// この契約が崩れると「Windows 設定アプリで slider 15 にしたのにアプリでは
-    /// 1 と表示される」回帰が再発するので、固定で守る。
+    /// この契約により、アプリが `CursorBaseSize` のみ書く invariant (specs/2026-05-23-cursor-size-redesign-v2)
+    /// と組み合わさり、round-trip が成立する。
     #[test]
-    fn resolve_prefers_accessibility_slider() {
-        // slider=15 (Accessibility 側) と CursorBaseSize=32 (古い既定) が併存している
-        // 典型ケース: Windows 設定アプリでスライダーを動かしただけの状態。
-        // → Accessibility=15 を採用して 256 を返す。
+    fn resolve_prefers_accessibility_only_when_eoa_active() {
+        // eoa active: slider=15 + CursorBaseSize=32 → Accessibility=15 を採用 (256)。
         assert_eq!(resolve_cursor_base_size(Some(15), Some(32)), 256);
-        // 中間スライダー位置 (6) も DWORD に変換される: 32 + 16 * (6-1) = 112。
+        // eoa active: 中間スライダー位置 6 → 32 + 16*(6-1) = 112。
         assert_eq!(resolve_cursor_base_size(Some(6), None), 112);
-        // slider=1 (= 32px) → 32。
-        assert_eq!(resolve_cursor_base_size(Some(1), Some(128)), 32);
+        // eoa **inactive** (slider=1): CursorBaseSize=128 が採用される (= round-trip 成立)。
+        // v1 ではここで 32 (slider=1) が返っていたため app slider が勝手に 1 に戻っていた。
+        assert_eq!(resolve_cursor_base_size(Some(1), Some(128)), 128);
+        // eoa inactive かつ CursorBaseSize なし → 32 既定。
+        assert_eq!(resolve_cursor_base_size(Some(1), None), 32);
     }
 
     #[test]

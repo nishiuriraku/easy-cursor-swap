@@ -39,7 +39,7 @@
 | ファイル | 機能 |
 |---|---|
 | [config.rs](../src-tauri/src/config.rs) | `AppConfig` の RwLock + schema_version (v1 固定) + `config.corrupt.{epoch}.json` 退避 |
-| [registry/mod.rs](../src-tauri/src/registry/mod.rs) | `HKCU\Control Panel\Cursors` 読み書き、theme apply の `SPI_SETCURSORS` 通知 (`notify_cursor_change`) + `SPI_SETCURSORSHADOW` (`set_cursor_shadow`)、`LoadImageW` + `SetSystemCursor`(OCR_* × 14) によるカーソル即時リサイズ (`apply_system_cursors_at_size`、cursor size 変更経路は broadcast を意図的に行わない)、トランザクション + `_pending_apply.snapshot`、`save_initial_snapshot` / `check_pending_snapshot` / `reset_to_windows_default` |
+| [registry/mod.rs](../src-tauri/src/registry/mod.rs) | `HKCU\Control Panel\Cursors` 読み書き、theme apply の `SPI_SETCURSORS` 通知 (`notify_cursor_change`) + `SPI_SETCURSORSHADOW` (`set_cursor_shadow`)、`LoadImageW` + `SetSystemCursor`(OCR_* × 14) によるカーソル即時リサイズ (`apply_system_cursors_at_size`、cursor size 変更経路は broadcast を意図的に行わない)、トランザクション + `_pending_apply.snapshot`、`save_initial_snapshot` / `check_pending_snapshot` / `reset_to_windows_default`。アプリ書込は `Control Panel\Cursors\CursorBaseSize` のみ、`Accessibility\*` は触らない (v2 invariant)。 |
 | [registry/roles.rs](../src-tauri/src/registry/roles.rs) | 17 役割の絶対パス書き込みロジック、`compute_apply_values` 純粋関数 |
 | [registry/scheme.rs](../src-tauri/src/registry/scheme.rs) | `Schemes` への REG_EXPAND_SZ 登録、`build_scheme_value` / `sanitize_scheme_name` |
 | [registry/env.rs](../src-tauri/src/registry/env.rs) | レジストリ環境変数操作補助 |
@@ -74,7 +74,7 @@
 | [hotkey.rs](../src-tauri/src/hotkey.rs) | `RegisterHotKey` で `Ctrl+Alt+Shift+R` → `panic-hotkey` イベント |
 | [autostart.rs](../src-tauri/src/autostart.rs) | `HKCU\...\Run` 登録、MSIX 検出時は no-op で `startupTask` に委譲 |
 | [appusermodel.rs](../src-tauri/src/appusermodel.rs) | `SetCurrentProcessExplicitAppUserModelID("dev.easycursorswap.app")` |
-| [accessibility.rs](../src-tauri/src/accessibility.rs) | `CursorIndicator` / `ContrastScheme` / `CursorBaseSize` 競合検出 + `Accessibility\CursorSize` (slider 1-15) / `Accessibility\CursorType` (0/1/2/3/6/...) を IPC レスポンス用に取得 (eoa pipeline 状態を frontend 側で `cursor_size_slider != 1` で判定する) |
+| [accessibility.rs](../src-tauri/src/accessibility.rs) | `CursorIndicator` / `ContrastScheme` / `CursorBaseSize` 競合検出 + `Accessibility\CursorSize` (slider 1-15) / `Accessibility\CursorType` (0/1/2/3/6/...) を IPC レスポンス用に取得 (eoa pipeline 状態を frontend 側で `cursor_size_slider != 1` で判定する)。`resolve_cursor_base_size` 優先順位 (v2): Accessibility は slider > 1 のときのみ採用、それ以外は CursorBaseSize fallback (アプリ書込みの round-trip 成立)。 |
 | [environment.rs](../src-tauri/src/environment.rs) | RDP / Citrix / Server 検出 (`SM_REMOTESESSION` + `InstallationType`) |
 | [logging.rs](../src-tauri/src/logging.rs) | `tracing-appender` 日次ローテ + 14 日 + 100MB 上限 + `redact_path` / `short_hash` |
 

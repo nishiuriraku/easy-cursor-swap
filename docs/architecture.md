@@ -132,6 +132,7 @@ README の security テーブルは概要、本セクションは **不変条件
 | Vue では `v-html` を使わない (CI で grep ベースで検出) | `app/components/icons/{UiIcon,CursorIcon}.vue` の render-function 方式 |
 | ログには PII を残さない (パスは `redact_path`、ハッシュは `short_hash[:12]`) | `logging.rs` |
 | HTTPS は rustls-tls (OS の TLS スタックに依存しない) | `Cargo.toml` の reqwest features |
+| アプリは `HKCU\SOFTWARE\Microsoft\Accessibility\*` を**書かない** (Settings UI の専用領域、書くと Win11 eoa pipeline が誤起動してアプリスライダーがロックアウトされる) | `registry/mod.rs::set_cursor_base_size` |
 
 ## フロントエンド (`app/`)
 

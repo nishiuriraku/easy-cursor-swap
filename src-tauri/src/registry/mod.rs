@@ -502,14 +502,15 @@ impl RegistryManager {
     ///
     /// シーケンス:
     ///
-    /// 1. **`HKCU\SOFTWARE\Microsoft\Accessibility\CursorSize`** にスライダー位置 (1〜15) を
-    ///    DWORD で書く (Settings アプリの UI 状態保持用、best-effort)。
-    /// 2. **`HKCU\Control Panel\Cursors\CursorBaseSize`** に DWORD (32〜256) を書く
+    /// 1. **`HKCU\Control Panel\Cursors\CursorBaseSize`** に DWORD (32〜256) を書く
     ///    (永続化 — 次回ログオン時にもサイズが保たれる)。
-    /// 3. **[`Self::apply_system_cursors_at_size`]** で 14 種の OCR_* 役割について
+    /// 2. **[`Self::apply_system_cursors_at_size`]** で 14 種の OCR_* 役割について
     ///    `LoadImageW` + `SetSystemCursor` を実行 — 全アプリ・全 HDC で即時視覚反映。
     ///    `NWPen` / `Pin` / `Person` の 3 役割は OCR_* 定数が存在しないため即時反映対象外
     ///    (永続化のみ。次回テーマ適用 / ログオン時に反映される)。
+    ///
+    /// `HKCU\SOFTWARE\Microsoft\Accessibility\CursorSize` は **書かない**
+    /// (Invariant v2 / 2026-05-23 redesign — 下記参照)。
     ///
     /// 本機能は「テーマ適用」とは独立した設定として扱うため、
     /// `_pending_apply.snapshot` には参加しない (= cursor 役割の transactional
@@ -524,6 +525,12 @@ impl RegistryManager {
     /// を使用しており、本関数の `LoadImageW` + `SetSystemCursor` 経路では視覚反映できない
     /// ためである。UI 側でも `cursor_size_slider != 1` のとき slider を `disabled` に
     /// するが、IPC が他経路から呼ばれた場合の安全網として Rust 側でも拒否する。
+    ///
+    /// ## Invariant (v2 / 2026-05-23 redesign)
+    ///
+    /// 本関数は `HKCU\SOFTWARE\Microsoft\Accessibility\*` を **書かない**。
+    /// 該当 namespace は Windows Settings UI の専用領域で、アプリが書くと eoa pipeline
+    /// が誤作動する (specs/2026-05-23-cursor-size-redesign-v2)。
     #[cfg(windows)]
     pub fn set_cursor_base_size(size: u32) -> AppResult<u32> {
         use winreg::enums::*;
@@ -556,28 +563,17 @@ impl RegistryManager {
 
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
 
-        // (1) HKCU\SOFTWARE\Microsoft\Accessibility\CursorSize にスライダー位置を書く。
-        //     キー自体が存在しない環境 (clean install 直後 etc.) もあるので create_subkey で
-        //     不存在時は作成する。失敗してもメインの書込 (step 2) は続行する (best-effort)。
-        match hkcu.create_subkey("SOFTWARE\\Microsoft\\Accessibility") {
-            Ok((a11y_key, _disp)) => {
-                let slider_dword: u32 = u32::from(slider_pos);
-                if let Err(e) = a11y_key.set_value("CursorSize", &slider_dword) {
-                    tracing::warn!(
-                        "Accessibility\\CursorSize 書込失敗 (best-effort、続行): {}",
-                        e
-                    );
-                }
-            }
-            Err(e) => {
-                tracing::warn!(
-                    "Accessibility キー open/create 失敗 (best-effort、続行): {}",
-                    e
-                );
-            }
-        }
+        // **Invariant (specs/2026-05-23-cursor-size-redesign-v2):**
+        // `HKCU\SOFTWARE\Microsoft\Accessibility\CursorSize` は **Windows Settings UI 専用**
+        // のキーで、アプリからは絶対に書かない。書くと Win11 の eoa pipeline がアクティブ化し、
+        // `%LOCALAPPDATA%\Microsoft\Windows\Cursors\*_eoa.cur` を期待される状態になるが、
+        // それらのファイルは Settings UI 経由でしか生成されないためカーソルが破綻する。
+        // 過去 commit `9d16c2b` 〜 `c3863aa` で「Accessibility と CursorBaseSize を sync 書込」
+        // していたが、これが lockout バグの根本原因だった (specs 詳細参照)。
+        //
+        // slider_pos は log 用にだけ計算しており、書込みは行わない (戻り値は clamped)。
 
-        // (2) HKCU\Control Panel\Cursors\CursorBaseSize を書く (canonical 値)。
+        // (1) HKCU\Control Panel\Cursors\CursorBaseSize を書く (canonical 値)。
         //
         // **KEY_READ | KEY_WRITE 両方が必須**:
         //   - `set_value("CursorBaseSize", ...)` には KEY_WRITE
@@ -608,7 +604,7 @@ impl RegistryManager {
         // cursors_key は (4) の SetSystemCursor 用にもう一度だけ使う必要があるので
         // ここでは drop しない。
 
-        // (3) LoadImageW + SetSystemCursor で全 OCR_* 役割を明示サイズで再ロード。
+        // (2) LoadImageW + SetSystemCursor で全 OCR_* 役割を明示サイズで再ロード。
         //     視覚反映の本命経路。これだけで全アプリ・全 HDC のカーソルが即時に
         //     指定サイズへ差し替わる。SPI_SETCURSORS や WM_SETTINGCHANGE の broadcast は
         //     意図的に行わない (docstring 参照)。
@@ -1342,15 +1338,15 @@ mod tests {
         }
     }
 
-    /// `set_cursor_base_size` が以下を end-to-end で実施することを確認する:
+    /// `set_cursor_base_size` が以下を end-to-end で実施することを確認する (v2):
     ///
     /// 1. `HKCU\Control Panel\Cursors\CursorBaseSize` に DWORD でクランプ済値を書く
-    /// 2. `HKCU\SOFTWARE\Microsoft\Accessibility\CursorSize` にスライダー位置 (1〜15) を書く
-    /// 3. 範囲外入力でも (1) でクランプされ (2) のスライダー位置も対応する
+    /// 2. `HKCU\SOFTWARE\Microsoft\Accessibility\CursorSize` は **絶対に触らない**
+    ///    (invariant: app は Accessibility\* を書かない / specs/2026-05-23-cursor-size-redesign-v2)
+    /// 3. 範囲外入力は (1) でクランプされる
     ///
-    /// (3) と (4) の SystemParametersInfoW / WM_SETTINGCHANGE broadcast は副作用なので
-    /// unit test で直接検証できないが、registry 書込まで完走することで本番動線の
-    /// 大半をカバーする。
+    /// SystemParametersInfoW / SetSystemCursor 等の副作用は unit test で検証不能なので、
+    /// registry 書込の有無のみを確認する。
     ///
     /// HKCU のみ書込、Drop で 2 キー両方を元の値に復元するためテスト機の
     /// ユーザー設定を壊さない。
@@ -1365,6 +1361,7 @@ mod tests {
 
         // defensive guard を通過するために CursorSize=1 (eoa pipeline 非アクティブ) を
         // 事前にセットする。_cleanup::drop で元の値に復元される。
+        // 同時に、テスト後の比較用にこの「事前セット値」を保持する。
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         let (a11y_pre, _) = hkcu
             .create_subkey("SOFTWARE\\Microsoft\\Accessibility")
@@ -1373,12 +1370,11 @@ mod tests {
             .set_value("CursorSize", &1u32)
             .expect("CursorSize=1 書込失敗");
 
-        // 通常値の round-trip (slider=3 = 64px)
+        // 通常値の round-trip (64px)
         let written =
             RegistryManager::set_cursor_base_size(64).expect("set_cursor_base_size(64) failed");
         assert_eq!(written, 64, "clamp 内なので入力値がそのまま返るべき");
 
-        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         let cursors_key = hkcu
             .open_subkey("Control Panel\\Cursors")
             .expect("Cursors キーが開けない");
@@ -1390,23 +1386,20 @@ mod tests {
             "CursorBaseSize が DWORD として書き込まれているべき"
         );
 
-        // Accessibility\CursorSize にも slider 位置 3 が書かれているはず
+        // **invariant 確認**: Accessibility\CursorSize は事前セット値 1 のまま (= app が触っていない)。
         let a11y_key = hkcu
             .open_subkey("SOFTWARE\\Microsoft\\Accessibility")
-            .expect("Accessibility キーが開けない (set_cursor_base_size が作成しているはず)");
+            .expect("Accessibility キーが開けない");
         let slider_raw: u32 = a11y_key
             .get_value("CursorSize")
             .expect("Accessibility\\CursorSize が読み戻せない");
         assert_eq!(
-            slider_raw, 3,
-            "Accessibility\\CursorSize に slider 位置 3 が書き込まれているべき (64px ↔ slider 3)"
+            slider_raw, 1,
+            "set_cursor_base_size は Accessibility\\CursorSize を書き換えてはいけない \
+             (specs/2026-05-23-cursor-size-redesign-v2 invariant)"
         );
 
-        // 範囲外 → クランプ
-        // defensive guard 用に CursorSize=1 を再セット (上の呼出で slider=3 が書込まれた)
-        a11y_pre
-            .set_value("CursorSize", &1u32)
-            .expect("CursorSize=1 (2回目) 書込失敗");
+        // 範囲外 → クランプ。Accessibility は依然として 1 のまま。
         let written =
             RegistryManager::set_cursor_base_size(1000).expect("set_cursor_base_size(1000) failed");
         assert_eq!(written, MAX_CURSOR_BASE_SIZE);
@@ -1418,9 +1411,8 @@ mod tests {
             .get_value("CursorSize")
             .expect("Accessibility\\CursorSize が読み戻せない");
         assert_eq!(
-            slider_raw,
-            u32::from(MAX_CURSOR_SIZE_SLIDER),
-            "256px は slider 15 に対応するべき"
+            slider_raw, 1,
+            "2 回目の set_cursor_base_size 後も Accessibility\\CursorSize は 1 のまま"
         );
 
         // _cleanup の Drop で両方の値が元に戻る。
