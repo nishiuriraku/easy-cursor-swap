@@ -189,7 +189,9 @@ mod tests {
     fn is_allowed_url_scheme_accepts_known_schemes() {
         assert!(is_allowed_url_scheme("https://example.com"));
         assert!(is_allowed_url_scheme("http://example.com"));
-        assert!(is_allowed_url_scheme("ms-settings:easeofaccess-cursor"));
+        assert!(is_allowed_url_scheme(
+            "ms-settings:easeofaccess-mousepointer"
+        ));
         assert!(is_allowed_url_scheme("ms-settings:display"));
     }
 
@@ -279,7 +281,7 @@ fn shell_execute_w(verb: Option<&str>, path: &str) -> Result<(), AppError> {
 /// スキーム (例: `app:` / `file:` / `javascript:`) は拒否する。
 ///
 /// - `https://` / `http://`: 既定のブラウザで開く (Marketplace / About 等)。
-/// - `ms-settings:`: Windows Settings deep-link (例: `ms-settings:easeofaccess-cursor`)。
+/// - `ms-settings:`: Windows Settings deep-link (例: `ms-settings:easeofaccess-mousepointer`)。
 ///   引数は Settings page 識別子で shell command ではないため、ShellExecuteW 経由で
 ///   呼んでも shell command injection は発生しない。
 const ALLOWED_URL_SCHEME_PREFIXES: &[&str] = &["https://", "http://", "ms-settings:"];
@@ -341,16 +343,16 @@ pub fn get_accessibility_conflicts() -> AccessibilityConflicts {
 /// `32 + 16 * (slider - 1)` で DWORD に変換してから呼ぶ。実換算式は Rust 側
 /// (`registry::slider_position_to_base_size`) が single source of truth。
 #[tauri::command]
-pub fn set_cursor_base_size(app: AppHandle, size: u32) -> Result<u32, AppError> {
+pub fn set_cursor_base_size(size: u32) -> Result<u32, AppError> {
     tracing::info!("set_cursor_base_size 要求: size={}", size);
     let written = RegistryManager::set_cursor_base_size(size)?;
-    // cursor_watcher は HWND_MESSAGE 上に作られた message-only window で
-    // WM_SETTINGCHANGE のブロードキャストを受け取れないため、SPI_SETCURSORS で
-    // 反映した変更を UI に伝える 'cursor-changed' を明示発火する
-    // (reset_with_cleanup と同じ理由)。
-    if let Err(err) = app.emit("cursor-changed", ()) {
-        tracing::warn!("set_cursor_base_size: cursor-changed emit 失敗: {}", err);
-    }
+    // **注意**: ここで `cursor-changed` イベントを emit してはいけない。
+    // `set_cursor_base_size` は CursorBaseSize DWORD と SetSystemCursor だけを触り、
+    // 役割パス (Arrow / IBeam / ...) は **一切変更しない** ため、テーマ自体の
+    // 状態は変わらない。Library は `cursor-changed` を受信すると loadThemes() で
+    // 全テーマ照合 + アイコン再生成のフルリロードを走らせるため、サイズスライダー
+    // 操作のたびに無意味な I/O が発生する。reset_with_cleanup と違って active_theme_id
+    // のクリアも不要。視覚反映は SetSystemCursor が全 HDC に対して既に行っている。
     Ok(written)
 }
 

@@ -222,11 +222,11 @@ sequenceDiagram
 
     U->>V: "Windows の設定を開く" をクリック
     V->>S: emit('open-windows-cursor-settings')
-    S->>R: invoke('open_url',<br/>{ url: 'ms-settings:easeofaccess-cursor' })
+    S->>R: invoke('open_url',<br/>{ url: 'ms-settings:easeofaccess-mousepointer' })
 
     activate R
     Note over R: ALLOWED_URL_SCHEME_PREFIXES check<br/>['https://', 'http://', 'ms-settings:']
-    R->>W: ShellExecuteW("open",<br/>"ms-settings:easeofaccess-cursor")
+    R->>W: ShellExecuteW("open",<br/>"ms-settings:easeofaccess-mousepointer")
     W->>OS: Settings アプリ起動 + deep-link
     OS-->>U: マウスポインターとタッチ画面
     W-->>R: HINSTANCE > 32 (成功)

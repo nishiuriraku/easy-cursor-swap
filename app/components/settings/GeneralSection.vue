@@ -41,7 +41,7 @@ const emit = defineEmits<{
   (e: 'update:cursor-size-slider', value: number): void
   /** ユーザーが「OS から再取得」を押したとき。親が refreshCursorSizeFromOs を呼ぶ。 */
   (e: 'refresh-cursor-size-from-os'): void
-  /** ユーザーが「Windows 設定を開く」を押したとき。親が ms-settings:easeofaccess-cursor を起動する。 */
+  /** ユーザーが「Windows 設定を開く」を押したとき。親が ms-settings:easeofaccess-mousepointer (マウスポインターとタッチ) を起動する。 */
   (e: 'open-windows-cursor-settings'): void
 }>()
 

@@ -258,7 +258,7 @@ export default {
     groupDisplayLanguage: '表示言語',
     groupCursorSize: 'カーソルサイズ',
     cursorSizeLabel: 'マウスポインターのサイズ',
-    cursorSizeDesc: 'Windows 全体のマウスポインターサイズを変更します (HKCU\\Control Panel\\Cursors\\CursorBaseSize)。Windows アクセシビリティ側でサイズが拡大されているときはアプリからは変更できません。',
+    cursorSizeDesc: 'Windows 全体のマウスポインターサイズを変更します。Windows アクセシビリティ側でサイズが拡大されているときはアプリからは変更できません。',
     cursorSizeReadout: '{px} px',
     cursorSizeError: 'サイズ変更に失敗しました: {error}',
     cursorSizeRefreshFromOs: 'OS から再取得',

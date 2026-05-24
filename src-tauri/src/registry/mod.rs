@@ -547,10 +547,34 @@ impl RegistryManager {
         //     配下の動的生成 .cur に切替わっており、CursorBaseSize 書込や
         //     LoadImageW + SetSystemCursor では視覚反映できない。Windows Settings UI
         //     経由でしか操作できないため、ここで Err を返す。
-        let current_slider: u32 = RegKey::predef(HKEY_CURRENT_USER)
+        //
+        // **fail-closed ポリシー**: `NotFound` (Accessibility キー / CursorSize 値が
+        // 未作成 = ユーザーが Windows Settings の eoa を一度も触っていない) のみ
+        // 「eoa 非アクティブ」とみなし 1 にフォールバック。それ以外のエラー
+        // (permission denied / 型不一致 / I/O 異常 等) は **eoa 状態を判定不能** な
+        // ので書込を中止する。`.unwrap_or(1)` で全エラーを 1 に丸めると、
+        // 過去 commit 229038e の `KEY_WRITE` フラグ不足バグと同種の "本来 eoa active
+        // なのに guard を通過して書込み → cursor 破綻" シナリオが再現するため、
+        // 防衛的に Err を返す。
+        let current_slider: u32 = match RegKey::predef(HKEY_CURRENT_USER)
             .open_subkey(r"SOFTWARE\Microsoft\Accessibility")
-            .and_then(|k| k.get_value("CursorSize"))
-            .unwrap_or(1u32);
+            .and_then(|k| k.get_value::<u32, _>("CursorSize"))
+        {
+            Ok(v) => v,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => 1,
+            Err(e) => {
+                tracing::warn!(
+                    "Accessibility\\CursorSize 読取失敗 (eoa 状態判定不能 — fail-closed で書込中止): kind={:?}, err={}",
+                    e.kind(),
+                    e
+                );
+                return Err(AppError::Registry(format!(
+                    "Accessibility\\CursorSize の読み取りに失敗しました ({}); \
+                     eoa pipeline の状態を判定できないため CursorBaseSize 書込を中止します。",
+                    e
+                )));
+            }
+        };
         if current_slider != 1 {
             return Err(AppError::Registry(format!(
                 "Windows accessibility cursor pipeline is active (CursorSize={}); refuse to \
@@ -653,7 +677,7 @@ impl RegistryManager {
     ) -> AppResult<usize> {
         use windows::core::PCWSTR;
         use windows::Win32::UI::WindowsAndMessaging::{
-            LoadImageW, SetSystemCursor, HCURSOR, IMAGE_CURSOR, LR_LOADFROMFILE,
+            DestroyCursor, LoadImageW, SetSystemCursor, HCURSOR, IMAGE_CURSOR, LR_LOADFROMFILE,
         };
 
         let mut applied: usize = 0;
@@ -716,6 +740,8 @@ impl RegistryManager {
 
             // SetSystemCursor: 成功時は hcursor の所有権を OS 側に移譲し、関数内で
             // destroy されるため呼出側で destroy 不要 (= ここで二重 free しない)。
+            // **失敗時は呼出側に所有権が残る** ため明示的に DestroyCursor で解放
+            // しないと最大 14 個 × 数 KB の HCURSOR がプロセス寿命の間リークする。
             match unsafe { SetSystemCursor(hcursor, ocr_id) } {
                 Ok(()) => applied += 1,
                 Err(e) => {
@@ -724,6 +750,9 @@ impl RegistryManager {
                         role.registry_name(),
                         e
                     );
+                    // SAFETY: hcursor は LoadImageW で生成され、Ok 経路に入らな
+                    // かったので所有権がここに残っている。二重 free にはならない。
+                    let _ = unsafe { DestroyCursor(hcursor) };
                 }
             }
         }

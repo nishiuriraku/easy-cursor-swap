@@ -629,9 +629,12 @@ function onRefreshCursorSizeFromOs() {
  */
 async function onOpenWindowsCursorSettings() {
   try {
-    await invokeTauri('open_url', { url: 'ms-settings:easeofaccess-cursor' })
+    // **正しい URI** は `easeofaccess-mousepointer` (= マウスポインターとタッチ)。
+    // `easeofaccess-cursor` は **テキストカーソル (挿入点)** ページのため別ページに飛ぶ。
+    // Microsoft 公式: https://learn.microsoft.com/windows/apps/develop/launch/launch-settings
+    await invokeTauri('open_url', { url: 'ms-settings:easeofaccess-mousepointer' })
   } catch (err) {
-    console.warn('[Settings] open ms-settings:easeofaccess-cursor failed:', err)
+    console.warn('[Settings] open ms-settings:easeofaccess-mousepointer failed:', err)
   }
 }
 
