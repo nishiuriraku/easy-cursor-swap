@@ -50,10 +50,15 @@ Windows の全 17 カーソル役割 / 6 DPI サイズに対応し、Ed25519 署
 どちらも minisign 鍵で署名されています（組み込みアップデーターが検証）。
 署名の手動検証方法は [docs/updater_signing.md](docs/updater_signing.md) を参照してください。
 
-> **SmartScreen について:** ダウンロード数が少ない初期段階では「不明な発行元」の警告が出ることがあります。
-> **「詳細情報」→「実行」** で続行してください。
-> 本アプリは [SignPath Foundation](https://signpath.org/) (OSS 向けコードサイニング) によって署名されています。
-> 署名ポリシー (チーム構成・プライバシー・ビルド再現性) は
+> **SmartScreen について:** 現状このアプリは **Authenticode コード署名を未取得** です。
+> OSS 向け署名サービスの [SignPath Foundation](https://signpath.org/) に申請しましたが、
+> 外部認知 (GitHub stars / 紹介記事 / 言及) がまだ十分でないため一次審査が保留となり
+> (2026-05-21)、認知度が伸びた段階での再申請を予定しています。そのため Windows
+> SmartScreen が「不明な発行元」の警告を出すことがあります。
+> **「詳細情報」→「実行」** で続行可能です。
+> 配布物は GitHub の公開ワークフローでビルドされ、Tauri Updater 用の Ed25519
+> (minisign) 署名は付与されています。ソースは MIT ライセンスで全公開、署名ポリシー
+> (チーム構成・プライバシー・ビルド再現性・現在の署名状況) は
 > [docs/code_signing_policy.md](docs/code_signing_policy.md) を参照してください。
 
 ### 自動アップデート

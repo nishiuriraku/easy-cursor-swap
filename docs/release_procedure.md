@@ -3,8 +3,10 @@
 EasyCursorSwap の v0.0.X リリース運用 runbook。`develop` に蓄積した変更を `main` に
 反映し、annotated tag を打って `release.yml` を起動するまでの一連の手順を定義する。
 
-> **タグ発行後の手順** (Authenticode 署名 / Tauri Updater Ed25519 署名 / SignPath 経由
-> 配信) は [`authenticode_signing.md`](./authenticode_signing.md) と
+> **タグ発行後の手順** (Tauri Updater Ed25519 署名 / SignPath 経由の Authenticode 署名 —
+> ただし 2026-05-21 時点で SignPath Foundation 一次審査は保留中につき SignPath
+> ステップは SIGNPATH_* secret 未設定で自動 skip される) は
+> [`authenticode_signing.md`](./authenticode_signing.md) と
 > [`updater_signing.md`](./updater_signing.md) を参照。本 runbook はタグ push までの
 > リポジトリ側作業に範囲を限定する。
 
@@ -248,7 +250,7 @@ gh run list --workflow=release.yml --limit 3
 | PR マージ前にタグを打ってしまう | `gh pr view <N> --json state` で `MERGED` を確認してから |
 | CHANGELOG の comparison link を更新し忘れる | ファイル末尾の `[Unreleased]: .../v0.0.(X-1)...HEAD` を `v0.0.X...HEAD` に書き換え、新たに `[0.0.X]: .../compare/v0.0.(X-1)...v0.0.X` を追加 |
 | docs-only commit と勘違いして gate をスキップ | `CHANGELOG.md` は規約上 docs-only に含まれるが、**release commit は安全側に gate を通す** のが慣例 |
-| `npm run tauri:build` を回さずに PR を作る | ローカル installer build は CI / SignPath で代替可能だが、Authenticode 署名前の sanity check として手元で 1 回回しておくと安全 |
+| `npm run tauri:build` を回さずに PR を作る | ローカル installer build は CI で代替可能だが、Authenticode 署名前の sanity check として手元で 1 回回しておくと安全 (現状 SignPath 申請保留中につき CI でも Authenticode は付与されない) |
 
 ---
 
@@ -268,7 +270,7 @@ PR 本文に明記する。`v0.0.2` PR と `v0.0.3` PR の前例に倣う:
 
 ## 関連 runbook
 
-- [`authenticode_signing.md`](./authenticode_signing.md) — Authenticode 署名 (SignPath / EV / OV) のセットアップ
+- [`authenticode_signing.md`](./authenticode_signing.md) — Authenticode 署名 (SignPath / Certum / EV / OV) のセットアップ、一次審査の結果と再申請ロードマップ
 - [`updater_signing.md`](./updater_signing.md) — Tauri Updater の Ed25519 署名鍵管理
 - [`distribution.md`](./distribution.md) — `.msi` / `.nsis` / `.msix` の生成と配布形態
 - [`code_signing_policy.md`](./code_signing_policy.md) — 署名方針と OS 検証フロー

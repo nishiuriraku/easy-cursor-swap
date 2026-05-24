@@ -57,9 +57,11 @@ RWTB...
 
 Tauri Updater 署名 (minisign) と Windows コードサイニング (Authenticode) は**独立した別物**。
 
-| 署名種別 | 目的 | 状態 |
+| 署名種別 | 目的 | 状態 (2026-05-21) |
 |---|---|---|
-| Tauri Updater (minisign) | 更新ファイルの改ざん防止 | ✅ 設定済み |
-| Windows Authenticode | SmartScreen レピュテーション | 🔄 EV/OV 証明書調達中 |
+| Tauri Updater (minisign) | 更新ファイルの改ざん防止 | ✅ 設定済み (有効) |
+| Windows Authenticode | SmartScreen レピュテーション | ⏸️ SignPath Foundation 一次審査保留、再申請準備中 |
 
-SmartScreen 回避に必要な Authenticode 証明書の調達は [`distribution.md`](distribution.md) を参照。
+Authenticode 証明書の調達戦略と再申請ロードマップは
+[`authenticode_signing.md`](authenticode_signing.md) を参照。配布形態と
+SmartScreen 緩和策の概要は [`distribution.md`](distribution.md) を参照。

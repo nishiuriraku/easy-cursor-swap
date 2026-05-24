@@ -20,7 +20,7 @@
       "frontend": "Nuxt 4 / Vue 3 SPA、Composition API、TypeScript、Tailwind v4",
       "backend": "Rust 1.82+ (windows、winreg、image、tracing、ed25519-dalek)",
       "shell": "Tauri v2 (single-instance プラグイン、updater、システムトレイ)",
-      "distribution": "SignPath 署名の NSIS / MSI インストーラ; Tauri Updater は Ed25519",
+      "distribution": "NSIS / MSI インストーラ (Authenticode 未署名 — SignPath Foundation OSS 申請は 2026-05-21 に外部認知不足で保留、再申請準備中。`release.yml` の SignPath ステップは skip-guard 付きで配線済、SIGNPATH_* secret 投入で自動再活性化); Tauri Updater は Ed25519 で署名済 (有効)",
       "test_runners": "vitest + happy-dom (フロント)、cargo test --lib + criterion (バックエンド)"
     },
     "single_source_of_truth_note": "Rust バックエンドが状態の所有者。フロントは IPC で同期する。Vue 側だけにアプリ状態を保持しない。",
@@ -40,7 +40,7 @@
       "ci_workflows": 3
     },
     "doc_drift_warnings": [
-      "No known drift as of 2026-05-23 (re-measured after cursor-size redesign v2). 直前の `c3863aa` で導入された case E gate は維持しつつ、本パッチで write path から `HKCU\\SOFTWARE\\Microsoft\\Accessibility\\CursorSize` の書込を完全削除 (新規 invariant `cursor_size_app_writes_only_cursorbasesize` 参照)。`accessibility::resolve_cursor_base_size` の優先順位も変更: Accessibility は slider > 1 のときのみ採用、それ以外は CursorBaseSize を信頼。round-trip が成立し、アプリスライダーが eoa pipeline を起動してロックアウトする現象が物理的に発生不可能になった。IPC 数 53 / Rust modules 23 / commands submodules 9 / composables 36 / components_total 60 はいずれも不変。architecture.json / architecture.md / file_inventory.md / architecture.html が同期。spec: docs/superpowers/specs/2026-05-23-cursor-size-redesign-v2.md (local)。",
+      "No known drift as of 2026-05-24 (re-measured after merging origin/main into develop for v0.0.5 release prep). develop の cursor-size redesign v2 (write path から `HKCU\\SOFTWARE\\Microsoft\\Accessibility\\CursorSize` の書込を完全削除、invariant `cursor_size_app_writes_only_cursorbasesize` を導入、`accessibility::resolve_cursor_base_size` の優先順位を「Accessibility は slider > 1 のときのみ採用、それ以外は CursorBaseSize を信頼」に変更してアプリスライダーが eoa pipeline を起動してロックアウトする現象を物理的に発生不可能にした) と、main の SignPath Foundation 一次申請保留対応 (`docs/authenticode_signing.md` 再申請ロードマップ追加 / README / `release.yml` SignPath ステップは skip-guard 付きで残置、再承認時に SIGNPATH_* secret 投入で自動再活性化) が両立。さらに PR review 由来の 5 fix (S1 Library 不要リロード撤去 / eoa guard fail-closed 強化 / HCURSOR リーク防止 / UI 技術文字列クリーン / deep-link URI `easeofaccess-cursor`→`easeofaccess-mousepointer` 修正) を適用。IPC 数 53 / Rust modules 23 / commands submodules 9 / composables 36 / components_total 60 はいずれも不変。architecture.json / architecture.md / file_inventory.md / architecture.html が同期。",
       "ui_map.json と相互整合済み: backend.ipc_commands 53 件のうち 3 件 (export_cursorpack / get_theme_previews / get_windows_scheme_previews) は Rust に登録だけされた legacy_unused 状態で、それぞれ status と replaced_by を明示。次の PR で Rust 側からも削除するか、frontend で再利用する決定をすること。",
       "新たに食い違いを見つけたら『docs/<file> は X と書いているが実測 Y』の形で追記し、修正コミットと同じ PR で解消する。",
       "数字が docs と食い違ったら grep を信用する。frontend の数字は ui_map.html の live check (末尾) が canonical counter。"

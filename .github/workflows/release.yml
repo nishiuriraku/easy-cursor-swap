@@ -18,6 +18,11 @@ name: Release
 #   SIGNPATH_ORGANIZATION_ID    : SignPath Organization Settings の UUID
 #   SIGNPATH_SIGNING_POLICY_SLUG: 'test-signing' (テスト) / 'release-signing' (本番)
 #   いずれかが未設定なら署名ステップは skip される。
+#
+# 2026-05-21 時点で SignPath Foundation OSS 一次申請は外部認知不足を理由に保留中
+# (詳細は docs/authenticode_signing.md)。SIGNPATH_* secret は未投入のままなので、
+# 下記の SignPath 関連ステップは現状すべて skip される。再申請通過時に Secret を
+# 投入するだけで自動的に有効化される設計のため、本ワークフロー側のコードは変更不要。
 on:
   push:
     tags:
