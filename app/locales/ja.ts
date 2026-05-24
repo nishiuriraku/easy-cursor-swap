@@ -20,6 +20,7 @@ export default {
     save: '保存',
     saving: '保存中...',
     cancel: 'キャンセル',
+    confirm: '確認',
     discard: '変更を破棄',
     import: 'インポート',
     export: 'エクスポート',
@@ -132,7 +133,6 @@ export default {
     conflictTitle: 'アクセシビリティ機能との競合',
     conflictMouseSonar: 'マウスソナー (Ctrl 押下でカーソル位置を表示) が有効です。テーマ適用後も Ctrl 押下時の表示は変わりません。',
     conflictHighContrast: 'ハイコントラストモードが有効です。OS 既定のシステムカーソルに置き換えられる場合があります。',
-    conflictCursorBaseSize: 'カーソルサイズが {size} に拡大されています (既定 32)。テーマのデザイン意図と異なるサイズで表示される可能性があります。',
   },
   creator: {
     breadcrumb: 'Creator',
@@ -256,6 +256,17 @@ export default {
     // 一般
     descGeneral: '言語、通知、起動時の挙動など、アプリ全体の基本設定。',
     groupDisplayLanguage: '表示言語',
+    groupCursorSize: 'カーソルサイズ',
+    cursorSizeLabel: 'マウスポインターのサイズ',
+    cursorSizeDesc: 'Windows 全体のマウスポインターサイズを変更します。Windows アクセシビリティ側でサイズが拡大されているときはアプリからは変更できません。',
+    cursorSizeReadout: '{px} px',
+    cursorSizeError: 'サイズ変更に失敗しました: {error}',
+    cursorSizeRefreshFromOs: 'OS から再取得',
+    cursorSizeEoaSizeMessage:
+      'Windows でマウスポインターのサイズが拡大 (現在: {currentSlider}) されているため、本アプリでの調整は利用できません。Windows の設定でサイズを 1 に戻すと、本アプリでの調整が再度有効になります。',
+    cursorSizeEoaStyleMessage:
+      'Windows のマウスポインタースタイル (type={type}) によって本アプリでの調整が制限されています。スタイルを「白 / 黒 / 反転」に変更してください。',
+    cursorSizeOpenWindowsSettings: 'Windows の設定を開く',
     groupNotifications: '通知',
     showApplyToastLabel: '適用結果のトースト表示',
     showApplyToastDesc: 'Windows トースト通知で適用結果を告知',

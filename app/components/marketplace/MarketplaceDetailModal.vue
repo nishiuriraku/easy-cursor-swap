@@ -2,12 +2,10 @@
 /**
  * 公式インデックスエントリの詳細モーダル。
  *
- * Library の ThemeDetailModal と類似:
- *  - Teleport + バックドロップ + Esc/外側クリックで閉じる
- *  - スクロールロック (body overflow: hidden)
- * 違い:
- *  - マウント時に useMarketplacePreviews で 6 ロール PNG を並列取得
- *  - フッター中央に「ライブラリに追加」プライマリボタン (インストール済みなら disabled)
+ * `UiModal` で骨格 (Teleport / focus trap / body scroll lock / Esc) を共通化し、
+ * - マウント時に useMarketplacePreviews で 6 ロール PNG を並列取得
+ * - フッターに「ライブラリに追加」プライマリボタン (インストール済みなら disabled)
+ * を載せる構成。
  */
 import type { MarketplaceEntry } from '~/types/marketplace'
 
@@ -46,6 +44,15 @@ const coveragePct = computed(() => {
   return Math.round((n / 17) * 100)
 })
 
+const subtitle = computed(() => {
+  if (!props.entry) return ''
+  return `@${props.entry.author} · v${props.entry.version}`
+})
+
+const ariaLabel = computed(() =>
+  t('marketplace.openMarketplaceDetailAria', { name: displayName.value }),
+)
+
 async function fetchPreviews(entry: MarketplaceEntry | null) {
   previewMap.value = null
   if (!entry || !entry.previewBaseUrl) return
@@ -59,9 +66,6 @@ function close() {
   emit('close')
 }
 
-// Body scroll lock + Esc 購読 + cleanup は useModalLifecycle に委譲。
-useModalLifecycle({ open: isOpen, onClose: close })
-
 function onInstall() {
   if (!props.entry) return
   if (alreadyInstalled.value || props.installing) return
@@ -70,120 +74,71 @@ function onInstall() {
 </script>
 
 <template>
-  <Teleport to="body">
-    <Transition name="fade">
-      <div
-        v-if="isOpen && entry"
-        class="md-backdrop"
-        role="dialog"
-        aria-modal="true"
-        :aria-label="t('marketplace.openMarketplaceDetailAria', { name: displayName })"
-        @click.self="close"
-      >
-        <div class="md-shell" @click.stop>
-          <div class="md-head">
-            <div>
-              <div class="md-eyebrow">{{ t('marketplace.detailEyebrow') }}</div>
-              <h2>{{ displayName }}</h2>
-              <div class="md-sub">
-                @{{ entry.author }} · v{{ entry.version }}
-                <span v-if="entry.verified" class="tag ok md-verified">
-                  <UiIcon name="Shield" :size="10" />
-                </span>
-              </div>
-            </div>
-            <button
-              class="btn icon"
-              :aria-label="t('common.close')"
-              :title="`${t('common.close')} (Esc)`"
-              @click="close"
-            >
-              <UiIcon name="X" :size="13" />
-            </button>
+  <UiModal :open="isOpen" :title="displayName" :description="subtitle" size="lg" @close="close">
+    <template v-if="entry" #headExtra>
+      <span v-if="entry.verified" class="tag ok md-verified" :aria-label="ariaLabel">
+        <UiIcon name="Shield" :size="10" />
+      </span>
+    </template>
+
+    <template v-if="entry">
+      <div class="md-eyebrow">{{ t('marketplace.detailEyebrow') }}</div>
+
+      <div class="md-preview">
+        <CursorMatrix
+          :included="entry.includedRoles"
+          :preview-map="previewMap"
+          :limit="6"
+          :cols="3"
+        />
+      </div>
+
+      <div class="md-meta">
+        <div class="coverage">
+          <div class="bar" aria-hidden="true">
+            <i :style="{ width: coveragePct + '%' }" />
           </div>
-
-          <div class="md-body">
-            <div class="md-preview">
-              <CursorMatrix
-                :included="entry.includedRoles"
-                :preview-map="previewMap"
-                :limit="6"
-                :cols="3"
-              />
-            </div>
-
-            <div class="md-meta">
-              <div class="coverage">
-                <div class="bar" aria-hidden="true">
-                  <i :style="{ width: coveragePct + '%' }" />
-                </div>
-                <span class="num">{{ entry.includedRoles.length }}/17</span>
-              </div>
-              <div v-if="entry.tags.length" class="md-row">
-                <span class="md-k">Tags</span>
-                <span class="md-v chips-row">
-                  <span v-for="tag in entry.tags" :key="tag" class="chip">{{ tag }}</span>
-                </span>
-              </div>
-              <div v-if="entry.homepage" class="md-row">
-                <span class="md-k">Homepage</span>
-                <a
-                  :href="entry.homepage"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="md-v link"
-                  >{{ entry.homepage }}</a
-                >
-              </div>
-            </div>
-          </div>
-
-          <footer class="md-foot">
-            <button class="btn ghost" @click="close">{{ t('common.cancel') }}</button>
-            <button
-              class="btn primary"
-              :disabled="alreadyInstalled || installing"
-              @click="onInstall"
-            >
-              <UiIcon :name="alreadyInstalled ? 'Check' : 'Import'" :size="13" aria-hidden="true" />
-              <span v-if="alreadyInstalled">{{ t('marketplace.alreadyInstalled') }}</span>
-              <span v-else-if="installing">{{ t('marketplace.installing') }}</span>
-              <span v-else>{{ t('marketplace.addToLibrary') }}</span>
-            </button>
-          </footer>
+          <span class="num">{{ entry.includedRoles.length }}/17</span>
+        </div>
+        <div v-if="entry.tags.length" class="md-row">
+          <span class="md-k">Tags</span>
+          <span class="md-v chips-row">
+            <span v-for="tag in entry.tags" :key="tag" class="chip">{{ tag }}</span>
+          </span>
+        </div>
+        <div v-if="entry.homepage" class="md-row">
+          <span class="md-k">Homepage</span>
+          <a :href="entry.homepage" target="_blank" rel="noopener noreferrer" class="md-v link">{{
+            entry.homepage
+          }}</a>
         </div>
       </div>
-    </Transition>
-  </Teleport>
+    </template>
+
+    <template #actions>
+      <UiButton variant="ghost" @click="close">{{ t('common.cancel') }}</UiButton>
+      <UiButton
+        variant="primary"
+        :disabled="alreadyInstalled || installing"
+        :icon-left="alreadyInstalled ? 'Check' : 'Import'"
+        @click="onInstall"
+      >
+        <span v-if="alreadyInstalled">{{ t('marketplace.alreadyInstalled') }}</span>
+        <span v-else-if="installing">{{ t('marketplace.installing') }}</span>
+        <span v-else>{{ t('marketplace.addToLibrary') }}</span>
+      </UiButton>
+    </template>
+  </UiModal>
 </template>
 
 <style scoped>
 @reference '~/assets/css/tailwind.css';
 
-.md-backdrop {
-  @apply fixed inset-0 z-[100] grid place-items-center bg-[rgba(8,9,14,0.6)] p-8 backdrop-blur-[8px];
-}
-.md-shell {
-  @apply flex h-auto max-h-[calc(100vh-64px)] w-[min(720px,100%)] flex-col overflow-hidden rounded-[14px] border border-line-hi bg-bg-1;
-  box-shadow: var(--shadow-2);
-}
-.md-head {
-  @apply flex items-start justify-between gap-3 border-b border-line px-[22px] pb-4 pt-[18px];
-}
 .md-eyebrow {
-  @apply mb-1 font-mono text-[9.5px] uppercase tracking-[0.16em] text-accent;
-}
-.md-head h2 {
-  @apply m-0 font-display text-[20px] font-semibold tracking-[-0.02em];
-}
-.md-sub {
-  @apply mt-1 inline-flex items-center gap-2 font-mono text-[12px] tracking-[0.02em] text-fg-dim;
+  @apply mb-3 font-mono text-[9.5px] uppercase tracking-[0.16em] text-accent;
 }
 .md-verified {
   padding: 2px 6px;
-}
-.md-body {
-  @apply min-h-0 flex-1 overflow-y-auto p-[22px];
 }
 .md-preview {
   @apply mb-4 grid place-items-center rounded-[10px] border border-line p-4;
@@ -206,17 +161,5 @@ function onInstall() {
 }
 .chips-row {
   @apply inline-flex flex-wrap gap-1;
-}
-.md-foot {
-  @apply flex items-center justify-end gap-2 border-t border-line px-[22px] py-3;
-}
-
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.18s ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
 }
 </style>

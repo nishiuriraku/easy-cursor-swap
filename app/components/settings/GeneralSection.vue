@@ -2,8 +2,13 @@
 /**
  * 設定 → 一般 セクション。
  *
- * UI 言語選択 + 通知トグル 2 つ + ConfigRecoveryPanel (バックアップ復旧) を含む。
- * ConfigRecoveryPanel が emit する `restored` を親に伝播するためのラッパー。
+ * UI 言語選択 + 通知トグル 2 つ + マウスポインターサイズ (1〜15 スライダー) +
+ * ConfigRecoveryPanel (バックアップ復旧)。
+ *
+ * カーソルサイズは config.json には永続化されない (OS レジストリ
+ * HKCU\Control Panel\Cursors\CursorBaseSize が source of truth)。スライダー変更を
+ * 即時 IPC で反映するため、`update:cursor-size-slider` を親 (settings.vue) が
+ * `@change` 相当のタイミングで受け取り `set_cursor_base_size` IPC を叩く。
  */
 
 const { t } = useI18n()
@@ -12,9 +17,79 @@ const language = defineModel<string>('language', { required: true })
 const showApplyToast = defineModel<boolean>('showApplyToast', { required: true })
 const applyShadowControl = defineModel<boolean>('applyShadowControl', { required: true })
 
-defineEmits<{
-  (e: 'config-restored'): void
+const props = defineProps<{
+  cursorSizeSlider: number
+  cursorSizeMin: number
+  cursorSizeMax: number
+  /** スライダー位置に対応する DWORD 値 (px 表示用) */
+  cursorSizePx: number
+  cursorSizeBusy: boolean
+  cursorSizeError: string | null
+  /** Windows 側で eoa pipeline (CursorSize > 1) がアクティブか。
+   *  true のとき本コンポーネントは slider を disabled にし、解除ガイドのバナーを表示する。 */
+  cursorAccessibilityActive: boolean
+  /** Windows 側の現在の slider 位置 (1-15)。バナーメッセージに displayed する。 */
+  cursorCurrentWindowsSlider: number
+  /** Windows 側の現在の CursorType (0=白, 1=黒, 2=反転, 3/6/...=eoa 起動)。
+   *  メッセージのバリエーション切替に使用。 */
+  cursorCurrentWindowsType: number
 }>()
+
+const emit = defineEmits<{
+  (e: 'config-restored'): void
+  /** スライダー値が確定したとき (`@change` 相当)。親が IPC を発火する。 */
+  (e: 'update:cursor-size-slider', value: number): void
+  /** ユーザーが「OS から再取得」を押したとき。親が refreshCursorSizeFromOs を呼ぶ。 */
+  (e: 'refresh-cursor-size-from-os'): void
+  /** ユーザーが「Windows 設定を開く」を押したとき。親が ms-settings:easeofaccess-mousepointer (マウスポインターとタッチ) を起動する。 */
+  (e: 'open-windows-cursor-settings'): void
+}>()
+
+// ドラッグ中の視覚フィードバック用にローカル ref を持つ。親側の値が変わったら同期する。
+const localSlider = ref(props.cursorSizeSlider)
+watch(
+  () => props.cursorSizeSlider,
+  (v) => {
+    localSlider.value = v
+  },
+)
+const localPxPreview = computed(() => {
+  // 親の `cursorSizePx` (= sliderToDword(parentSlider)) と同じ式で local 用を計算する。
+  // 親の DWORD 値が必要なくドラッグ中のプレビューが出せる。
+  const step = 16
+  const min = 32
+  return min + step * (localSlider.value - props.cursorSizeMin)
+})
+
+// eoa active 時のバナーメッセージを切替える。
+// CursorSize > 1 (= サイズ拡大が原因) と CursorType != 0 (= スタイルが原因) を区別する。
+const eoaMessage = computed(() => {
+  if (props.cursorCurrentWindowsSlider > 1) {
+    return t('settings.cursorSizeEoaSizeMessage', {
+      currentSlider: props.cursorCurrentWindowsSlider,
+    })
+  }
+  // CursorSize == 1 だが eoa active のケース (本仕様 gate では発火しないが将来 known
+  // limitation 緩和時に有効化)。
+  return t('settings.cursorSizeEoaStyleMessage', {
+    type: props.cursorCurrentWindowsType,
+  })
+})
+
+function onSliderInput(ev: Event) {
+  const raw = (ev.target as HTMLInputElement).value
+  const n = Number.parseInt(raw, 10)
+  if (Number.isFinite(n)) localSlider.value = n
+}
+
+// `@input` (ドラッグ中) は連続発火するので IPC 発火を `@change` に絞る。
+// `<input type="range">` の値は文字列なので number に正規化。
+function onSliderChange(ev: Event) {
+  const raw = (ev.target as HTMLInputElement).value
+  const n = Number.parseInt(raw, 10)
+  if (!Number.isFinite(n)) return
+  emit('update:cursor-size-slider', n)
+}
 </script>
 
 <template>
@@ -42,6 +117,61 @@ defineEmits<{
             ]"
           />
         </SettingsRow>
+      </div>
+    </div>
+
+    <div class="prop-section">
+      <div class="prop-head">{{ t('settings.groupCursorSize') }}</div>
+      <div class="prop-body">
+        <UiAlert v-if="cursorAccessibilityActive" variant="info" class="cursor-size-eoa-banner">
+          <p class="cursor-size-eoa-message">{{ eoaMessage }}</p>
+          <button
+            type="button"
+            class="cursor-size-open-windows-settings"
+            @click="$emit('open-windows-cursor-settings')"
+          >
+            {{ t('settings.cursorSizeOpenWindowsSettings') }}
+          </button>
+        </UiAlert>
+        <SettingsRow
+          anchor="cursorSize"
+          :label="t('settings.cursorSizeLabel')"
+          :desc="t('settings.cursorSizeDesc')"
+        >
+          <div class="cursor-size-control">
+            <input
+              type="range"
+              :min="cursorSizeMin"
+              :max="cursorSizeMax"
+              step="1"
+              :value="localSlider"
+              :disabled="cursorSizeBusy || cursorAccessibilityActive"
+              :aria-label="t('settings.cursorSizeLabel')"
+              :aria-valuemin="cursorSizeMin"
+              :aria-valuemax="cursorSizeMax"
+              :aria-valuenow="localSlider"
+              :aria-valuetext="t('settings.cursorSizeReadout', { px: localPxPreview })"
+              @input="onSliderInput"
+              @change="onSliderChange"
+            />
+            <span class="cursor-size-readout">
+              {{ t('settings.cursorSizeReadout', { px: localPxPreview }) }}
+            </span>
+          </div>
+        </SettingsRow>
+        <div class="cursor-size-refresh">
+          <button
+            type="button"
+            class="cursor-size-refresh-link"
+            :disabled="cursorSizeBusy"
+            @click="$emit('refresh-cursor-size-from-os')"
+          >
+            {{ t('settings.cursorSizeRefreshFromOs') }}
+          </button>
+        </div>
+        <p v-if="cursorSizeError" class="cursor-size-error" role="alert">
+          {{ t('settings.cursorSizeError', { error: cursorSizeError }) }}
+        </p>
       </div>
     </div>
 
@@ -97,5 +227,64 @@ defineEmits<{
 }
 .prop-body {
   padding: 4px 16px;
+}
+
+.cursor-size-control {
+  @apply flex items-center gap-3;
+  min-width: 220px;
+}
+.cursor-size-control input[type='range'] {
+  flex: 1;
+  min-width: 160px;
+  accent-color: var(--accent, #7cf2d4);
+}
+.cursor-size-control input[type='range']:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.cursor-size-readout {
+  @apply font-mono text-[11px] text-fg-dim;
+  min-width: 60px;
+  text-align: right;
+}
+.cursor-size-error {
+  @apply mt-2 break-all rounded-md text-[11.5px] text-fg-dim;
+  padding: 8px 12px;
+  background: rgba(255, 100, 100, 0.08);
+  border: 1px solid rgba(255, 100, 100, 0.2);
+}
+.cursor-size-refresh {
+  @apply mt-2 flex justify-end;
+}
+.cursor-size-refresh-link {
+  @apply inline-flex items-center text-[12px] underline decoration-dotted underline-offset-2 transition-colors;
+  color: var(--text-secondary, currentColor);
+  background: transparent;
+  border: none;
+  padding: 2px 4px;
+  cursor: pointer;
+}
+.cursor-size-refresh-link:hover:not(:disabled) {
+  color: var(--text-primary, currentColor);
+}
+.cursor-size-refresh-link:disabled {
+  @apply cursor-not-allowed opacity-50;
+}
+.cursor-size-eoa-banner {
+  @apply mb-3;
+}
+.cursor-size-eoa-message {
+  @apply m-0 mb-2 text-[12px] leading-relaxed;
+}
+.cursor-size-open-windows-settings {
+  @apply inline-flex items-center text-[12px] underline decoration-dotted underline-offset-2 transition-colors;
+  color: var(--text-primary, currentColor);
+  background: transparent;
+  border: none;
+  padding: 2px 4px;
+  cursor: pointer;
+}
+.cursor-size-open-windows-settings:hover {
+  @apply opacity-80;
 }
 </style>

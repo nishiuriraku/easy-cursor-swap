@@ -6,6 +6,10 @@
  * - ライブラリのテーマ一覧 + 検索
  * - 選択中ハイライト + クリックで選択
  * - クリアボタン (null = 未指定)
+ *
+ * 共通 `<UiModal>` シェルにラップを委譲し、Esc / バックドロップ / スクロール
+ * ロック / focus trap は UiModal 側で処理する。本ファイルではフィルタ済みリスト
+ * とフッターアクションのみ実装する。
  */
 import type { ThemeCardData } from '~/types/theme'
 
@@ -20,7 +24,11 @@ const props = defineProps<{
   title?: string
   /** サブタイトル (どのスロット用かの文脈) */
   sub?: string
-  /** モーダルアクセント色 (CSS) — Light=amber, Dark=mint 等 */
+  /**
+   * モーダルアクセント色 (CSS) — Light=amber, Dark=mint 等
+   * 現状はどの呼び出し元も渡していないため UiModal の `iconTone` に統一済みで
+   * 視覚的反映は無いが、互換のため公開 API としては保持。
+   */
   accent?: string
   /**
    * フッターに「未指定にする」ボタンを表示するか。既定 true。
@@ -59,106 +67,80 @@ function clear() {
   emit('cancel')
 }
 
-function onBackdrop(e: MouseEvent) {
-  if (e.target === e.currentTarget) emit('cancel')
-}
+// `accent` は未使用警告対策で参照 (props は public API として保持)。
+void props.accent
 </script>
 
 <template>
-  <div
-    class="modal-page"
-    role="dialog"
-    aria-modal="true"
+  <UiModal
+    :open="true"
+    :title="title ?? t('themePicker.titleDefault')"
+    :description="sub"
+    icon="Library"
+    icon-tone="accent"
+    size="md"
     aria-labelledby="picker-modal-title"
-    @click="onBackdrop"
+    @close="emit('cancel')"
   >
-    <div class="modal picker-modal" @click.stop>
-      <div class="modal-head">
-        <div
-          class="modal-icon"
-          aria-hidden="true"
-          :style="
-            accent ? { background: `${accent}1f`, borderColor: `${accent}59`, color: accent } : {}
-          "
+    <div class="picker-body">
+      <div class="search picker-search">
+        <UiIcon name="Search" :size="14" style="color: var(--fg-mute)" />
+        <input
+          v-model="query"
+          :placeholder="t('library.searchPlaceholder')"
+          :aria-label="t('common.search')"
+        />
+      </div>
+
+      <div v-if="filtered.length === 0" class="picker-empty">
+        <UiIcon name="Search" :size="32" />
+        <p>{{ t('themePicker.notFound') }}</p>
+      </div>
+
+      <ul v-else class="picker-list">
+        <li
+          v-for="t in filtered"
+          :key="t.id"
+          :class="['picker-item', { selected: modelValue === t.id }]"
+          tabindex="0"
+          role="button"
+          @click="pick(t.id)"
+          @keydown.enter="pick(t.id)"
+          @keydown.space.prevent="pick(t.id)"
         >
-          <UiIcon name="Library" :size="20" />
-        </div>
-        <div style="flex: 1; min-width: 0">
-          <h2 id="picker-modal-title">{{ title ?? t('themePicker.titleDefault') }}</h2>
-          <p v-if="sub">{{ sub }}</p>
-        </div>
-        <button class="btn icon" :aria-label="t('common.close')" @click="emit('cancel')">
-          <UiIcon name="X" :size="11" />
-        </button>
-      </div>
-
-      <div class="modal-body picker-body">
-        <div class="search picker-search">
-          <UiIcon name="Search" :size="14" style="color: var(--fg-mute)" />
-          <input
-            v-model="query"
-            :placeholder="t('library.searchPlaceholder')"
-            :aria-label="t('common.search')"
-          />
-        </div>
-
-        <div v-if="filtered.length === 0" class="picker-empty">
-          <UiIcon name="Search" :size="32" />
-          <p>{{ t('themePicker.notFound') }}</p>
-        </div>
-
-        <ul v-else class="picker-list">
-          <li
-            v-for="t in filtered"
-            :key="t.id"
-            :class="['picker-item', { selected: modelValue === t.id }]"
-            tabindex="0"
-            role="button"
-            @click="pick(t.id)"
-            @keydown.enter="pick(t.id)"
-            @keydown.space.prevent="pick(t.id)"
-          >
-            <div class="pi-thumb">
-              <CursorIcon role="Arrow" :size="20" />
+          <div class="pi-thumb">
+            <CursorIcon role="Arrow" :size="20" />
+          </div>
+          <div class="pi-meta">
+            <div class="pi-name">{{ t.name }}</div>
+            <div class="pi-sub">
+              @{{ t.author ?? 'unknown' }} · v{{ t.version }} · {{ t.includedRoles.length }}/17
             </div>
-            <div class="pi-meta">
-              <div class="pi-name">{{ t.name }}</div>
-              <div class="pi-sub">
-                @{{ t.author ?? 'unknown' }} · v{{ t.version }} · {{ t.includedRoles.length }}/17
-              </div>
-            </div>
-            <UiIcon
-              v-if="modelValue === t.id"
-              name="Check"
-              :size="14"
-              style="color: var(--accent)"
-            />
-          </li>
-        </ul>
-      </div>
-
-      <div v-if="(props.showClear ?? true) || (props.showFooterCancel ?? true)" class="modal-foot">
-        <button v-if="props.showClear ?? true" class="btn ghost" @click="clear">
-          {{ t('themePicker.clear') }}
-        </button>
-        <div class="actions">
-          <button v-if="props.showFooterCancel ?? true" class="btn ghost" @click="emit('cancel')">
-            {{ t('common.cancel') }}
-          </button>
-        </div>
-      </div>
+          </div>
+          <UiIcon v-if="modelValue === t.id" name="Check" :size="14" style="color: var(--accent)" />
+        </li>
+      </ul>
     </div>
-  </div>
+
+    <template v-if="props.showClear ?? true" #leftNote>
+      <UiButton variant="ghost" @click="clear">
+        {{ t('themePicker.clear') }}
+      </UiButton>
+    </template>
+
+    <template v-if="props.showFooterCancel ?? true" #actions>
+      <UiButton variant="ghost" @click="emit('cancel')">
+        {{ t('common.cancel') }}
+      </UiButton>
+    </template>
+  </UiModal>
 </template>
 
 <style scoped>
 @reference '~/assets/css/tailwind.css';
 
-.picker-modal {
-  @apply w-[480px];
-}
 .picker-body {
-  @apply px-5 pb-2 pt-4;
+  @apply px-1 pb-1 pt-0;
 }
 .picker-search {
   @apply mb-3 max-w-none;

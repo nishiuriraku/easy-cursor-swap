@@ -108,135 +108,115 @@ defineExpose({ matches, unmatched, unassignRole, pickRoleFromUnmatched, unassign
 </script>
 
 <template>
-  <div v-if="open" class="bi-overlay" @click.self="emit('cancel')">
-    <div class="bi-modal" role="dialog" aria-modal="true">
-      <header class="bi-head">
-        <h3>{{ t('bulkImport.previewTitle') }}</h3>
-        <button class="btn ghost" :aria-label="t('common.close')" @click="emit('cancel')">✕</button>
-      </header>
-      <div class="bi-body">
-        <div class="bi-source">{{ sourceLabel }} — {{ summaryLine }}</div>
+  <UiModal
+    :open="open"
+    :title="t('bulkImport.previewTitle')"
+    icon="Import"
+    size="xl"
+    @close="emit('cancel')"
+  >
+    <div class="bi-source">{{ sourceLabel }} — {{ summaryLine }}</div>
 
-        <div class="bi-protect">
-          <button
-            type="button"
-            class="btn ghost"
-            :disabled="matches.length === 0"
-            :title="t('bulkImport.unassignAllHint')"
-            @click="unassignAll"
-          >
-            {{ t('bulkImport.unassignAll', { count: matches.length }) }}
-          </button>
-        </div>
-
-        <div class="bi-columns">
-          <section class="bi-col bi-col-unmatched">
-            <h4>
-              {{
-                unmatched.length
-                  ? t('bulkImport.unmatchedHeader', { count: unmatched.length })
-                  : t('bulkImport.unmatchedEmpty')
-              }}
-            </h4>
-            <div v-for="u in sortedUnmatched" :key="u.asset.sourcePath" class="bi-unmatched">
-              <AniThumb
-                v-if="u.asset.ani && u.aniFramesU8"
-                :frame-pngs="u.aniFramesU8"
-                :sequence="u.asset.ani.sequence"
-                :durations="u.asset.ani.perStepDurationsMs"
-                :width="64"
-                :height="64"
-              />
-              <img v-else :src="u.previewUrl" :alt="u.asset.sourceFile" />
-              <span class="unmatched-meta">{{ u.asset.sourceFile }} ({{ u.asset.width }}px)</span>
-              <UiSelect
-                :model-value="null"
-                width="180px"
-                :placeholder="t('bulkImport.selectRolePlaceholder')"
-                :options="unmatchedRoleOptions"
-                @change="(v) => v && pickRoleFromUnmatched(u, v as string)"
-              />
-            </div>
-            <p v-if="!unmatched.length" class="bi-col-empty">
-              {{ t('bulkImport.unmatchedEmptyHint') }}
-            </p>
-          </section>
-
-          <section class="bi-col bi-col-roles">
-            <h4>{{ t('bulkImport.seventeenRoles') }}</h4>
-            <BulkImportRoleRow
-              v-for="row in allRoleRows"
-              :key="row.roleId"
-              :role-id="row.roleId"
-              :role-label="row.roleLabel"
-              :required="row.required"
-              :preview-url="row.match?.previewUrl ?? null"
-              :source-file="row.match?.asset.sourceFile ?? null"
-              :native-size="row.match?.asset.width ?? null"
-              :conflict="row.match?.conflict ?? 'none'"
-              :ani-data="row.match?.asset.ani ?? null"
-              :ani-frames-u8="row.match?.aniFramesU8 ?? null"
-              @unassign="unassignRole(row.roleId)"
-            />
-          </section>
-        </div>
-
-        <template v-if="cursorpack">
-          <h4>{{ t('bulkImport.metadataHeader') }}</h4>
-          <div class="bi-meta-info">
-            {{ t('bulkImport.metadataNameLabel') }}: {{ cursorpack.metadata.nameJa ?? '—' }} /
-            {{ t('bulkImport.metadataAuthorLabel') }}: {{ cursorpack.metadata.author ?? '—' }} /
-            {{ t('bulkImport.metadataVersionLabel') }}: {{ cursorpack.metadata.version ?? '—' }}
-          </div>
-          <label class="ui-radio" :class="{ 'is-checked': metadataChoice === 'keep' }">
-            <input v-model="metadataChoice" type="radio" name="bi-metadata-choice" value="keep" />
-            <span class="ui-radio-mark" aria-hidden="true" />
-            <span class="ui-radio-label">{{ t('bulkImport.metadataKeep') }}</span>
-          </label>
-          <label class="ui-radio" :class="{ 'is-checked': metadataChoice === 'overwrite' }">
-            <input
-              v-model="metadataChoice"
-              type="radio"
-              name="bi-metadata-choice"
-              value="overwrite"
-            />
-            <span class="ui-radio-mark" aria-hidden="true" />
-            <span class="ui-radio-label">{{ t('bulkImport.metadataOverwrite') }}</span>
-          </label>
-          <label class="ui-radio" :class="{ 'is-checked': metadataChoice === 'name-only' }">
-            <input
-              v-model="metadataChoice"
-              type="radio"
-              name="bi-metadata-choice"
-              value="name-only"
-            />
-            <span class="ui-radio-mark" aria-hidden="true" />
-            <span class="ui-radio-label">{{ t('bulkImport.metadataNameOnly') }}</span>
-          </label>
-        </template>
-      </div>
-
-      <footer class="bi-foot">
-        <button class="btn ghost ml-auto" @click="emit('cancel')">{{ t('common.cancel') }}</button>
-        <button class="btn primary" @click="apply">
-          ✓
-          {{ t('bulkImport.applyCount', { count: matches.length }) }}
-        </button>
-      </footer>
+    <div class="bi-protect">
+      <button
+        type="button"
+        class="btn ghost"
+        :disabled="matches.length === 0"
+        :title="t('bulkImport.unassignAllHint')"
+        @click="unassignAll"
+      >
+        {{ t('bulkImport.unassignAll', { count: matches.length }) }}
+      </button>
     </div>
-  </div>
+
+    <div class="bi-columns">
+      <section class="bi-col bi-col-unmatched">
+        <h4>
+          {{
+            unmatched.length
+              ? t('bulkImport.unmatchedHeader', { count: unmatched.length })
+              : t('bulkImport.unmatchedEmpty')
+          }}
+        </h4>
+        <div v-for="u in sortedUnmatched" :key="u.asset.sourcePath" class="bi-unmatched">
+          <AniThumb
+            v-if="u.asset.ani && u.aniFramesU8"
+            :frame-pngs="u.aniFramesU8"
+            :sequence="u.asset.ani.sequence"
+            :durations="u.asset.ani.perStepDurationsMs"
+            :width="64"
+            :height="64"
+          />
+          <img v-else :src="u.previewUrl" :alt="u.asset.sourceFile" />
+          <span class="unmatched-meta">{{ u.asset.sourceFile }} ({{ u.asset.width }}px)</span>
+          <UiSelect
+            :model-value="null"
+            width="180px"
+            :placeholder="t('bulkImport.selectRolePlaceholder')"
+            :options="unmatchedRoleOptions"
+            @change="(v) => v && pickRoleFromUnmatched(u, v as string)"
+          />
+        </div>
+        <p v-if="!unmatched.length" class="bi-col-empty">
+          {{ t('bulkImport.unmatchedEmptyHint') }}
+        </p>
+      </section>
+
+      <section class="bi-col bi-col-roles">
+        <h4>{{ t('bulkImport.seventeenRoles') }}</h4>
+        <BulkImportRoleRow
+          v-for="row in allRoleRows"
+          :key="row.roleId"
+          :role-id="row.roleId"
+          :role-label="row.roleLabel"
+          :required="row.required"
+          :preview-url="row.match?.previewUrl ?? null"
+          :source-file="row.match?.asset.sourceFile ?? null"
+          :native-size="row.match?.asset.width ?? null"
+          :conflict="row.match?.conflict ?? 'none'"
+          :ani-data="row.match?.asset.ani ?? null"
+          :ani-frames-u8="row.match?.aniFramesU8 ?? null"
+          @unassign="unassignRole(row.roleId)"
+        />
+      </section>
+    </div>
+
+    <template v-if="cursorpack">
+      <h4>{{ t('bulkImport.metadataHeader') }}</h4>
+      <div class="bi-meta-info">
+        {{ t('bulkImport.metadataNameLabel') }}: {{ cursorpack.metadata.nameJa ?? '—' }} /
+        {{ t('bulkImport.metadataAuthorLabel') }}: {{ cursorpack.metadata.author ?? '—' }} /
+        {{ t('bulkImport.metadataVersionLabel') }}: {{ cursorpack.metadata.version ?? '—' }}
+      </div>
+      <label class="ui-radio" :class="{ 'is-checked': metadataChoice === 'keep' }">
+        <input v-model="metadataChoice" type="radio" name="bi-metadata-choice" value="keep" />
+        <span class="ui-radio-mark" aria-hidden="true" />
+        <span class="ui-radio-label">{{ t('bulkImport.metadataKeep') }}</span>
+      </label>
+      <label class="ui-radio" :class="{ 'is-checked': metadataChoice === 'overwrite' }">
+        <input v-model="metadataChoice" type="radio" name="bi-metadata-choice" value="overwrite" />
+        <span class="ui-radio-mark" aria-hidden="true" />
+        <span class="ui-radio-label">{{ t('bulkImport.metadataOverwrite') }}</span>
+      </label>
+      <label class="ui-radio" :class="{ 'is-checked': metadataChoice === 'name-only' }">
+        <input v-model="metadataChoice" type="radio" name="bi-metadata-choice" value="name-only" />
+        <span class="ui-radio-mark" aria-hidden="true" />
+        <span class="ui-radio-label">{{ t('bulkImport.metadataNameOnly') }}</span>
+      </label>
+    </template>
+
+    <template #actions>
+      <UiButton variant="ghost" @click="emit('cancel')">{{ t('common.cancel') }}</UiButton>
+      <UiButton variant="primary" icon-left="Check" @click="apply">
+        {{ t('bulkImport.applyCount', { count: matches.length }) }}
+      </UiButton>
+    </template>
+  </UiModal>
 </template>
 
 <style scoped>
 @reference '~/assets/css/tailwind.css';
 
-.bi-overlay {
-  @apply fixed inset-0 z-[100] flex items-center justify-center bg-[rgba(10,11,15,0.7)];
-}
-.bi-modal {
-  @apply flex max-h-[90vh] w-[min(1200px,96vw)] flex-col rounded-[12px] border border-line;
-  background: var(--bg-1, #14161c);
-}
 /* 2 カラム本体: 狭幅では縦積みにフォールバック (md=768px) */
 .bi-columns {
   @apply mt-2 flex flex-col items-start gap-4 md:flex-row;
@@ -250,16 +230,6 @@ defineExpose({ matches, unmatched, unassignRole, pickRoleFromUnmatched, unassign
 }
 .bi-col-empty {
   @apply mt-2 rounded border border-dashed border-line/60 px-3 py-4 text-center text-[11px] text-fg-dim;
-}
-.bi-head,
-.bi-foot {
-  @apply flex items-center justify-between border-b border-line px-4 py-3;
-}
-.bi-foot {
-  @apply justify-end gap-2 border-b-0 border-t border-line;
-}
-.bi-body {
-  @apply flex-1 overflow-y-auto px-4 py-3;
 }
 .bi-source {
   @apply mb-2 text-[12px] text-fg-mute;

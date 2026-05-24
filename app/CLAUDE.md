@@ -32,6 +32,16 @@ Tailwind v4 utility classes are the default styling mechanism.
 - **`routeRules: { '/**': { ssr: false } }`** in `nuxt.config.ts`is intentional. Nuxt 4.4.4 has an IPC bug with`ssr: false`at the top level; do not change to`ssr: false` directly.
 - `npm run dev` (Nuxt-only) has no Tauri runtime — IPC calls will fail. Use `npm run tauri:dev` from the repo root to exercise IPC.
 
+## Visual regression — Tauri MCP
+
+When you (Claude) edit `app/**/*.vue` or `app/**/*.ts` and `tauri:dev` is running, capture before/after snapshots of the active page to confirm no unintended visual or DOM change:
+
+1. **Before edit** — `mcp___hypothesi_tauri-mcp-server__webview_screenshot` + `mcp___hypothesi_tauri-mcp-server__webview_dom_snapshot` (save to `c:/tmp/visual/before-<page>.png|json`).
+2. **After HMR** — same two calls into `after-<page>.png|json`.
+3. **Compare** — DOM diff (refactors should be zero diff). Image diff via `compare` (ImageMagick) when intentional design changes; review the pixel diff to confirm scope.
+
+Skip for trivial single-line CSS tweaks; mandatory for component splits, modal/layout changes, and composable-driven state refactors. The PostToolUse hook will remind you (`💡 Visual regression reminder:`) after each frontend edit.
+
 ## Test commands
 
 ```bash

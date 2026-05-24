@@ -76,104 +76,80 @@ const headerDesc = computed(() => {
 const headerAccent = computed(() =>
   compareResult.value === 'older' ? 'var(--rose)' : 'var(--accent)',
 )
-
-function onBackdrop(e: MouseEvent) {
-  if (e.target === e.currentTarget) emit('cancel')
-}
 </script>
 
 <template>
-  <div
-    class="modal-page"
-    role="dialog"
-    aria-modal="true"
+  <UiModal
+    :open="true"
+    :title="headerLabel"
+    :description="headerDesc"
+    icon="Alert"
+    :icon-tone="compareResult === 'older' ? 'danger' : 'accent'"
+    size="lg"
     aria-labelledby="conflict-modal-title"
-    @click="onBackdrop"
+    @close="emit('cancel')"
   >
-    <div class="modal conflict-modal" @click.stop>
-      <div class="modal-head">
-        <div
-          class="modal-icon"
-          aria-hidden="true"
-          :style="{
-            borderColor: `${headerAccent}59`,
-            color: headerAccent,
-            background: `${headerAccent}1f`,
-          }"
+    <div class="diff-grid">
+      <div class="col">
+        <div class="col-head">{{ t('conflict.colExisting') }}</div>
+        <div class="diff-name">{{ info.existing.name }}</div>
+        <div class="diff-meta">
+          <span class="m">v{{ info.existing.version }}</span>
+          <span class="m">@{{ info.existing.author ?? 'unknown' }}</span>
+          <span class="m">{{ info.existing.roleCount }}/17</span>
+        </div>
+      </div>
+
+      <div class="arrow" :style="{ color: headerAccent }">
+        <svg
+          width="22"
+          height="22"
+          viewBox="0 0 22 22"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+          stroke-linecap="round"
+          stroke-linejoin="round"
         >
-          <UiIcon name="Alert" :size="20" />
-        </div>
-        <div style="flex: 1; min-width: 0">
-          <h2 id="conflict-modal-title">{{ headerLabel }}</h2>
-          <p>{{ headerDesc }}</p>
-        </div>
+          <path d="M3 11h16M14 5l5 6-5 6" />
+        </svg>
       </div>
 
-      <div class="modal-body">
-        <div class="diff-grid">
-          <div class="col">
-            <div class="col-head">{{ t('conflict.colExisting') }}</div>
-            <div class="diff-name">{{ info.existing.name }}</div>
-            <div class="diff-meta">
-              <span class="m">v{{ info.existing.version }}</span>
-              <span class="m">@{{ info.existing.author ?? 'unknown' }}</span>
-              <span class="m">{{ info.existing.roleCount }}/17</span>
-            </div>
-          </div>
-
-          <div class="arrow" :style="{ color: headerAccent }">
-            <svg
-              width="22"
-              height="22"
-              viewBox="0 0 22 22"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.6"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M3 11h16M14 5l5 6-5 6" />
-            </svg>
-          </div>
-
-          <div class="col" :style="{ borderColor: headerAccent }">
-            <div class="col-head" :style="{ color: headerAccent }">
-              {{ t('conflict.colImport') }}
-            </div>
-            <div class="diff-name">{{ info.name }}</div>
-            <div class="diff-meta">
-              <span class="m" :style="{ color: headerAccent }">v{{ info.version }}</span>
-              <span class="m">@{{ info.author ?? 'unknown' }}</span>
-              <span class="m">{{ info.roleCount }}/17</span>
-            </div>
-          </div>
+      <div class="col" :style="{ borderColor: headerAccent }">
+        <div class="col-head" :style="{ color: headerAccent }">
+          {{ t('conflict.colImport') }}
         </div>
-
-        <div class="id-row">
-          <UiIcon name="Pkg" :size="13" />
-          <span class="id-label">theme.id</span>
-          <span class="id-value">{{ info.id }}</span>
-        </div>
-      </div>
-
-      <div class="modal-foot">
-        <div class="left-note">
-          <UiIcon name="Shield" :size="12" style="color: var(--accent)" />
-          {{ t('conflict.snapshotNote') }}
-        </div>
-        <div class="actions">
-          <button class="btn ghost" @click="emit('cancel')">{{ t('common.cancel') }}</button>
-          <button
-            :class="['btn', compareResult === 'older' ? 'danger' : 'primary']"
-            @click="emit('overwrite')"
-          >
-            <UiIcon name="Check" :size="13" />
-            {{ compareResult === 'older' ? t('conflict.downgrade') : t('conflict.overwrite') }}
-          </button>
+        <div class="diff-name">{{ info.name }}</div>
+        <div class="diff-meta">
+          <span class="m" :style="{ color: headerAccent }">v{{ info.version }}</span>
+          <span class="m">@{{ info.author ?? 'unknown' }}</span>
+          <span class="m">{{ info.roleCount }}/17</span>
         </div>
       </div>
     </div>
-  </div>
+
+    <div class="id-row">
+      <UiIcon name="Pkg" :size="13" />
+      <span class="id-label">theme.id</span>
+      <span class="id-value">{{ info.id }}</span>
+    </div>
+
+    <template #leftNote>
+      <UiIcon name="Shield" :size="12" style="color: var(--accent)" />
+      <span>{{ t('conflict.snapshotNote') }}</span>
+    </template>
+
+    <template #actions>
+      <UiButton variant="ghost" @click="emit('cancel')">{{ t('common.cancel') }}</UiButton>
+      <UiButton
+        :variant="compareResult === 'older' ? 'danger' : 'primary'"
+        icon-left="Check"
+        @click="emit('overwrite')"
+      >
+        {{ compareResult === 'older' ? t('conflict.downgrade') : t('conflict.overwrite') }}
+      </UiButton>
+    </template>
+  </UiModal>
 </template>
 
 <style scoped>

@@ -14,7 +14,8 @@
     "app/components/settings/**/*.vue",
     "app/components/panic/**/*.vue",
     "app/components/icons/**/*.vue",
-    "app/components/preview/CursorPreview.vue"
+    "app/components/preview/CursorPreview.vue",
+    "app/components/ui/**/*.vue"
   ],
   "meta": {
     "name": "EasyCursorSwap UI Map",
@@ -30,17 +31,17 @@
     "measured_counts": {
       "pages": 4,
       "layouts": 1,
-      "components_total": 56,
+      "components_total": 60,
       "components_by_group": {
         "shell": 3,
-        "library": 15,
-        "creator": 13,
+        "library": 14,
+        "creator": 14,
         "marketplace": 6,
         "settings": 14,
         "preview": 1,
         "panic": 1,
         "icons": 2,
-        "ui": 1
+        "ui": 5
       },
       "interactions_total": 197,
       "ipc_unique_targets": 49,
@@ -49,7 +50,7 @@
       "modals": 14
     },
     "drift_notes": [
-      "現時点では既知のドリフトなし (2026-05-19 architecture.json + file_inventory.md + architecture.md + CLAUDE.md と完全同期)。本 JSON が IPC 名フィールドに `\"update_config (Save 時)\"` のような注釈付き文字列を書いていた件 (audit B1, 14 箇所) は同コミット内で全て解消済み。注釈は `action` フィールドに移されている。",
+      "現時点では既知のドリフトなし (2026-05-21 architecture.json + file_inventory.md + architecture.md + CLAUDE.md と完全同期)。components.ui を 1 → 5 に拡張: 既存 UiSelect.vue に加え、UiButton.vue / UiAlert.vue / UiModal.vue / UiConfirmDialog.vue を新規追加。これに伴い 11 モーダル (Apply / ImportConflict / DiscardEdit / NewThemeStart / SaveDestination / BulkImportPreview / ThemeDetail / ThemePicker / MarketplaceDetail / SubmitTheme / SubmitDeviceFlow / OssLicense / PassphrasePrompt) が UiModal shell に統一され、各モーダルの onBackdrop / onKeydown ハンドラ重複と modals 14 の数値は変化なし。インラインアラート (a11y-banner / ConfigRecoveryPanel / KeysSection / UpdatesSection / SubmitThemeAuto / SubmitThemeManual / SubmitDeviceFlow danger 領域) は UiAlert に統一され、tone 別 (info / success / warn / danger) の色トークン参照を一元化。さらに UiModal 統一後の smoke で ThemeDetailModal が body 内アクション行 + .modal-foot の二重フッターになる UX 問題が判明したため、ThemeDetailDrawerFooter.vue を削除し、edit / export / duplicate / delete を UiModal #leftNote、Close + Apply を #actions slot に移動 (library 15 → 14)。本 JSON が IPC 名フィールドに `\"update_config (Save 時)\"` のような注釈付き文字列を書いていた件 (audit B1, 14 箇所) は同コミット内で全て解消済み。注釈は `action` フィールドに移されている。",
       "本ファイルの数字 (interactions_total / ipc_unique_targets) は ui_map.html を開いた瞬間に live check が再計上して宣言値とミスマッチを検出する canonical counter として機能する。新規ハンドラ・モーダル・キーボードショートカット追加と同じコミットで本 JSON を更新すること。",
       "backend.ipc_commands 52 件のうち 3 件 (export_cursorpack / get_theme_previews / get_windows_scheme_previews) は Rust に登録されているが現行フロントから呼ばれない legacy_unused。本 ui_map では参照しない (= ipc_unique_targets は 49 のまま)。Rust 側で削除するか維持するかの決定は別 PR で。"
     ]

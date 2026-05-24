@@ -94,9 +94,9 @@ onMounted(load)
           </button>
         </div>
 
-        <div v-if="message" class="recovery-msg" :class="{ error: !message.ok }">
+        <UiAlert v-if="message" :tone="message.ok ? 'success' : 'danger'" class="recovery-msg">
           {{ message.text }}
-        </div>
+        </UiAlert>
       </div>
     </div>
   </div>
@@ -156,13 +156,6 @@ onMounted(load)
 }
 
 .recovery-msg {
-  @apply mt-2.5 rounded-md border border-accent-line p-3 font-mono text-[11.5px] text-fg-dim;
-  padding: 10px 12px;
-  background: rgba(124, 242, 212, 0.06);
-}
-.recovery-msg.error {
-  background: rgba(255, 107, 138, 0.06);
-  border-color: rgba(255, 107, 138, 0.4);
-  color: #ffb8c5;
+  @apply mt-2.5;
 }
 </style>

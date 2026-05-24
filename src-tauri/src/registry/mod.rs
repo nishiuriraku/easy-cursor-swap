@@ -482,6 +482,289 @@ impl RegistryManager {
         Ok(())
     }
 
+    /// `HKCU\Control Panel\Cursors\CursorBaseSize` (REG_DWORD) を書き換えて
+    /// マウスポインターサイズを更新する。Windows 設定 UI 側「マウスポインターとタッチ」
+    /// スライダーが触る canonical キーと同じ key を書くが、`Accessibility\*` の併存値は
+    /// 書かない (v2 invariant — specs/2026-05-23-cursor-size-redesign-v2)。よって両者の
+    /// スライダー位置は意図的に同期しない。
+    ///
+    /// 引数 `size` は書き込む DWORD 値。範囲外の値は
+    /// `clamp_cursor_base_size` で [MIN_CURSOR_BASE_SIZE, MAX_CURSOR_BASE_SIZE]
+    /// (32〜256) にクランプされる。戻り値は実際に書き込まれた値。
+    ///
+    /// ## 反映機構: SetSystemCursor を経由した一方向書込み
+    ///
+    /// 本関数はアプリを single source of truth として、Windows レジストリとカーネル
+    /// カーソルテーブルに **書込みのみ** を行う。`SPI_SETCURSORS` や明示
+    /// `WM_SETTINGCHANGE(L"Cursors")` の broadcast は **意図的に行わない** —
+    /// それらは自分自身の [`cursor_watcher`][crate::cursor_watcher] が echo として
+    /// 受信し、focus 戻り時の auto-refresh と組み合わせると Win↔アプリ往復で
+    /// カーソルが徐々に肥大化する双方向同期ループを引き起こすため
+    /// (詳細は `docs/superpowers/specs/2026-05-22-cursor-size-architecture-redesign.md`)。
+    ///
+    /// シーケンス:
+    ///
+    /// 1. **`HKCU\Control Panel\Cursors\CursorBaseSize`** に DWORD (32〜256) を書く
+    ///    (永続化 — 次回ログオン時にもサイズが保たれる)。
+    /// 2. **[`Self::apply_system_cursors_at_size`]** で 14 種の OCR_* 役割について
+    ///    `LoadImageW` + `SetSystemCursor` を実行 — 全アプリ・全 HDC で即時視覚反映。
+    ///    `NWPen` / `Pin` / `Person` の 3 役割は OCR_* 定数が存在しないため即時反映対象外
+    ///    (永続化のみ。次回テーマ適用 / ログオン時に反映される)。
+    ///
+    /// `HKCU\SOFTWARE\Microsoft\Accessibility\CursorSize` は **書かない**
+    /// (Invariant v2 / 2026-05-23 redesign — 下記参照)。
+    ///
+    /// 本機能は「テーマ適用」とは独立した設定として扱うため、
+    /// `_pending_apply.snapshot` には参加しない (= cursor 役割の transactional
+    /// apply とは別系統)。テーマを切り替えてもサイズは保持される。
+    ///
+    /// ## Defensive guard: Windows accessibility eoa pipeline 状態の検出
+    ///
+    /// 本関数は冒頭で `HKCU\SOFTWARE\Microsoft\Accessibility\CursorSize` を読み、値が
+    /// 1 以外ならば即時 [`AppError::Registry`] を返す。Windows Accessibility のスライダー
+    /// が 2 以上に設定されていると Windows は eoa pipeline (動的生成された
+    /// `*_eoa.cur` ファイルを `%LOCALAPPDATA%\Microsoft\Windows\Cursors\` に置く経路)
+    /// を使用しており、本関数の `LoadImageW` + `SetSystemCursor` 経路では視覚反映できない
+    /// ためである。UI 側でも `cursor_size_slider != 1` のとき slider を `disabled` に
+    /// するが、IPC が他経路から呼ばれた場合の安全網として Rust 側でも拒否する。
+    ///
+    /// ## Invariant (v2 / 2026-05-23 redesign)
+    ///
+    /// 本関数は `HKCU\SOFTWARE\Microsoft\Accessibility\*` を **書かない**。
+    /// 該当 namespace は Windows Settings UI の専用領域で、アプリが書くと eoa pipeline
+    /// が誤作動する (specs/2026-05-23-cursor-size-redesign-v2)。
+    #[cfg(windows)]
+    pub fn set_cursor_base_size(size: u32) -> AppResult<u32> {
+        use winreg::enums::*;
+        use winreg::RegKey;
+
+        // (0) Defensive guard: Windows accessibility eoa pipeline がアクティブな
+        //     状態 (CursorSize > 1) では本関数を呼ばない。通常は UI 側で slider を
+        //     disabled にして防御するが、IPC が他経路から直接呼ばれた場合 / UI に
+        //     bug があった場合の安全網。
+        //
+        //     eoa active 中は cursor file paths が `%LOCALAPPDATA%\Microsoft\Windows\Cursors\`
+        //     配下の動的生成 .cur に切替わっており、CursorBaseSize 書込や
+        //     LoadImageW + SetSystemCursor では視覚反映できない。Windows Settings UI
+        //     経由でしか操作できないため、ここで Err を返す。
+        //
+        // **fail-closed ポリシー**: `NotFound` (Accessibility キー / CursorSize 値が
+        // 未作成 = ユーザーが Windows Settings の eoa を一度も触っていない) のみ
+        // 「eoa 非アクティブ」とみなし 1 にフォールバック。それ以外のエラー
+        // (permission denied / 型不一致 / I/O 異常 等) は **eoa 状態を判定不能** な
+        // ので書込を中止する。`.unwrap_or(1)` で全エラーを 1 に丸めると、
+        // 過去 commit 229038e の `KEY_WRITE` フラグ不足バグと同種の "本来 eoa active
+        // なのに guard を通過して書込み → cursor 破綻" シナリオが再現するため、
+        // 防衛的に Err を返す。
+        let current_slider: u32 = match RegKey::predef(HKEY_CURRENT_USER)
+            .open_subkey(r"SOFTWARE\Microsoft\Accessibility")
+            .and_then(|k| k.get_value::<u32, _>("CursorSize"))
+        {
+            Ok(v) => v,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => 1,
+            Err(e) => {
+                tracing::warn!(
+                    "Accessibility\\CursorSize 読取失敗 (eoa 状態判定不能 — fail-closed で書込中止): kind={:?}, err={}",
+                    e.kind(),
+                    e
+                );
+                return Err(AppError::Registry(format!(
+                    "Accessibility\\CursorSize の読み取りに失敗しました ({}); \
+                     eoa pipeline の状態を判定できないため CursorBaseSize 書込を中止します。",
+                    e
+                )));
+            }
+        };
+        if current_slider != 1 {
+            return Err(AppError::Registry(format!(
+                "Windows accessibility cursor pipeline is active (CursorSize={}); refuse to \
+                 write to avoid interference with eoa pipeline. User must reset to size 1 via \
+                 Windows Accessibility Settings before in-app slider can apply.",
+                current_slider
+            )));
+        }
+
+        let clamped = clamp_cursor_base_size(size);
+        let slider_pos = base_size_to_slider_position(clamped);
+
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+
+        // **Invariant (specs/2026-05-23-cursor-size-redesign-v2):**
+        // `HKCU\SOFTWARE\Microsoft\Accessibility\CursorSize` は **Windows Settings UI 専用**
+        // のキーで、アプリからは絶対に書かない。書くと Win11 の eoa pipeline がアクティブ化し、
+        // `%LOCALAPPDATA%\Microsoft\Windows\Cursors\*_eoa.cur` を期待される状態になるが、
+        // それらのファイルは Settings UI 経由でしか生成されないためカーソルが破綻する。
+        // 過去 commit `9d16c2b` 〜 `c3863aa` で「Accessibility と CursorBaseSize を sync 書込」
+        // していたが、これが lockout バグの根本原因だった (specs 詳細参照)。
+        //
+        // slider_pos は log 用にだけ計算しており、書込みは行わない (戻り値は clamped)。
+
+        // (1) HKCU\Control Panel\Cursors\CursorBaseSize を書く (canonical 値)。
+        //
+        // **KEY_READ | KEY_WRITE 両方が必須**:
+        //   - `set_value("CursorBaseSize", ...)` には KEY_WRITE
+        //   - 直後の read-back 検証 (`get_value`) と、(4) `apply_system_cursors_at_size`
+        //     内の各役割パス取得 (`get_value`) に KEY_READ が必要
+        //
+        // KEY_WRITE 単独だと `set_value` は成功する一方、同じハンドルでの `get_value` が
+        // permission denied で Err になり、本コードは `.ok()` / `Err(_) => continue` で
+        // 握り潰すため「書込は成功、読取は静かに失敗」という悪い fail mode に陥る。
+        // この結果、過去3回 (41574f7 / cee1398 / d96296c) の修整は本命の機構を実装した
+        // にもかかわらず効かなかった (`SetSystemCursor 適用: 0/14`、`read_back=None`)。
+        let cursors_key = hkcu
+            .open_subkey_with_flags("Control Panel\\Cursors", KEY_READ | KEY_WRITE)
+            .map_err(|e| AppError::Registry(format!("Cursors キーを開けません: {}", e)))?;
+        cursors_key
+            .set_value("CursorBaseSize", &clamped)
+            .map_err(|e| AppError::Registry(format!("CursorBaseSize 書込失敗: {}", e)))?;
+
+        // 書込検証 (PII redact なし: DWORD 値そのものは PII でない、UI 設定値)
+        let read_back: Option<u32> = cursors_key.get_value("CursorBaseSize").ok();
+        tracing::info!(
+            "CursorBaseSize 書込: target={} read_back={:?} slider={}",
+            clamped,
+            read_back,
+            slider_pos
+        );
+
+        // cursors_key は (4) の SetSystemCursor 用にもう一度だけ使う必要があるので
+        // ここでは drop しない。
+
+        // (2) LoadImageW + SetSystemCursor で全 OCR_* 役割を明示サイズで再ロード。
+        //     視覚反映の本命経路。これだけで全アプリ・全 HDC のカーソルが即時に
+        //     指定サイズへ差し替わる。SPI_SETCURSORS や WM_SETTINGCHANGE の broadcast は
+        //     意図的に行わない (docstring 参照)。
+        match Self::apply_system_cursors_at_size(&cursors_key, clamped) {
+            Ok(applied) => {
+                tracing::info!(
+                    "SetSystemCursor 適用: {}/14 OCR_* 役割 @ {}px",
+                    applied,
+                    clamped
+                );
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "SetSystemCursor 一括適用失敗 (続行 — registry 書込は完了済み): {}",
+                    e
+                );
+            }
+        }
+
+        Ok(clamped)
+    }
+
+    /// `CursorBaseSize` 書込後の本命: 14 種の OCR_* 役割について `LoadImageW` で
+    /// `target_size` ピクセルのカーソルを生成し、`SetSystemCursor` で kernel の
+    /// cursor table を直接差し替える。
+    ///
+    /// `SPI_SETCURSORS` は実行時に `CursorBaseSize` の DWORD 値を再評価しないため、
+    /// 視覚反映を即時実現する唯一の経路がこれ。Windows 設定アプリの
+    /// 「マウスポインターとタッチ」スライダーが内部で行っているのと同じ動作。
+    ///
+    /// 戻り値は `SetSystemCursor` が成功した役割の数 (期待値: 14)。
+    /// `NWPen` / `Pin` / `Person` は対応する `OCR_*` 定数が存在しないため
+    /// 即時反映できず、サイレントスキップする (DWORD 永続化済みなので次回テーマ
+    /// 適用 / ログオン時に反映される)。
+    ///
+    /// 個別役割の `LoadImageW` / `SetSystemCursor` 失敗は best-effort (debug ログ
+    /// のみ、続行)。`LR_SHARED` は使わない — `SetSystemCursor` は HCURSOR の
+    /// 所有権を OS に移譲して関数内で destroy する仕様のため、`LR_LOADFROMFILE`
+    /// 単独で都度ロードする。
+    #[cfg(windows)]
+    fn apply_system_cursors_at_size(
+        cursors_key: &winreg::RegKey,
+        target_size: u32,
+    ) -> AppResult<usize> {
+        use windows::core::PCWSTR;
+        use windows::Win32::UI::WindowsAndMessaging::{
+            DestroyCursor, LoadImageW, SetSystemCursor, HCURSOR, IMAGE_CURSOR, LR_LOADFROMFILE,
+        };
+
+        let mut applied: usize = 0;
+        for role in CursorRole::all() {
+            let ocr_id = match role_to_ocr_id(*role) {
+                Some(id) => id,
+                None => {
+                    tracing::debug!(
+                        "role '{}' は OCR_* マッピングなし — SetSystemCursor スキップ",
+                        role.registry_name()
+                    );
+                    continue;
+                }
+            };
+
+            // 値が存在しない役割は Windows 既定継承なので、レジストリの空文字列も
+            // 「ファイルパスなし」として扱いスキップ。
+            let raw_path: String = match cursors_key.get_value(role.registry_name()) {
+                Ok(s) => s,
+                Err(_) => continue,
+            };
+            if raw_path.is_empty() {
+                continue;
+            }
+
+            // REG_EXPAND_SZ で書かれた %SystemRoot% を実パスに展開。
+            let expanded = expand_env_vars(&raw_path);
+
+            // UTF-16 NUL 終端の wide string に変換 (LoadImageW のシグネチャ要件)。
+            let wide: Vec<u16> = expanded.encode_utf16().chain(std::iter::once(0)).collect();
+
+            // LoadImageW: HMODULE=None (=ファイルからロード), name=ファイルパス,
+            // type=IMAGE_CURSOR, cx/cy=target_size (明示サイズ), fuLoad=LR_LOADFROMFILE。
+            // 失敗 (パス不正 / ファイル無し / .ani サイズ非対応など) は debug ログで続行。
+            let handle = unsafe {
+                LoadImageW(
+                    None,
+                    PCWSTR(wide.as_ptr()),
+                    IMAGE_CURSOR,
+                    target_size as i32,
+                    target_size as i32,
+                    LR_LOADFROMFILE,
+                )
+            };
+            let raw_handle = match handle {
+                Ok(h) => h,
+                Err(e) => {
+                    tracing::debug!(
+                        "LoadImageW 失敗 role='{}' (続行): {}",
+                        role.registry_name(),
+                        e
+                    );
+                    continue;
+                }
+            };
+
+            // HANDLE -> HCURSOR (windows-rs では別 newtype のため明示変換)。
+            // SAFETY: LoadImageW が IMAGE_CURSOR で返した handle は HCURSOR として扱える。
+            let hcursor = HCURSOR(raw_handle.0);
+
+            // SetSystemCursor: 成功時は hcursor の所有権を OS 側に移譲し、関数内で
+            // destroy されるため呼出側で destroy 不要 (= ここで二重 free しない)。
+            // **失敗時は呼出側に所有権が残る** ため明示的に DestroyCursor で解放
+            // しないと最大 14 個 × 数 KB の HCURSOR がプロセス寿命の間リークする。
+            match unsafe { SetSystemCursor(hcursor, ocr_id) } {
+                Ok(()) => applied += 1,
+                Err(e) => {
+                    tracing::debug!(
+                        "SetSystemCursor 失敗 role='{}' (続行): {}",
+                        role.registry_name(),
+                        e
+                    );
+                    // SAFETY: hcursor は LoadImageW で生成され、Ok 経路に入らな
+                    // かったので所有権がここに残っている。二重 free にはならない。
+                    let _ = unsafe { DestroyCursor(hcursor) };
+                }
+            }
+        }
+
+        Ok(applied)
+    }
+
+    #[cfg(not(windows))]
+    pub fn set_cursor_base_size(size: u32) -> AppResult<u32> {
+        Ok(clamp_cursor_base_size(size))
+    }
+
     /// 初回起動時のスナップショットを保存する
     pub fn save_initial_snapshot() -> AppResult<()> {
         let cursors_dir = ConfigManager::cursors_dir()?;
@@ -659,10 +942,238 @@ pub fn paths_match_current_registry(expected: &HashMap<String, String>) -> bool 
     })
 }
 
+/// CursorBaseSize DWORD の最小値 (= Windows 既定 32 px)。
+pub const MIN_CURSOR_BASE_SIZE: u32 = 32;
+
+/// CursorBaseSize DWORD の最大値 (= Windows 設定アプリ slider 15 = 256 px)。
+pub const MAX_CURSOR_BASE_SIZE: u32 = 256;
+
+/// Windows 設定アプリ「マウスポインターとタッチ」のサイズスライダーは
+/// 16 px 刻みで CursorBaseSize を変える (32 / 48 / 64 / ... / 256)。
+pub const CURSOR_BASE_SIZE_STEP: u32 = 16;
+
+/// スライダー位置の最小値 (Windows 設定アプリと同じ 1 始まり)。
+pub const MIN_CURSOR_SIZE_SLIDER: u8 = 1;
+
+/// スライダー位置の最大値。`MIN_CURSOR_BASE_SIZE + STEP * (MAX_SLIDER - 1) = 256` を満たす。
+pub const MAX_CURSOR_SIZE_SLIDER: u8 = 15;
+
+/// 任意の入力値を CursorBaseSize として有効な範囲 [32, 256] にクランプする。
+///
+/// 端数 (例: 40) はそのまま許容する — Windows は 16 px 刻み以外でも一応動作するが、
+/// `.cur` の埋め込みサイズ (32/48/64/96/128/256) と一致しないため Windows 側で
+/// 線形補間がかかり、ピクセルアートのカーソルではややぼやけて見える。本アプリの
+/// UI スライダーは 16 px 刻みでしか書かないので通常は埋め込みサイズと一致する。
+pub fn clamp_cursor_base_size(size: u32) -> u32 {
+    size.clamp(MIN_CURSOR_BASE_SIZE, MAX_CURSOR_BASE_SIZE)
+}
+
+/// Windows 設定アプリ流のスライダー位置 (1〜15) を CursorBaseSize DWORD に変換する。
+///
+/// 関係式: `size = MIN_CURSOR_BASE_SIZE + STEP * (slider - 1)`
+/// 例: slider=1 → 32 / slider=2 → 48 / slider=3 → 64 / ... / slider=15 → 256
+///
+/// 範囲外のスライダー位置はクランプ後に変換する (UI が 1〜15 を強制しているが
+/// 念のため backend 側でもサニタイズ)。
+pub fn slider_position_to_base_size(slider: u8) -> u32 {
+    let s = slider.clamp(MIN_CURSOR_SIZE_SLIDER, MAX_CURSOR_SIZE_SLIDER);
+    MIN_CURSOR_BASE_SIZE + CURSOR_BASE_SIZE_STEP * u32::from(s - 1)
+}
+
+/// CursorBaseSize DWORD を最も近いスライダー位置 (1〜15) に変換する。
+///
+/// 16 px 刻みに揃っていない値 (例: 40) は四捨五入で最近接スライダーにスナップする。
+/// 範囲外の値はクランプ後に変換する。UI で「OS の現在値をスライダーに反映する」
+/// 用途。
+pub fn base_size_to_slider_position(size: u32) -> u8 {
+    let clamped = clamp_cursor_base_size(size);
+    // 四捨五入: +STEP/2 してから整数除算
+    let offset = clamped - MIN_CURSOR_BASE_SIZE;
+    let slider_zero = (offset + CURSOR_BASE_SIZE_STEP / 2) / CURSOR_BASE_SIZE_STEP;
+    let slider = slider_zero as u8 + MIN_CURSOR_SIZE_SLIDER;
+    slider.clamp(MIN_CURSOR_SIZE_SLIDER, MAX_CURSOR_SIZE_SLIDER)
+}
+
+/// `CursorRole` を `SetSystemCursor` 用の `OCR_*` 定数 (= `SYSTEM_CURSOR_ID`) に
+/// マップする。`NWPen` / `Pin` / `Person` には対応する `OCR_*` が存在しないため
+/// `None` を返す (= `SetSystemCursor` で即時反映できない)。
+///
+/// マッピング根拠: Windows SDK の `winuser.h` で定義されている 14 種の `OCR_*` 定数
+/// (`OCR_NORMAL` / `OCR_IBEAM` / `OCR_WAIT` / `OCR_CROSS` / `OCR_UP` / `OCR_SIZE*` ×6 /
+/// `OCR_NO` / `OCR_HAND` / `OCR_APPSTARTING` / `OCR_HELP`)。
+///
+/// `windows` crate (0.62) は各定数を `SYSTEM_CURSOR_ID(u32)` newtype として export
+/// しているので、`SetSystemCursor` のシグネチャ `(HCURSOR, SYSTEM_CURSOR_ID) -> Result<()>`
+/// にそのまま渡せる。
+#[cfg(windows)]
+fn role_to_ocr_id(
+    role: CursorRole,
+) -> Option<windows::Win32::UI::WindowsAndMessaging::SYSTEM_CURSOR_ID> {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        OCR_APPSTARTING, OCR_CROSS, OCR_HAND, OCR_HELP, OCR_IBEAM, OCR_NO, OCR_NORMAL, OCR_SIZEALL,
+        OCR_SIZENESW, OCR_SIZENS, OCR_SIZENWSE, OCR_SIZEWE, OCR_UP, OCR_WAIT,
+    };
+    Some(match role {
+        CursorRole::Arrow => OCR_NORMAL,
+        CursorRole::Help => OCR_HELP,
+        CursorRole::AppStarting => OCR_APPSTARTING,
+        CursorRole::Wait => OCR_WAIT,
+        CursorRole::Crosshair => OCR_CROSS,
+        CursorRole::IBeam => OCR_IBEAM,
+        CursorRole::No => OCR_NO,
+        CursorRole::SizeNS => OCR_SIZENS,
+        CursorRole::SizeWE => OCR_SIZEWE,
+        CursorRole::SizeNWSE => OCR_SIZENWSE,
+        CursorRole::SizeNESW => OCR_SIZENESW,
+        CursorRole::SizeAll => OCR_SIZEALL,
+        CursorRole::UpArrow => OCR_UP,
+        CursorRole::Hand => OCR_HAND,
+        // OCR_* 定数が存在しない3役割は即時反映対象外。
+        CursorRole::NWPen | CursorRole::Pin | CursorRole::Person => return None,
+    })
+}
+
+#[cfg(test)]
+mod size_helpers_tests {
+    use super::*;
+
+    /// スライダー位置 → DWORD の境界値と全有効値のテスト。
+    /// Windows 設定アプリの仕様 (1=32, 15=256) と一致することを保証する。
+    #[test]
+    fn slider_to_base_size_covers_full_range() {
+        assert_eq!(slider_position_to_base_size(1), 32);
+        assert_eq!(slider_position_to_base_size(2), 48);
+        assert_eq!(slider_position_to_base_size(3), 64);
+        assert_eq!(slider_position_to_base_size(5), 96);
+        assert_eq!(slider_position_to_base_size(7), 128);
+        assert_eq!(slider_position_to_base_size(15), 256);
+    }
+
+    /// 範囲外スライダーは MIN/MAX にクランプされる。
+    #[test]
+    fn slider_to_base_size_clamps_out_of_range() {
+        assert_eq!(slider_position_to_base_size(0), 32);
+        assert_eq!(slider_position_to_base_size(16), 256);
+        assert_eq!(slider_position_to_base_size(u8::MAX), 256);
+    }
+
+    /// DWORD → スライダーの境界値ラウンドトリップ。
+    #[test]
+    fn base_size_to_slider_round_trip_at_aligned_values() {
+        for s in MIN_CURSOR_SIZE_SLIDER..=MAX_CURSOR_SIZE_SLIDER {
+            let size = slider_position_to_base_size(s);
+            assert_eq!(
+                base_size_to_slider_position(size),
+                s,
+                "slider {} round-trip via size {}",
+                s,
+                size
+            );
+        }
+    }
+
+    /// 16 px 刻みに揃っていない中間値は四捨五入で最近接スライダーにスナップする。
+    #[test]
+    fn base_size_to_slider_snaps_to_nearest() {
+        // 32 .. 40 → slider 1 (32 寄り)
+        assert_eq!(base_size_to_slider_position(32), 1);
+        assert_eq!(base_size_to_slider_position(39), 1);
+        // 40 は 32 と 48 の中点、四捨五入で 48 = slider 2
+        assert_eq!(base_size_to_slider_position(40), 2);
+        assert_eq!(base_size_to_slider_position(47), 2);
+        assert_eq!(base_size_to_slider_position(48), 2);
+        // 56 は 48 と 64 の中点 → slider 3
+        assert_eq!(base_size_to_slider_position(56), 3);
+    }
+
+    /// 範囲外 DWORD はクランプ後に変換される。
+    #[test]
+    fn base_size_to_slider_clamps_out_of_range() {
+        assert_eq!(base_size_to_slider_position(0), 1);
+        assert_eq!(base_size_to_slider_position(31), 1);
+        assert_eq!(base_size_to_slider_position(257), 15);
+        assert_eq!(base_size_to_slider_position(u32::MAX), 15);
+    }
+
+    /// `role_to_ocr_id` のマッピング契約:
+    /// - 14 種の標準カーソル役割は OCR_* 定数にマップされる (Some)
+    /// - NWPen / Pin / Person は対応する OCR_* が存在しない (None)
+    ///
+    /// この契約が変わると `apply_system_cursors_at_size` の挙動 (即時反映できる
+    /// 役割数) が変わるため、回帰検出の意味で固定する。
+    #[cfg(windows)]
+    #[test]
+    fn role_to_ocr_id_covers_expected_roles() {
+        // OCR_* マッピングが存在する 14 役割
+        for role in [
+            CursorRole::Arrow,
+            CursorRole::Help,
+            CursorRole::AppStarting,
+            CursorRole::Wait,
+            CursorRole::Crosshair,
+            CursorRole::IBeam,
+            CursorRole::No,
+            CursorRole::SizeNS,
+            CursorRole::SizeWE,
+            CursorRole::SizeNWSE,
+            CursorRole::SizeNESW,
+            CursorRole::SizeAll,
+            CursorRole::UpArrow,
+            CursorRole::Hand,
+        ] {
+            assert!(
+                role_to_ocr_id(role).is_some(),
+                "{:?} は OCR_* にマップされるべき",
+                role
+            );
+        }
+        // OCR_* マッピングがない 3 役割 (Windows 10+ の追加 / 手書きペン専用)
+        for role in [CursorRole::NWPen, CursorRole::Pin, CursorRole::Person] {
+            assert!(
+                role_to_ocr_id(role).is_none(),
+                "{:?} には OCR_* 定数が存在しないので None を返すべき",
+                role
+            );
+        }
+        // 全 17 役割で合計 14 + 3 = 17 — 抜け漏れがないこと
+        let mapped = CursorRole::all()
+            .iter()
+            .filter(|r| role_to_ocr_id(**r).is_some())
+            .count();
+        let unmapped = CursorRole::all()
+            .iter()
+            .filter(|r| role_to_ocr_id(**r).is_none())
+            .count();
+        assert_eq!(mapped, 14, "OCR_* にマップされる役割は 14 種であるべき");
+        assert_eq!(unmapped, 3, "OCR_* にマップされない役割は 3 種であるべき");
+    }
+
+    /// clamp_cursor_base_size の境界。
+    #[test]
+    fn clamp_at_boundaries() {
+        assert_eq!(clamp_cursor_base_size(0), 32);
+        assert_eq!(clamp_cursor_base_size(32), 32);
+        assert_eq!(clamp_cursor_base_size(48), 48);
+        assert_eq!(clamp_cursor_base_size(256), 256);
+        assert_eq!(clamp_cursor_base_size(1000), 256);
+    }
+}
+
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, OnceLock};
     use windows::core::{Error as WinError, HRESULT};
+
+    /// `CursorBaseSize` / `Accessibility\CursorSize` は UUID 分離できないグローバル
+    /// レジストリ値。これらを触るテスト (`set_cursor_base_size_*`) は並列実行すると
+    /// 互いに干渉するため、このミューテックスを先頭で取得してシリアライズする。
+    fn cursor_size_test_lock() -> std::sync::MutexGuard<'static, ()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+    }
 
     /// `is_broadcast_false_positive` は SPIF_SENDCHANGE 起因の偽陽性を
     /// 拾い、それ以外の Win32 エラーは伝播させる必要がある。
@@ -785,5 +1296,188 @@ mod tests {
         );
 
         // _cleanup の Drop でテストスキームは削除される。
+    }
+
+    /// テスト終了時に CursorBaseSize と Accessibility\CursorSize を元に戻す RAII ガード。
+    /// 両方の値は単一値で UUID 分離できないため、テスト前に読み取った値を保存し、
+    /// Drop で必ず復元する。テスト機のユーザー設定を破壊しないためのセーフティ。
+    struct CursorBaseSizeCleanup {
+        cursor_base_size: Option<u32>,
+        accessibility_cursor_size: Option<u32>,
+    }
+
+    impl CursorBaseSizeCleanup {
+        fn capture() -> Self {
+            use winreg::enums::*;
+            use winreg::RegKey;
+            let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+            let cursor_base_size = hkcu
+                .open_subkey("Control Panel\\Cursors")
+                .ok()
+                .and_then(|k| k.get_value::<u32, _>("CursorBaseSize").ok());
+            let accessibility_cursor_size = hkcu
+                .open_subkey("SOFTWARE\\Microsoft\\Accessibility")
+                .ok()
+                .and_then(|k| k.get_value::<u32, _>("CursorSize").ok());
+            Self {
+                cursor_base_size,
+                accessibility_cursor_size,
+            }
+        }
+    }
+
+    impl Drop for CursorBaseSizeCleanup {
+        fn drop(&mut self) {
+            use winreg::enums::*;
+            use winreg::RegKey;
+
+            // 元の DWORD 値があれば set_cursor_base_size 経由で「完全復元」する。
+            // これは DWORD 書込 + SetSystemCursor までフルパイプラインを通すので、
+            // 視覚的にもユーザーの元のサイズに戻る (テスト機の cursors を 256px のまま
+            // 放置しないため重要 — SetSystemCursor の効果はセッション終了まで残る)。
+            //
+            // 元値が None (= 未設定 = Windows 既定 32px 相当) のときは値そのものは
+            // 削除しつつ、視覚反映のために 32px で SetSystemCursor を流す。
+            let restored_size = self.cursor_base_size.unwrap_or(MIN_CURSOR_BASE_SIZE);
+            let _ = RegistryManager::set_cursor_base_size(restored_size);
+
+            // set_cursor_base_size は値を書く動作なので、「元から値が無かった」
+            // ケースでは書込んだ値を削除し直す (= 真の原状回復)。
+            let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+            if self.cursor_base_size.is_none() {
+                if let Ok(cursors_key) =
+                    hkcu.open_subkey_with_flags("Control Panel\\Cursors", KEY_WRITE)
+                {
+                    let _ = cursors_key.delete_value("CursorBaseSize");
+                }
+            }
+            if self.accessibility_cursor_size.is_none() {
+                if let Ok(a11y_key) =
+                    hkcu.open_subkey_with_flags("SOFTWARE\\Microsoft\\Accessibility", KEY_WRITE)
+                {
+                    let _ = a11y_key.delete_value("CursorSize");
+                }
+            } else if let (Some(orig), Ok(a11y_key)) = (
+                self.accessibility_cursor_size,
+                hkcu.open_subkey_with_flags("SOFTWARE\\Microsoft\\Accessibility", KEY_WRITE),
+            ) {
+                // set_cursor_base_size は base_size_to_slider_position で再計算する
+                // ため、四捨五入で元のスライダー位置とズレるケースがありうる。
+                // 元のスライダー値を正確に書き戻す。
+                let _ = a11y_key.set_value("CursorSize", &orig);
+            }
+        }
+    }
+
+    /// `set_cursor_base_size` が以下を end-to-end で実施することを確認する (v2):
+    ///
+    /// 1. `HKCU\Control Panel\Cursors\CursorBaseSize` に DWORD でクランプ済値を書く
+    /// 2. `HKCU\SOFTWARE\Microsoft\Accessibility\CursorSize` は **絶対に触らない**
+    ///    (invariant: app は Accessibility\* を書かない / specs/2026-05-23-cursor-size-redesign-v2)
+    /// 3. 範囲外入力は (1) でクランプされる
+    ///
+    /// SystemParametersInfoW / SetSystemCursor 等の副作用は unit test で検証不能なので、
+    /// registry 書込の有無のみを確認する。
+    ///
+    /// HKCU のみ書込、Drop で 2 キー両方を元の値に復元するためテスト機の
+    /// ユーザー設定を壊さない。
+    #[test]
+    fn set_cursor_base_size_writes_dword_round_trip() {
+        use winreg::enums::*;
+        use winreg::RegKey;
+
+        // グローバル registry 値を触るテストは並列実行不可。ロックでシリアライズ。
+        let _lock = cursor_size_test_lock();
+        let _cleanup = CursorBaseSizeCleanup::capture();
+
+        // defensive guard を通過するために CursorSize=1 (eoa pipeline 非アクティブ) を
+        // 事前にセットする。_cleanup::drop で元の値に復元される。
+        // 同時に、テスト後の比較用にこの「事前セット値」を保持する。
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let (a11y_pre, _) = hkcu
+            .create_subkey("SOFTWARE\\Microsoft\\Accessibility")
+            .expect("Accessibility キー作成失敗");
+        a11y_pre
+            .set_value("CursorSize", &1u32)
+            .expect("CursorSize=1 書込失敗");
+
+        // 通常値の round-trip (64px)
+        let written =
+            RegistryManager::set_cursor_base_size(64).expect("set_cursor_base_size(64) failed");
+        assert_eq!(written, 64, "clamp 内なので入力値がそのまま返るべき");
+
+        let cursors_key = hkcu
+            .open_subkey("Control Panel\\Cursors")
+            .expect("Cursors キーが開けない");
+        let raw: u32 = cursors_key
+            .get_value("CursorBaseSize")
+            .expect("CursorBaseSize が読み戻せない");
+        assert_eq!(
+            raw, 64,
+            "CursorBaseSize が DWORD として書き込まれているべき"
+        );
+
+        // **invariant 確認**: Accessibility\CursorSize は事前セット値 1 のまま (= app が触っていない)。
+        let a11y_key = hkcu
+            .open_subkey("SOFTWARE\\Microsoft\\Accessibility")
+            .expect("Accessibility キーが開けない");
+        let slider_raw: u32 = a11y_key
+            .get_value("CursorSize")
+            .expect("Accessibility\\CursorSize が読み戻せない");
+        assert_eq!(
+            slider_raw, 1,
+            "set_cursor_base_size は Accessibility\\CursorSize を書き換えてはいけない \
+             (specs/2026-05-23-cursor-size-redesign-v2 invariant)"
+        );
+
+        // 範囲外 → クランプ。Accessibility は依然として 1 のまま。
+        let written =
+            RegistryManager::set_cursor_base_size(1000).expect("set_cursor_base_size(1000) failed");
+        assert_eq!(written, MAX_CURSOR_BASE_SIZE);
+        let raw: u32 = cursors_key
+            .get_value("CursorBaseSize")
+            .expect("CursorBaseSize が読み戻せない");
+        assert_eq!(raw, MAX_CURSOR_BASE_SIZE);
+        let slider_raw: u32 = a11y_key
+            .get_value("CursorSize")
+            .expect("Accessibility\\CursorSize が読み戻せない");
+        assert_eq!(
+            slider_raw, 1,
+            "2 回目の set_cursor_base_size 後も Accessibility\\CursorSize は 1 のまま"
+        );
+
+        // _cleanup の Drop で両方の値が元に戻る。
+    }
+
+    /// defensive guard: `Accessibility\CursorSize != 1` のとき
+    /// `set_cursor_base_size` が Err を返すことを確認する。
+    ///
+    /// テスト前に Accessibility/CursorSize=4 をセットし、テスト後に
+    /// `CursorBaseSizeCleanup::drop` で復元 (= 既存 guard が同じ key を扱うため流用)。
+    #[test]
+    fn set_cursor_base_size_rejects_when_accessibility_active() {
+        use winreg::enums::*;
+        use winreg::RegKey;
+
+        // グローバル registry 値を触るテストは並列実行不可。ロックでシリアライズ。
+        let _lock = cursor_size_test_lock();
+        let _cleanup = CursorBaseSizeCleanup::capture();
+
+        // Accessibility\CursorSize = 4 を事前にセット (eoa pipeline 状態を模擬)
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let (a11y_key, _) = hkcu
+            .create_subkey("SOFTWARE\\Microsoft\\Accessibility")
+            .expect("Accessibility キー作成失敗");
+        a11y_key
+            .set_value("CursorSize", &4u32)
+            .expect("CursorSize=4 書込失敗");
+
+        // この状態で set_cursor_base_size を呼ぶと Err になるべき
+        let result = RegistryManager::set_cursor_base_size(96);
+        assert!(
+            matches!(result, Err(AppError::Registry(_))),
+            "Accessibility\\CursorSize != 1 のとき set_cursor_base_size は Err を返すべき, got {:?}",
+            result
+        );
     }
 }

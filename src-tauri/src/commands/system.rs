@@ -177,6 +177,41 @@ mod tests {
             .unwrap_or(0);
         assert!(major >= 10, "expected major >= 10 (Win10/Win11), got {v}");
     }
+
+    /// `open_url` の許可スキーム判定 contract: `https://` / `http://` / `ms-settings:`
+    /// の 3 種類のみを受け付け、それ以外 (file: / javascript: / カスタム scheme / 空文字 /
+    /// プレフィックス類似 ms-cmd: 等) はすべて拒否する。
+    ///
+    /// この契約が崩れると (1) 設定 → 一般 → カーソルサイズ の「Windows の設定を開く」
+    /// deep-link が再び動かなくなる、もしくは (2) 任意 URL スキームを通してしまい
+    /// shell 経由の攻撃面が拡大する、のいずれかの回帰が起きるので固定で守る。
+    #[test]
+    fn is_allowed_url_scheme_accepts_known_schemes() {
+        assert!(is_allowed_url_scheme("https://example.com"));
+        assert!(is_allowed_url_scheme("http://example.com"));
+        assert!(is_allowed_url_scheme(
+            "ms-settings:easeofaccess-mousepointer"
+        ));
+        assert!(is_allowed_url_scheme("ms-settings:display"));
+    }
+
+    #[test]
+    fn is_allowed_url_scheme_rejects_unknown_schemes() {
+        // よくある危険スキーム
+        assert!(!is_allowed_url_scheme(
+            "file:///C:/Windows/System32/cmd.exe"
+        ));
+        assert!(!is_allowed_url_scheme("javascript:alert(1)"));
+        assert!(!is_allowed_url_scheme("data:text/html,<script>"));
+        // ms-settings: と紛らわしいが別物
+        assert!(!is_allowed_url_scheme("ms-cmd:foo"));
+        assert!(!is_allowed_url_scheme("ms-settings"));
+        // 相対パス / 空文字
+        assert!(!is_allowed_url_scheme("/etc/passwd"));
+        assert!(!is_allowed_url_scheme(""));
+        // scheme 違い
+        assert!(!is_allowed_url_scheme("ftp://example.com"));
+    }
 }
 
 /// 設定バックアップファイルの一覧を返す。
@@ -239,15 +274,34 @@ fn shell_execute_w(verb: Option<&str>, path: &str) -> Result<(), AppError> {
     Ok(())
 }
 
-/// 指定 URL をシステムのデフォルトブラウザで開く。
+/// `open_url` が受け付ける URL スキーム一覧。
 ///
-/// URL は `https://` または `http://` で始まる必要がある。
+/// 拡張時の方針: Windows shell が解釈する URI スキームのうち、attack surface が
+/// 限定的でアプリから明示的に呼ぶ用途があるものだけを許可する。任意のカスタム
+/// スキーム (例: `app:` / `file:` / `javascript:`) は拒否する。
+///
+/// - `https://` / `http://`: 既定のブラウザで開く (Marketplace / About 等)。
+/// - `ms-settings:`: Windows Settings deep-link (例: `ms-settings:easeofaccess-mousepointer`)。
+///   引数は Settings page 識別子で shell command ではないため、ShellExecuteW 経由で
+///   呼んでも shell command injection は発生しない。
+const ALLOWED_URL_SCHEME_PREFIXES: &[&str] = &["https://", "http://", "ms-settings:"];
+
+/// URL が許可スキームで始まっているかを判定する pure 関数 (テスト容易化用)。
+fn is_allowed_url_scheme(url: &str) -> bool {
+    ALLOWED_URL_SCHEME_PREFIXES
+        .iter()
+        .any(|prefix| url.starts_with(prefix))
+}
+
+/// 指定 URL をシステムのデフォルトハンドラで開く。
+///
+/// 受け付けるスキームは [`ALLOWED_URL_SCHEME_PREFIXES`] に限定する。
 /// それ以外は `AppError::InvalidInput` を返す。
 ///
 /// Windows 専用実装: [`shell_execute_w`] 経由。
 #[tauri::command]
 pub fn open_url(url: String) -> Result<(), AppError> {
-    if !url.starts_with("https://") && !url.starts_with("http://") {
+    if !is_allowed_url_scheme(&url) {
         return Err(AppError::InvalidInput(format!(
             "不正な URL スキーム: {}",
             url
@@ -272,6 +326,34 @@ pub fn open_url(url: String) -> Result<(), AppError> {
 #[tauri::command]
 pub fn get_accessibility_conflicts() -> AccessibilityConflicts {
     AccessibilityConflicts::detect()
+}
+
+/// マウスポインターのサイズ (HKCU\Control Panel\Cursors\CursorBaseSize) を設定する。
+///
+/// Windows 設定アプリの「アクセシビリティ → マウスポインターとタッチ → サイズ」
+/// スライダーが触る canonical キー (`CursorBaseSize`) と同じ key を更新するが、
+/// `Accessibility\CursorSize` (Windows 設定 UI 専用領域) は書かない invariant のため、
+/// Windows 設定 UI 側スライダー位置とは意図的に同期しない
+/// (specs/2026-05-23-cursor-size-redesign-v2)。
+///
+/// 引数 `size` は DWORD 値で、`set_cursor_base_size` 側で 32〜256 にクランプされる。
+/// 戻り値は実際に書き込まれた値 (クランプ後)。
+///
+/// フロントエンドは Settings ページの一般セクションのスライダー (1〜15) を
+/// `32 + 16 * (slider - 1)` で DWORD に変換してから呼ぶ。実換算式は Rust 側
+/// (`registry::slider_position_to_base_size`) が single source of truth。
+#[tauri::command]
+pub fn set_cursor_base_size(size: u32) -> Result<u32, AppError> {
+    tracing::info!("set_cursor_base_size 要求: size={}", size);
+    let written = RegistryManager::set_cursor_base_size(size)?;
+    // **注意**: ここで `cursor-changed` イベントを emit してはいけない。
+    // `set_cursor_base_size` は CursorBaseSize DWORD と SetSystemCursor だけを触り、
+    // 役割パス (Arrow / IBeam / ...) は **一切変更しない** ため、テーマ自体の
+    // 状態は変わらない。Library は `cursor-changed` を受信すると loadThemes() で
+    // 全テーマ照合 + アイコン再生成のフルリロードを走らせるため、サイズスライダー
+    // 操作のたびに無意味な I/O が発生する。reset_with_cleanup と違って active_theme_id
+    // のクリアも不要。視覚反映は SetSystemCursor が全 HDC に対して既に行っている。
+    Ok(written)
 }
 
 /// 現行バージョンから新バージョンへの更新がメジャー跨ぎかどうかを返す。

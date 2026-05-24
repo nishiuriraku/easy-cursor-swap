@@ -7,9 +7,13 @@
  *  - hasKeystoreSigning=false で sign チェックボックスが disabled
  *  - destination=file 選択時に save dialog が呼ばれる
  *  - submit ペイロードが期待する形
+ *
+ * UiModal が `<Teleport to="body">` を使うため、要素検索は `document.querySelector`
+ * を経由する。mount 時に `attachTo: document.body` を指定し、afterEach で wrapper を
+ * unmount してテレポートノードもクリーンアップする。
  */
-import { describe, it, expect, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { mount, type VueWrapper } from '@vue/test-utils'
 import SaveDestinationModal from '../SaveDestinationModal.vue'
 
 vi.mock('@tauri-apps/plugin-dialog', () => ({
@@ -28,47 +32,54 @@ const baseProps = {
   metaName: 'Existing Theme',
 }
 
+let currentWrapper: VueWrapper | null = null
+
+function mountModal(props: Partial<typeof baseProps>) {
+  currentWrapper = mount(SaveDestinationModal, {
+    props: { ...baseProps, ...props },
+    attachTo: document.body,
+    global: { stubs },
+  })
+  return currentWrapper
+}
+
+afterEach(() => {
+  currentWrapper?.unmount()
+  currentWrapper = null
+})
+
 describe('SaveDestinationModal', () => {
   it('hides overwrite/duplicate section when sourceThemeId is null', () => {
-    const wrapper = mount(SaveDestinationModal, {
-      props: baseProps,
-      global: { stubs },
-    })
-    expect(wrapper.find('[data-test="overwrite-section"]').exists()).toBe(false)
+    mountModal({})
+    expect(document.querySelector('[data-test="overwrite-section"]')).toBeNull()
   })
 
   it('shows overwrite/duplicate radio when sourceThemeId is provided', () => {
-    const wrapper = mount(SaveDestinationModal, {
-      props: { ...baseProps, sourceThemeId: 'abc-uuid' },
-      global: { stubs },
-    })
-    expect(wrapper.find('[data-test="overwrite-section"]').exists()).toBe(true)
+    mountModal({ sourceThemeId: 'abc-uuid' })
+    expect(document.querySelector('[data-test="overwrite-section"]')).not.toBeNull()
   })
 
   it('disables sign checkbox when hasKeystoreSigning=false', () => {
-    const wrapper = mount(SaveDestinationModal, {
-      props: { ...baseProps, hasKeystoreSigning: false },
-      global: { stubs },
-    })
-    const signCb = wrapper.find('[data-test="sign-checkbox"]')
-    expect(signCb.attributes('disabled')).toBeDefined()
+    mountModal({ hasKeystoreSigning: false })
+    const signCb = document.querySelector('[data-test="sign-checkbox"]') as HTMLInputElement | null
+    expect(signCb).not.toBeNull()
+    expect(signCb!.hasAttribute('disabled')).toBe(true)
   })
 
   it('emits cancel on cancel button click', async () => {
-    const wrapper = mount(SaveDestinationModal, {
-      props: baseProps,
-      global: { stubs },
-    })
-    await wrapper.find('[data-test="cancel-btn"]').trigger('click')
+    const wrapper = mountModal({})
+    const btn = document.querySelector('[data-test="cancel-btn"]') as HTMLButtonElement | null
+    expect(btn).not.toBeNull()
+    btn!.click()
+    await wrapper.vm.$nextTick()
     expect(wrapper.emitted('cancel')).toHaveLength(1)
   })
 
   it('emits submit with destination=file payload after dialog returns path', async () => {
-    const wrapper = mount(SaveDestinationModal, {
-      props: { ...baseProps, defaultDestination: 'file' },
-      global: { stubs },
-    })
-    await wrapper.find('[data-test="submit-btn"]').trigger('click')
+    const wrapper = mountModal({ defaultDestination: 'file' })
+    const btn = document.querySelector('[data-test="submit-btn"]') as HTMLButtonElement | null
+    expect(btn).not.toBeNull()
+    btn!.click()
     await new Promise((r) => setTimeout(r, 0))
     const events = wrapper.emitted('submit')
     expect(events).toHaveLength(1)
@@ -86,10 +97,7 @@ describe('SaveDestinationModal', () => {
   })
 
   it('uses Untitled placeholder when metaName is empty', () => {
-    const wrapper = mount(SaveDestinationModal, {
-      props: { ...baseProps, metaName: '' },
-      global: { stubs },
-    })
-    expect(wrapper.find('[data-test="name-field"]').exists()).toBe(true)
+    mountModal({ metaName: '' })
+    expect(document.querySelector('[data-test="name-field"]')).not.toBeNull()
   })
 })

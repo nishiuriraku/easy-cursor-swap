@@ -86,10 +86,14 @@ defineEmits<{
             :label="t('settings.regenerateLabel')"
             :desc="t('settings.regenerateDesc')"
           >
-            <button class="btn danger" :disabled="keystoreBusy" @click="$emit('regenerate')">
-              <span v-if="keystoreBusy" class="spinner" style="width: 13px; height: 13px" />
-              <UiIcon v-else name="Alert" :size="13" />{{ t('settings.btnRegenerate') }}
-            </button>
+            <UiButton
+              variant="danger"
+              :loading="keystoreBusy"
+              icon-left="Alert"
+              @click="$emit('regenerate')"
+            >
+              {{ t('settings.btnRegenerate') }}
+            </UiButton>
           </SettingsRow>
           <SettingsRow
             anchor="deleteKey"
@@ -107,10 +111,14 @@ defineEmits<{
             :label="t('settings.generateLabel')"
             :desc="t('settings.generateDesc')"
           >
-            <button class="btn primary" :disabled="keystoreBusy" @click="$emit('generate')">
-              <span v-if="keystoreBusy" class="spinner" style="width: 13px; height: 13px" />
-              <UiIcon v-else name="Plus" :size="13" />{{ t('settings.btnGenerate') }}
-            </button>
+            <UiButton
+              variant="primary"
+              :loading="keystoreBusy"
+              icon-left="Plus"
+              @click="$emit('generate')"
+            >
+              {{ t('settings.btnGenerate') }}
+            </UiButton>
           </SettingsRow>
           <SettingsRow
             anchor="importExisting"
@@ -125,17 +133,9 @@ defineEmits<{
         <div v-if="keystoreMessage" class="profile-msg">
           {{ keystoreMessage }}
         </div>
-        <div
-          v-if="keystoreError"
-          class="profile-msg"
-          style="
-            background: rgba(255, 107, 138, 0.06);
-            border-color: rgba(255, 107, 138, 0.4);
-            color: #ffb8c5;
-          "
-        >
+        <UiAlert v-if="keystoreError" tone="danger" class="mt-2">
           {{ keystoreError }}
-        </div>
+        </UiAlert>
       </div>
     </div>
     <!-- GitHub 連携 -->
@@ -220,17 +220,6 @@ defineEmits<{
   @apply mt-2 rounded-[8px] border px-3 py-2 text-[12px];
   background: rgba(106, 213, 184, 0.06);
   border-color: rgba(106, 213, 184, 0.4);
-}
-.spinner {
-  @apply inline-block size-[13px] rounded-full;
-  border: 2px solid var(--fg-mute);
-  border-top-color: transparent;
-  animation: spin 800ms linear infinite;
-}
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 .hint-text {
   @apply text-[12px] text-fg-mute;

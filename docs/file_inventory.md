@@ -16,17 +16,17 @@
 |---|---|
 | [main.rs](../src-tauri/src/main.rs) | Tauri アプリのエントリ。tracing 初期化、`StartupCheck::begin()`、AppUserModelID 登録、ConfigManager 初期化、孤児カーソル復旧、pending snapshot リカバリ、`tauri::Builder` 構築 (single-instance プラグイン / 各種 plugin / setup でトレイ・ホットキー)、`build()` + `run(callback)` 形式で `RunEvent::ExitRequested { code: None }` を `prevent_exit` してトレイ常駐させるガード (close ボタン → WebView destroy → プロセス残留 を保証) |
 | [lib.rs](../src-tauri/src/lib.rs) | 23 モジュールの `pub mod` 宣言 |
-| [commands/mod.rs](../src-tauri/src/commands/mod.rs) | 全 Tauri コマンドのハンドラ登録 (`get_command_handlers()` が 52 IPC を `tauri::generate_handler!` に渡す) |
+| [commands/mod.rs](../src-tauri/src/commands/mod.rs) | 全 Tauri コマンドのハンドラ登録 (`get_command_handlers()` が 53 IPC を `tauri::generate_handler!` に渡す) |
 | [errors.rs](../src-tauri/src/errors.rs) | `AppError` (`thiserror`、`Serialize` 派生で IPC 経由 throw 対応) |
 
-### 1-2. IPC コマンド実体 (9 サブモジュール / 52 個)
+### 1-2. IPC コマンド実体 (9 サブモジュール / 53 個)
 
 | ファイル | 主な IPC |
 |---|---|
 | [commands/cursor_build/](../src-tauri/src/commands/cursor_build/) | `mod` (公開 API + 共通ステート + `cancel_build` IPC) / `build` (`export_cursorpack`) / `stream` (`export_cursorpack_streamed`、進捗イベント `build-progress`) / `sign` (Ed25519 署名埋込) / `dto` (DTO 定義)。共有キャンセルレジストリは別 `cancel_registry.rs` に切出済 |
 | [commands/cursor_io.rs](../src-tauri/src/commands/cursor_io.rs) | `take_pending_cursorpack` (起動時 argv からの `.cursorpack` 引き継ぎ。 `extract_cursorpack_arg` / `stash_pending_cursorpack` / `handle_pending_cursorpack` ヘルパー含む) |
 | [commands/theme.rs](../src-tauri/src/commands/theme.rs) | `get_themes` / `get_theme_previews` / `get_theme_role_previews` / `apply_theme` / `set_theme_favorite` / `inspect_cursorpack` / `import_cursorpack` / `delete_theme` / `duplicate_theme` / `repackage_theme` |
-| [commands/system.rs](../src-tauri/src/commands/system.rs) | `reset_to_default` / `reset_to_initial` / `get_environment_report` / `get_config` / `update_config` / `get_app_info` / `list_config_backups` / `restore_config_backup` / `open_url` / `open_log_folder` / `get_accessibility_conflicts` / `check_update_is_major_jump` / `list_crash_reports` / `clear_crash_reports` / `submit_crash_reports` |
+| [commands/system.rs](../src-tauri/src/commands/system.rs) | `reset_to_default` / `reset_to_initial` / `get_environment_report` / `get_config` / `update_config` / `get_app_info` / `list_config_backups` / `restore_config_backup` / `open_url` / `open_log_folder` / `get_accessibility_conflicts` / `set_cursor_base_size` / `check_update_is_major_jump` / `list_crash_reports` / `clear_crash_reports` / `submit_crash_reports` |
 | [commands/keystore.rs](../src-tauri/src/commands/keystore.rs) | `keystore_info` / `keystore_generate` / `keystore_delete` / `keystore_export` / `keystore_import` |
 | [commands/marketplace.rs](../src-tauri/src/commands/marketplace.rs) | `marketplace_fetch_index` / `marketplace_install` / `marketplace_fetch_preview` |
 | [commands/marketplace_submit.rs](../src-tauri/src/commands/marketplace_submit.rs) | `start_device_flow` / `complete_device_flow` / `cancel_device_flow` / `submit_theme_auto` / `revoke_github_link` |
@@ -39,7 +39,7 @@
 | ファイル | 機能 |
 |---|---|
 | [config.rs](../src-tauri/src/config.rs) | `AppConfig` の RwLock + schema_version (v1 固定) + `config.corrupt.{epoch}.json` 退避 |
-| [registry/mod.rs](../src-tauri/src/registry/mod.rs) | `HKCU\Control Panel\Cursors` 読み書き、`SPI_SETCURSORS` / `SPI_SETCURSORSHADOW`、トランザクション + `_pending_apply.snapshot`、`save_initial_snapshot` / `check_pending_snapshot` / `reset_to_windows_default` |
+| [registry/mod.rs](../src-tauri/src/registry/mod.rs) | `HKCU\Control Panel\Cursors` 読み書き、theme apply の `SPI_SETCURSORS` 通知 (`notify_cursor_change`) + `SPI_SETCURSORSHADOW` (`set_cursor_shadow`)、`LoadImageW` + `SetSystemCursor`(OCR_* × 14) によるカーソル即時リサイズ (`apply_system_cursors_at_size`、cursor size 変更経路は broadcast を意図的に行わない)、トランザクション + `_pending_apply.snapshot`、`save_initial_snapshot` / `check_pending_snapshot` / `reset_to_windows_default`。アプリ書込は `Control Panel\Cursors\CursorBaseSize` のみ、`Accessibility\*` は触らない (v2 invariant)。 |
 | [registry/roles.rs](../src-tauri/src/registry/roles.rs) | 17 役割の絶対パス書き込みロジック、`compute_apply_values` 純粋関数 |
 | [registry/scheme.rs](../src-tauri/src/registry/scheme.rs) | `Schemes` への REG_EXPAND_SZ 登録、`build_scheme_value` / `sanitize_scheme_name` |
 | [registry/env.rs](../src-tauri/src/registry/env.rs) | レジストリ環境変数操作補助 |
@@ -74,7 +74,7 @@
 | [hotkey.rs](../src-tauri/src/hotkey.rs) | `RegisterHotKey` で `Ctrl+Alt+Shift+R` → `panic-hotkey` イベント |
 | [autostart.rs](../src-tauri/src/autostart.rs) | `HKCU\...\Run` 登録、MSIX 検出時は no-op で `startupTask` に委譲 |
 | [appusermodel.rs](../src-tauri/src/appusermodel.rs) | `SetCurrentProcessExplicitAppUserModelID("dev.easycursorswap.app")` |
-| [accessibility.rs](../src-tauri/src/accessibility.rs) | `CursorIndicator` / `ContrastScheme` / `CursorBaseSize` 競合検出 |
+| [accessibility.rs](../src-tauri/src/accessibility.rs) | `CursorIndicator` / `ContrastScheme` / `CursorBaseSize` 競合検出 + `Accessibility\CursorSize` (slider 1-15) / `Accessibility\CursorType` (0/1/2/3/6/...) を IPC レスポンス用に取得 (eoa pipeline 状態を frontend 側で `cursor_size_slider != 1` で判定する)。`resolve_cursor_base_size` 優先順位 (v2): Accessibility は slider > 1 のときのみ採用、それ以外は CursorBaseSize fallback (アプリ書込みの round-trip 成立)。 |
 | [environment.rs](../src-tauri/src/environment.rs) | RDP / Citrix / Server 検出 (`SM_REMOTESESSION` + `InstallationType`) |
 | [logging.rs](../src-tauri/src/logging.rs) | `tracing-appender` 日次ローテ + 14 日 + 100MB 上限 + `redact_path` / `short_hash` |
 
@@ -107,14 +107,14 @@
 | グループ | 主要ファイル |
 |---|---|
 | [shell/](../app/components/shell/) | `AppTitlebar` / `AppSidebar` / `EnvironmentBanner` |
-| [library/](../app/components/library/) (15) | `ThemeCard` / `ThemeRow` / `ThemeDetailModal` / `ThemeDetailDrawer` / `ThemeDetailDrawerHero` / `ThemeDetailDrawerStrip` / `ThemeDetailDrawerFooter` / `ApplyModal` / `ImportConflictDialog` / `ThemePickerModal` / `CursorMatrix` / `LibraryToolbar` / `LibraryFilterBar` / `LibraryEmptyState` / `LibraryDropOverlay` |
+| [library/](../app/components/library/) (14) | `ThemeCard` / `ThemeRow` / `ThemeDetailModal` (フッターアクション群を UiModal `#leftNote` / `#actions` slot に直接配置) / `ThemeDetailDrawer` / `ThemeDetailDrawerHero` / `ThemeDetailDrawerStrip` / `ApplyModal` / `ImportConflictDialog` / `ThemePickerModal` / `CursorMatrix` / `LibraryToolbar` / `LibraryFilterBar` / `LibraryEmptyState` / `LibraryDropOverlay` |
 | [creator/](../app/components/creator/) (14) | `CreatorStartScreen` / `CreatorToolbar` / `CreatorRoleList` / `CreatorMetadataPane` (Hotspot 節を内包) / `CreatorEditorCanvas` / `NewThemeStartModal` / `SaveDestinationModal` / `DiscardEditDialog` (Clear / 画面遷移時の編集破棄確認) / `BulkImportButton` / `BulkImportPreviewModal` / `BulkImportRoleRow` / `RoleListItem` / `SizeStrip` / `AniThumb` |
 | [marketplace/](../app/components/marketplace/) (6) | `FeaturedCard` / `SubmitThemeDialog` (Auto/Manual タブ切替) / `SubmitThemeAutoForm` / `SubmitThemeManualForm` / `MarketplaceDetailModal` / `SubmitDeviceFlowModal` (Device Flow 認証 UI) |
 | [settings/](../app/components/settings/) (14) | `GeneralSection` / `StartupSection` / `LibrarySection` / `SecuritySection` / `KeysSection` / `LoggingSection` (ログ出力設定 + クラッシュレポート opt-in トグル / 件数表示 / 送信・クリアボタン) / `UpdatesSection` / `AboutSection` / `SettingsRow` (anchor prop で検索ジャンプ対応) / `SettingsToggle` / `PassphrasePrompt` / `ConfigRecoveryPanel` / `SettingsSearchDropdown` (ja/en 両言語の横断検索ドロップダウン) / `OssLicenseModal` |
 | [preview/](../app/components/preview/) | `CursorPreview` (theme detail で使うプレビュー) |
 | [panic/](../app/components/panic/) | `PanicFlow` (ステージ選択 + ライブログ + 17 ロールグリッド) |
 | [icons/](../app/components/icons/) | `UiIcon` + `UI_ICONS`、`CursorIcon` + `CURSOR_ICONS` — render 関数で v-html 回避 |
-| [ui/](../app/components/ui/) | `UiSelect` (ネイティブ select の白背景を回避) |
+| [ui/](../app/components/ui/) (5) | `UiSelect` (ネイティブ select の白背景を回避) / `UiButton` (.btn shared utility の Vue ラッパ + loading/icon ハンドリング) / `UiAlert` (info/success/warn/danger インラインバナー) / `UiModal` (Teleport + focus trap + useModalLifecycle を内包する shared modal shell) / `UiConfirmDialog` (UiModal + UiButton を compose した cancel/confirm 専用ダイアログ) |
 
 ### 2-3. Composables (36 個)
 
@@ -153,6 +153,7 @@
 | [useExternalUrl.ts](../app/composables/useExternalUrl.ts) | `open_url` IPC + `window.open` フォールバックの 1 行 API。6 callsite で重複していた try/catch を集約 |
 | [useListbox.ts](../app/composables/useListbox.ts) | `UiSelect` の listbox 状態機械 + キーボードナビ + viewport-aware Teleport 位置計算 |
 | [useModalLifecycle.ts](../app/composables/useModalLifecycle.ts) | Teleport modal の body scroll lock (重ね合わせ対応 counter) + Esc 購読 + cleanup |
+| [useFocusTrap.ts](../app/composables/useFocusTrap.ts) | モーダル / ダイアログ用 focus trap (Tab/Shift+Tab wrap + 初期 focus + active=false で直前の要素へ復帰)。`UiModal` から利用 |
 | [usePngBlobCache.ts](../app/composables/usePngBlobCache.ts) | Map + in-flight Promise + dispose の汎用キャッシュ機構 (useThemePreviews / useMarketplacePreviews / Creator の blob URL キャッシュで共有) |
 | [useThemeCardState.ts](../app/composables/useThemeCardState.ts) | `ThemeCard` / `ThemeRow` の 5 ブロック並行重複 (preview fetch / kind 判定 / displayDate / 詳細遷移 / お気に入り) を共通化 |
 
@@ -185,9 +186,9 @@
 | 指標 | 値 |
 |---|---|
 | Rust モジュール数 (lib.rs `pub mod`) | 23 + ベンチ 2 |
-| Tauri IPC コマンド数 | 52 |
+| Tauri IPC コマンド数 | 53 |
 | Vue ページ数 | 4 (+2 helpers) |
-| Vue コンポーネント (subdir 別) | shell 3 / library 15 / creator 14 / marketplace 6 / settings 14 / preview 1 / panic 1 / icons 2 / ui 1 (合計 57) |
+| Vue コンポーネント (subdir 別) | shell 3 / library 14 / creator 14 / marketplace 6 / settings 14 / preview 1 / panic 1 / icons 2 / ui 5 (合計 60) |
 | Composables 数 | 36 |
 | Vitest テストファイル数 | 20 (composables) + 4 (pages) + 6 (components/creator) + 7 (components/library) + 8 (components/settings) + 2 (components/marketplace) + 1 (components/preview) = 48 |
 | CI ワークフロー数 | 3 (ci / performance / release) |

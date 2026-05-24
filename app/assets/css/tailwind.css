@@ -829,12 +829,16 @@
   -webkit-backdrop-filter: blur(8px);
   animation: fade-in 0.2s ease-out;
 }
+/* `.modal` は flex column + max-h-full にして、body コンテンツがビューポートを
+ * 超える場合に head / foot を固定したまま body だけ内部スクロールできるようにする。
+ * (旧モーダルは各々 `.oss-body` 等の内部スクロール container を持っていたが、
+ *  UiModal shell へ統一後は `.modal-body` が直接スクロールを担う。) */
 .modal {
-  @apply w-[540px] max-w-full overflow-hidden rounded-2xl border border-line-hi bg-bg-glass-hi backdrop-blur-[28px];
+  @apply flex max-h-full w-[540px] max-w-full flex-col overflow-hidden rounded-2xl border border-line-hi bg-bg-glass-hi backdrop-blur-[28px];
   box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.7);
 }
 .modal-head {
-  @apply flex items-center gap-3.5 border-b border-line px-6 pb-3.5 pt-5;
+  @apply flex shrink-0 items-center gap-3.5 border-b border-line px-6 pb-3.5 pt-5;
 }
 .modal-icon {
   @apply grid size-10 shrink-0 place-items-center rounded-[10px] border border-accent-line text-accent;
@@ -847,10 +851,10 @@
   @apply mx-0 mb-0 mt-0.5 text-[12px] text-fg-dim;
 }
 .modal-body {
-  @apply px-6 py-[18px];
+  @apply min-h-0 flex-1 overflow-y-auto px-6 py-[18px];
 }
 .modal-foot {
-  @apply flex items-center justify-between gap-3 border-t border-line px-6 py-4;
+  @apply flex shrink-0 items-center justify-between gap-3 border-t border-line px-6 py-4;
   background: rgba(0, 0, 0, 0.18);
 }
 :where(html.light) .modal-foot {

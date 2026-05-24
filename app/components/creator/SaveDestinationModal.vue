@@ -83,172 +83,144 @@ async function onSubmit() {
 </script>
 
 <template>
-  <div v-if="open" class="sd-overlay" @click.self="emit('cancel')">
-    <div class="sd-modal" role="dialog" aria-modal="true">
-      <header class="sd-head">
-        <h3>{{ t('saveModal.title') }}</h3>
-        <button class="btn ghost" :aria-label="t('common.close')" @click="emit('cancel')">✕</button>
-      </header>
-
-      <div class="sd-body">
-        <fieldset class="sv-fieldset">
-          <legend>{{ t('saveModal.destinationLabel') }}</legend>
-          <div class="ctl-stack">
-            <label class="ctl-row">
-              <input v-model="destination" type="radio" name="save-destination" value="file" />
-              <span class="ctl-radio" :class="{ on: destination === 'file' }" aria-hidden="true" />
-              <span>
-                <div class="ctl-label">{{ t('saveModal.destinationFile') }}</div>
-                <div class="ctl-sub">{{ t('saveModal.destinationFileSub') }}</div>
-              </span>
-              <span class="ctl-tail">{{ t('saveModal.destinationFileTail') }}</span>
-            </label>
-            <label class="ctl-row">
-              <input v-model="destination" type="radio" name="save-destination" value="library" />
-              <span
-                class="ctl-radio"
-                :class="{ on: destination === 'library' }"
-                aria-hidden="true"
-              />
-              <span>
-                <div class="ctl-label">{{ t('saveModal.destinationLibrary') }}</div>
-                <div class="ctl-sub">{{ t('saveModal.destinationLibrarySub') }}</div>
-              </span>
-              <span class="ctl-tail">{{ t('saveModal.destinationLibraryTail') }}</span>
-            </label>
-            <label class="ctl-row">
-              <input
-                v-model="destination"
-                type="radio"
-                name="save-destination"
-                value="libraryAndApply"
-              />
-              <span
-                class="ctl-radio"
-                :class="{ on: destination === 'libraryAndApply' }"
-                aria-hidden="true"
-              />
-              <span>
-                <div class="ctl-label">{{ t('saveModal.destinationLibraryAndApply') }}</div>
-                <div class="ctl-sub">{{ t('saveModal.destinationLibraryAndApplySub') }}</div>
-              </span>
-              <span class="ctl-tail">{{ t('saveModal.destinationLibraryAndApplyTail') }}</span>
-            </label>
-          </div>
-        </fieldset>
-
-        <fieldset v-if="showOverwriteSection" data-test="overwrite-section" class="sv-fieldset">
-          <legend>{{ t('saveModal.overwriteLabel') }}</legend>
-          <div class="ctl-stack">
-            <label class="ctl-row">
-              <input
-                v-model="overwriteExisting"
-                type="radio"
-                name="save-overwrite-existing"
-                :value="true"
-              />
-              <span
-                class="ctl-radio"
-                :class="{ on: overwriteExisting === true }"
-                aria-hidden="true"
-              />
-              <span>
-                <div class="ctl-label">{{ t('saveModal.overwriteOverwrite') }}</div>
-                <div class="ctl-sub">{{ t('saveModal.overwriteOverwriteSub') }}</div>
-              </span>
-            </label>
-            <label class="ctl-row">
-              <input
-                v-model="overwriteExisting"
-                type="radio"
-                name="save-overwrite-existing"
-                :value="false"
-              />
-              <span
-                class="ctl-radio"
-                :class="{ on: overwriteExisting === false }"
-                aria-hidden="true"
-              />
-              <span>
-                <div class="ctl-label">{{ t('saveModal.overwriteDuplicate') }}</div>
-                <div class="ctl-sub">{{ t('saveModal.overwriteDuplicateSub') }}</div>
-              </span>
-            </label>
-          </div>
-        </fieldset>
-
-        <div class="sv-divider" />
-
-        <!-- 署名: Variant A の .ctl-check + tick svg を採用。
-             SettingsToggle と挙動を揃えるため input[type=checkbox] + :disabled 制御。 -->
-        <label class="ctl-row" :class="{ disabled: !hasKeystoreSigning }">
-          <input
-            v-model="sign"
-            type="checkbox"
-            data-test="sign-checkbox"
-            :disabled="!hasKeystoreSigning"
-          />
-          <span class="ctl-check" :class="{ on: sign }" aria-hidden="true">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-          </span>
-          <span>
-            <div class="ctl-label">{{ t('saveModal.sign') }}</div>
-            <div class="ctl-sub">
-              {{ hasKeystoreSigning ? t('saveModal.signSub') : t('saveModal.signDisabled') }}
-            </div>
-          </span>
-        </label>
-
-        <section v-if="!props.metaName.trim()" data-test="name-field" class="prop-section">
-          <label class="sd-field">
-            <span class="sd-field-label">{{ t('saveModal.nameLabel') }}</span>
-            <input class="input" v-model="nameInput" type="text" :placeholder="namePlaceholder" />
+  <UiModal :open="open" :title="t('saveModal.title')" icon="Pkg" size="md" @close="emit('cancel')">
+    <div class="sd-body-stack">
+      <fieldset class="sv-fieldset">
+        <legend>{{ t('saveModal.destinationLabel') }}</legend>
+        <div class="ctl-stack">
+          <label class="ctl-row">
+            <input v-model="destination" type="radio" name="save-destination" value="file" />
+            <span class="ctl-radio" :class="{ on: destination === 'file' }" aria-hidden="true" />
+            <span>
+              <div class="ctl-label">{{ t('saveModal.destinationFile') }}</div>
+              <div class="ctl-sub">{{ t('saveModal.destinationFileSub') }}</div>
+            </span>
+            <span class="ctl-tail">{{ t('saveModal.destinationFileTail') }}</span>
           </label>
-        </section>
-      </div>
+          <label class="ctl-row">
+            <input v-model="destination" type="radio" name="save-destination" value="library" />
+            <span class="ctl-radio" :class="{ on: destination === 'library' }" aria-hidden="true" />
+            <span>
+              <div class="ctl-label">{{ t('saveModal.destinationLibrary') }}</div>
+              <div class="ctl-sub">{{ t('saveModal.destinationLibrarySub') }}</div>
+            </span>
+            <span class="ctl-tail">{{ t('saveModal.destinationLibraryTail') }}</span>
+          </label>
+          <label class="ctl-row">
+            <input
+              v-model="destination"
+              type="radio"
+              name="save-destination"
+              value="libraryAndApply"
+            />
+            <span
+              class="ctl-radio"
+              :class="{ on: destination === 'libraryAndApply' }"
+              aria-hidden="true"
+            />
+            <span>
+              <div class="ctl-label">{{ t('saveModal.destinationLibraryAndApply') }}</div>
+              <div class="ctl-sub">{{ t('saveModal.destinationLibraryAndApplySub') }}</div>
+            </span>
+            <span class="ctl-tail">{{ t('saveModal.destinationLibraryAndApplyTail') }}</span>
+          </label>
+        </div>
+      </fieldset>
 
-      <footer class="sd-foot">
-        <button class="btn ghost" data-test="cancel-btn" @click="emit('cancel')">
-          {{ t('saveModal.cancel') }}
-        </button>
-        <button class="btn primary" data-test="submit-btn" @click="onSubmit">
-          {{ t('saveModal.save') }}
-        </button>
-      </footer>
+      <fieldset v-if="showOverwriteSection" data-test="overwrite-section" class="sv-fieldset">
+        <legend>{{ t('saveModal.overwriteLabel') }}</legend>
+        <div class="ctl-stack">
+          <label class="ctl-row">
+            <input
+              v-model="overwriteExisting"
+              type="radio"
+              name="save-overwrite-existing"
+              :value="true"
+            />
+            <span
+              class="ctl-radio"
+              :class="{ on: overwriteExisting === true }"
+              aria-hidden="true"
+            />
+            <span>
+              <div class="ctl-label">{{ t('saveModal.overwriteOverwrite') }}</div>
+              <div class="ctl-sub">{{ t('saveModal.overwriteOverwriteSub') }}</div>
+            </span>
+          </label>
+          <label class="ctl-row">
+            <input
+              v-model="overwriteExisting"
+              type="radio"
+              name="save-overwrite-existing"
+              :value="false"
+            />
+            <span
+              class="ctl-radio"
+              :class="{ on: overwriteExisting === false }"
+              aria-hidden="true"
+            />
+            <span>
+              <div class="ctl-label">{{ t('saveModal.overwriteDuplicate') }}</div>
+              <div class="ctl-sub">{{ t('saveModal.overwriteDuplicateSub') }}</div>
+            </span>
+          </label>
+        </div>
+      </fieldset>
+
+      <div class="sv-divider" />
+
+      <!-- 署名: Variant A の .ctl-check + tick svg を採用。
+         SettingsToggle と挙動を揃えるため input[type=checkbox] + :disabled 制御。 -->
+      <label class="ctl-row" :class="{ disabled: !hasKeystoreSigning }">
+        <input
+          v-model="sign"
+          type="checkbox"
+          data-test="sign-checkbox"
+          :disabled="!hasKeystoreSigning"
+        />
+        <span class="ctl-check" :class="{ on: sign }" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </span>
+        <span>
+          <div class="ctl-label">{{ t('saveModal.sign') }}</div>
+          <div class="ctl-sub">
+            {{ hasKeystoreSigning ? t('saveModal.signSub') : t('saveModal.signDisabled') }}
+          </div>
+        </span>
+      </label>
+
+      <section v-if="!props.metaName.trim()" data-test="name-field" class="prop-section">
+        <label class="sd-field">
+          <span class="sd-field-label">{{ t('saveModal.nameLabel') }}</span>
+          <input class="input" v-model="nameInput" type="text" :placeholder="namePlaceholder" />
+        </label>
+      </section>
     </div>
-  </div>
+
+    <template #actions>
+      <UiButton variant="ghost" data-test="cancel-btn" @click="emit('cancel')">
+        {{ t('saveModal.cancel') }}
+      </UiButton>
+      <UiButton variant="primary" data-test="submit-btn" icon-left="Check" @click="onSubmit">
+        {{ t('saveModal.save') }}
+      </UiButton>
+    </template>
+  </UiModal>
 </template>
 
 <style scoped>
 @reference '~/assets/css/tailwind.css';
 
-.sd-overlay {
-  @apply fixed inset-0 z-[100] flex items-center justify-center bg-[rgba(10,11,15,0.7)];
-}
-.sd-modal {
-  @apply flex max-h-[90vh] w-[min(520px,92vw)] flex-col rounded-[12px] border border-line;
-  background: var(--bg-1, #14161c);
-}
-.sd-head,
-.sd-foot {
-  @apply flex items-center justify-between border-b border-line px-4 py-3;
-}
-.sd-foot {
-  @apply justify-end gap-2 border-b-0 border-t border-line;
-}
-.sd-body {
-  @apply flex-1 space-y-4 overflow-y-auto px-4 py-4;
-}
-.sd-hint {
-  @apply text-[11px] text-fg-mute;
+.sd-body-stack {
+  @apply space-y-4;
 }
 
 /* fieldset + legend は Claude Design "Save Dialog Controls" Variant A の

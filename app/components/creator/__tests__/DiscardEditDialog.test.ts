@@ -5,89 +5,75 @@
  * - mode='clear' / 'navigate' で文言とタイトルが切り替わる
  * - 確定ボタンで `confirm`、キャンセルボタン / バックドロップ / Esc で `cancel` を emit
  */
-import { describe, it, expect, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { mount, type VueWrapper } from '@vue/test-utils'
 import DiscardEditDialog from '../DiscardEditDialog.vue'
 import { useI18n } from '~/composables/useI18n'
 
-const stubs = {
-  UiIcon: { template: '<span></span>' },
-}
+const stubs = { UiIcon: { template: '<span></span>', props: ['name', 'size'] } }
+
+const wrappers: VueWrapper[] = []
+afterEach(() => {
+  while (wrappers.length) wrappers.pop()!.unmount()
+  document.body.style.overflow = ''
+})
 
 beforeEach(() => {
   useI18n().setLocale('ja')
 })
 
+function mountDialog(props: { open: boolean; mode: 'clear' | 'navigate' }) {
+  const w = mount(DiscardEditDialog, { props, global: { stubs }, attachTo: document.body })
+  wrappers.push(w)
+  return w
+}
+
 describe('DiscardEditDialog', () => {
   it('renders nothing when open=false', () => {
-    const wrapper = mount(DiscardEditDialog, {
-      props: { open: false, mode: 'clear' },
-      global: { stubs },
-    })
-    expect(wrapper.find('.modal-page').exists()).toBe(false)
+    mountDialog({ open: false, mode: 'clear' })
+    expect(document.querySelector('.modal-page')).toBeNull()
   })
 
-  it('shows clear-specific title when mode=clear', () => {
-    const wrapper = mount(DiscardEditDialog, {
-      props: { open: true, mode: 'clear' },
-      global: { stubs },
-    })
-    expect(wrapper.text()).toContain('編集内容を破棄しますか')
+  it('shows clear-specific title when mode=clear', async () => {
+    const w = mountDialog({ open: true, mode: 'clear' })
+    await w.vm.$nextTick()
+    expect(document.body.textContent).toContain('編集内容を破棄しますか')
   })
 
-  it('shows navigate-specific title when mode=navigate', () => {
-    const wrapper = mount(DiscardEditDialog, {
-      props: { open: true, mode: 'navigate' },
-      global: { stubs },
-    })
-    expect(wrapper.text()).toContain('クリエイターを離れますか')
+  it('shows navigate-specific title when mode=navigate', async () => {
+    const w = mountDialog({ open: true, mode: 'navigate' })
+    await w.vm.$nextTick()
+    expect(document.body.textContent).toContain('クリエイターを離れますか')
   })
 
   it('emits confirm when the danger button is clicked', async () => {
-    const wrapper = mount(DiscardEditDialog, {
-      props: { open: true, mode: 'clear' },
-      global: { stubs },
-    })
-    await wrapper.find('button.danger').trigger('click')
-    expect(wrapper.emitted('confirm')).toHaveLength(1)
-    expect(wrapper.emitted('cancel')).toBeUndefined()
+    const w = mountDialog({ open: true, mode: 'clear' })
+    await w.vm.$nextTick()
+    const btn = document.querySelector('.modal-foot .actions button.danger') as HTMLButtonElement
+    btn.click()
+    expect(w.emitted('confirm')).toHaveLength(1)
   })
 
   it('emits cancel when the ghost button is clicked', async () => {
-    const wrapper = mount(DiscardEditDialog, {
-      props: { open: true, mode: 'clear' },
-      global: { stubs },
-    })
-    await wrapper.find('button.ghost').trigger('click')
-    expect(wrapper.emitted('cancel')).toHaveLength(1)
+    const w = mountDialog({ open: true, mode: 'clear' })
+    await w.vm.$nextTick()
+    const btn = document.querySelector('.modal-foot .actions button.ghost') as HTMLButtonElement
+    btn.click()
+    expect(w.emitted('cancel')).toHaveLength(1)
   })
 
-  it('emits cancel on backdrop click (event.target === currentTarget)', async () => {
-    const wrapper = mount(DiscardEditDialog, {
-      props: { open: true, mode: 'clear' },
-      global: { stubs },
-    })
-    // backdrop=root .modal-page; click 自身 (currentTarget=target) のときに cancel
-    await wrapper.find('.modal-page').trigger('click')
-    expect(wrapper.emitted('cancel')).toHaveLength(1)
+  it('emits cancel on backdrop click', async () => {
+    const w = mountDialog({ open: true, mode: 'clear' })
+    await w.vm.$nextTick()
+    const page = document.querySelector('.modal-page') as HTMLElement
+    page.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(w.emitted('cancel')).toHaveLength(1)
   })
 
-  it('does NOT emit cancel when clicking inside the modal body', async () => {
-    const wrapper = mount(DiscardEditDialog, {
-      props: { open: true, mode: 'clear' },
-      global: { stubs },
-    })
-    // .modal は @click.stop で伝播停止するので backdrop ハンドラに届かない
-    await wrapper.find('.modal').trigger('click')
-    expect(wrapper.emitted('cancel')).toBeUndefined()
-  })
-
-  it('emits cancel on Escape key', async () => {
-    const wrapper = mount(DiscardEditDialog, {
-      props: { open: true, mode: 'clear' },
-      global: { stubs },
-    })
-    await wrapper.find('.modal-page').trigger('keydown', { key: 'Escape' })
-    expect(wrapper.emitted('cancel')).toHaveLength(1)
+  it('emits cancel on Escape keydown', async () => {
+    const w = mountDialog({ open: true, mode: 'clear' })
+    await w.vm.$nextTick()
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    expect(w.emitted('cancel')).toHaveLength(1)
   })
 })

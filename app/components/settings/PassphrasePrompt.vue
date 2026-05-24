@@ -5,6 +5,10 @@
  * - 確認入力を強制 (export 時のみ)
  * - 8 文字以上の弱バリデーション
  * - エンターで確定
+ *
+ * 共通の `<UiModal>` shell を使用。focus trap が body 内の最初の focusable
+ * (= passphrase input) に自動 focus するため、open 直後にパスワード欄が
+ * フォーカスされる UX 期待を満たす。
  */
 
 const { t } = useI18n()
@@ -61,78 +65,56 @@ function confirm() {
 </script>
 
 <template>
-  <Transition name="fade">
-    <div
-      v-if="open"
-      class="modal-page"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="passphrase-modal-title"
-      @click.self="close"
-    >
-      <div class="modal pp-modal">
-        <div class="modal-head">
-          <div class="modal-icon" aria-hidden="true"><UiIcon name="Shield" :size="20" /></div>
-          <div style="flex: 1; min-width: 0">
-            <h2 id="passphrase-modal-title">
-              {{ mode === 'export' ? t('passphrase.exportTitle') : t('passphrase.importTitle') }}
-            </h2>
-            <p>{{ mode === 'export' ? t('passphrase.exportDesc') : t('passphrase.importDesc') }}</p>
-          </div>
-        </div>
+  <UiModal
+    :open="open"
+    :title="mode === 'export' ? t('passphrase.exportTitle') : t('passphrase.importTitle')"
+    :description="mode === 'export' ? t('passphrase.exportDesc') : t('passphrase.importDesc')"
+    icon="Shield"
+    size="sm"
+    @close="close"
+  >
+    <label class="pp-row">
+      <span class="pp-label">{{ t('passphrase.phraseLabel') }}</span>
+      <input
+        v-model="phrase"
+        type="password"
+        class="input mono"
+        autocomplete="new-password"
+        @keydown.enter="confirm"
+      />
+    </label>
+    <label v-if="mode === 'export'" class="pp-row">
+      <span class="pp-label">{{ t('passphrase.confirmLabel') }}</span>
+      <input
+        v-model="phraseConfirm"
+        type="password"
+        class="input mono"
+        autocomplete="new-password"
+        @keydown.enter="confirm"
+      />
+    </label>
+    <p v-if="error" class="pp-error">{{ error }}</p>
+    <p class="pp-note">
+      <UiIcon name="Alert" :size="11" />
+      {{ t('passphrase.note') }}
+    </p>
 
-        <div class="modal-body">
-          <label class="pp-row">
-            <span class="pp-label">{{ t('passphrase.phraseLabel') }}</span>
-            <input
-              v-model="phrase"
-              type="password"
-              class="input mono"
-              autocomplete="new-password"
-              @keydown.enter="confirm"
-            />
-          </label>
-          <label v-if="mode === 'export'" class="pp-row">
-            <span class="pp-label">{{ t('passphrase.confirmLabel') }}</span>
-            <input
-              v-model="phraseConfirm"
-              type="password"
-              class="input mono"
-              autocomplete="new-password"
-              @keydown.enter="confirm"
-            />
-          </label>
-          <p v-if="error" class="pp-error">{{ error }}</p>
-          <p class="pp-note">
-            <UiIcon name="Alert" :size="11" />
-            {{ t('passphrase.note') }}
-          </p>
-        </div>
-
-        <div class="modal-foot">
-          <div class="left-note">
-            <UiIcon name="Shield" :size="12" style="color: var(--accent)" />
-            XChaCha20-Poly1305 + Argon2id (m=64MiB, t=3)
-          </div>
-          <div class="actions">
-            <button class="btn ghost" @click="close">{{ t('common.cancel') }}</button>
-            <button class="btn primary" :disabled="!canConfirm" @click="confirm">
-              <UiIcon name="Check" :size="13" />
-              {{ mode === 'export' ? t('common.export') : t('common.import') }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </Transition>
+    <template #leftNote>
+      <UiIcon name="Shield" :size="12" style="color: var(--accent)" />
+      XChaCha20-Poly1305 + Argon2id (m=64MiB, t=3)
+    </template>
+    <template #actions>
+      <UiButton variant="ghost" @click="close">{{ t('common.cancel') }}</UiButton>
+      <UiButton variant="primary" icon-left="Check" :disabled="!canConfirm" @click="confirm">
+        {{ mode === 'export' ? t('common.export') : t('common.import') }}
+      </UiButton>
+    </template>
+  </UiModal>
 </template>
 
 <style scoped>
 @reference '~/assets/css/tailwind.css';
 
-.pp-modal {
-  @apply w-[460px];
-}
 .pp-row {
   @apply mb-3.5 flex flex-col gap-1.5;
 }
@@ -147,13 +129,5 @@ function confirm() {
 }
 .pp-note {
   @apply mt-1 flex items-center gap-1.5 text-[11.5px] text-fg-dim;
-}
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.18s ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
 }
 </style>

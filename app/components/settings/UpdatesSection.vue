@@ -62,15 +62,15 @@ defineEmits<{
           </button>
         </SettingsRow>
         <SettingsRow anchor="checkNow" :label="t('settings.checkNowLabel')">
-          <button
-            class="btn"
-            :disabled="updaterChecking || updaterDownloading"
+          <UiButton
+            variant="primary"
+            :loading="updaterChecking"
+            :disabled="updaterDownloading"
+            icon-left="Import"
             @click="$emit('check-update')"
           >
-            <span v-if="updaterChecking" class="spinner" style="width: 13px; height: 13px" />
-            <UiIcon v-else name="Import" :size="13" />
             {{ updaterChecking ? t('settings.btnChecking') : t('settings.btnCheckUpdate') }}
-          </button>
+          </UiButton>
         </SettingsRow>
         <SettingsRow
           v-if="updaterAvailable"
@@ -81,13 +81,12 @@ defineEmits<{
           "
           :desc="updaterAvailable.body ?? ''"
         >
-          <button
-            class="btn primary"
-            :disabled="updaterDownloading"
+          <UiButton
+            variant="primary"
+            :loading="updaterDownloading"
+            icon-left="Import"
             @click="$emit('download-update')"
           >
-            <span v-if="updaterDownloading" class="spinner" style="width: 13px; height: 13px" />
-            <UiIcon v-else name="Import" :size="13" />
             {{
               updaterDownloading
                 ? t('settings.btnDownloading', {
@@ -96,22 +95,14 @@ defineEmits<{
                   })
                 : t('settings.btnDownloadInstall')
             }}
-          </button>
+          </UiButton>
         </SettingsRow>
         <div v-if="updaterMessage" class="profile-msg">
           {{ updaterMessage }}
         </div>
-        <div
-          v-if="updaterError"
-          class="profile-msg"
-          style="
-            background: rgba(255, 107, 138, 0.06);
-            border-color: rgba(255, 107, 138, 0.4);
-            color: #ffb8c5;
-          "
-        >
+        <UiAlert v-if="updaterError" tone="danger" class="mt-2">
           {{ updaterError }}
-        </div>
+        </UiAlert>
       </div>
     </div>
   </section>
@@ -155,16 +146,5 @@ defineEmits<{
   @apply mt-2 rounded-[8px] border px-3 py-2 text-[12px];
   background: rgba(106, 213, 184, 0.06);
   border-color: rgba(106, 213, 184, 0.4);
-}
-.spinner {
-  @apply inline-block size-[13px] rounded-full;
-  border: 2px solid var(--fg-mute);
-  border-top-color: transparent;
-  animation: spin 800ms linear infinite;
-}
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 </style>

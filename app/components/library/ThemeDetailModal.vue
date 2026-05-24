@@ -6,9 +6,13 @@
  * グリッドが乱れる UX 問題があったため、シェブロン押下で中央オーバーレイ
  * のモーダルに切り替えた。
  *
- * - 背景クリック / Esc キーで閉じる
- * - スクロールロック (body に overflow: hidden を一時的に付与)
- * - Teleport で `<body>` 直下にレンダリングして z-index 戦争を回避
+ * 共通 `<UiModal>` シェル (Teleport + バックドロップ + Esc + スクロールロック +
+ * focus trap) にラップを委譲し、ここでは:
+ *   - body slot     : ThemeDetailDrawer (Hero + Strip)
+ *   - #leftNote slot: 二次アクション (edit / export / duplicate / delete)
+ *                     または marketplace / system 由来の代替表示
+ *   - #actions slot : 閉じる (ghost) + 適用 (primary) / 適用中 (disabled)
+ * を差し込む。旧 ThemeDetailDrawerFooter コンポーネントは削除済み。
  */
 import type { ThemeCardData } from '~/types/theme'
 import type { RolePreviewDetail } from '~/composables/useThemePreviews'
@@ -35,111 +39,164 @@ const emit = defineEmits<{
 
 const isOpen = computed(() => props.theme !== null)
 
-function close() {
-  emit('close')
-}
+const headerDescription = computed(() => {
+  if (!props.theme) return ''
+  const datePart = props.theme.date ? ` · ${props.theme.date.slice(0, 10)}` : ''
+  return `@${props.theme.author ?? 'unknown'} · v${props.theme.version}${datePart}`
+})
 
-// Body scroll lock / Esc 購読 / cleanup は useModalLifecycle に委譲。
-// `<Teleport to="body">` 配下のレンダリング階層制御だけ template 側に残す。
-useModalLifecycle({ open: isOpen, onClose: close })
+const isSystem = computed(() => props.theme?.kind === 'system')
+const isMarketplace = computed(() => props.theme?.kind === 'marketplace')
 </script>
 
 <template>
-  <Teleport to="body">
-    <Transition name="fade">
-      <div
-        v-if="isOpen && theme"
-        class="td-modal-backdrop"
-        role="dialog"
-        aria-modal="true"
-        :aria-label="t('themeDetail.modalAria', { name: theme.name })"
-        @click.self="close"
-      >
-        <div class="td-standalone td-modal-shell" @click.stop>
-          <div class="td-standalone-h">
-            <div>
-              <div class="td-standalone-eyebrow">{{ t('themePicker.detailsEyebrow') }}</div>
-              <h2>{{ theme.name }}</h2>
-              <div class="td-standalone-sub">
-                @{{ theme.author ?? 'unknown' }} · v{{ theme.version }}
-                <template v-if="theme.date"> · {{ theme.date.slice(0, 10) }}</template>
-              </div>
-            </div>
-            <button
-              class="btn icon"
-              :aria-label="t('common.close')"
-              :title="`${t('common.close')} (Esc)`"
-              @click="close"
-            >
-              <UiIcon name="X" :size="13" />
-            </button>
-          </div>
-          <div class="td-modal-body">
-            <ThemeDetailDrawer
-              :theme="theme"
-              :preview-map="previewMap"
-              :preview-details="previewDetails"
-              @apply="(id) => emit('apply', id)"
-              @edit="(id) => emit('edit', id)"
-              @duplicate="(id) => emit('duplicate', id)"
-              @export-pack="(id) => emit('exportPack', id)"
-              @delete="(id) => emit('delete', id)"
-              @close="close"
-            />
-          </div>
-        </div>
+  <UiModal
+    :open="isOpen"
+    :title="theme?.name ?? ''"
+    :description="headerDescription"
+    icon="Library"
+    icon-tone="accent"
+    size="xl"
+    :body-padded="false"
+    :aria-labelledby="theme ? `theme-detail-${theme.id}` : undefined"
+    @close="emit('close')"
+  >
+    <ThemeDetailDrawer
+      v-if="theme"
+      :theme="theme"
+      :preview-map="previewMap"
+      :preview-details="previewDetails"
+    />
+
+    <!-- 二次アクション (フッター左側) -->
+    <template v-if="theme" #leftNote>
+      <div class="td-secondary">
+        <template v-if="!isSystem">
+          <button
+            v-if="!isMarketplace"
+            class="td-act"
+            :aria-label="t('themeDetail.editAria', { name: theme.name })"
+            @click="emit('edit', theme.id)"
+          >
+            <UiIcon name="Brush" :size="13" />{{ t('themeDetail.editLabel') }}
+          </button>
+          <button
+            v-if="!isMarketplace"
+            class="td-act"
+            :aria-label="t('themeDetail.exportAria', { name: theme.name })"
+            @click="emit('exportPack', theme.id)"
+          >
+            <UiIcon name="Export" :size="13" />{{ t('themeDetail.exportLabel') }}
+          </button>
+          <button
+            class="td-act"
+            :aria-label="t('themeDetail.duplicateAria', { name: theme.name })"
+            @click="emit('duplicate', theme.id)"
+          >
+            <UiIcon name="Plus" :size="13" />{{ t('themeDetail.duplicateLabel') }}
+          </button>
+          <button
+            class="td-act danger"
+            :disabled="theme.isActive"
+            :aria-label="
+              theme.isActive
+                ? t('themeDetail.deleteDisabledAria', { name: theme.name })
+                : t('themeDetail.deleteAria', { name: theme.name })
+            "
+            :title="theme.isActive ? t('themeDetail.deleteDisabledTitle') : undefined"
+            @click="emit('delete', theme.id)"
+          >
+            {{ t('themeDetail.deleteLabel') }}
+          </button>
+          <span v-if="isMarketplace" class="td-hint">
+            {{ t('themeDetail.cannotEditMarketplace') }}
+          </span>
+        </template>
+        <template v-else>
+          <!--
+            システムスキームは編集・複製・削除はできないが、`.cursorpack`
+            として書き出して別環境へ持ち運ぶことはできる。
+          -->
+          <button
+            class="td-act"
+            :aria-label="t('themeDetail.exportSchemeAria', { name: theme.name })"
+            @click="emit('exportPack', theme.id)"
+          >
+            <UiIcon name="Export" :size="13" />{{ t('themeDetail.exportSchemeLabel') }}
+          </button>
+          <span class="td-source-readonly">
+            <UiIcon name="Globe" :size="11" />{{ t('themeDetail.systemSchemeReadOnly') }}
+          </span>
+        </template>
       </div>
-    </Transition>
-  </Teleport>
+    </template>
+
+    <!-- 主アクション (フッター右側) -->
+    <template #actions>
+      <UiButton variant="ghost" @click="emit('close')">
+        {{ t('common.close') }}
+      </UiButton>
+      <UiButton v-if="theme && theme.isActive" variant="default" :disabled="true" icon-left="Check">
+        {{ t('themeDetail.applyingNow') }}
+      </UiButton>
+      <UiButton v-else-if="theme" variant="primary" @click="emit('apply', theme.id)">
+        {{ t('themeDetail.applyTheme') }}
+      </UiButton>
+    </template>
+  </UiModal>
 </template>
 
 <style scoped>
 @reference '~/assets/css/tailwind.css';
 
-.td-modal-backdrop {
-  @apply fixed inset-0 z-[100] grid place-items-center bg-[rgba(8,9,14,0.6)] p-8 backdrop-blur-[8px];
-}
-/*
- * シェルは `grid place-items-center` の中で中央寄せされる。
- * 高さはコンテンツに追従し、`max-h` だけで上限を抑える。
- * `td-standalone` 由来の `height: 100%` が乗ると、グリッドトラック全体
- * (viewport - 64px) まで張ってしまい常に最大サイズになるので、レイアウト
- * 系プロパティはこちらに寄せて `td-standalone` は枠線・角丸・影だけに絞る。
- */
-.td-modal-shell {
-  @apply flex h-auto max-h-[calc(100vh-64px)] w-[min(960px,100%)] flex-col overflow-hidden;
-}
-.td-modal-body {
-  @apply min-h-0 flex-1 overflow-y-auto;
-}
 /* モーダル内の drawer は通常のカード文脈ではないので、外側の境界線を消して二重枠を避ける */
-.td-modal-body :deep(.td-drawer) {
+:deep(.td-drawer) {
   background: transparent;
 }
 
-.td-standalone {
-  @apply rounded-[14px] border border-line-hi bg-bg-1;
-  box-shadow: var(--shadow-2);
-}
-.td-standalone-h {
-  @apply flex items-start justify-between gap-3 border-b border-line px-[22px] pb-4 pt-[18px];
-}
-.td-standalone-eyebrow {
-  @apply mb-1 font-mono text-[9.5px] uppercase tracking-[0.16em] text-accent;
-}
-.td-standalone h2 {
-  @apply m-0 font-display text-[20px] font-semibold tracking-[-0.02em];
-}
-.td-standalone-sub {
-  @apply mt-1 font-mono text-[12px] tracking-[0.02em] text-fg-dim;
+/* 二次アクション群 (旧 ThemeDetailDrawerFooter の .td-foot-l 相当)。
+ * UiModal の `.modal-foot .left-note` (font-mono / text-fg-mute) の文字サイズと
+ * 噛み合わないため、ここで text style を上書きする。 */
+.td-secondary {
+  @apply flex flex-wrap items-center gap-1.5;
 }
 
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.18s ease;
+.td-act {
+  @apply inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-md border border-transparent bg-transparent px-[11px] text-[12px] font-medium text-fg-dim;
+  transition: all 0.12s;
 }
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
+.td-act:hover {
+  @apply border-line-hi text-fg;
+  background: rgba(255, 255, 255, 0.05);
+}
+:where(html.light) .td-act:hover {
+  background: rgba(15, 20, 35, 0.04);
+}
+.td-act.danger {
+  color: var(--rose);
+}
+.td-act.danger:hover {
+  background: rgba(255, 107, 138, 0.08);
+  border-color: rgba(255, 107, 138, 0.3);
+  color: #fff;
+}
+:where(html.light) .td-act.danger:hover {
+  color: var(--rose);
+}
+.td-act.danger:disabled,
+.td-act.danger:disabled:hover {
+  @apply cursor-not-allowed;
+  opacity: 0.45;
+  background: transparent;
+  border-color: transparent;
+  color: var(--rose);
+}
+
+.td-hint {
+  @apply text-[11px] text-fg-mute;
+}
+
+.td-source-readonly {
+  @apply inline-flex items-center gap-1.5 font-mono text-[10.5px] tracking-[0.02em] text-fg-mute;
 }
 </style>

@@ -934,7 +934,7 @@
 <script id="data" type="application/json">
 {
   "$schema_version": "0.1.0",
-  "generated_at": "2026-05-21",
+  "generated_at": "2026-05-23",
   "generated_from": [
     "docs/architecture.md",
     "docs/file_inventory.md",
@@ -966,16 +966,16 @@
     },
     "measured_counts": {
       "rust_modules_in_lib_rs": 23,
-      "tauri_ipc_commands": 52,
-      "composables": 35,
+      "tauri_ipc_commands": 53,
+      "composables": 36,
       "pages_vue": 4,
       "pages_ts_helpers": 2,
-      "components_total": 57,
+      "components_total": 60,
       "ci_workflows": 3
     },
     "doc_drift_warnings": [
-      "No known drift as of 2026-05-21 (re-measured)。本マージで components.creator が 13 → 14 (合計 56 → 57) に増加 (`DiscardEditDialog` を追加 — Creator の Clear ボタン / 画面遷移時の編集破棄確認ダイアログ)。先行コミット (develop) で composables が 36 → 35 件に減少済 (`useTagChipInput` を削除、`SubmitThemeDialog` に inline 化)。modules=23 / IPC=52 / commands-submodules=9 は変化なし。architecture.json/architecture.md/file_inventory.md/architecture.html が同期。同コミットで `stack.distribution` を SignPath Foundation 申請保留 (2026-05-21) に合わせて更新 — `release.yml` の SignPath ステップは skip-guard 付きで残置、再承認時に SIGNPATH_* secret 投入で自動再活性化する設計。詳細は `docs/authenticode_signing.md`。",
-      "ui_map.json と相互整合済み: backend.ipc_commands 52 件のうち 3 件 (export_cursorpack / get_theme_previews / get_windows_scheme_previews) は Rust に登録だけされた legacy_unused 状態で、それぞれ status と replaced_by を明示。次の PR で Rust 側からも削除するか、frontend で再利用する決定をすること。",
+      "No known drift as of 2026-05-24 (re-measured after merging origin/main into develop for v0.0.5 release prep). develop の cursor-size redesign v2 (write path から `HKCU\\SOFTWARE\\Microsoft\\Accessibility\\CursorSize` の書込を完全削除、invariant `cursor_size_app_writes_only_cursorbasesize` を導入、`accessibility::resolve_cursor_base_size` の優先順位を「Accessibility は slider > 1 のときのみ採用、それ以外は CursorBaseSize を信頼」に変更してアプリスライダーが eoa pipeline を起動してロックアウトする現象を物理的に発生不可能にした) と、main の SignPath Foundation 一次申請保留対応 (`docs/authenticode_signing.md` 再申請ロードマップ追加 / README / `release.yml` SignPath ステップは skip-guard 付きで残置、再承認時に SIGNPATH_* secret 投入で自動再活性化) が両立。さらに PR review 由来の 5 fix (S1 Library 不要リロード撤去 / eoa guard fail-closed 強化 / HCURSOR リーク防止 / UI 技術文字列クリーン / deep-link URI `easeofaccess-cursor`→`easeofaccess-mousepointer` 修正) を適用。IPC 数 53 / Rust modules 23 / commands submodules 9 / composables 36 / components_total 60 はいずれも不変。architecture.json / architecture.md / file_inventory.md / architecture.html が同期。",
+      "ui_map.json と相互整合済み: backend.ipc_commands 53 件のうち 3 件 (export_cursorpack / get_theme_previews / get_windows_scheme_previews) は Rust に登録だけされた legacy_unused 状態で、それぞれ status と replaced_by を明示。次の PR で Rust 側からも削除するか、frontend で再利用する決定をすること。",
       "新たに食い違いを見つけたら『docs/<file> は X と書いているが実測 Y』の形で追記し、修正コミットと同じ PR で解消する。",
       "数字が docs と食い違ったら grep を信用する。frontend の数字は ui_map.html の live check (末尾) が canonical counter。"
     ]
@@ -1075,6 +1075,11 @@
       "id": "key_export_passphrase",
       "rule": "鍵エクスポートは XChaCha20-Poly1305 + Argon2id によるパスフレーズ暗号化 (.cfkey 形式)。",
       "responsible_module": "src-tauri/src/keystore.rs"
+    },
+    {
+      "id": "cursor_size_app_writes_only_cursorbasesize",
+      "rule": "in-app カーソルサイズスライダーは `HKCU\\Control Panel\\Cursors\\CursorBaseSize` のみを書く。`HKCU\\SOFTWARE\\Microsoft\\Accessibility\\*` namespace は Windows Settings UI の専用領域で、アプリは絶対に書かない (書くと Win11 eoa pipeline が起動してアプリスライダーがロックアウトされる)。spec: docs/superpowers/specs/2026-05-23-cursor-size-redesign-v2.md",
+      "responsible_module": "src-tauri/src/registry/mod.rs (set_cursor_base_size)、src-tauri/src/accessibility.rs (resolve_cursor_base_size)"
     }
   ],
   "backend": {
@@ -1333,7 +1338,8 @@
       { "name": "check_update_is_major_jump", "category": "system", "file": "src-tauri/src/commands/system.rs", "frontend_callers": ["useUpdater"] },
       { "name": "open_url", "category": "system", "file": "src-tauri/src/commands/system.rs", "frontend_callers": ["pages/marketplace.vue", "components/settings/AboutSection.vue"] },
       { "name": "open_log_folder", "category": "system", "file": "src-tauri/src/commands/system.rs", "frontend_callers": ["components/settings/LoggingSection.vue"] },
-      { "name": "get_accessibility_conflicts", "category": "system", "file": "src-tauri/src/commands/system.rs", "frontend_callers": ["pages/settings.vue"] },
+      { "name": "get_accessibility_conflicts", "category": "system", "file": "src-tauri/src/commands/system.rs", "frontend_callers": ["pages/settings.vue", "components/library/ApplyModal.vue"] },
+      { "name": "set_cursor_base_size", "category": "system", "file": "src-tauri/src/commands/system.rs", "frontend_callers": ["pages/settings.vue", "components/settings/GeneralSection.vue"] },
       { "name": "list_crash_reports", "category": "system", "file": "src-tauri/src/commands/system.rs", "frontend_callers": ["components/settings/LoggingSection.vue"] },
       { "name": "clear_crash_reports", "category": "system", "file": "src-tauri/src/commands/system.rs", "frontend_callers": ["components/settings/LoggingSection.vue"] },
       { "name": "submit_crash_reports", "category": "system", "file": "src-tauri/src/commands/system.rs", "frontend_callers": ["components/settings/LoggingSection.vue"] },
@@ -1394,7 +1400,7 @@
         "role": "設定 8 セクション (一般 / 起動 / ライブラリ / セキュリティ / 鍵 / ログ / 更新 / About)",
         "composables": ["useAppSettings", "useKeystore", "useUpdater", "useSettingsSearch", "useAppInfo"],
         "components": ["ConfigRecoveryPanel", "PassphrasePrompt", "SettingsSearchDropdown", "GeneralSection", "StartupSection", "LibrarySection", "SecuritySection", "KeysSection", "LoggingSection", "UpdatesSection", "AboutSection"],
-        "ipc_calls": ["get_config", "update_config", "get_app_info", "keystore_info", "keystore_generate", "keystore_delete", "keystore_export", "keystore_import", "list_config_backups", "restore_config_backup", "export_profile", "import_profile", "list_crash_reports", "clear_crash_reports", "submit_crash_reports", "check_update_is_major_jump", "revoke_github_link", "open_log_folder", "open_url", "get_accessibility_conflicts"]
+        "ipc_calls": ["get_config", "update_config", "get_app_info", "keystore_info", "keystore_generate", "keystore_delete", "keystore_export", "keystore_import", "list_config_backups", "restore_config_backup", "export_profile", "import_profile", "list_crash_reports", "clear_crash_reports", "submit_crash_reports", "check_update_is_major_jump", "revoke_github_link", "open_log_folder", "open_url", "get_accessibility_conflicts", "set_cursor_base_size"]
       }
     ],
     "composables": [

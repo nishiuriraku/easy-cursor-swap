@@ -16,7 +16,7 @@
                         │ IPC (Tauri 2 / serde)
 ┌───────────────────────▼─────────────────────────────────────────┐
 │ Rust バックエンド  (src-tauri/src/)                              │
-│   commands/ (52 IPC 受け口を 9 サブモジュールに分割)             │
+│   commands/ (53 IPC 受け口を 9 サブモジュールに分割)             │
 │   ├─ config / theme / cursor / registry  ← Source of Truth      │
 │   ├─ marketplace / keystore / bulk_import                       │
 │   └─ tray / hotkey / health / crash                             │
@@ -51,7 +51,7 @@
 
 | カテゴリ | モジュール | 主な役割 |
 |---|---|---|
-| **IPC 表玄関** | `commands/` | 52 個の `#[tauri::command]` を 9 サブモジュールに分割。`mod.rs::get_command_handlers()` が `tauri::generate_handler!` にまとめて渡す。サブモジュール: `theme` / `cursor_build/` (build / dto / sign / stream / mod の 5 ファイル分割; `cancel_build` IPC は `mod.rs` 直下、共有キャンセルレジストリは `cancel_registry.rs`) / `cursor_io` / `keystore` / `marketplace` / `marketplace_submit` / `profile` / `system` / `windows_scheme` |
+| **IPC 表玄関** | `commands/` | 53 個の `#[tauri::command]` を 9 サブモジュールに分割。`mod.rs::get_command_handlers()` が `tauri::generate_handler!` にまとめて渡す。サブモジュール: `theme` / `cursor_build/` (build / dto / sign / stream / mod の 5 ファイル分割; `cancel_build` IPC は `mod.rs` 直下、共有キャンセルレジストリは `cancel_registry.rs`) / `cursor_io` / `keystore` / `marketplace` / `marketplace_submit` / `profile` / `system` / `windows_scheme` |
 | **GitHub API クライアント** | `github/` | OAuth Device Flow + REST API (`mod.rs` / `types.rs` / `device_flow.rs` / `client.rs`)。Marketplace 自動提出フローから利用。`client_id` は build 時に `option_env!("EASY_CURSOR_SWAP_GITHUB_OAUTH_CLIENT_ID")` で注入。 |
 | **設定 / 状態** | `config.rs` | `AppConfig` / `ConfigManager` (RwLock + schema_version (v1 固定) + パースエラー時 `config.corrupt.*.json` 退避) |
 | | `errors.rs` | `AppError` / `AppResult` 共通型 |
@@ -77,9 +77,9 @@
 
 > 多重起動防止は `tauri_plugin_single_instance::init` プラグインに集約 (argv ハンドオーバ含む)。旧 `single_instance.rs` モジュールは削除済。
 
-### IPC 一覧 (52 commands)
+### IPC 一覧 (53 commands)
 
-`commands::get_command_handlers()` が `tauri::generate_handler!` に登録する 52 個。フロントは `app/composables/useTauri.ts::invokeTauri<T>(name, args)` で呼ぶ。
+`commands::get_command_handlers()` が `tauri::generate_handler!` に登録する 53 個。フロントは `app/composables/useTauri.ts::invokeTauri<T>(name, args)` で呼ぶ。
 
 | カテゴリ | コマンド名 |
 |---|---|
@@ -91,7 +91,7 @@
 | マーケットプレース自動提出 (5) | `start_device_flow`, `complete_device_flow`, `cancel_device_flow`, `submit_theme_auto`, `revoke_github_link` |
 | プロファイル (2) | `export_profile`, `import_profile` |
 | Windows スキーム (5) | `list_windows_schemes`, `apply_windows_scheme`, `get_windows_scheme_previews`, `get_windows_scheme_role_previews`, `export_windows_scheme_as_cursorpack` |
-| システム / 設定 / 診断 (15) | `reset_to_default`, `reset_to_initial`, `get_environment_report`, `get_config`, `update_config`, `get_app_info`, `list_config_backups`, `restore_config_backup`, `check_update_is_major_jump`, `open_url`, `open_log_folder`, `get_accessibility_conflicts`, `list_crash_reports`, `clear_crash_reports`, `submit_crash_reports` |
+| システム / 設定 / 診断 (16) | `reset_to_default`, `reset_to_initial`, `get_environment_report`, `get_config`, `update_config`, `get_app_info`, `list_config_backups`, `restore_config_backup`, `check_update_is_major_jump`, `open_url`, `open_log_folder`, `get_accessibility_conflicts`, `set_cursor_base_size`, `list_crash_reports`, `clear_crash_reports`, `submit_crash_reports` |
 | 一括取込 (3) | `bulk_resolve_assets`, `cancel_bulk_import`, `parse_cursorpack_for_creator` |
 
 ### 起動シーケンス (`main.rs`)
@@ -132,6 +132,7 @@ README の security テーブルは概要、本セクションは **不変条件
 | Vue では `v-html` を使わない (CI で grep ベースで検出) | `app/components/icons/{UiIcon,CursorIcon}.vue` の render-function 方式 |
 | ログには PII を残さない (パスは `redact_path`、ハッシュは `short_hash[:12]`) | `logging.rs` |
 | HTTPS は rustls-tls (OS の TLS スタックに依存しない) | `Cargo.toml` の reqwest features |
+| アプリは `HKCU\SOFTWARE\Microsoft\Accessibility\*` を**書かない** (Settings UI の専用領域、書くと Win11 eoa pipeline が誤起動してアプリスライダーがロックアウトされる) | `registry/mod.rs::set_cursor_base_size` |
 
 ## フロントエンド (`app/`)
 
@@ -146,9 +147,9 @@ app/
 ├─ components/
 │  ├─ shell/       ← AppTitlebar, AppSidebar, EnvironmentBanner (3)
 │  ├─ library/     ← ThemeCard, ThemeRow, ThemeDetailModal, ThemeDetailDrawer,
-│  │                ThemeDetailDrawerHero, ThemeDetailDrawerStrip, ThemeDetailDrawerFooter,
+│  │                ThemeDetailDrawerHero, ThemeDetailDrawerStrip,
 │  │                ApplyModal, ImportConflictDialog, ThemePickerModal, CursorMatrix,
-│  │                LibraryToolbar, LibraryFilterBar, LibraryEmptyState, LibraryDropOverlay (15)
+│  │                LibraryToolbar, LibraryFilterBar, LibraryEmptyState, LibraryDropOverlay (14)
 │  ├─ creator/     ← CreatorStartScreen, CreatorToolbar, CreatorRoleList, CreatorMetadataPane,
 │  │                CreatorEditorCanvas, NewThemeStartModal, SaveDestinationModal,
 │  │                DiscardEditDialog, BulkImportButton, BulkImportPreviewModal,
@@ -161,7 +162,8 @@ app/
 │  │                UpdatesSection, AboutSection (14)
 │  ├─ preview/     ← CursorPreview (theme detail で使うプレビュー) (1)
 │  ├─ panic/       ← PanicFlow (Stage 1 / Stage 2 リカバリ) (1)
-│  ├─ ui/          ← UiSelect (ネイティブ select の白背景を回避) (1)
+│  ├─ ui/          ← UiSelect (ネイティブ select の白背景を回避), UiButton, UiAlert,
+│  │                UiModal (shared modal shell + focus trap), UiConfirmDialog (5)
 │  └─ icons/       ← UiIcon, CursorIcon (render-function ベースで v-html を使わない) (2)
 ├─ composables/    ← useThemes, useAppSettings, useI18n, useTauri (IPC), useKeystore, useUiTheme,
 │                    useRoleMatcher, useThemePreviews, useBulkImport, useBulkImportPreviewState,
@@ -173,8 +175,8 @@ app/
 │                    useGithubAuth (GitHub Device Flow 認証・トークン管理),
 │                    useMarketplaceSubmit (自動 PR 提出フロー),
 │                    pickLocalizedName (Marketplace name の locale 解決),
-│                    useExternalUrl, useListbox, useModalLifecycle, usePngBlobCache,
-│                    useThemeCardState (合計 35)
+│                    useExternalUrl, useListbox, useModalLifecycle, useFocusTrap,
+│                    usePngBlobCache, useThemeCardState (合計 36)
 ├─ types/          ← config.ts, theme.ts, marketplace.ts, githubAuth.ts (Rust struct と 1:1)
 ├─ locales/        ← ja.ts, en.ts (CI で parity チェック)
 ├─ assets/css/     ← tailwind.css (Tailwind v4 entry + @theme + 横断 shared utility) +
