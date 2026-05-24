@@ -1,6 +1,6 @@
 [package]
 name = "easy-cursor-swap"
-version = "0.0.4"
+version = "0.0.5"
 description = "Windows 用マウスカーソルテーマ管理ツール"
 authors = ["nishiuriraku"]
 license = "MIT"
