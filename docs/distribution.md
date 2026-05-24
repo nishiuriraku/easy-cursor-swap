@@ -60,31 +60,45 @@ signtool sign /a /v /fd SHA256 /f cert.pfx /p "<password>" EasyCursorSwap.msix
 
 仕様書「§5 コードサイニング」要件:
 
-- 配布物は EV/OV 証明書で署名 (SmartScreen レピュテーション獲得)
+- 配布物は EV/OV 証明書で署名 (SmartScreen レピュテーション獲得) — **将来目標**
 - OSS 向けの無償署名サービスを第一候補
+
+> **現状 (2026-05-21):** Authenticode 署名は **未取得**。SignPath Foundation OSS
+> 申請は外部認知不足で保留となり、再申請準備中。`release.yml` の SignPath ステップ
+> は SIGNPATH_* secret 未設定時に自動 skip するため、CI は無影響。詳細と再申請
+> ロードマップは [`authenticode_signing.md`](authenticode_signing.md) を参照。
 
 ### 候補
 
-| サービス                            | 種類          | 条件                 |
-| ----------------------------------- | ------------- | -------------------- |
-| [SignPath.io](https://signpath.io/) | OV (組織検証) | OSS プロジェクト無償 |
-| Microsoft Trusted Signing           | EV            | $9.99/月、Azure 経由 |
-| SSL.com Code Signing                | EV/OV         | 商用、有料           |
+候補の全体像と推奨パスは [`authenticode_signing.md`](authenticode_signing.md) を
+正本とする。本ファイルは概要のみ:
 
-### SignPath.io 申請手順 (推奨)
+| サービス                            | 種類          | 条件                                                  | 状態 (2026-05-21)              |
+| ----------------------------------- | ------------- | ----------------------------------------------------- | ------------------------------ |
+| [SignPath.io](https://signpath.org/) Foundation | OV    | OSS プロジェクト無償、外部認知シグナル要件あり        | 一次審査保留、再申請準備中    |
+| Certum Open Source (SimplySign)     | OV            | €29〜€69/年、個人 OSS 開発者向け、クラウド HSM        | 暫定有料案 (再申請長期化時)    |
+| Microsoft Trusted Signing           | OV (相当)     | $9.99/月、Azure 経由                                  | 個人 onboarding 一時停止中     |
+| SSL.com Code Signing                | EV/OV         | 商用、有料                                            | 参考のみ                       |
 
-1. https://signpath.io/ でアカウント作成
-2. プロジェクト作成 → GitHub Actions 連携
-3. `.github/workflows/release.yml` に SignPath SignAction 追加
-4. リリース時に `.msi` / `.exe` / `.msix` を自動署名
+### SignPath.io 申請手順
+
+詳細は [`authenticode_signing.md`](authenticode_signing.md) を参照。サマリ:
+
+1. https://signpath.org/apply から OSS Foundation 申請
+2. 必要書類: GitHub repo URL、ライセンス、メンテナ情報、公開済み Code Signing Policy URL
+3. `.github/workflows/release.yml` の SignPath ステップは既に配線済 (skip-guard 付き)
+4. 承認後に GitHub Secrets (`SIGNPATH_API_TOKEN` / `SIGNPATH_ORGANIZATION_ID`) を
+   投入すれば自動的に有効化される
+5. **2026-05-21 時点では一次審査保留**。再申請は外部認知シグナル蓄積後
 
 ## SmartScreen レピュテーション獲得
 
-新規発行の証明書は SmartScreen の警告を受ける。緩和策:
+新規発行の証明書 (および無署名配布) は SmartScreen の警告を受ける。緩和策:
 
-1. **EV 証明書を使う** → 即時レピュテーション
+1. **EV 証明書を使う** → 即時レピュテーション (個人開発では運用コスト見合わず除外)
 2. **OV 証明書を使う** → 数週間〜数か月のダウンロード実績で警告解消
-3. **未署名で配布** → 不可 (常駐 + 自動起動アプリのため)
+3. **無署名で配布 (現状の運用)** → README / Wiki FAQ で警告案内、`More info → Run anyway`
+   で続行可能。Tauri Updater minisign 署名で改ざん防止は別途維持
 
 ## アップデートチャネル
 

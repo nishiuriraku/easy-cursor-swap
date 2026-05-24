@@ -954,7 +954,7 @@
       "frontend": "Nuxt 4 / Vue 3 SPA、Composition API、TypeScript、Tailwind v4",
       "backend": "Rust 1.82+ (windows、winreg、image、tracing、ed25519-dalek)",
       "shell": "Tauri v2 (single-instance プラグイン、updater、システムトレイ)",
-      "distribution": "SignPath 署名の NSIS / MSI インストーラ; Tauri Updater は Ed25519",
+      "distribution": "NSIS / MSI インストーラ (Authenticode 未署名 — SignPath Foundation OSS 申請は 2026-05-21 に外部認知不足で保留、再申請準備中。`release.yml` の SignPath ステップは skip-guard 付きで配線済、SIGNPATH_* secret 投入で自動再活性化); Tauri Updater は Ed25519 で署名済 (有効)",
       "test_runners": "vitest + happy-dom (フロント)、cargo test --lib + criterion (バックエンド)"
     },
     "single_source_of_truth_note": "Rust バックエンドが状態の所有者。フロントは IPC で同期する。Vue 側だけにアプリ状態を保持しない。",
@@ -974,7 +974,7 @@
       "ci_workflows": 3
     },
     "doc_drift_warnings": [
-      "No known drift as of 2026-05-21 (re-measured)。本マージで components.creator が 13 → 14 (合計 56 → 57) に増加 (`DiscardEditDialog` を追加 — Creator の Clear ボタン / 画面遷移時の編集破棄確認ダイアログ)。先行コミット (develop) で composables が 36 → 35 件に減少済 (`useTagChipInput` を削除、`SubmitThemeDialog` に inline 化)。modules=23 / IPC=52 / commands-submodules=9 は変化なし。architecture.json/architecture.md/file_inventory.md/architecture.html が同期。",
+      "No known drift as of 2026-05-21 (re-measured)。本マージで components.creator が 13 → 14 (合計 56 → 57) に増加 (`DiscardEditDialog` を追加 — Creator の Clear ボタン / 画面遷移時の編集破棄確認ダイアログ)。先行コミット (develop) で composables が 36 → 35 件に減少済 (`useTagChipInput` を削除、`SubmitThemeDialog` に inline 化)。modules=23 / IPC=52 / commands-submodules=9 は変化なし。architecture.json/architecture.md/file_inventory.md/architecture.html が同期。同コミットで `stack.distribution` を SignPath Foundation 申請保留 (2026-05-21) に合わせて更新 — `release.yml` の SignPath ステップは skip-guard 付きで残置、再承認時に SIGNPATH_* secret 投入で自動再活性化する設計。詳細は `docs/authenticode_signing.md`。",
       "ui_map.json と相互整合済み: backend.ipc_commands 52 件のうち 3 件 (export_cursorpack / get_theme_previews / get_windows_scheme_previews) は Rust に登録だけされた legacy_unused 状態で、それぞれ status と replaced_by を明示。次の PR で Rust 側からも削除するか、frontend で再利用する決定をすること。",
       "新たに食い違いを見つけたら『docs/<file> は X と書いているが実測 Y』の形で追記し、修正コミットと同じ PR で解消する。",
       "数字が docs と食い違ったら grep を信用する。frontend の数字は ui_map.html の live check (末尾) が canonical counter。"
