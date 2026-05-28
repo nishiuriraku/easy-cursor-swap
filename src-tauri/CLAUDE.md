@@ -57,7 +57,7 @@ cargo bench                                       # criterion benches in benches
 2. Register it in the `invoke_handler` list in `lib.rs`.
 3. Add the matching payload type in `app/types/`.
 4. Add a `tracing::info!` log on entry; redact any PII.
-5. Update the vault `reference/architecture.md` IPC inventory + `reference/file_inventory.md` (numbers must stay in sync) + `reference/architecture.json`. (The repo-side embed step `scripts/embed-arch-json.mjs` was retired 2026-05-28 when Tier 1/3 moved to the vault.)
+5. Update the vault `reference/architecture.json` `backend.ipc_commands[]` + `meta.measured_counts` + `reference/file_inventory.md` (numbers must stay in sync). (Narrative `architecture.md` and the `scripts/embed-arch-json.mjs` embed step were retired 2026-05-28.)
 
 ## Hard rules (backend-side)
 

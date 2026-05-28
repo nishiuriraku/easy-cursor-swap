@@ -3,7 +3,7 @@
 # stdout の内容は Claude の context にそのまま入る
 set -e
 
-# All living docs (Tier 1/2/3) live in the Obsidian vault as of 2026-05-28:
+# All living docs live in the Obsidian vault as of 2026-05-28:
 # develop/easy-cursor-swap/reference/. The repo keeps operational runbooks only.
 # This hook reads the relocated architecture.json from the vault when present,
 # and silently no-ops elsewhere (CI, fresh clones).
@@ -41,9 +41,9 @@ cat <<EOF
 ## EasyCursorSwap — Session start snapshot
 
 **Branch**: \`$branch\` ($modified modified files) | **Last commit**: $last_commit
-**Tier 1 (relocated to Obsidian vault)**: \`develop/easy-cursor-swap/reference/architecture.json\` (generated: $generated_at) · repo keeps runbooks only (Tier 1/2/3 in vault \`reference/\`)
+**Canonical docs (Obsidian vault)**: \`develop/easy-cursor-swap/reference/architecture.json\` (generated: $generated_at) · repo keeps runbooks only · human visual = \`overview.canvas\`
 
-### Measured counts (Tier 1)
+### Measured counts
 $counts
 
 ### Critical invariants (re-check before any change)
