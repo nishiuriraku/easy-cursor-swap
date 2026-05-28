@@ -3,7 +3,11 @@
 # stdout の内容は Claude の context にそのまま入る
 set -e
 
-ARCH_JSON="docs/architecture.json"
+# All living docs (Tier 1/2/3) live in the Obsidian vault as of 2026-05-28:
+# develop/easy-cursor-swap/reference/. The repo keeps operational runbooks only.
+# This hook reads the relocated architecture.json from the vault when present,
+# and silently no-ops elsewhere (CI, fresh clones).
+ARCH_JSON="$HOME/Workspace/Obsidian/develop/easy-cursor-swap/reference/architecture.json"
 if [ ! -f "$ARCH_JSON" ]; then
   exit 0
 fi
@@ -37,7 +41,7 @@ cat <<EOF
 ## EasyCursorSwap — Session start snapshot
 
 **Branch**: \`$branch\` ($modified modified files) | **Last commit**: $last_commit
-**Living docs**: \`docs/architecture.json\` (generated: $generated_at)
+**Tier 1 (relocated to Obsidian vault)**: \`develop/easy-cursor-swap/reference/architecture.json\` (generated: $generated_at) · repo keeps runbooks only (Tier 1/2/3 in vault \`reference/\`)
 
 ### Measured counts (Tier 1)
 $counts

@@ -32,12 +32,16 @@ case "$tool_name" in
 esac
 
 # --- Rule 4: Tier 3 HTML の Read 禁止 ---
+# Tier 1/3 docs は 2026-05-28 に Obsidian vault へ移設:
+#   develop/easy-cursor-swap/reference/{architecture,ui_map}.{json,html}
+# repo には runbook のみ残存 (Tier 1/2/3 は vault reference/)。
 if [ "$tool_name" = "Read" ]; then
   case "$rel_path" in
-    docs/architecture.html|docs/ui_map.html|*/docs/architecture.html|*/docs/ui_map.html)
-      echo "🚫 INVARIANT VIOLATION: docs/*.html (Tier 3) は AI 読み取り禁止 — 53kトークン無駄。" >&2
-      echo "   代わりに docs/architecture.json と docs/ui_map.json を読んでください (Tier 1)。" >&2
-      echo "   CLAUDE.md 'Documentation map' セクション参照。" >&2
+    *architecture.html|*ui_map.html)
+      echo "🚫 INVARIANT VIOLATION: Tier 3 *.html ビューアは AI 読み取り禁止 — 53kトークン無駄。" >&2
+      echo "   代わりに Obsidian vault の Tier 1 を読んでください:" >&2
+      echo "   develop/easy-cursor-swap/reference/architecture.json と ui_map.json。" >&2
+      echo "   repo 側は runbook のみ (Tier 1/2/3 は vault reference/)。" >&2
       exit 2
       ;;
   esac

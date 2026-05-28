@@ -171,7 +171,7 @@ Vue (UI) ──IPC──▶ Tauri commands ──▶ Rust modules ──▶ Wind
   automatically rolled back on crash (detected on next startup via a pending-snapshot file).
 - Cursor files live in `%USERPROFILE%\.custom_cursors\` and survive uninstallation.
 
-See [docs/architecture.md](docs/architecture.md) for details.
+Detailed module / IPC documentation is maintained in the maintainer's knowledge base outside this repository.
 
 ## Security Model
 
@@ -185,7 +185,7 @@ See [docs/architecture.md](docs/architecture.md) for details.
 | Image safety        | PNG metadata stripping (eXIf, iTXt, zTXt), SVG sanitisation             |
 | Transport           | rustls-tls (no OS TLS stack dependency)                                 |
 
-See [docs/architecture.md#security](docs/architecture.md#security) for the full model.
+The table above is the complete security model.
 
 ## Submitting Themes to the Official Index
 

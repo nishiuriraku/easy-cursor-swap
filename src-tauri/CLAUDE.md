@@ -28,7 +28,7 @@ Vue (UI) ──invoke()──▶ Tauri command (commands/) ──▶ Rust module
 | OS integration  | `tray.rs`, `hotkey.rs`, `autostart.rs`, `appusermodel.rs`, `accessibility.rs`, `environment.rs` (RDP/Citrix detection). Multi-instance lock via `tauri_plugin_single_instance` (no custom module). Dark mode is handled on the frontend (`useUiTheme` composable).                 |
 | Observability   | `logging.rs` (`redact_path` / `short_hash` PII helpers)                                                                                                                                                                                                                            |
 
-**Full file-by-file detail and exact module / IPC counts: `docs/architecture.json` → `backend.modules[]` and `backend.ipc_commands[]`, or `docs/file_inventory.md` section 1.**
+**Full file-by-file detail and exact module / IPC counts: Obsidian vault `develop/easy-cursor-swap/reference/architecture.json` → `backend.modules[]` and `backend.ipc_commands[]`, or the vault `reference/file_inventory.md` section 1.**
 
 ## Conventions
 
@@ -57,7 +57,7 @@ cargo bench                                       # criterion benches in benches
 2. Register it in the `invoke_handler` list in `lib.rs`.
 3. Add the matching payload type in `app/types/`.
 4. Add a `tracing::info!` log on entry; redact any PII.
-5. Update `docs/architecture.md` IPC inventory + `docs/file_inventory.md` (numbers must stay in sync) + `docs/architecture.json`, and re-embed via `node scripts/embed-arch-json.mjs`.
+5. Update the vault `reference/architecture.md` IPC inventory + `reference/file_inventory.md` (numbers must stay in sync) + `reference/architecture.json`. (The repo-side embed step `scripts/embed-arch-json.mjs` was retired 2026-05-28 when Tier 1/3 moved to the vault.)
 
 ## Hard rules (backend-side)
 

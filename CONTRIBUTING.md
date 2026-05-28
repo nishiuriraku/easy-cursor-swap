@@ -34,8 +34,7 @@ Windows 10 22H2+ / Windows 11 with Rust 1.82+ is required. Full command referenc
 
 - `app/` — Nuxt 4 / Vue 3 frontend (SPA)
 - `src-tauri/src/` — Rust backend (registry, cursor pipeline, marketplace, keystore, etc.)
-- `docs/` — living docs (`architecture.md` / `file_inventory.md`) + runbooks
-- See [`docs/architecture.md`](docs/architecture.md) for the IPC layout and module responsibility map.
+- `docs/` — operational runbooks only (release / signing / key rotation, etc.); architecture & spec docs are maintained in the maintainer's external knowledge base
 
 ## Coding conventions
 

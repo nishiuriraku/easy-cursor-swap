@@ -6,7 +6,7 @@ This file is loaded automatically when working under `app/`. Root `../CLAUDE.md`
 
 - `pages/` — `index.vue` (Library), `creator.vue`, `marketplace.vue`, `settings.vue` (4 pages; helpers in `index.helpers.ts` / `marketplace.helpers.ts`).
 - `components/{shell,library,creator,marketplace,settings,preview,panic,icons,ui}/` — domain-grouped SFCs. `nuxt.config.ts` sets `pathPrefix: false`, so reference components by file name (`<ThemeCard>`, not `<LibraryThemeCard>`). **Filenames in `components/` must stay globally unique.**
-- `composables/` — IPC wrapper (`useTauri`), domain state (themes / settings / keystore / updater / notify / ui-theme), Creator helpers, marketplace helpers, UI utilities. Vitest specs in `composables/__tests__/`. **Full list with descriptions: `docs/architecture.json` → `frontend.composables[]` and `docs/file_inventory.md` section 2-3.**
+- `composables/` — IPC wrapper (`useTauri`), domain state (themes / settings / keystore / updater / notify / ui-theme), Creator helpers, marketplace helpers, UI utilities. Vitest specs in `composables/__tests__/`. **Full list with descriptions: Obsidian vault `develop/easy-cursor-swap/reference/architecture.json` → `frontend.composables[]` (distilled `…/specs/*`) and the vault `reference/file_inventory.md` section 2-3.**
 - `locales/{ja,en}.ts` — keys typed `as const`; **must stay in parity** (CI gate via `scripts/check-i18n.mjs`).
 - `types/` — IPC payload types (`config.ts`, `theme.ts`, `marketplace.ts`, `githubAuth.ts`). Must mirror `serde`-derived Rust structs in `src-tauri/src/commands/`.
 
