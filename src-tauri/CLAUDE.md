@@ -57,7 +57,7 @@ cargo bench                                       # criterion benches in benches
 2. Register it in the `invoke_handler` list in `lib.rs`.
 3. Add the matching payload type in `app/types/`.
 4. Add a `tracing::info!` log on entry; redact any PII.
-5. Update the vault `reference/architecture.json` `backend.ipc_commands[]` + `meta.measured_counts` + `reference/file_inventory.md` (numbers must stay in sync). (Narrative `architecture.md` and the `scripts/embed-arch-json.mjs` embed step were retired 2026-05-28.)
+5. Update the vault `reference/architecture.json` `backend.ipc_commands[]` (the narrative entry: name / category / file / frontend_callers) + `reference/file_inventory.md` by hand, then run `node scripts/gen-architecture.mjs` to sync `meta.measured_counts` + `generated_at`. `verify-gate.sh` runs `gen-architecture.mjs --check` and goes red if the registered IPC count (from `generate_handler![]`) drifts from the json. (Narrative `architecture.md` and the `scripts/embed-arch-json.mjs` embed step were retired 2026-05-28.)
 
 ## Hard rules (backend-side)
 

@@ -76,12 +76,21 @@ When starting any new feature, refactor, or bug fix, always follow these steps i
 3. **Run `bash scripts/verify-gate.sh`** right before committing and confirm green.
 4. **Update docs in the same commit** (see policy below). Code-only commits that move source-of-truth without touching living docs are the main cause of doc rot.
 
+### Where new design work lands (development loop)
+
+The `superpowers/` and `legacy/` vault dirs are **frozen design history** (now excluded from Graph View / search) — do **not** add new files there. Capture ongoing work like this instead:
+
+- **While thinking / brainstorming** → append to the daily log `develop/easy-cursor-swap/log/YYYY-MM-DD.md` (one rolling file per day under the `log/` dir, via `obsidian create`/`append`). This replaces the old per-feature `superpowers/{plans,specs}/` 3-files-per-feature pattern.
+- **Once a design is confirmed** → promote the conclusion into the relevant `specs/<feature>/spec.md` 設計判断 block (the spec is the living home; the log is the scratchpad).
+- **Follow-ups / bugs / refactors discovered** → file in `develop/easy-cursor-swap/task.md` with a priority mark and a `[[specs/...]]` backlink.
+- **History stays in git** — don't hand-write changelogs of what you did into the vault; the commit message is the record.
+
 ## Documentation update policy
 
 Living docs must move with the code. Triggers and required updates:
 
 - **New / renamed / removed Rust file** → `reference/architecture.json` `backend.modules[]` + `reference/file_inventory.md`.
-- **Added / removed `#[tauri::command]`** → `reference/architecture.json` `backend.ipc_commands[]` + `meta.measured_counts` + `reference/file_inventory.md`. Numbers must stay in sync.
+- **Added / removed `#[tauri::command]`** → `reference/architecture.json` `backend.ipc_commands[]` (narrative, by hand) + `reference/file_inventory.md`. The **count** (`meta.measured_counts.tauri_ipc_commands`) is owned by `node scripts/gen-architecture.mjs` — run it instead of editing the number by hand. Drift is gated by `verify-gate.sh` (`gen-architecture.mjs --check`).
 - **Module split / merge** → `reference/architecture.json` `backend.modules[]` + `reference/file_inventory.md`.
 - **Startup sequence change** (`main.rs`) → `reference/architecture.json` `backend.startup_sequence[]`.
 - **New security invariant** → `reference/architecture.json` `critical_invariants[]` + `shared/invariants.md` + README "Security Model" if user-visible.
@@ -90,8 +99,8 @@ Living docs must move with the code. Triggers and required updates:
 - **Verification gate change** → `scripts/verify-gate.sh` only.
 - **Operational procedure change** → the corresponding runbook in `docs/`.
 - **User-visible behaviour / install flow / supported OS / security model change** → both `README.md` and `README.ja.md` in parity, plus `CHANGELOG.md` under `## [Unreleased]` with the right Keep-a-Changelog section.
-- **Any numeric / enumerated claim drift** — re-measure against the actual source (`grep -c` / `glob`) and update **every file that mentions the changed number in the same commit**: `README*.md` / `reference/file_inventory.md` / vault `reference/architecture.json` (the sole numeric home — `meta.measured_counts`). The CLAUDE.md files no longer hard-code counts, and `index.md` no longer carries a count table, so numeric drift is contained to `architecture.json`.
-- **Any change touching `reference/file_inventory.md`** → also bump `reference/architecture.json` `meta.generated_at` + sync `meta.measured_counts` + set `meta.doc_drift_warnings` accordingly. If the high-level structure changed, also hand-adjust `overview.canvas`. (Narrative `architecture.md`, the HTML viewers, and the `scripts/embed-arch-json.mjs` step were all retired 2026-05-28.)
+- **Any numeric / enumerated claim drift** — run `node scripts/gen-architecture.mjs`. It re-measures from source (`pub mod` in `lib.rs`, the `generate_handler![]` list in `commands/mod.rs`, composable/page/component globs, CI workflows) and surgically updates `reference/architecture.json` `meta.measured_counts` + `generated_at` **without reflowing the file's compact arrays**. It also reports name-level module/IPC drift (json narrative you must update by hand). `meta.measured_counts` is the sole numeric home; `README*.md` only mentions counts in prose — fix those in the same commit if they reference a changed number.
+- **Any change touching `reference/file_inventory.md`** → run `node scripts/gen-architecture.mjs` to refresh `meta.measured_counts` + `generated_at`; update `meta.doc_drift_warnings` narrative by hand if relevant. If the high-level structure changed, also hand-adjust `overview.canvas`. (Narrative `architecture.md`, the HTML viewers, and the `scripts/embed-arch-json.mjs` step were all retired 2026-05-28.)
 
 **Doc-only commits** are fine as standalone — use the `docs:` Conventional Commit prefix. Exempt from `scripts/verify-gate.sh` (see the Exception above).
 
