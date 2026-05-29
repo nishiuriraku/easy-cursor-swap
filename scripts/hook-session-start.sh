@@ -3,12 +3,11 @@
 # stdout の内容は Claude の context にそのまま入る
 set -e
 
-# All living docs live in the Obsidian vault as of 2026-05-28:
-# develop/easy-cursor-swap/reference/. The repo keeps operational runbooks only.
-# This hook reads the relocated architecture.json from the vault when present,
-# and silently no-ops elsewhere (CI, fresh clones).
-ARCH_JSON="$HOME/Workspace/Obsidian/develop/easy-cursor-swap/reference/architecture.json"
-if [ ! -f "$ARCH_JSON" ]; then
+# 正準は Layer1 markdown (specs/* + shared/* + reference/*.md)。数値は Layer3 生成物
+# develop/easy-cursor-swap/reference/index.json (gen-architecture.mjs が出力) を読む。
+# vault が無い環境 (CI, fresh clone) では silently no-op。
+INDEX_JSON="$HOME/Workspace/Obsidian/develop/easy-cursor-swap/reference/index.json"
+if [ ! -f "$INDEX_JSON" ]; then
   exit 0
 fi
 
@@ -23,25 +22,24 @@ if [ -f "$HOME/.custom_cursors/_pending_apply.snapshot" ]; then
   pending="⚠️  _pending_apply.snapshot が残存 — 前回の適用が異常終了した可能性。 reset_to_windows_default で復旧推奨。"
 fi
 
-# architecture.json から measured_counts を取得
+# index.json から measured_counts を取得 (トップレベル)
 counts=$(jq -r '
-  .meta.measured_counts |
+  .measured_counts |
   "- Rust modules (lib.rs): \(.rust_modules_in_lib_rs)\n" +
   "- Tauri IPC commands:    \(.tauri_ipc_commands)\n" +
   "- Composables:           \(.composables)\n" +
   "- Vue pages:             \(.pages_vue) (+ \(.pages_ts_helpers) helpers)\n" +
   "- Components total:      \(.components_total)\n" +
   "- CI workflows:          \(.ci_workflows)"
-' "$ARCH_JSON")
+' "$INDEX_JSON")
 
-generated_at=$(jq -r '.generated_at // .meta.generated_at // "?"' "$ARCH_JSON")
-drift_warnings=$(jq -r '.meta.doc_drift_warnings[0] // ""' "$ARCH_JSON" | head -c 200)
+generated_at=$(jq -r '.generated_at // "?"' "$INDEX_JSON")
 
 cat <<EOF
 ## EasyCursorSwap — Session start snapshot
 
 **Branch**: \`$branch\` ($modified modified files) | **Last commit**: $last_commit
-**Canonical docs (Obsidian vault)**: \`develop/easy-cursor-swap/reference/architecture.json\` (generated: $generated_at) · repo keeps runbooks only · human visual = \`overview.canvas\`
+**Canonical docs (Obsidian vault)**: Layer1 markdown — \`develop/easy-cursor-swap/{specs,shared,reference}/*.md\` (agent が grep する正準) · 数値は生成物 \`reference/index.json\` (generated: $generated_at) · human visual = \`overview.canvas\` + Bases + Graph
 
 ### Measured counts
 $counts
@@ -56,5 +54,5 @@ $counts
 
 $pending
 
-> Tip: 数値がコードと食い違ったら \`grep -c '#\\[tauri::command\\]' src-tauri/src/commands/**/*.rs\` で実測し、 architecture.json を更新してください。
+> Tip: 数値がコードと食い違ったら \`node scripts/gen-architecture.mjs\` で index.json を再生成してください (frontmatter↔コードのドリフトは --check が検出)。
 EOF

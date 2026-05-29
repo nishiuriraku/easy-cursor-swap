@@ -26,7 +26,7 @@ Skip sections that don't apply.
 
 - [ ] `bash scripts/verify-gate.sh` がローカルで緑 (cargo fmt / clippy -D warnings / cargo test --lib / prettier / vue-tsc / i18n parity / vitest)
 - [ ] UI 文言を追加/変更した場合は `app/locales/ja.ts` と `app/locales/en.ts` のキー数が一致する (`node scripts/check-i18n.mjs` 緑)
-- [ ] 新規 IPC コマンド / モジュール追加時は Obsidian vault の `reference/architecture.md` と `reference/file_inventory.md` を同期した
+- [ ] 新規 IPC コマンド / モジュール追加時は該当 spec の frontmatter (`ipc:` / `modules:`) + `reference/ipc-catalog.md` + `reference/file_inventory.md` を同期し、`node scripts/gen-architecture.mjs` で `reference/index.json` を再生成した
 - [ ] ユーザー可視動作 / インストールフロー / セキュリティモデルに影響する変更は `README.md` / `README.ja.md` 両方と `CHANGELOG.md`(`[Unreleased]`) を更新した
 - [ ] `Co-Authored-By` 行を含むコミットは AI コラボの場合のみ付与 (任意)
 
