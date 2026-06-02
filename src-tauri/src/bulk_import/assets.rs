@@ -231,6 +231,7 @@ pub fn bulk_resolve_inner(
     recursive: bool,
     job_id: &str,
     on_progress: Option<&dyn Fn(BulkImportProgress)>,
+    should_cancel: Option<&dyn Fn() -> bool>,
 ) -> Result<BulkResolveResult, AppError> {
     let files = collect_target_files(paths, recursive);
     if files.is_empty() {
@@ -244,6 +245,13 @@ pub fn bulk_resolve_inner(
     let mut total_bytes: u64 = 0;
 
     for (idx, path) in files.iter().enumerate() {
+        // 各ファイル処理の前にキャンセル要求を polling する。要求があれば
+        // 以降のファイルを処理せず即座に打ち切る。
+        if let Some(check) = should_cancel {
+            if check() {
+                return Err(AppError::BulkImportCancelled);
+            }
+        }
         if let Some(cb) = on_progress {
             cb(BulkImportProgress {
                 job_id: job_id.to_string(),
@@ -299,10 +307,21 @@ pub async fn bulk_resolve_assets(
     let app_clone = app.clone();
 
     let result = tauri::async_runtime::spawn_blocking(move || {
+        let registry = app_clone.state::<CancelRegistry>();
         let cb = |p: BulkImportProgress| {
             let _ = app_clone.emit("bulk-import-progress", p);
         };
-        bulk_resolve_inner(&req.paths, req.recursive, &req.job_id, Some(&cb))
+        // ループ各反復の先頭で「明示的に cancel されたか」を polling する。
+        // 未登録ジョブでは false を返す is_cancelled を使い、誤キャンセルを避ける
+        // (cursor_build/stream.rs と同じキャンセル意味論)。
+        let should_cancel = || registry.is_cancelled(&req.job_id);
+        bulk_resolve_inner(
+            &req.paths,
+            req.recursive,
+            &req.job_id,
+            Some(&cb),
+            Some(&should_cancel),
+        )
     })
     .await
     .map_err(|e| AppError::ImageProcessing(format!("join 失敗: {}", e)))?;
@@ -414,6 +433,7 @@ mod tests {
             false,
             "test-job",
             None,
+            None,
         )
         .unwrap();
         assert!(
@@ -442,6 +462,7 @@ mod tests {
             &[tmp.path().to_string_lossy().to_string()],
             false,
             "test-job-2",
+            None,
             None,
         )
         .unwrap();
@@ -499,5 +520,47 @@ mod tests {
         assert_eq!(ani_data.frame_pngs.len(), 1);
         assert!(!ani_data.is_legacy_raw_dib);
         assert_eq!(ani_data.per_step_durations_ms, vec![100]);
+    }
+
+    #[test]
+    fn bulk_resolve_returns_cancelled_when_flag_set() {
+        // should_cancel が true を返すと、ループはファイル処理を完了させず
+        // BulkImportCancelled で打ち切らねばならない (キャンセルボタンの実機能)。
+        let tmp = tempfile::tempdir().unwrap();
+        let one_pix = include_bytes!("../../tests/fixtures/1x1.png");
+        std::fs::write(tmp.path().join("a.png"), one_pix).unwrap();
+        std::fs::write(tmp.path().join("b.png"), one_pix).unwrap();
+
+        let cancel = || true;
+        let result = bulk_resolve_inner(
+            &[tmp.path().to_string_lossy().to_string()],
+            false,
+            "cancel-job",
+            None,
+            Some(&cancel),
+        );
+        match result {
+            Err(AppError::BulkImportCancelled) => {}
+            other => panic!("expected BulkImportCancelled, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn bulk_resolve_completes_when_cancel_flag_false() {
+        // should_cancel が常に false なら通常どおり完走する (誤キャンセルしない)。
+        let tmp = tempfile::tempdir().unwrap();
+        let one_pix = include_bytes!("../../tests/fixtures/1x1.png");
+        std::fs::write(tmp.path().join("a.png"), one_pix).unwrap();
+
+        let no_cancel = || false;
+        let result = bulk_resolve_inner(
+            &[tmp.path().to_string_lossy().to_string()],
+            false,
+            "live-job",
+            None,
+            Some(&no_cancel),
+        )
+        .unwrap();
+        assert_eq!(result.assets.len(), 1);
     }
 }
