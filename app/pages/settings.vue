@@ -400,6 +400,7 @@ function discardChanges() {
   applyConfigToLocal()
 }
 
+const { exportProfile: runExportProfile, importProfile: runImportProfile } = useProfileBackup()
 const profileBusy = ref(false)
 const profileMessage = ref<string | null>(null)
 
@@ -414,7 +415,7 @@ async function exportProfile() {
       filters: [{ name: 'EasyCursorSwap Profile', extensions: ['cursorprofile'] }],
     })
     if (!target) return
-    await invokeTauri<void>('export_profile', { path: target })
+    await runExportProfile(target)
     profileMessage.value = t('settings.profileExportSuccess', { target })
   } catch (err) {
     profileMessage.value = t('settings.profileExportFail', {
@@ -439,10 +440,7 @@ async function importProfile() {
       title: t('settings.profileImportAskTitle'),
       kind: 'warning',
     })
-    await invokeTauri<unknown>('import_profile', {
-      path: selected,
-      merge: !overwrite,
-    })
+    await runImportProfile(selected, !overwrite)
     profileMessage.value = t('settings.profileImportSuccess', {
       target: selected,
     })
