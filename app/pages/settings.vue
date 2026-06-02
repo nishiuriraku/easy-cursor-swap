@@ -125,11 +125,7 @@ async function onCursorSizeCommit(next: number) {
 
 async function refreshCursorSizeFromOs() {
   try {
-    const a11y = await invokeTauri<{
-      cursor_base_size: number
-      cursor_size_slider: number
-      cursor_type: number
-    }>('get_accessibility_conflicts')
+    const a11y = await useAccessibility().getAccessibilityConflicts()
     cursorSizeSlider.value = dwordToSlider(a11y?.cursor_base_size ?? CURSOR_SIZE_MIN_DWORD)
     cursorSizeSliderRaw.value = a11y?.cursor_size_slider ?? 1
     cursorTypeRaw.value = a11y?.cursor_type ?? 0
