@@ -74,7 +74,8 @@ When starting any new feature, refactor, or bug fix, always follow these steps i
 1. **Invoke the relevant skill** via the `Skill` tool if there's even a 1% chance one applies (e.g. `superpowers:brainstorming`, `superpowers:test-driven-development`, `superpowers:systematic-debugging`, `rust-skills:m01-ownership`).
 2. **Read the canonical docs before writing** — the relevant Layer1 markdown in the Obsidian vault (`develop/easy-cursor-swap/specs/<NN-slug>/<NN-slug>.md` + `shared/*.md` + `reference/*.md`); the agent SessionStart snapshot already injects counts from `index.json`. Do NOT read `overview.canvas` (human visual aid). Read `reference/file_inventory.md` only when per-file detail is needed. Follow `file` pointers down to real sources and match existing conventions. Update `locales/{ja,en}.ts` in parity. Prefer extending an existing composable / module over duplication.
 3. **Run `bash scripts/verify-gate.sh`** right before committing and confirm green.
-4. **Update docs in the same commit** (see policy below). Code-only commits that move source-of-truth without touching living docs are the main cause of doc rot.
+4. **(UI を変更したとき) `tauri-visual-review` スキルで実機レビュー** — `npm run tauri:dev` を起動し Tauri MCP Bridge (port 9223) 経由で「動作確認 (起動 / コンソールエラー / 主要フロー / IPC 応答) + ビジュアルリグレッション (`git stash` + HMR で before/after を構造シグネチャ diff) + 視覚バグ批評 (スクショ目視)」を行い、`C:\tmp\ecs-visual-review\<run-id>\report.md` に出す (`/visual-review` でも起動可)。**助言であってゲートではない** — 実機・ディスプレイ・debug ビルドが要るので `verify-gate.sh`/CI には含めない。Rust のみ / 設定変更でフロントの見た目に影響しないなら省略可。スキル実体はローカル (`~/.claude/skills/tauri-visual-review/`、git 非追跡) なので、フローの正準記録はこの CLAUDE.md 側に置く。
+5. **Update docs in the same commit** (see policy below). Code-only commits that move source-of-truth without touching living docs are the main cause of doc rot.
 
 ### Where new design work lands (development loop)
 
