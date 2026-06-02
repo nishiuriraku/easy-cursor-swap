@@ -36,10 +36,6 @@ pub const PUBKEY_BASE_URL: &str =
 /// HTTP リクエストのタイムアウト。
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
-/// `.cursorpack` ダウンロードサイズの上限 (50 MB)。
-/// `config.json` のセキュリティ閾値と同期させる予定。
-const MAX_DOWNLOAD_BYTES: u64 = 50 * 1024 * 1024;
-
 /// `index.json` のスキーマ。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MarketplaceIndex {
@@ -214,8 +210,10 @@ impl MarketplaceClient {
 
         let verifying_key = decode_verifying_key(pubkey_b64)?;
 
-        // 3. ZIP をダウンロード (サイズ上限つき)
-        let bytes = Self::download_with_limit(&req.download_url, MAX_DOWNLOAD_BYTES).await?;
+        // 3. ZIP をダウンロード (サイズ上限つき。圧縮サイズ上限の SoT は config.rs)
+        use crate::config::DEFAULT_MAX_PACK_COMPRESSED_SIZE;
+        let bytes =
+            Self::download_with_limit(&req.download_url, DEFAULT_MAX_PACK_COMPRESSED_SIZE).await?;
 
         // 4. SHA-256 整合性チェック
         let actual_sha256 = hex::encode(Sha256::digest(&bytes));
