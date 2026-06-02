@@ -11,6 +11,7 @@
  */
 import type { ThemeCardData } from '~/types/theme'
 import { mapLocalSummaryToCard, type IpcThemeSummary } from '~/pages/index.helpers'
+import type { IpcWindowsScheme } from '~/composables/useWindowsSchemes'
 
 const { t, locale } = useI18n()
 // UiIcon / ThemeCard / ApplyModal は Nuxt の自動インポートで解決される。
@@ -59,6 +60,7 @@ const {
   inspectCursorpack: inspectCursorpackIpc,
   importCursorpack: importCursorpackIpc,
 } = useThemes()
+const { listSchemes, applyScheme, exportSchemeAsCursorpack } = useWindowsSchemes()
 
 // インポート衝突ダイアログ用
 interface ConflictPending {
@@ -153,7 +155,7 @@ async function confirmApply(id: string) {
     // Windows システムスキームは別 IPC 経路で適用する。ID が `windows:` プレフィックス
     // の場合は UUID パースエラーを避けるためにこちらを呼ぶ。
     if (target?.kind === 'system') {
-      await invokeTauri<void>('apply_windows_scheme', { name: target.name })
+      await applyScheme(target.name)
     } else {
       await applyThemeIpc(id)
     }
@@ -299,11 +301,7 @@ async function exportTheme(id: string) {
       // Windows レジストリスキームはローカルテーマディレクトリを持たないので
       // 専用の export_windows_scheme_as_cursorpack を経由する。`%SystemRoot%`
       // 配下の .cur / .ani をそのまま zip 化する設計。
-      const result = await invokeTauri<{ theme_id: string; size_bytes: number }>(
-        'export_windows_scheme_as_cursorpack',
-        { name: target.name, outputPath },
-      )
-      bytes = result?.size_bytes ?? null
+      bytes = await exportSchemeAsCursorpack(target.name, outputPath)
     } else {
       bytes = await repackageThemeIpc(id, outputPath)
     }
@@ -462,15 +460,6 @@ function sortBy(key: SortKey) {
   }
 }
 
-/** `list_windows_schemes` のレスポンス。Windows レジストリ HKCU\Cursors\Schemes 由来。 */
-interface IpcWindowsScheme {
-  name: string
-  cursor_paths: Record<string, string>
-  role_count: number
-  /** Rust 側で `paths_match_current_registry` 判定済み。現在実態と一致するなら true。 */
-  is_active?: boolean
-}
-
 /**
  * Windows レジストリのスキームを ThemeCardData に変換する。
  *
@@ -530,7 +519,7 @@ async function loadThemes(opts: { silent?: boolean } = {}) {
         console.warn('[Library] get_themes failed:', err)
         return null
       }),
-      invokeTauri<IpcWindowsScheme[]>('list_windows_schemes').catch((err) => {
+      listSchemes().catch((err) => {
         console.warn('[Library] list_windows_schemes failed (non-fatal):', err)
         return [] as IpcWindowsScheme[]
       }),
