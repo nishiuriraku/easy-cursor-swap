@@ -43,10 +43,15 @@ for all 17 Windows cursor roles, 6 DPI sizes, and Ed25519-signed theme distribut
 Download the latest installer from the
 [Releases page](https://github.com/nishiuriraku/easy-cursor-swap/releases):
 
-| File                           | Description                                  |
-| ------------------------------ | -------------------------------------------- |
-| `EasyCursorSwap_x64-setup.exe` | NSIS installer (per-user, no admin required) |
-| `EasyCursorSwap_x64_en-US.msi` | MSI installer                                |
+| File                           | Description                                                  |
+| ------------------------------ | ----------------------------------------------------------- |
+| `EasyCursorSwap_x64-setup.exe` | NSIS installer (per-user, no admin; English/Japanese setup) |
+| `EasyCursorSwap_x64_ja-JP.msi` | MSI installer (for silent / GPO deployment)                 |
+
+> The NSIS installer is recommended for most users — it lets you pick English or
+> Japanese during setup. The MSI ships with a Japanese setup UI and is provided
+> for silent / managed deployment. The app's own UI language is independent of the
+> installer and follows your selection inside the app.
 
 Both are signed with a minisign key (verified by the built-in updater).
 See [docs/updater_signing.md](docs/updater_signing.md) for signature verification instructions.

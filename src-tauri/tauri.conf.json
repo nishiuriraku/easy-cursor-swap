@@ -61,7 +61,6 @@
       },
       "wix": {
         "language": {
-          "en-US": {},
           "ja-JP": {
             "localePath": "wix/ja-JP.wxl"
           }
