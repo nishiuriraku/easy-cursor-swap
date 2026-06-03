@@ -231,8 +231,12 @@ async function onDownloadUpdate() {
   // メジャーバージョン跨ぎ確認
   if (pendingUpdateVersion.value) {
     const appInfo = await useAppInfo().load()
+    // get_app_info が取れない場合 (通常 Tauri 起動中は発生しない) は、空バージョンで
+    // メジャー跨ぎを誤判定しないよう中断する。直接 invoke していた頃の throw→中断と
+    // 同じ「現在バージョン不明ならダウンロードへ進まない」挙動を維持する。
+    if (!appInfo) return
     const isMajorJump = await invokeTauri<boolean>('check_update_is_major_jump', {
-      currentVersion: appInfo?.version ?? '',
+      currentVersion: appInfo.version,
       newVersion: pendingUpdateVersion.value,
     })
     if (isMajorJump) {
