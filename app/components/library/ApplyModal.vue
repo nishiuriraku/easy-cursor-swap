@@ -12,16 +12,11 @@
  */
 import type { ThemeCardData } from '~/types/theme'
 import { CURSOR_ROLES } from '~/components/icons/CursorIcons'
+import type { AccessibilityConflicts } from '~/composables/useAccessibility'
 
 const { t } = useI18n()
 
-interface AccessibilityConflicts {
-  mouse_sonar_enabled: boolean
-  high_contrast_enabled: boolean
-  cursor_base_size: number
-  has_conflicts: boolean
-}
-
+const { getAccessibilityConflicts } = useAccessibility()
 const conflicts = ref<AccessibilityConflicts | null>(null)
 const previewMap = ref<Record<string, string> | null>(null)
 const { getMap } = useThemePreviews()
@@ -38,7 +33,7 @@ const conflictMessages = computed(() => {
 
 onMounted(async () => {
   try {
-    conflicts.value = await invokeTauri<AccessibilityConflicts>('get_accessibility_conflicts')
+    conflicts.value = await getAccessibilityConflicts()
   } catch {
     // 取得失敗時はバナー非表示 (フェイルセーフ)
     conflicts.value = null

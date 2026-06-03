@@ -10,6 +10,7 @@
  * 依存: useBulkImport, creatorAssets, meta refs, 各種 UI ref。
  */
 import type { Ref } from 'vue'
+import { BulkImportCancelledError } from './useBulkImport'
 import type { useBulkImport, ResolvedAsset, ParsedCursorpack } from './useBulkImport'
 import type { useCreatorAssets } from './useCreatorAssets'
 import type { ApplyPayload } from './useBulkImportPreviewState'
@@ -118,6 +119,11 @@ export function useCreatorBulkImportFlow(deps: CreatorBulkImportFlowDeps) {
         importMessage.value = `${r.failures.length} 件のファイルをスキップしました`
       }
     } catch (err) {
+      // ユーザーによるキャンセルは「失敗」ではないので静かに中断する。
+      if (err instanceof BulkImportCancelledError) {
+        importMessage.value = null
+        return
+      }
       importMessage.value = `一括インポート失敗: ${err instanceof Error ? err.message : String(err)}`
     }
   }

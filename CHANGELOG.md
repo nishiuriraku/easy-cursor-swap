@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Windows MSI インストーラーの英語 (en-US) ロケール版の生成を取りやめ、MSI は日本語 (ja-JP) 版のみを配布するようになりました。NSIS インストーラー (`EasyCursorSwap_*-setup.exe`) は従来どおり 1 本でインストール時に日本語 / 英語を選択できるため、英語環境のユーザーも引き続き英語のセットアップを利用できます (アプリ本体の表示言語はインストーラーの種類とは独立)。`tauri.conf.json` の `bundle.windows.wix.language` から `en-US` キーを除外し、`release.yml` の Release ノートと README (en / ja) のインストール表を「二言語 NSIS + ja-JP MSI」の案内に更新。自動アップデートへの影響はなし — updater は NSIS / MSI を個別キーで配信し、更新はサイレント実行のため MSI の UI 言語に依存しない (削除後はデフォルトキー `windows-x86_64` が ja-JP MSI に切り替わるのみ)。
+
 ## [0.0.5] - 2026-05-24
 
 カーソルサイズ機能と共通 UI コンポーネント統一を 2 つの柱とするリリース。Windows 全体のマウスポインターサイズをアプリ内スライダーから即時変更できるようになり (`LoadImageW` + `SetSystemCursor` × 14 役割の直接適用)、フロントエンドの全 11 モーダルが新 `UiModal` shell に統一されて focus trap / Esc / backdrop / Tab 循環の挙動が完全一貫した。Win11 ease-of-access (eoa) pipeline 起動を物理的に防ぐ one-way write architecture と、PR review 由来の 5 件の防御深化 fix も含む。HKCU 限定 / 適用トランザクション性 / アーカイブ検閲 / PII レダクション / `v-html` 不採用 の 5 大不変条件はすべて維持。

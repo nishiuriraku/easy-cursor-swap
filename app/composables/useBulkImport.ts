@@ -79,10 +79,24 @@ interface BulkImportProgress {
   message: string | null
 }
 
+/**
+ * ユーザー操作 (cancel ボタン) による一括インポート中断を表す型。
+ * 通常の失敗 (エラー表示) と区別し、UI 側で「失敗」トーストを出さないために使う。
+ */
+export class BulkImportCancelledError extends Error {
+  constructor() {
+    super('bulk import cancelled')
+    this.name = 'BulkImportCancelledError'
+  }
+}
+
 export function useBulkImport() {
   const busy = ref(false)
   const progress = ref<BulkImportProgress | null>(null)
   const currentJobId = ref<string | null>(null)
+  /** 直近に cancel() が要求されたジョブ ID。resolveAssets の reject を
+   *  「失敗」と「中断」に区別するために使う。 */
+  const cancelledJobId = ref<string | null>(null)
 
   function newJobId(prefix: string) {
     return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -105,12 +119,19 @@ export function useBulkImport() {
     progress.value = null
     const jobId = newJobId('bulk')
     currentJobId.value = jobId
+    cancelledJobId.value = null
     const unlisten = await subscribeProgress(jobId)
     try {
       const r = await invokeTauri<BulkResolveResult>('bulk_resolve_assets', {
         req: { paths, recursive, jobId },
       })
       return r ?? { assets: [], failures: [] }
+    } catch (e) {
+      // このジョブに対して cancel() が呼ばれていれば「失敗」ではなく「中断」。
+      if (cancelledJobId.value === jobId) {
+        throw new BulkImportCancelledError()
+      }
+      throw e
     } finally {
       unlisten()
       currentJobId.value = null
@@ -139,6 +160,7 @@ export function useBulkImport() {
 
   async function cancel() {
     if (!currentJobId.value) return
+    cancelledJobId.value = currentJobId.value
     try {
       await invokeTauri('cancel_bulk_import', { jobId: currentJobId.value })
     } catch {

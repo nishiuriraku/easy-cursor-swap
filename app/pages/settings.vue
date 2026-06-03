@@ -11,7 +11,6 @@
  */
 import type { SettingsSearchEntry } from '~/composables/useSettingsSearch'
 import type { GithubAccount } from '~/types/githubAuth'
-import type { CrashSubmitSummary } from '~/types/config'
 
 const { t, locale } = useI18n()
 
@@ -125,11 +124,7 @@ async function onCursorSizeCommit(next: number) {
 
 async function refreshCursorSizeFromOs() {
   try {
-    const a11y = await invokeTauri<{
-      cursor_base_size: number
-      cursor_size_slider: number
-      cursor_type: number
-    }>('get_accessibility_conflicts')
+    const a11y = await useAccessibility().getAccessibilityConflicts()
     cursorSizeSlider.value = dwordToSlider(a11y?.cursor_base_size ?? CURSOR_SIZE_MIN_DWORD)
     cursorSizeSliderRaw.value = a11y?.cursor_size_slider ?? 1
     cursorTypeRaw.value = a11y?.cursor_type ?? 0
@@ -235,7 +230,11 @@ async function onDownloadUpdate() {
 
   // メジャーバージョン跨ぎ確認
   if (pendingUpdateVersion.value) {
-    const appInfo = await invokeTauri<{ version: string }>('get_app_info')
+    const appInfo = await useAppInfo().load()
+    // get_app_info が取れない場合 (通常 Tauri 起動中は発生しない) は、空バージョンで
+    // メジャー跨ぎを誤判定しないよう中断する。直接 invoke していた頃の throw→中断と
+    // 同じ「現在バージョン不明ならダウンロードへ進まない」挙動を維持する。
+    if (!appInfo) return
     const isMajorJump = await invokeTauri<boolean>('check_update_is_major_jump', {
       currentVersion: appInfo.version,
       newVersion: pendingUpdateVersion.value,
@@ -284,11 +283,12 @@ const updates = ref({
 // 戻り長、メッセージは送信/クリア後のユーザー向けトースト相当の文字列。
 const crashReportsCount = ref(0)
 const crashBusy = ref(false)
+const { listCrashReports, submitCrashReports, clearCrashReports } = useCrashReports()
 const crashMessage = ref<string | null>(null)
 
 async function loadCrashReports() {
   try {
-    const reports = await invokeTauri<unknown[]>('list_crash_reports')
+    const reports = await listCrashReports()
     crashReportsCount.value = reports?.length ?? 0
   } catch (err) {
     crashMessage.value = t('settings.crashLoadFailed', {
@@ -301,7 +301,7 @@ async function onSubmitCrashReports() {
   crashBusy.value = true
   crashMessage.value = null
   try {
-    const summary = await invokeTauri<CrashSubmitSummary>('submit_crash_reports')
+    const summary = await submitCrashReports()
     if (summary.sent === 0 && summary.failed === 0 && summary.skipped === 0) {
       // 全部 0 のときは「opt-in OFF」か「ビルド時 env 未設定」のどちらかだが、
       // フロントからは区別できないため crash_reporting フラグで判定する。
@@ -327,7 +327,7 @@ async function onClearCrashReports() {
   crashBusy.value = true
   crashMessage.value = null
   try {
-    const removed = await invokeTauri<number>('clear_crash_reports')
+    const removed = await clearCrashReports()
     crashMessage.value = t('settings.crashClearedCount', { count: removed })
     await loadCrashReports()
   } catch (err) {
@@ -404,6 +404,7 @@ function discardChanges() {
   applyConfigToLocal()
 }
 
+const { exportProfile: runExportProfile, importProfile: runImportProfile } = useProfileBackup()
 const profileBusy = ref(false)
 const profileMessage = ref<string | null>(null)
 
@@ -418,7 +419,7 @@ async function exportProfile() {
       filters: [{ name: 'EasyCursorSwap Profile', extensions: ['cursorprofile'] }],
     })
     if (!target) return
-    await invokeTauri<void>('export_profile', { path: target })
+    await runExportProfile(target)
     profileMessage.value = t('settings.profileExportSuccess', { target })
   } catch (err) {
     profileMessage.value = t('settings.profileExportFail', {
@@ -443,10 +444,7 @@ async function importProfile() {
       title: t('settings.profileImportAskTitle'),
       kind: 'warning',
     })
-    await invokeTauri<unknown>('import_profile', {
-      path: selected,
-      merge: !overwrite,
-    })
+    await runImportProfile(selected, !overwrite)
     profileMessage.value = t('settings.profileImportSuccess', {
       target: selected,
     })
@@ -632,7 +630,7 @@ async function onOpenWindowsCursorSettings() {
     // **正しい URI** は `easeofaccess-mousepointer` (= マウスポインターとタッチ)。
     // `easeofaccess-cursor` は **テキストカーソル (挿入点)** ページのため別ページに飛ぶ。
     // Microsoft 公式: https://learn.microsoft.com/windows/apps/develop/launch/launch-settings
-    await invokeTauri('open_url', { url: 'ms-settings:easeofaccess-mousepointer' })
+    await useExternalUrl().openExternalUrl('ms-settings:easeofaccess-mousepointer')
   } catch (err) {
     console.warn('[Settings] open ms-settings:easeofaccess-mousepointer failed:', err)
   }
