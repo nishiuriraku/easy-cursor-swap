@@ -16,23 +16,23 @@ EasyCursorSwap (`package.json` name: `easy-cursor-swap`) — a Windows-only desk
 
 ## Documentation map
 
-`docs/` consists of **Living state docs** (descriptions of the current code) and **Operational runbooks**. Living docs are authoritative — if they disagree with the code, fix the docs.
+**All living state docs live in the Obsidian vault** (`<USER_HOME>\Workspace\Obsidian`, under `develop/easy-cursor-swap/`). Repo `docs/` keeps **operational runbooks only**. 3-layer model (2026-05-29 redesign v2):
 
-| Tier                                          | Files                                             | Who reads it                                                                                                                                                                                               |
-| --------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **1. Required for AI (canonical for agents)** | `docs/architecture.json` + `docs/ui_map.json`     | AI/agents only need these two files for full coverage of structure / IPC / UI interactions / security invariants (~27k tokens total). **Read these first** — module / IPC / composable counts live inside. |
-| **2. Optional for AI / preferred for humans** | `docs/architecture.md` + `docs/file_inventory.md` | AI reads only when narrative / refactor history / why-context is needed.                                                                                                                                   |
-| **3. Humans only (visual viewer)**            | `docs/architecture.html` + `docs/ui_map.html`     | **AI must NOT Read these.** Their embedded JSON is identical to Tier 1; opening them wastes ~53k tokens for zero added information.                                                                        |
+| Layer                                          | What                                                                                                                                                                                   | Who reads it                                                                                                     |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **Layer1 正準 (markdown, hand-written)**       | `specs/<NN-slug>/<NN-slug>.md` (14 feature specs, folder-note form) + `shared/*.md` (7 cross-cutting) + `reference/{backend-overview,frontend-overview,ipc-catalog,file_inventory}.md` | **Agents grep these first.** Each spec's frontmatter carries `ipc:` / `modules:` / `invariants:` ownership maps. |
+| **Layer2 人間ナビ**                            | `bases/*.base` + `overview.canvas` + Obsidian Graph View + `index.md`                                                                                                                  | Humans. **AI must NOT read `.canvas` / `.base`** (frontmatter projections, redundant with Layer1 markdown).      |
+| **Layer3 機械マニフェスト (生成・手書き禁止)** | `reference/index.json` (measured_counts + module/IPC/invariant → note maps) + `reference/ui-map.json` (197 UI interactions, grep 用)                                                   | Tools (SessionStart hook / verify-gate). `scripts/gen-architecture.mjs` が出力。                                 |
 
-**Operational runbooks** (procedure-only): `docs/release_procedure.md` / `updater_signing.md` / `authenticode_signing.md` / `distribution.md` / `key_rotation.md` / `author_registration.md` / `code_signing_policy.md`.
+**Operational runbooks** (procedure-only, in repo `docs/`): `docs/release_procedure.md` / `updater_signing.md` / `authenticode_signing.md` / `distribution.md` / `key_rotation.md` / `author_registration.md` / `code_signing_policy.md`.
 
-When documents disagree, **Tier 2 prose is authoritative**; Tier 1 JSON is the structured mirror agents consume. Tier 3 HTML is regenerated from JSON via `node scripts/embed-arch-json.mjs` — never hand-edit.
+When documents disagree, the **Layer1 markdown** is canonical; `reference/index.json` is a generated projection (never hand-edit it). The Tier 1/2/3 system was abolished 2026-05-28; `architecture.json` and the narrative `architecture.md` + HTML viewers were retired (architecture.json on 2026-05-29 in redesign v2, replaced by Layer1 markdown + generated `index.json`). Human visual = `overview.canvas` + Graph + Bases.
 
-> Internal design records (the original-plan documents formerly in `docs/legacy/` and the per-feature work logs in `docs/superpowers/`) were removed from history before the v0.1.0 release. They are maintained locally only.
+> Design history — the original-plan documents (formerly `docs/legacy/`) and per-feature work logs (formerly `docs/superpowers/`) — was moved to the Obsidian vault on 2026-05-28: `develop/easy-cursor-swap/legacy/` and `…/superpowers/`. Both were always git-untracked / removed from history before v0.1.0.
 
 ## Critical invariants (cross-cutting)
 
-These apply regardless of which side you're working on. Full list (including module-specific ones) is in `docs/architecture.json` → `critical_invariants[]`.
+These apply regardless of which side you're working on. Full list (including module-specific ones) is in the Obsidian vault `develop/easy-cursor-swap/shared/invariants.md` (Layer1 canonical home; `invariants:` frontmatter lists all ids).
 
 - **HKCU only.** Never touch HKLM or anything that triggers UAC.
 - **Apply is transactional.** `registry/mod.rs` writes a snapshot to `~/.custom_cursors/_pending_apply.snapshot` before mutating, deletes it on success. On startup, a leftover snapshot triggers auto-rollback. `_initial_snapshot.json` (first-run) is restored by the panic button (`Ctrl+Alt+Shift+R`).
@@ -63,7 +63,7 @@ cargo test --manifest-path src-tauri/Cargo.toml --lib
 bash scripts/verify-gate.sh
 ```
 
-Edit `scripts/verify-gate.sh` directly to change gate steps (do **not** re-document them here or in `docs/architecture.md`). To validate installer builds as well, additionally run `npm run tauri:build`.
+Edit `scripts/verify-gate.sh` directly to change gate steps (do **not** re-document them here or in the vault docs). To validate installer builds as well, additionally run `npm run tauri:build`.
 
 **Exception — docs-only commits skip the gate.** If a commit touches only `CLAUDE.md` (root or sub-dirs) / `README*.md` / anything under `docs/` / `CHANGELOG.md` / community markdown (`SUPPORT.md` / `CODE_OF_CONDUCT.md` / `SECURITY.md` / `CONTRIBUTING.md`), and nothing under `app/`, `src-tauri/`, `scripts/`, `.github/`, `package.json`, `nuxt.config.ts`, the gate is not required. Mark with `docs:` Conventional Commit prefix.
 
@@ -72,29 +72,36 @@ Edit `scripts/verify-gate.sh` directly to change gate steps (do **not** re-docum
 When starting any new feature, refactor, or bug fix, always follow these steps in order:
 
 1. **Invoke the relevant skill** via the `Skill` tool if there's even a 1% chance one applies (e.g. `superpowers:brainstorming`, `superpowers:test-driven-development`, `superpowers:systematic-debugging`, `rust-skills:m01-ownership`).
-2. **Read Tier 1 docs before writing** (`docs/architecture.json` + `docs/ui_map.json`). Do NOT read Tier 3 `.html`. Read Tier 2 `.md` only when narrative is needed. Follow `file` pointers down to real sources and match existing conventions. Update `locales/{ja,en}.ts` in parity. Prefer extending an existing composable / module over duplication.
+2. **Read the canonical docs before writing** — the relevant Layer1 markdown in the Obsidian vault (`develop/easy-cursor-swap/specs/<NN-slug>/<NN-slug>.md` + `shared/*.md` + `reference/*.md`); the agent SessionStart snapshot already injects counts from `index.json`. Do NOT read `overview.canvas` (human visual aid). Read `reference/file_inventory.md` only when per-file detail is needed. Follow `file` pointers down to real sources and match existing conventions. Update `locales/{ja,en}.ts` in parity. Prefer extending an existing composable / module over duplication.
 3. **Run `bash scripts/verify-gate.sh`** right before committing and confirm green.
-4. **Update docs in the same commit** (see policy below). Code-only commits that move source-of-truth without touching living docs are the main cause of doc rot.
+4. **(UI を変更したとき) `tauri-visual-review` スキルで実機レビュー** — `npm run tauri:dev` を起動し Tauri MCP Bridge (port 9223) 経由で「動作確認 (起動 / コンソールエラー / 主要フロー / IPC 応答) + ビジュアルリグレッション (`git stash` + HMR で before/after を構造シグネチャ diff) + 視覚バグ批評 (スクショ目視)」を行い、`C:\tmp\ecs-visual-review\<run-id>\report.md` に出す (`/visual-review` でも起動可)。**助言であってゲートではない** — 実機・ディスプレイ・debug ビルドが要るので `verify-gate.sh`/CI には含めない。Rust のみ / 設定変更でフロントの見た目に影響しないなら省略可。スキル実体はローカル (`~/.claude/skills/tauri-visual-review/`、git 非追跡) なので、フローの正準記録はこの CLAUDE.md 側に置く。
+5. **Update docs in the same commit** (see policy below). Code-only commits that move source-of-truth without touching living docs are the main cause of doc rot.
+
+### Where new design work lands (development loop)
+
+The `superpowers/` and `legacy/` vault dirs are **frozen design history** (now excluded from Graph View / search) — do **not** add new files there. Capture ongoing work like this instead:
+
+- **While thinking / brainstorming** → append to the daily log `develop/easy-cursor-swap/log/YYYY-MM-DD.md` (one rolling file per day under the `log/` dir, via `obsidian create`/`append`). This replaces the old per-feature `superpowers/{plans,specs}/` 3-files-per-feature pattern.
+- **Once a design is confirmed** → promote the conclusion into the relevant `specs/<feature>/spec.md` 設計判断 block (the spec is the living home; the log is the scratchpad).
+- **Follow-ups / bugs / refactors discovered** → file in `develop/easy-cursor-swap/task.md` with a priority mark and a `[[specs/...]]` backlink.
+- **History stays in git** — don't hand-write changelogs of what you did into the vault; the commit message is the record.
 
 ## Documentation update policy
 
 Living docs must move with the code. Triggers and required updates:
 
-- **New / renamed / removed Rust file** → `docs/file_inventory.md` section 1 (+ `docs/architecture.md` "Backend layout" if module boundary changed).
-- **Added / removed `#[tauri::command]`** → `docs/architecture.md` IPC inventory + `docs/file_inventory.md`. Numbers must stay in sync.
-- **Module split / merge** → `docs/architecture.md` responsibility map + Backend layout + refactor tracking, plus `docs/file_inventory.md`.
-- **Startup sequence change** (`main.rs`) → `docs/architecture.md` Startup sequence list.
-- **New security invariant** → `docs/architecture.md` Security table + README "Security Model" if user-visible.
-- **New / changed Vue page, composable, or component sub-directory** → `docs/architecture.md` Frontend layout + Page→Composable→IPC table, and `docs/file_inventory.md`.
+- **New / renamed / removed Rust file** → `reference/backend-overview.md` (if infra: main/lib/errors/config/logging/cancel_registry) OR the owning `specs/<NN-slug>/<NN-slug>.md` `modules:` frontmatter + `reference/file_inventory.md`.
+- **Added / removed `#[tauri::command]`** → update the owning `specs/<NN-slug>/<NN-slug>.md` `ipc:` frontmatter + `reference/ipc-catalog.md` table + `reference/file_inventory.md`. The **count** is owned by `node scripts/gen-architecture.mjs` (regenerates `reference/index.json` `measured_counts`). Drift is gated by `verify-gate.sh` (`gen-architecture.mjs --check`).
+- **Module split / merge** → the owning `specs/<NN-slug>/<NN-slug>.md` `modules:` frontmatter + `reference/backend-overview.md` + `reference/file_inventory.md`.
+- **Startup sequence change** (`main.rs`) → `reference/backend-overview.md` startup sequence section.
+- **New security invariant** → `shared/invariants.md` (canonical home, `invariants:` frontmatter lists all ids) + the owning spec's `invariants:` frontmatter + README "Security Model" if user-visible.
+- **New / changed Vue page, composable, or component sub-directory** → `reference/frontend-overview.md` + `reference/ui-map.json` + the relevant `frontend/<page>.md` spec + `reference/file_inventory.md`.
 - **Tailwind / global CSS pattern change** → `app/CLAUDE.md` CSS subsection.
 - **Verification gate change** → `scripts/verify-gate.sh` only.
 - **Operational procedure change** → the corresponding runbook in `docs/`.
 - **User-visible behaviour / install flow / supported OS / security model change** → both `README.md` and `README.ja.md` in parity, plus `CHANGELOG.md` under `## [Unreleased]` with the right Keep-a-Changelog section.
-- **Any numeric / enumerated claim drift in the living-doc ring** — re-measure against the actual source (`grep -c` / `glob`) and update **every file in the ring that mentions the changed number in the same commit** (`README*.md` / `docs/architecture.md` / `docs/file_inventory.md` / `docs/architecture.json`). The CLAUDE.md files no longer hard-code module / IPC / composable counts — they reference `docs/architecture.json`, so doc rot from numeric drift is contained to the documentation ring.
-- **Any change touching `docs/architecture.md` or `docs/file_inventory.md`** → also update `docs/architecture.json` (bump `meta.generated_at`, sync `meta.measured_counts`, update `meta.doc_drift_warnings` to `["No known drift as of YYYY-MM-DD (re-measured)."]` or list remaining drifts) and re-embed into `docs/architecture.html`:
-  ```bash
-  node scripts/embed-arch-json.mjs
-  ```
+- **Any numeric / enumerated claim drift** — run `node scripts/gen-architecture.mjs`. It re-measures from source (`pub mod` in `lib.rs`, the `generate_handler![]` list in `commands/mod.rs`, composable/page/component globs, CI workflows) and regenerates `reference/index.json` `measured_counts` + `generated_at` from code + frontmatter ownership maps. It also reports name-level module/IPC drift (Layer1 markdown you must update by hand). `reference/index.json` `measured_counts` is the sole numeric home; `README*.md` only mentions counts in prose — fix those in the same commit if they reference a changed number.
+- **Any change touching `reference/file_inventory.md`** → run `node scripts/gen-architecture.mjs` to refresh `reference/index.json` `measured_counts` + `generated_at`; update narrative drift warnings by hand if relevant. If the high-level structure changed, also hand-adjust `overview.canvas`. (Narrative `architecture.md`, the JSON `architecture.json`, the HTML viewers, and the `scripts/embed-arch-json.mjs` step were all retired — `architecture.md` and HTML viewers 2026-05-28, `architecture.json` on 2026-05-29 in redesign v2.)
 
 **Doc-only commits** are fine as standalone — use the `docs:` Conventional Commit prefix. Exempt from `scripts/verify-gate.sh` (see the Exception above).
 

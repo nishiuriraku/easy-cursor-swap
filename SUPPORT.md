@@ -12,7 +12,7 @@ Thanks for using EasyCursorSwap! This page tells you where to go depending on wh
 | Report a security vulnerability    | [Private Vulnerability Reporting](https://github.com/nishiuriraku/easy-cursor-swap/security/advisories/new) — see [SECURITY.md](SECURITY.md) |
 | Submit a code change               | See [CONTRIBUTING.md](CONTRIBUTING.md)                                                                                                       |
 | Submit a theme to the public index | The separate [`easy-cursor-swap-index`](https://github.com/nishiuriraku/easy-cursor-swap-index) repo                                         |
-| Read about the architecture        | [`docs/architecture.md`](docs/architecture.md)                                                                                               |
+| Read about the architecture        | [`README.md` Architecture section](README.md#architecture)                                                                                   |
 
 ## Before you ask
 

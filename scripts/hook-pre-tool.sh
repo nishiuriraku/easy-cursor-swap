@@ -7,7 +7,7 @@
 # このプロジェクトの致命的不変条件を機械的に強制する:
 #   (1) HKLM 書き込み禁止 (UAC 発生防止)
 #   (2) v-html 禁止 (XSS 対策)
-#   (3) docs/*.html を Read 禁止 (53kトークン無駄遣い)
+#   (3) *.canvas を Read 禁止 (人間用ナビ・markdown 正準と冗長)
 #   (4) components/ から @tauri-apps/api の invoke 直呼び禁止 (useTauri 経由を強制)
 set -e
 
@@ -31,13 +31,14 @@ case "$tool_name" in
   Read)      payload="" ;;
 esac
 
-# --- Rule 4: Tier 3 HTML の Read 禁止 ---
+# --- Rule 4: Obsidian Canvas の Read 禁止 ---
+# overview.canvas は人間用ビジュアルナビ (Layer2)。
+# 内容は Layer1 markdown (specs/shared/reference) と冗長なので AI は読まない。
 if [ "$tool_name" = "Read" ]; then
   case "$rel_path" in
-    docs/architecture.html|docs/ui_map.html|*/docs/architecture.html|*/docs/ui_map.html)
-      echo "🚫 INVARIANT VIOLATION: docs/*.html (Tier 3) は AI 読み取り禁止 — 53kトークン無駄。" >&2
-      echo "   代わりに docs/architecture.json と docs/ui_map.json を読んでください (Tier 1)。" >&2
-      echo "   CLAUDE.md 'Documentation map' セクション参照。" >&2
+    *.canvas)
+      echo "🚫 INVARIANT: *.canvas は人間用ビジュアルナビ — AI 読み取り禁止 (markdown 正準と冗長)。" >&2
+      echo "   代わりに Obsidian vault の specs/* shared/* reference/{backend-overview,frontend-overview,ipc-catalog}.md を grep してください。" >&2
       exit 2
       ;;
   esac

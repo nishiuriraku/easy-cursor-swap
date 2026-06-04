@@ -11,6 +11,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { ref } from 'vue'
 import { useCreatorBulkImportFlow } from '~/composables/useCreatorBulkImportFlow'
+import { BulkImportCancelledError } from '~/composables/useBulkImport'
 import type { ResolvedAsset } from '~/composables/useBulkImport'
 
 function makeResolvedAsset(overrides: Partial<ResolvedAsset> = {}): ResolvedAsset {
@@ -108,5 +109,17 @@ describe('useCreatorBulkImportFlow.dispatchBulkPaths', () => {
     expect(resolveAssets).not.toHaveBeenCalled()
     expect(flow.bulkModalOpen.value).toBe(true)
     expect(flow.bulkCursorpack.value).not.toBeNull()
+  })
+
+  it('キャンセル中断時は失敗メッセージを出さずモーダルも開かない', async () => {
+    const rejecting = vi.fn().mockRejectedValue(new BulkImportCancelledError())
+    const { deps } = makeDeps({ resolveAssets: rejecting })
+    const flow = useCreatorBulkImportFlow(deps)
+
+    await flow.dispatchBulkPaths(['C:/tmp/arrow.png'])
+
+    expect(rejecting).toHaveBeenCalledTimes(1)
+    expect(deps.importMessage.value).toBeNull()
+    expect(flow.bulkModalOpen.value).toBe(false)
   })
 })

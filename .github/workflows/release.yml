@@ -153,9 +153,9 @@ jobs:
             ---
 
             ### インストール
-            - **MSI x64** (推奨): `EasyCursorSwap_*_x64_ja-JP.msi` / `*_x64_en-US.msi`
-            - **MSI ARM64**: `EasyCursorSwap_*_arm64_ja-JP.msi` / `*_arm64_en-US.msi`
-            - **NSIS**: `EasyCursorSwap_*_x64-setup.exe` / `*_arm64-setup.exe`
+            - **NSIS** (推奨): `EasyCursorSwap_*_x64-setup.exe` / `*_arm64-setup.exe` — インストーラーで日本語 / 英語を選択可能
+            - **MSI x64**: `EasyCursorSwap_*_x64_ja-JP.msi` (サイレント / GPO 配布向け)
+            - **MSI ARM64**: `EasyCursorSwap_*_arm64_ja-JP.msi`
 
             ### 自動アップデート
             Tauri Updater により署名検証済みの差分更新が配信されます。

@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.6] - 2026-06-04
+
+フロントエンドの直接 IPC 呼び出しを composable へ集約するリファクタ群を中心に、一括取り込み (bulk import) の「キャンセル」が実際に解決ジョブを停止するようになった機能修正、ドキュメント SSOT (Single Source of Truth) の 3 層モデルへの再設計、そして Windows MSI インストーラーの英語 (en-US) ロケール版の生成停止を含むリリース。HKCU 限定 / 適用トランザクション性 / アーカイブ検閲 / PII レダクション / `v-html` 不採用 の 5 大不変条件はすべて維持。
+
+### Changed
+
+- Windows MSI インストーラーの英語 (en-US) ロケール版の生成を取りやめ、MSI は日本語 (ja-JP) 版のみを配布するようになりました。NSIS インストーラー (`EasyCursorSwap_*-setup.exe`) は従来どおり 1 本でインストール時に日本語 / 英語を選択できるため、英語環境のユーザーも引き続き英語のセットアップを利用できます (アプリ本体の表示言語はインストーラーの種類とは独立)。`tauri.conf.json` の `bundle.windows.wix.language` から `en-US` キーを除外し、`release.yml` の Release ノートと README (en / ja) のインストール表を「二言語 NSIS + ja-JP MSI」の案内に更新。自動アップデートへの影響はなし — updater は NSIS / MSI を個別キーで配信し、更新はサイレント実行のため MSI の UI 言語に依存しない (削除後はデフォルトキー `windows-x86_64` が ja-JP MSI に切り替わるのみ)。
+
+### Fixed
+
+- 一括取り込み (フォルダ / ファイルの bulk import) で「キャンセル」を押しても解決ジョブが最後まで走り切ってしまう不具合を修正。`bulk_resolve_inner` がループ各反復の先頭でキャンセル要求を polling し、要求があれば以降のファイルを処理せず `AppError::BulkImportCancelled` で即時打ち切るようにした (未登録ジョブは false 扱いで誤キャンセルしない `cursor_build/stream.rs` と同じキャンセル意味論)。フロントエンドは rejection を型付き `BulkImportCancelledError` に変換し、エラートーストではなくサイレントキャンセルとして扱う。実機 (Tauri MCP) で進行中の再帰スキャンが約 155ms で停止することを確認。
+
+### Internal
+
+- フロントエンドの直接 IPC 呼び出しを composable へ集約 (いずれも挙動不変・Vitest 付き): `useAccessibility` (`get_accessibility_conflicts` — `ApplyModal` / settings の重複インライン型を単一の `AccessibilityConflicts` 型へ統一)、`useProfileBackup` (`export_profile` / `import_profile`)、`useWindowsSchemes` (`list` / `apply` / `export_windows_scheme_as_cursorpack` — `index.vue` の 3 callsite + `IpcWindowsScheme` 型を集約)、`useCrashReports` (`list` / `submit` / `clear_crash_reports`)。あわせて settings.vue の `get_app_info` を `useAppInfo` (キャッシュ singleton)、`open_url` を `useExternalUrl` に寄せ、settings の直接 system invoke を 8 → 3 に削減。
+- marketplace の `.cursorpack` ダウンロードサイズ上限を、重複定義していた private 定数から config の SoT 定数 `DEFAULT_MAX_PACK_COMPRESSED_SIZE` (50 MB) へ統一 (値・挙動不変)。
+- ドキュメント SSOT を 3 層モデルへ再設計。Tier 1/2/3 区分を廃止し、リポジトリ内の HTML viewer / `architecture.{json,md}` / `ui_map.*` / `file_inventory.md` / `cursor_size_architecture.md` を撤去 (正準は Obsidian vault の Layer1 markdown + 生成物 `reference/index.json`)。`scripts/gen-architecture.mjs` を追加し、`lib.rs` の `pub mod` / `commands/mod.rs` の `generate_handler![]` / composable・page・component の glob / CI workflow を再測定して `index.json` の `measured_counts` を生成。`scripts/verify-gate.sh` に `gen-architecture.mjs --check` を追加し、frontmatter ↔ コードの構造ドリフトを検出 (vault 不在の CI runner では self-skip)。SessionStart / pre-tool hook も新マニフェストへ repoint。
+- 実装ポリシーに実機ビジュアルレビュー (`tauri-visual-review`) の step を追加 (助言であってゲートではない)。
+- pr-review (#10) 指摘対応: settings.vue の `onDownloadUpdate` で `get_app_info` 取得失敗時に空バージョンでメジャー跨ぎ判定へ進まないよう `if (!appInfo) return` ガードを追加 (composable 化で握り潰されたエラー経路の復元、防御深化)。
+
 ## [0.0.5] - 2026-05-24
 
 カーソルサイズ機能と共通 UI コンポーネント統一を 2 つの柱とするリリース。Windows 全体のマウスポインターサイズをアプリ内スライダーから即時変更できるようになり (`LoadImageW` + `SetSystemCursor` × 14 役割の直接適用)、フロントエンドの全 11 モーダルが新 `UiModal` shell に統一されて focus trap / Esc / backdrop / Tab 循環の挙動が完全一貫した。Win11 ease-of-access (eoa) pipeline 起動を物理的に防ぐ one-way write architecture と、PR review 由来の 5 件の防御深化 fix も含む。HKCU 限定 / 適用トランザクション性 / アーカイブ検閲 / PII レダクション / `v-html` 不採用 の 5 大不変条件はすべて維持。
@@ -172,7 +192,8 @@ v0.0.1 と同じく仮リリース系列 (provisional, SemVer 0.0.x で API 安�
   - `BulkImportPreviewModal.vue` (579 → 297 行 / -49%) から `useBulkImportPreviewState` を抽出。matches/unmatched の三方移動 state machine + props.open 連動の初期マッチ watch + Blob URL ライフサイクル + ApplyPayload 組立を composable に閉じ込め、SFC は presentation に専念 (audit C21-SIZE 部分)。`ApplyPayload` 型の output 場所も SFC から composable に移動 (`useCreatorBulkImportFlow` 側 import を更新)。
 - component 総数: 50 → 56 (library +3 / marketplace +2 / creator +1)。`docs/architecture.json` / `docs/ui_map.json` の `measured_counts.components_total` を再測定し、HTML viewer に再埋め込み。
 
-[Unreleased]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.5...HEAD
+[Unreleased]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.6...HEAD
+[0.0.6]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.5...v0.0.6
 [0.0.5]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.2...v0.0.3

@@ -4,8 +4,8 @@
  * 旧設計では `get_themes` だけを wrap し、apply / delete / duplicate /
  * repackage / set_favorite / inspect / import の 7 IPC が `pages/index.vue` から
  * 直接 `invokeTauri` 呼びされていた (audit B8-SIZE-001)。本 composable に
- * 集約することで page を presentation 中心に縮め、`docs/architecture.json` の
- * `useThemes.ipc_calls` の宣言と実態を一致させる。
+ * 集約することで page を presentation 中心に縮め、IPC 集約の宣言
+ * (vault `reference/ipc-catalog.md` / 各 spec の `ipc:` frontmatter) と実態を一致させる。
  *
  * 各 mutation 系メソッドは「IPC 呼出 → 失敗時 throw → 成功時の refresh は
  * 呼出側で `void refresh()`」のシンプルな規約。呼出側で UI toast や confirm を
