@@ -629,5 +629,9 @@ export default {
     toastSavedAndApplied: 'Saved to Library and applied',
     toastAppliedFailed: 'Saved to Library but apply failed: {error}',
     retryApply: 'Retry',
+    validateRoleRequired: 'Assign an image to at least one role',
+    validateArrowRequired: 'The Arrow role is required',
+    toastExportFailed: 'Export failed: {error}',
+    toastRetryFailed: 'Retry failed: {error}',
   },
 } as const

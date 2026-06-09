@@ -628,5 +628,9 @@ export default {
     toastSavedAndApplied: 'Library に保存して適用しました',
     toastAppliedFailed: 'Library に保存しましたが、適用に失敗しました: {error}',
     retryApply: '再試行',
+    validateRoleRequired: '少なくとも 1 役割に画像を割り当ててください',
+    validateArrowRequired: 'Arrow ロールは必須です',
+    toastExportFailed: 'エクスポート失敗: {error}',
+    toastRetryFailed: '再試行失敗: {error}',
   },
 } as const
