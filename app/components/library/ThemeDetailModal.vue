@@ -26,6 +26,9 @@ const props = defineProps<{
   previewMap: Record<string, string> | null
   /** 役割名 → ホットスポット詳細。ホットスポットドット表示に使う。 */
   previewDetails?: Record<string, RolePreviewDetail> | null
+  /** 二次アクション実行中フラグ (LD8)。該当ボタンにスピナーを出し、操作中は
+   *  二次アクション群を無効化する。親 (index.vue) が IPC 実行中に立てる。 */
+  busyAction?: 'edit' | 'export' | 'duplicate' | 'delete' | null
 }>()
 
 const emit = defineEmits<{
@@ -75,29 +78,35 @@ const isMarketplace = computed(() => props.theme?.kind === 'marketplace')
           <button
             v-if="!isMarketplace"
             class="td-act"
+            :disabled="busyAction != null"
             :aria-label="t('themeDetail.editAria', { name: theme.name })"
             @click="emit('edit', theme.id)"
           >
-            <UiIcon name="Brush" :size="13" />{{ t('themeDetail.editLabel') }}
+            <UiSpinner v-if="busyAction === 'edit'" :size="12" />
+            <UiIcon v-else name="Brush" :size="13" />{{ t('themeDetail.editLabel') }}
           </button>
           <button
             v-if="!isMarketplace"
             class="td-act"
+            :disabled="busyAction != null"
             :aria-label="t('themeDetail.exportAria', { name: theme.name })"
             @click="emit('exportPack', theme.id)"
           >
-            <UiIcon name="Export" :size="13" />{{ t('themeDetail.exportLabel') }}
+            <UiSpinner v-if="busyAction === 'export'" :size="12" />
+            <UiIcon v-else name="Export" :size="13" />{{ t('themeDetail.exportLabel') }}
           </button>
           <button
             class="td-act"
+            :disabled="busyAction != null"
             :aria-label="t('themeDetail.duplicateAria', { name: theme.name })"
             @click="emit('duplicate', theme.id)"
           >
-            <UiIcon name="Plus" :size="13" />{{ t('themeDetail.duplicateLabel') }}
+            <UiSpinner v-if="busyAction === 'duplicate'" :size="12" />
+            <UiIcon v-else name="Plus" :size="13" />{{ t('themeDetail.duplicateLabel') }}
           </button>
           <button
             class="td-act danger"
-            :disabled="theme.isActive"
+            :disabled="theme.isActive || busyAction != null"
             :aria-label="
               theme.isActive
                 ? t('themeDetail.deleteDisabledAria', { name: theme.name })
@@ -106,6 +115,7 @@ const isMarketplace = computed(() => props.theme?.kind === 'marketplace')
             :title="theme.isActive ? t('themeDetail.deleteDisabledTitle') : undefined"
             @click="emit('delete', theme.id)"
           >
+            <UiSpinner v-if="busyAction === 'delete'" :size="12" />
             {{ t('themeDetail.deleteLabel') }}
           </button>
           <span v-if="isMarketplace" class="td-hint">
@@ -119,10 +129,12 @@ const isMarketplace = computed(() => props.theme?.kind === 'marketplace')
           -->
           <button
             class="td-act"
+            :disabled="busyAction != null"
             :aria-label="t('themeDetail.exportSchemeAria', { name: theme.name })"
             @click="emit('exportPack', theme.id)"
           >
-            <UiIcon name="Export" :size="13" />{{ t('themeDetail.exportSchemeLabel') }}
+            <UiSpinner v-if="busyAction === 'export'" :size="12" />
+            <UiIcon v-else name="Export" :size="13" />{{ t('themeDetail.exportSchemeLabel') }}
           </button>
           <span class="td-source-readonly">
             <UiIcon name="Globe" :size="11" />{{ t('themeDetail.systemSchemeReadOnly') }}
@@ -171,6 +183,11 @@ const isMarketplace = computed(() => props.theme?.kind === 'marketplace')
 }
 :where(html.light) .td-act:hover {
   background: rgba(15, 20, 35, 0.04);
+}
+.td-act:disabled,
+.td-act:disabled:hover {
+  @apply cursor-not-allowed border-transparent bg-transparent text-fg-dim;
+  opacity: 0.5;
 }
 .td-act.danger {
   color: var(--rose);

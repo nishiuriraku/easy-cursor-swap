@@ -39,6 +39,9 @@ const showDrop = ref(false)
 const pendingTheme = ref<ThemeCardData | null>(null)
 const applyBusy = ref(false)
 const applyError = ref<string | null>(null)
+// 詳細モーダルの二次アクション (edit/export/duplicate/delete) 実行中フラグ (LD8)。
+// 該当ボタンにスピナーを出し、実行中はグループを無効化する。
+const detailBusyAction = ref<'edit' | 'export' | 'duplicate' | 'delete' | null>(null)
 
 // 詳細モーダル制御。モーダルは画面に同時に 1 つしか出さない。
 const detailTheme = ref<ThemeCardData | null>(null)
@@ -248,6 +251,7 @@ function applyFromDetail(id: string) {
  * OS の TEMP に書き出し、Nuxt から `parse_cursorpack_for_creator` で読み込む。
  */
 async function editInCreator(id: string) {
+  detailBusyAction.value = 'edit'
   try {
     const { tempDir, sep } = await import('@tauri-apps/api/path')
     const dir = await tempDir()
@@ -261,11 +265,14 @@ async function editInCreator(id: string) {
     applyError.value = t('library.errEditModeTransition', {
       detail: err instanceof Error ? err.message : String(err),
     })
+  } finally {
+    detailBusyAction.value = null
   }
 }
 
 /** 詳細モーダルからの「複製」。`duplicate_theme` IPC で新 UUID を作りリロードする。 */
 async function duplicateTheme(id: string) {
+  detailBusyAction.value = 'duplicate'
   try {
     await duplicateThemeIpc(id)
     closeDetails()
@@ -281,6 +288,8 @@ async function duplicateTheme(id: string) {
     applyError.value = t('library.errDuplicate', {
       detail: err instanceof Error ? err.message : String(err),
     })
+  } finally {
+    detailBusyAction.value = null
   }
 }
 
@@ -296,6 +305,7 @@ async function exportTheme(id: string) {
       filters: [{ name: 'Cursor Pack', extensions: ['cursorpack'] }],
     })
     if (!outputPath) return
+    detailBusyAction.value = 'export'
     let bytes: number | null = null
     if (target.kind === 'system') {
       // Windows レジストリスキームはローカルテーマディレクトリを持たないので
@@ -317,6 +327,8 @@ async function exportTheme(id: string) {
     applyError.value = t('library.errExport', {
       detail: err instanceof Error ? err.message : String(err),
     })
+  } finally {
+    detailBusyAction.value = null
   }
 }
 
@@ -334,6 +346,7 @@ async function deleteTheme(id: string) {
   // 将来的には専用の確認モーダルに置き換える。
   const ok = window.confirm(t('library.confirmDeleteMsg', { name: target.name }))
   if (!ok) return
+  detailBusyAction.value = 'delete'
   try {
     await deleteThemeIpc(id)
     closeDetails()
@@ -347,6 +360,8 @@ async function deleteTheme(id: string) {
     applyError.value = t('library.errDelete', {
       detail: err instanceof Error ? err.message : String(err),
     })
+  } finally {
+    detailBusyAction.value = null
   }
 }
 
@@ -810,6 +825,7 @@ onUnmounted(() => {
       :theme="detailTheme"
       :preview-map="detailPreviewMap"
       :preview-details="detailPreviewDetails"
+      :busy-action="detailBusyAction"
       @close="closeDetails"
       @apply="applyFromDetail"
       @edit="editInCreator"
