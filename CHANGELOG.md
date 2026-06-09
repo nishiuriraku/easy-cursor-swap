@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.7] - 2026-06-09
+
 UX・i18n の磨き込みと堅牢性修正のリリース (v0.0.7)。ライトモードで崩れていたカーソルサイズスライダーの修正、公式インデックス提出モーダルのタグ日本語化、英語 UI でも日本語が出ていたエクスポート時トーストの i18n 化、そして Web ページのように本文をドラッグ選択できていた UI をネイティブアプリ同様に既定で選択不可へ変更 (コピーが必要な箇所のみ opt-in)。あわせて、長時間ジョブのキャンセル機構のエントリリーク、プロファイル取り込み時の GitHub 連携メタ消失、起動ヘルスチェックの古いロールバック先の残留という 3 件のバックエンド堅牢性バグも修正。HKCU 限定 / 適用トランザクション性 / アーカイブ検閲 / PII レダクション / `v-html` 不採用 の 5 大不変条件はすべて維持。
 
 ### Changed
@@ -211,7 +213,8 @@ v0.0.1 と同じく仮リリース系列 (provisional, SemVer 0.0.x で API 安�
   - `BulkImportPreviewModal.vue` (579 → 297 行 / -49%) から `useBulkImportPreviewState` を抽出。matches/unmatched の三方移動 state machine + props.open 連動の初期マッチ watch + Blob URL ライフサイクル + ApplyPayload 組立を composable に閉じ込め、SFC は presentation に専念 (audit C21-SIZE 部分)。`ApplyPayload` 型の output 場所も SFC から composable に移動 (`useCreatorBulkImportFlow` 側 import を更新)。
 - component 総数: 50 → 56 (library +3 / marketplace +2 / creator +1)。`docs/architecture.json` / `docs/ui_map.json` の `measured_counts.components_total` を再測定し、HTML viewer に再埋め込み。
 
-[Unreleased]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.6...HEAD
+[Unreleased]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.7...HEAD
+[0.0.7]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.6...v0.0.7
 [0.0.6]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.5...v0.0.6
 [0.0.5]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.3...v0.0.4
