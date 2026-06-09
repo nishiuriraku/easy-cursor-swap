@@ -39,6 +39,11 @@ const emit = defineEmits<{
 
 const { t, locale } = useI18n()
 
+// 提出タグ ID (英語 enum) を表示用に locale 化する (提出値は英語のまま)。
+// script 側で marketplaceTagLabel を参照することで unimport が import を注入する
+// (template から直接呼ぶと auto-import されないため)。
+const tagLabel = (tg: string) => marketplaceTagLabel(tg, t)
+
 // Rust `LocalizedString` (`string | { [locale]: string }`) を現在の locale に解決して
 // `${name} (v${version})` 形式に整形する。
 // テンプレート内で `pickLocalizedName(...)` を直接呼ぶと unimport が script AST を見て
@@ -80,7 +85,7 @@ const themeOptions = computed(() =>
         @click="emit('toggle-tag', tg)"
       >
         <UiIcon :name="props.tags.includes(tg) ? 'Check' : 'Plus'" :size="11" />
-        {{ tg }}
+        {{ tagLabel(tg) }}
       </button>
     </div>
     <span class="field-note">

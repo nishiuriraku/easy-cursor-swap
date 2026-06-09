@@ -90,11 +90,22 @@ body,
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   overflow: hidden;
+  /* ネイティブアプリ感: 既定でテキスト選択を不可にする。コピーしたい箇所は
+   * `.selectable` (tailwind.css) と下の input/textarea 例外で opt-in する (Y13)。 */
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 button {
   font-family: inherit;
   color: inherit;
+}
+
+/* フォーム入力は常に選択・編集可能に保つ (グローバル user-select:none の例外, Y13) */
+input,
+textarea {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 /* --- スクロールバー --- */

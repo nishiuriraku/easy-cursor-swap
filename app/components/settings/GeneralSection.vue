@@ -233,10 +233,42 @@ function onSliderChange(ev: Event) {
   @apply flex items-center gap-3;
   min-width: 220px;
 }
+/* range input をネイティブ描画から外し、設計トークンで track/thumb を明示する。
+ * 旧実装は accent-color のみ + ダーク固定フォールバック (#7cf2d4) で、ライトモードでは
+ * 既定 track が背景に埋もれてスライダーがほぼ不可視だった (R4)。track=--line-strong /
+ * thumb=--accent は :root と html.light で値が入れ替わるため両テーマで可視になる。
+ * 対象は WebView2 (Chromium) のみなので -webkit-slider-* で十分。 */
 .cursor-size-control input[type='range'] {
   flex: 1;
   min-width: 160px;
-  accent-color: var(--accent, #7cf2d4);
+  height: 18px;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+.cursor-size-control input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--line-strong);
+}
+.cursor-size-control input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg-1);
+  box-shadow: 0 0 0 1px var(--line-strong);
+  transition: background 0.12s;
+}
+.cursor-size-control input[type='range']:hover:not(:disabled)::-webkit-slider-thumb {
+  background: var(--accent-hi);
+}
+.cursor-size-control input[type='range']:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px var(--accent-dim);
 }
 .cursor-size-control input[type='range']:disabled {
   opacity: 0.5;

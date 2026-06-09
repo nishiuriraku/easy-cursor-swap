@@ -157,7 +157,7 @@ async function openLogFolder() {
             <UiIcon name="X" :size="13" />{{ t('settings.btnClear') }}
           </button>
         </SettingsRow>
-        <div v-if="crashMessage" class="profile-msg">
+        <div v-if="crashMessage" class="profile-msg selectable">
           {{ crashMessage }}
         </div>
       </div>

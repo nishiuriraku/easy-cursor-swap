@@ -32,9 +32,69 @@ pub fn import_profile(
         )));
     }
     let envelope = BackupManager::import(&buf, merge)?;
-    // 設定もファイル経由で復元
+    // 設定もファイル経由で復元。ただし github_account は現マシンの値を保持する (Y16)。
     config.update(|c| {
-        *c = envelope.config.clone();
+        *c = apply_imported_config(c, &envelope.config);
     })?;
     Ok(envelope)
+}
+
+/// import 時に、バックアップの config を適用しつつ現マシンの `github_account` を保持する (Y16)。
+///
+/// GitHub 連携メタ (`github_account`) は keystore のトークン (DPAPI 暗号化・マシン固有) と
+/// 対で初めて意味を持つ。`.cursorprofile` はトークンを含まず、別マシン由来 / 連携解除後の
+/// 古い状態である可能性がある。そのまま上書きすると「login は表示されるがトークンが無い /
+/// 食い違う」孤児状態になるため、現在マシンの値を維持して keystore と整合させる。
+fn apply_imported_config(
+    current: &crate::config::AppConfig,
+    imported: &crate::config::AppConfig,
+) -> crate::config::AppConfig {
+    crate::config::AppConfig {
+        github_account: current.github_account.clone(),
+        ..imported.clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::{AppConfig, GithubAccount};
+
+    #[test]
+    fn apply_imported_config_preserves_current_github_account() {
+        let current = AppConfig {
+            github_account: Some(GithubAccount {
+                login: "me".to_string(),
+                token_saved_at: "2026-06-09T00:00:00Z".to_string(),
+            }),
+            ..AppConfig::default()
+        };
+        let imported = AppConfig {
+            github_account: Some(GithubAccount {
+                login: "stale-other".to_string(),
+                token_saved_at: "2020-01-01T00:00:00Z".to_string(),
+            }),
+            ..AppConfig::default()
+        };
+
+        let merged = apply_imported_config(&current, &imported);
+        // github_account は現マシンの値を保持 (バックアップ由来の login で上書きしない)
+        assert_eq!(merged.github_account.as_ref().unwrap().login, "me");
+    }
+
+    #[test]
+    fn apply_imported_config_keeps_none_when_current_unlinked() {
+        // 現マシンが未連携なら、バックアップに連携メタがあっても None を保持する
+        // (トークンを持たない孤児メタの復元を防ぐ)。
+        let current = AppConfig::default();
+        let imported = AppConfig {
+            github_account: Some(GithubAccount {
+                login: "x".to_string(),
+                token_saved_at: "t".to_string(),
+            }),
+            ..AppConfig::default()
+        };
+        let merged = apply_imported_config(&current, &imported);
+        assert!(merged.github_account.is_none());
+    }
 }

@@ -231,9 +231,20 @@ describe('SubmitThemeDialog Auto tab', () => {
     const buttons = Array.from(
       document.body.querySelectorAll<HTMLButtonElement>('button.tag-toggle'),
     )
+    // タグ表示は marketplaceTagLabel で locale 化される (Y14)。mock t は ja locale を
+    // 解決するため、ボタンラベルは日本語になる (提出値の英語 enum は別途維持)。
     const labels = buttons.map((b) => b.textContent?.trim()).sort()
     expect(labels).toEqual(
-      ['animated', 'anime', 'dark', 'light', 'minimal', 'neon', 'pixel', 'retro'].sort(),
+      [
+        'ピクセル',
+        'ミニマル',
+        'アニメーション',
+        'ダーク',
+        'ライト',
+        'アニメ',
+        'レトロ',
+        'ネオン',
+      ].sort(),
     )
 
     // 旧 UI の自由入力欄が残っていないこと

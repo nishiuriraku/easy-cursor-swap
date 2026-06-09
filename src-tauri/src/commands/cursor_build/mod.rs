@@ -132,6 +132,8 @@ mod tests {
         let id = "test-build-cancel-lifecycle-xyz";
         // 新規 instance なので前提状態は false
         assert!(!registry.is_cancelled(id));
+        // cancel() は登録済みジョブにのみ作用する (Y15)。ワーカーは register してから走る。
+        registry.register(id);
         registry.cancel(id);
         assert!(registry.is_cancelled(id));
         registry.drop_job(id);
@@ -143,6 +145,7 @@ mod tests {
         let registry = CancelRegistry::default();
         let id_a = "test-build-independent-a-xyz";
         let id_b = "test-build-independent-b-xyz";
+        registry.register(id_a);
         registry.cancel(id_a);
         assert!(registry.is_cancelled(id_a));
         assert!(!registry.is_cancelled(id_b));

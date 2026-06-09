@@ -133,11 +133,11 @@ export function useCreatorExport(deps: CreatorExportDeps) {
    */
   async function executeSave(payload: SaveSubmitPayload): Promise<SaveResultStatus> {
     if (creatorAssets.assignedRoleCount.value === 0) {
-      exportMessage.value = '少なくとも 1 役割に画像を割り当ててください'
+      exportMessage.value = t('saveModal.validateRoleRequired')
       return 'failed'
     }
     if (!creatorAssets.arrowAssigned.value) {
-      exportMessage.value = 'Arrow ロールは必須です'
+      exportMessage.value = t('saveModal.validateArrowRequired')
       return 'failed'
     }
     exportBusy.value = true
@@ -215,7 +215,10 @@ export function useCreatorExport(deps: CreatorExportDeps) {
         status = 'ok'
       }
     } catch (err) {
-      exportMessage.value = `エクスポート失敗: ${err instanceof Error ? err.message : String(err)}`
+      exportMessage.value = t('saveModal.toastExportFailed').replace(
+        '{error}',
+        err instanceof Error ? err.message : String(err),
+      )
       status = 'failed'
     } finally {
       if (unlisten) unlisten()
@@ -240,7 +243,10 @@ export function useCreatorExport(deps: CreatorExportDeps) {
       await useThemes().applyTheme(themeId)
       exportMessage.value = t('saveModal.toastSavedAndApplied')
     } catch (err) {
-      exportMessage.value = `再試行失敗: ${err instanceof Error ? err.message : String(err)}`
+      exportMessage.value = t('saveModal.toastRetryFailed').replace(
+        '{error}',
+        err instanceof Error ? err.message : String(err),
+      )
       failedApplyThemeId.value = themeId // 再再試行のため復元
     }
   }

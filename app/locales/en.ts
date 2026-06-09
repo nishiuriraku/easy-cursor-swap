@@ -501,6 +501,10 @@ export default {
     tagMinimal: 'Minimal',
     tagAnimated: 'Animated',
     tagDark: 'Dark',
+    tagLight: 'Light',
+    tagAnime: 'Anime',
+    tagRetro: 'Retro',
+    tagNeon: 'Neon',
   },
   conflict: {
     headerNewer: 'Update to a newer version',
@@ -629,5 +633,9 @@ export default {
     toastSavedAndApplied: 'Saved to Library and applied',
     toastAppliedFailed: 'Saved to Library but apply failed: {error}',
     retryApply: 'Retry',
+    validateRoleRequired: 'Assign an image to at least one role',
+    validateArrowRequired: 'The Arrow role is required',
+    toastExportFailed: 'Export failed: {error}',
+    toastRetryFailed: 'Retry failed: {error}',
   },
 } as const
