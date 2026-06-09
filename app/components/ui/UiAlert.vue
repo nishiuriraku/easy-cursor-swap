@@ -73,6 +73,9 @@ const resolvedIcon = computed<string | false>(() => {
 }
 .ui-alert-body {
   @apply text-fg;
+  /* アラート本文 (エラー / ステータス) はバグ報告等でコピーできるよう選択可に (Y13) */
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .ui-alert.info {

@@ -34,7 +34,7 @@ const openExternal = openExternalUrl
     <div class="prop-section">
       <div class="prop-head">
         {{ t('app.name') }}
-        <span class="head-hint">{{
+        <span class="head-hint selectable">{{
           t('settings.aboutAppHint', { version: appInfo?.version ?? '—' })
         }}</span>
       </div>

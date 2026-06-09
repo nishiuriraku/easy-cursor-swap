@@ -50,7 +50,7 @@ defineEmits<{
       <div class="prop-body">
         <template v-if="keystoreInfo.has_keypair">
           <SettingsRow anchor="keyId" :label="t('settings.keyIdLabel')" mono>
-            <span class="tag ok">{{ keystoreInfo.key_id ?? '—' }}</span>
+            <span class="tag ok selectable">{{ keystoreInfo.key_id ?? '—' }}</span>
           </SettingsRow>
           <SettingsRow
             v-if="keystoreInfo.public_key_b64"
@@ -60,7 +60,7 @@ defineEmits<{
             mono
           >
             <span
-              class="tag"
+              class="tag selectable"
               style="
                 max-width: 320px;
                 overflow: hidden;

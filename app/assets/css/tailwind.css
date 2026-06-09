@@ -86,6 +86,15 @@
  * 移行は Phase 10-A 〜 10-E で段階的に進める。
  */
 
+/* --- text selection opt-in (Y13) ---
+ * グローバルで `user-select: none` (global.css) にしているため、ユーザーがコピーしたい
+ * 要素 (エラー文 / ハッシュ / 公開鍵 / バージョン / ログ / ライセンス) に明示的に付与して
+ * 選択を許可する。子孫にも継承される。 */
+.selectable {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 /* --- .btn family (Phase 10-A) --- */
 .btn {
   @apply inline-flex h-8 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-[7px] border border-line-hi bg-white/[0.04] px-3 font-body text-[12.5px] font-medium text-fg;
