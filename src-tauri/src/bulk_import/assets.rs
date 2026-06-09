@@ -302,8 +302,9 @@ pub async fn bulk_resolve_assets(
     registry: State<'_, CancelRegistry>,
     req: BulkResolveRequest,
 ) -> Result<BulkResolveResult, AppError> {
-    registry.register(&req.job_id);
-    let job_id = req.job_id.clone();
+    // RAII ガードで register。関数を抜けるとき (成功・エラー・join 失敗の ? 経路すべて) に
+    // 自動で drop_job されるため、以前 join 失敗パスで drop_job を取りこぼしていた leak を防ぐ (Y15)。
+    let _job = registry.register_guard(&req.job_id);
     let app_clone = app.clone();
 
     let result = tauri::async_runtime::spawn_blocking(move || {
@@ -326,7 +327,7 @@ pub async fn bulk_resolve_assets(
     .await
     .map_err(|e| AppError::ImageProcessing(format!("join 失敗: {}", e)))?;
 
-    app.state::<CancelRegistry>().drop_job(&job_id);
+    // drop_job は _job (RAII ガード) が return 時に確実に実行する。
     result
 }
 

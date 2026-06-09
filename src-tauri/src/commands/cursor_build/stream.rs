@@ -41,6 +41,11 @@ pub fn export_cursorpack_streamed(
     let total_roles = req.roles.len() as u32;
     let total_steps = total_roles + if req.sign { 2 } else { 1 }; // roles + package (+sign)
 
+    // RAII ガードで register。`cancel()` は登録済みジョブにのみ作用するため、これが無いと
+    // キャンセルが効かない。さらに途中の各 `?` early-return / 完了のいずれの経路でも Drop で
+    // 確実に drop_job され、エントリが leak しない (Y15)。
+    let _job = registry.register_guard(&req.build_id);
+
     // 開始イベント
     emit_progress(
         &app,
