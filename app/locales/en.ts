@@ -501,6 +501,10 @@ export default {
     tagMinimal: 'Minimal',
     tagAnimated: 'Animated',
     tagDark: 'Dark',
+    tagLight: 'Light',
+    tagAnime: 'Anime',
+    tagRetro: 'Retro',
+    tagNeon: 'Neon',
   },
   conflict: {
     headerNewer: 'Update to a newer version',

@@ -498,8 +498,12 @@ export default {
     tagAll: 'すべて',
     tagPixel: 'ピクセル',
     tagMinimal: 'ミニマル',
-    tagAnimated: 'アニメ',
+    tagAnimated: 'アニメーション',
     tagDark: 'ダーク',
+    tagLight: 'ライト',
+    tagAnime: 'アニメ',
+    tagRetro: 'レトロ',
+    tagNeon: 'ネオン',
   },
   conflict: {
     headerNewer: '新しいバージョンへの更新',
