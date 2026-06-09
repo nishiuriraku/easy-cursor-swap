@@ -44,6 +44,24 @@ pub struct StartupState {
     pub previous_version: Option<String>,
 }
 
+impl StartupState {
+    /// 正常起動を記録した新しい state を返す (ファイル I/O を伴わない純変換)。
+    ///
+    /// `previous_version` はクリアする (G23): 現行版が healthy と確認できた以上、
+    /// ロールバック先 (移行元の旧版) はもう不要。残すと、後日この版が *バージョン変更を
+    /// 伴わずに* 失敗した際、`rollback_target()` が「既に正常移行済みの旧版」への
+    /// ロールバックを誤って提案し続ける。次の真のアップデート時に `begin()` が
+    /// 新しい previous_version を再設定する。
+    fn marked_healthy(&self, current_version: &str) -> StartupState {
+        StartupState {
+            pending_failures: 0,
+            last_healthy_version: Some(current_version.to_string()),
+            last_seen_version: Some(current_version.to_string()),
+            previous_version: None,
+        }
+    }
+}
+
 /// 現行バージョン番号からメジャー番号を取得する。
 /// パース失敗時は `None`。
 fn major_of(version: &str) -> Option<u64> {
@@ -141,10 +159,7 @@ impl StartupCheck {
     /// 起動完了後、Tauri ウィンドウが描画されたタイミングで呼ぶ。
     /// `pending_failures` を 0 リセットして「正常起動」を記録。
     pub fn mark_healthy(&self, current_version: &str) -> AppResult<()> {
-        let mut state = self.state.clone();
-        state.pending_failures = 0;
-        state.last_healthy_version = Some(current_version.to_string());
-        state.last_seen_version = Some(current_version.to_string());
+        let state = self.state.marked_healthy(current_version);
         let json = serde_json::to_string_pretty(&state)?;
         std::fs::write(&self.state_path, json)?;
         tracing::debug!("startup health: marked healthy (v{})", current_version);
@@ -183,6 +198,24 @@ mod tests {
         }
         assert_eq!(state.pending_failures, 0);
         assert_eq!(state.previous_version.as_deref(), Some("0.1.0"));
+    }
+
+    #[test]
+    fn marked_healthy_resets_counter_and_clears_rollback_target() {
+        // version 変更で previous_version がセットされ、pending_failures が立っている状態
+        let state = StartupState {
+            pending_failures: 2,
+            last_seen_version: Some("0.0.7".to_string()),
+            previous_version: Some("0.0.6".to_string()),
+            last_healthy_version: None,
+        };
+        let healthy = state.marked_healthy("0.0.7");
+        assert_eq!(healthy.pending_failures, 0);
+        assert_eq!(healthy.last_healthy_version.as_deref(), Some("0.0.7"));
+        assert_eq!(healthy.last_seen_version.as_deref(), Some("0.0.7"));
+        // G23: 正常起動を記録したら previous_version はクリアされる
+        // (バージョン変更を伴わない後日の失敗で旧版へのロールバックを誤提案しないため)
+        assert_eq!(healthy.previous_version, None);
     }
 
     #[test]
