@@ -30,6 +30,8 @@ const emit = defineEmits<{
 
 const isOpen = computed(() => props.entry !== null)
 const previewMap = ref<Record<string, string> | null>(null)
+/** プレビュー PNG 取得中フラグ。CursorMatrix の per-cell skeleton 表示に使う (LD6)。 */
+const previewLoading = ref(false)
 const { getMap } = useMarketplacePreviews()
 const { themes } = useThemes()
 
@@ -55,9 +57,17 @@ const ariaLabel = computed(() =>
 
 async function fetchPreviews(entry: MarketplaceEntry | null) {
   previewMap.value = null
-  if (!entry || !entry.previewBaseUrl) return
-  const map = await getMap(entry.id, entry.previewBaseUrl)
-  previewMap.value = map
+  if (!entry || !entry.previewBaseUrl) {
+    previewLoading.value = false
+    return
+  }
+  previewLoading.value = true
+  try {
+    const map = await getMap(entry.id, entry.previewBaseUrl)
+    previewMap.value = map
+  } finally {
+    previewLoading.value = false
+  }
 }
 
 watch(() => props.entry, fetchPreviews, { immediate: true })
@@ -88,6 +98,7 @@ function onInstall() {
         <CursorMatrix
           :included="entry.includedRoles"
           :preview-map="previewMap"
+          :loading="previewLoading"
           :limit="6"
           :cols="3"
         />
@@ -119,6 +130,7 @@ function onInstall() {
       <UiButton variant="ghost" @click="close">{{ t('common.cancel') }}</UiButton>
       <UiButton
         variant="primary"
+        :loading="installing"
         :disabled="alreadyInstalled || installing"
         :icon-left="alreadyInstalled ? 'Check' : 'Import'"
         @click="onInstall"

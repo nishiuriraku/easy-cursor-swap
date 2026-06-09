@@ -179,6 +179,12 @@ export default {
     exportFailPrefix: 'Export failed',
     appDescription: 'Author Windows cursor themes with 17 roles × 6 resolutions and export them',
     bulkSourceEditing: '📦 Editing',
+    // Bulk import progress overlay (LD5)
+    bulkImporting: 'Importing…',
+    bulkStageScan: 'Scanning',
+    bulkStageParse: 'Parsing',
+    bulkStageExtract: 'Extracting',
+    bulkCancel: 'Cancel',
     errEditLoadFailed: 'Failed to load edit data: {detail}',
     errSvgImageLoadFailed: 'Failed to load SVG image',
     errCanvas2dContext: 'Failed to acquire Canvas 2D context',

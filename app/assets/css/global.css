@@ -7,7 +7,7 @@
  *  - スクロールバーカスタマイズ (`::-webkit-scrollbar*`)
  *  - `:focus-visible` 既定スタイル
  *  - `prefers-reduced-motion` 対応
- *  - 共有 `@keyframes` (pulse / fade-in / slide-in-right / spin)
+ *  - 共有 `@keyframes` (pulse / fade-in / slide-in-right / spin / shimmer)
  *
  * すべてのコンポーネント固有スタイルは各 Vue ファイルの `<style scoped>` に、
  * 横断 utility は `app/assets/css/tailwind.css` の top-level shared utility に
@@ -130,7 +130,9 @@ textarea {
 
 /* --- 共有 @keyframes ---
  * 複数コンポーネント (Library / Marketplace / Creator) が `animation: pulse` 等で
- * 直接参照するため、各 Vue scoped ではなく global に置く。 */
+ * 直接参照するため、各 Vue scoped ではなく global に置く。
+ * `shimmer` は共有 `.skeleton` utility (tailwind.css) が参照するローディング
+ * プレースホルダ用 (Library / Marketplace グリッド + プレビューセル)。 */
 @keyframes pulse {
   0%,
   100% {
@@ -165,6 +167,14 @@ textarea {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
   }
 }
 

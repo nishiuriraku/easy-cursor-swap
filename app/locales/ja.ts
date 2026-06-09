@@ -178,6 +178,12 @@ export default {
     exportFailPrefix: 'エクスポート失敗',
     appDescription: 'Windows 用カーソルテーマを 17 役割 × 6 解像度で作成しエクスポートする',
     bulkSourceEditing: '📦 編集中',
+    // 一括インポート進捗オーバーレイ (LD5)
+    bulkImporting: '一括インポート中…',
+    bulkStageScan: '走査',
+    bulkStageParse: '解析',
+    bulkStageExtract: '展開',
+    bulkCancel: '中断',
     errEditLoadFailed: '編集データの読込に失敗: {detail}',
     errSvgImageLoadFailed: 'SVG イメージの読み込みに失敗',
     errCanvas2dContext: 'Canvas 2D コンテキスト取得失敗',

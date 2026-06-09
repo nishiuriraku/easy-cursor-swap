@@ -97,6 +97,15 @@ defineEmits<{
             }}
           </UiButton>
         </SettingsRow>
+        <!-- LD7: ダウンロードの確定バー (バックエンドがバイト進捗を出すので確定モード)。
+             contentLength 不明 (updaterTotal<=0) のときは UiProgress が自動で不確定アニメに倒す。 -->
+        <UiProgress
+          v-if="updaterDownloading"
+          class="mt-3"
+          :value="updaterProgress"
+          :max="updaterTotal"
+          :aria-label="t('settings.btnDownloadInstall')"
+        />
         <div v-if="updaterMessage" class="profile-msg">
           {{ updaterMessage }}
         </div>
