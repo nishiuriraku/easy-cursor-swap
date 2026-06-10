@@ -1175,6 +1175,70 @@ mod tests {
             .unwrap_or_else(|e| e.into_inner())
     }
 
+    /// `apply_cursors` / `restore_from_snapshot` は `HKCU\Control Panel\Cursors` の
+    /// 17 役割という UUID 分離できないグローバル値を書き換える。これらを触るテストを
+    /// 並列実行すると互いの書込・復元が干渉するため、このミューテックスを先頭で取得して
+    /// シリアライズする (`cursor_size_test_lock` と同型)。
+    fn apply_cursors_test_lock() -> std::sync::MutexGuard<'static, ()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// パニック時でも環境変数を確実に復元するための RAII ガード
+    /// (keystore.rs のテスト用 `EnvGuard` と同じ流儀)。`new` で旧値を退避し、
+    /// `Drop` で元の値に戻す (旧値が無ければ削除)。
+    struct EnvGuard {
+        key: &'static str,
+        prev: Option<String>,
+    }
+
+    impl EnvGuard {
+        /// `key` の現在値を退避して `value` をセットする。
+        fn new(key: &'static str, value: &std::path::Path) -> Self {
+            let prev = std::env::var(key).ok();
+            std::env::set_var(key, value);
+            Self { key, prev }
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            match &self.prev {
+                Some(v) => std::env::set_var(self.key, v),
+                None => std::env::remove_var(self.key),
+            }
+        }
+    }
+
+    /// `apply_cursors` / `restore_from_snapshot` が実機の `HKCU\Control Panel\Cursors`
+    /// 17 役割を書き換えるため、テスト前の全役割値を退避し `Drop` で必ず書き戻す RAII ガード。
+    /// アサート失敗で panic しても `Drop` が走るので、テスト機のカーソル設定を破壊しない。
+    ///
+    /// 復元は `restore_from_snapshot` を通すことで「DWORD/文字列書込 + SPI 再通知」まで
+    /// フルパイプラインを行い、視覚的にも元のカーソルへ戻す。`Drop` 内では結果を無視し
+    /// (復元失敗しても二次 panic を起こさない)、`Drop` 内 panic を禁止する。
+    struct CursorValuesCleanup {
+        original_values: HashMap<String, String>,
+    }
+
+    impl CursorValuesCleanup {
+        /// 現在の 17 役割値を退避する。読み取りに失敗した場合は空マップを保持し、
+        /// `Drop` を no-op にする (退避できないものは書き戻さない)。
+        fn capture() -> Self {
+            let original_values = RegistryManager::read_current_cursors().unwrap_or_default();
+            Self { original_values }
+        }
+    }
+
+    impl Drop for CursorValuesCleanup {
+        fn drop(&mut self) {
+            // 結果は無視する: 復元失敗で panic すると Drop 連鎖が壊れるため。
+            let _ = RegistryManager::restore_from_snapshot(&self.original_values);
+        }
+    }
+
     /// `is_broadcast_false_positive` は SPIF_SENDCHANGE 起因の偽陽性を
     /// 拾い、それ以外の Win32 エラーは伝播させる必要がある。
     #[test]
@@ -1479,5 +1543,190 @@ mod tests {
             "Accessibility\\CursorSize != 1 のとき set_cursor_base_size は Err を返すべき, got {:?}",
             result
         );
+    }
+
+    /// `apply_cursors` の成功パスを end-to-end で行使する特性化テスト。
+    ///
+    /// 確認する性質:
+    ///  1. `cursor_paths` で指定した役割は、その文字列が `HKCU\Control Panel\Cursors`
+    ///     に書き込まれる (`read_current_cursors` で一致)。
+    ///  2. 指定しなかった役割は空文字列で埋まる (= Windows 既定継承)。
+    ///  3. 成功時には pending スナップショットが削除されている
+    ///     (`check_pending_snapshot() == Ok(None)`)。
+    ///
+    /// ロック順序は `apply_cursors_test_lock → cursors_dir_override_lock` で固定し、
+    /// 他テストとのデッドロックを避ける。`CUSTOM_CURSORS_DIR_OVERRIDE` を TempDir に
+    /// 向けることで実機の `~/.custom_cursors` を汚さず、`CursorValuesCleanup` で
+    /// HKCU の 17 役割値を退避・復元する。
+    ///
+    /// パスには実在する Windows 既定カーソル (`C:\Windows\Cursors\*.cur`) を使う。
+    /// レジストリ書込自体はファイル存在を見ないが、`apply_cursors` 末尾の
+    /// `notify_cursor_change` (`SystemParametersInfoW(SPI_SETCURSORS)`) は OS が
+    /// 実際にカーソルを再ロードするため、存在しないパスだと
+    /// `ERROR_FILE_NOT_FOUND` (0x80070002) で失敗する。この HRESULT は本番コードが
+    /// 偽陽性として扱う対象に含まれないので、テスト側で実在ファイルを指す必要がある。
+    /// `%SystemRoot%` を使わない絶対パスなので env 展開の影響も受けない。
+    #[test]
+    fn apply_cursors_success_writes_specified_roles_and_clears_others() {
+        use tempfile::TempDir;
+
+        // ロック順序を固定: apply 系ロック → override ロック。
+        let _apply_lock = apply_cursors_test_lock();
+        let _override_lock = crate::config::cursors_dir_override_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+
+        let tmp = TempDir::new().unwrap();
+        let _env_guard = EnvGuard::new("CUSTOM_CURSORS_DIR_OVERRIDE", tmp.path());
+
+        // HKCU の 17 役割を退避 (Drop で確実に復元)。
+        let _cleanup = CursorValuesCleanup::capture();
+
+        // 一部役割だけ埋めた cursor_paths。実在する Windows 既定カーソルを指す
+        // (SPI_SETCURSORS の再ロードを通すため)。
+        const ARROW_CUR: &str = "C:\\Windows\\Cursors\\aero_arrow.cur";
+        const IBEAM_CUR: &str = "C:\\Windows\\Cursors\\beam_i.cur";
+        let mut paths: HashMap<String, PathBuf> = HashMap::new();
+        paths.insert("Arrow".to_string(), PathBuf::from(ARROW_CUR));
+        paths.insert("IBeam".to_string(), PathBuf::from(IBEAM_CUR));
+
+        RegistryManager::apply_cursors(&paths).expect("apply_cursors が成功するべき");
+
+        // 1 + 2: 指定役割は一致、未指定役割は空文字列。
+        let current =
+            RegistryManager::read_current_cursors().expect("read_current_cursors が成功するべき");
+        assert_eq!(
+            current.get("Arrow").map(String::as_str),
+            Some(ARROW_CUR),
+            "指定した Arrow のパスが書き込まれているべき"
+        );
+        assert_eq!(
+            current.get("IBeam").map(String::as_str),
+            Some(IBEAM_CUR),
+            "指定した IBeam のパスが書き込まれているべき"
+        );
+        assert_eq!(
+            current.get("Wait").map(String::as_str),
+            Some(""),
+            "未指定の Wait は空文字列 (既定継承) になるべき"
+        );
+        assert_eq!(
+            current.get("Hand").map(String::as_str),
+            Some(""),
+            "未指定の Hand は空文字列 (既定継承) になるべき"
+        );
+
+        // 3: 成功時に pending スナップショットは削除済み。
+        let pending = RegistryManager::check_pending_snapshot()
+            .expect("check_pending_snapshot が成功するべき");
+        assert!(
+            pending.is_none(),
+            "apply_cursors 成功後は pending スナップショットが削除されているべき, got {pending:?}"
+        );
+    }
+
+    /// pending スナップショットの保存→確認→削除のライフサイクル往復を、
+    /// レジストリに一切触れずに検証する特性化テスト。
+    ///
+    /// 確認する性質:
+    ///  1. `save_pending_snapshot` 後、TempDir 内に `_pending_apply.snapshot` が存在する。
+    ///  2. `check_pending_snapshot` が `original_values` / `target_theme_id` /
+    ///     `schema_version` を往復で保持する。
+    ///  3. `remove_pending_snapshot` 後は `check_pending_snapshot() == Ok(None)`。
+    ///
+    /// `CUSTOM_CURSORS_DIR_OVERRIDE` を TempDir に向けるだけで完結するため、
+    /// `apply_cursors_test_lock` は不要 (HKCU を触らない)。`cursors_dir_override_lock`
+    /// のみ取得する。
+    #[test]
+    fn pending_snapshot_lifecycle_round_trip() {
+        use tempfile::TempDir;
+
+        let _override_lock = crate::config::cursors_dir_override_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+
+        let tmp = TempDir::new().unwrap();
+        let _env_guard = EnvGuard::new("CUSTOM_CURSORS_DIR_OVERRIDE", tmp.path());
+
+        let mut values: HashMap<String, String> = HashMap::new();
+        values.insert("Arrow".to_string(), "C:\\snap\\arrow.cur".to_string());
+        values.insert("Wait".to_string(), String::new());
+
+        // 1: 保存するとファイルが TempDir に作られる。
+        RegistryManager::save_pending_snapshot(&values, Some("theme-x"))
+            .expect("save_pending_snapshot が成功するべき");
+        let snapshot_path = tmp.path().join("_pending_apply.snapshot");
+        assert!(
+            snapshot_path.exists(),
+            "_pending_apply.snapshot が TempDir に存在するべき"
+        );
+
+        // 2: 読み戻した内容が往復で保持される。
+        let snapshot = RegistryManager::check_pending_snapshot()
+            .expect("check_pending_snapshot が成功するべき")
+            .expect("スナップショットが Some であるべき");
+        assert_eq!(
+            snapshot.original_values, values,
+            "original_values が保存値と一致するべき"
+        );
+        assert_eq!(
+            snapshot.target_theme_id.as_deref(),
+            Some("theme-x"),
+            "target_theme_id が保存値と一致するべき"
+        );
+        assert_eq!(snapshot.schema_version, 1, "schema_version は 1 であるべき");
+
+        // 3: 削除後は None。
+        RegistryManager::remove_pending_snapshot().expect("remove_pending_snapshot が成功するべき");
+        let after = RegistryManager::check_pending_snapshot()
+            .expect("削除後の check_pending_snapshot が成功するべき");
+        assert!(
+            after.is_none(),
+            "remove_pending_snapshot 後は None になるべき, got {after:?}"
+        );
+    }
+
+    /// `restore_from_snapshot` を直接行使する特性化テスト。
+    ///
+    /// 既知の全 17 役割マップ (`roles` の `CursorRole::all` から役割名を取得) で
+    /// `restore_from_snapshot` を呼び、`read_current_cursors` が与えた値と一致することを
+    /// 確認する。`apply_cursors` の書込失敗時ロールバック経路が依存する復元動作の特性化。
+    ///
+    /// HKCU の 17 役割を直接書き換えるため、`apply_cursors_test_lock` を取得し、
+    /// `CursorValuesCleanup` でテスト前の値を退避・復元する。
+    ///
+    /// 各役割には実在する Windows 既定カーソル (`aero_arrow.cur`) を割り当てる。
+    /// `restore_from_snapshot` 末尾の `notify_cursor_change` が OS にカーソルを
+    /// 再ロードさせるため、存在しないパスだと `ERROR_FILE_NOT_FOUND` (0x80070002)
+    /// で失敗するので実在ファイルが必要。全役割を同一ファイルに向けても、各役割が
+    /// 「書いた値そのまま」読み戻せるかという往復の特性化には十分。
+    #[test]
+    fn restore_from_snapshot_writes_all_17_roles() {
+        let _apply_lock = apply_cursors_test_lock();
+
+        // HKCU の 17 役割を退避 (Drop で確実に復元)。
+        let _cleanup = CursorValuesCleanup::capture();
+
+        // 既知の全 17 役割マップ。SPI 再ロードを通すため実在ファイルを指す。
+        const ARROW_CUR: &str = "C:\\Windows\\Cursors\\aero_arrow.cur";
+        let mut values: HashMap<String, String> = HashMap::new();
+        for role in CursorRole::all() {
+            let name = role.registry_name();
+            values.insert(name.to_string(), ARROW_CUR.to_string());
+        }
+
+        RegistryManager::restore_from_snapshot(&values)
+            .expect("restore_from_snapshot が成功するべき");
+
+        let current =
+            RegistryManager::read_current_cursors().expect("read_current_cursors が成功するべき");
+        for role in CursorRole::all() {
+            let name = role.registry_name();
+            assert_eq!(
+                current.get(name).map(String::as_str),
+                Some(ARROW_CUR),
+                "役割 {name} が復元値と一致するべき"
+            );
+        }
     }
 }
