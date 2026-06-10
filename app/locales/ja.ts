@@ -244,6 +244,10 @@ export default {
     recoveryDone: '{ms}ms で復旧しました',
     recoveryFailed: '復旧に失敗しました: {reason}',
   },
+  hotkey: {
+    registerFailedTitle: 'ホットキー登録に失敗',
+    registerFailedBody: '『{spec}』は他のアプリが使用中の可能性があります。設定で別のキーに変更してください。',
+  },
   settings: {
     sectionGeneral: '一般',
     sectionStartup: '起動・常駐',

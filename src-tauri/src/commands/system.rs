@@ -22,7 +22,7 @@ use tauri::{AppHandle, Emitter, State};
 /// `cursor-changed` を明示発火する理由: cursor_watcher は `HWND_MESSAGE` で
 /// 作られた message-only window で WM_SETTINGCHANGE のブロードキャストを
 /// 受け取れない。SPI_SETCURSORS による即時反映だけでは UI に伝わらない。
-fn reset_with_cleanup<F>(
+pub(crate) fn reset_with_cleanup<F>(
     app: AppHandle,
     config: State<'_, ConfigManager>,
     action_label: &str,

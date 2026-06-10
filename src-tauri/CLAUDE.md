@@ -62,7 +62,7 @@ cargo bench                                       # criterion benches in benches
 ## Hard rules (backend-side)
 
 - **HKCU only.** Never touch HKLM or anything that triggers UAC.
-- **Apply is transactional.** Snapshot to `~/.custom_cursors/_pending_apply.snapshot` before mutating; delete on success. Leftover snapshot on startup triggers auto-rollback.
+- **Apply is transactional (2 recovery paths).** Snapshot to `~/.custom_cursors/_pending_apply.snapshot` before mutating; delete on success. In-process write failure rolls back to the pre-apply values via `restore_from_snapshot`. A leftover snapshot on startup means an interrupted apply (likely a crash) and the registry may be mixed, so recovery resets to **Windows default via `reset_to_windows_default` — not the pre-apply values** (intentional safety choice).
 - **PII redaction is mandatory.** Raw registry values and full SHA-256 must never appear in logs.
 - **Archive sanitisation.** Any unzip path must go through `theme::sanitize_archive_path` with the documented size limits (50 MB compressed / 200 MB expanded / 10 MB per image / 1 GB total).
 

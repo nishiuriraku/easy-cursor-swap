@@ -62,9 +62,10 @@ where
             };
 
             // 不可視ウィンドウなのでフォーカスは奪わない
+            // ポイズン (前回 lock 保持中の panic) でも回収して書き込む。
             CURSOR_CHANGE_CALLBACK
                 .lock()
-                .unwrap()
+                .unwrap_or_else(|e| e.into_inner())
                 .replace(Box::new(on_change));
             tracing::info!("カーソル設定変更監視を開始しました");
 
@@ -102,10 +103,12 @@ unsafe extern "system" fn cursor_wnd_proc(
         const SPI_SETCURSORS: usize = 0x0057;
         if wparam.0 == SPI_SETCURSORS {
             tracing::debug!("SPI_SETCURSORS 変更を検知");
-            if let Ok(cb) = CURSOR_CHANGE_CALLBACK.lock() {
-                if let Some(ref callback) = *cb {
-                    callback();
-                }
+            // ポイズンしていてもコールバックは実行する (UI 再読込の取りこぼしを防ぐ)。
+            let cb = CURSOR_CHANGE_CALLBACK
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            if let Some(ref callback) = *cb {
+                callback();
             }
         }
     }

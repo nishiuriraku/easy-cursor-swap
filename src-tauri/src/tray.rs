@@ -83,24 +83,30 @@ fn handle_tray_menu_event(app: &AppHandle, menu_id: &str) {
         }
         "panic_default" => {
             tracing::info!("パニックボタン: Windows 既定に戻す");
-            match crate::registry::RegistryManager::reset_to_windows_default() {
-                Ok(_) => {
-                    tracing::info!("Windows 既定カーソルに復旧しました");
-                }
-                Err(e) => {
-                    tracing::error!("復旧に失敗: {}", e);
-                }
+            // IPC 版 (commands::system::reset_to_default) と同一の後処理に統一する:
+            // レジストリ操作 + active_theme_id クリア + cursor-changed 発火を一手に行い、
+            // SoT (config) と UI 通知を直叩き経路でも迂回させない。
+            let config = app.state::<crate::config::ConfigManager>();
+            if let Err(e) = crate::commands::system::reset_with_cleanup(
+                app.clone(),
+                config,
+                "tray_panic_default",
+                crate::registry::RegistryManager::reset_to_windows_default,
+            ) {
+                tracing::error!("復旧に失敗: {}", e);
             }
         }
         "panic_initial" => {
             tracing::info!("パニックボタン: インストール前の状態に戻す");
-            match crate::registry::RegistryManager::restore_from_initial_snapshot() {
-                Ok(_) => {
-                    tracing::info!("インストール前のカーソル設定に復旧しました");
-                }
-                Err(e) => {
-                    tracing::error!("復旧に失敗: {}", e);
-                }
+            // IPC 版 (commands::system::reset_to_initial) と同一の後処理に統一する。
+            let config = app.state::<crate::config::ConfigManager>();
+            if let Err(e) = crate::commands::system::reset_with_cleanup(
+                app.clone(),
+                config,
+                "tray_panic_initial",
+                crate::registry::RegistryManager::restore_from_initial_snapshot,
+            ) {
+                tracing::error!("復旧に失敗: {}", e);
             }
         }
         "quit" => {

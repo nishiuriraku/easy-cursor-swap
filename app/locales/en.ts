@@ -245,6 +245,10 @@ export default {
     recoveryDone: 'Recovered in {ms}ms',
     recoveryFailed: 'Recovery failed: {reason}',
   },
+  hotkey: {
+    registerFailedTitle: 'Hotkey registration failed',
+    registerFailedBody: '"{spec}" may be in use by another app. Change it in Settings.',
+  },
   settings: {
     sectionGeneral: 'General',
     sectionStartup: 'Startup & Tray',

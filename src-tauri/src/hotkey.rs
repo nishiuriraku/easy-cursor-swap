@@ -84,19 +84,29 @@ pub fn parse_hotkey(spec: &str) -> Option<(u32, u32)> {
 /// パニックホットキーを登録し、押下時に `callback` を呼ぶ。
 ///
 /// `spec` は `parse_hotkey` で解釈する。失敗ケース:
-///   - 不正な形式 → `AppError::InvalidInput`
-///   - 既に他アプリが同じ組合せを取得済み → `AppError::Other` (RegisterHotKey 失敗)
+///   - 不正な形式 → `AppError::InvalidInput` (呼び出し元へ即 `Err`。`on_result` は呼ばない)
+///   - 既に他アプリが同じ組合せを取得済み → `RegisterHotKey` 失敗
+///
+/// 登録はバックグラウンドスレッドで非同期に行われるため、ウィンドウ作成 /
+/// `RegisterHotKey` の成否は戻り値では伝わらない。代わりに `on_result` クロージャを
+/// スレッド内で 1 度だけ呼んで結果を通知する (成功 → `Ok(())` / 失敗 → `Err(reason)`)。
+/// 呼び出し元はこれを使って UI へ「ホットキー登録失敗」を伝播できる (audit F-19)。
 #[cfg(windows)]
-pub fn register_panic_hotkey<F>(spec: &str, callback: F) -> AppResult<()>
+pub fn register_panic_hotkey<F, R>(spec: &str, callback: F, on_result: R) -> AppResult<()>
 where
     F: Fn() + Send + 'static,
+    R: FnOnce(Result<(), String>) + Send + 'static,
 {
     let (modifiers, vk) = parse_hotkey(spec).ok_or_else(|| {
         AppError::InvalidInput(format!("ホットキー文字列を解釈できません: {}", spec))
     })?;
 
     let spec_owned = spec.to_string();
-    HOTKEY_CALLBACK.lock().unwrap().replace(Box::new(callback));
+    // ポイズン (前回 lock 保持中の panic) でも回収して書き込む。
+    HOTKEY_CALLBACK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .replace(Box::new(callback));
 
     std::thread::Builder::new()
         .name("easycursorswap-hotkey".to_string())
@@ -132,6 +142,7 @@ where
                 Ok(h) => h,
                 Err(e) => {
                     tracing::error!("hotkey ウィンドウ作成失敗: {}", e);
+                    on_result(Err(format!("CreateWindow: {}", e)));
                     return;
                 }
             };
@@ -148,8 +159,11 @@ where
                     e
                 );
                 let _ = DestroyWindow(hwnd);
+                on_result(Err(format!("RegisterHotKey: {}", e)));
                 return;
             }
+            // 登録成功を通知してからメッセージループへ。
+            on_result(Ok(()));
             tracing::info!("パニックホットキーを登録: {}", spec_owned);
 
             let mut msg = MSG::default();
@@ -166,11 +180,14 @@ where
 }
 
 #[cfg(not(windows))]
-pub fn register_panic_hotkey<F>(_spec: &str, _callback: F) -> AppResult<()>
+pub fn register_panic_hotkey<F, R>(_spec: &str, _callback: F, on_result: R) -> AppResult<()>
 where
     F: Fn() + Send + 'static,
+    R: FnOnce(Result<(), String>) + Send + 'static,
 {
     tracing::warn!("グローバルホットキーは Windows 以外では利用できません");
+    // シグネチャ整合のため即座に成功通知 (このプラットフォームでは登録自体が no-op)。
+    on_result(Ok(()));
     Ok(())
 }
 
@@ -185,10 +202,11 @@ unsafe extern "system" fn hotkey_wnd_proc(
 
     if msg == WM_HOTKEY && wparam.0 as i32 == PANIC_HOTKEY_ID {
         tracing::info!("パニックホットキー押下を検知");
-        if let Ok(cb) = HOTKEY_CALLBACK.lock() {
-            if let Some(ref callback) = *cb {
-                callback();
-            }
+        // ポイズンしていてもコールバックは実行する (パニックリセットは最終救済手段なので
+        // 取りこぼさない方が安全)。
+        let cb = HOTKEY_CALLBACK.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(ref callback) = *cb {
+            callback();
         }
         return windows::Win32::Foundation::LRESULT(0);
     }

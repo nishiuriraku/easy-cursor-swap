@@ -244,14 +244,25 @@ fn main() {
     }
 
     // クラッシュリカバリ: pending スナップショットの確認
+    //
+    // 中断時の復旧には 2 経路ある:
+    //  (a) プロセス生存中の apply 失敗 → `apply_cursors` 内で `restore_from_snapshot`
+    //      により「適用前の値」へ正確に巻き戻す (in-process ロールバック)。
+    //  (b) ここ = クラッシュ後の再起動 → どの役割まで書けたか不明でレジストリが
+    //      混在状態になり得る。適用前値の部分復元は不整合を残すため、Windows 既定へ
+    //      リセットして安全側に倒す (意図的な設計。バグ修正ではない)。
     match RegistryManager::check_pending_snapshot() {
         Ok(Some(_snapshot)) => {
-            tracing::warn!("前回の適用処理が中断されていました。復元を開始します...");
-            // スナップショットから復元
+            // _snapshot は意図的に読み捨てる。既定化方針では original_values を使わず、
+            // スナップショットファイルの存在 = 前回 apply が中断された、という検出のみに使う。
+            tracing::warn!(
+                "前回の適用処理が中断されていました。Windows 既定へリセットします (適用前への復元ではない)"
+            );
+            // 適用前値ではなく Windows 既定へリセットする (混在状態回避の安全策)。
             if let Err(e) = RegistryManager::reset_to_windows_default() {
                 tracing::error!("クラッシュリカバリに失敗: {}", e);
             } else {
-                tracing::info!("クラッシュリカバリ完了");
+                tracing::info!("クラッシュリカバリ完了 (Windows 既定へリセット)");
             }
             // スナップショットを削除
             let _ = RegistryManager::remove_pending_snapshot();
@@ -352,16 +363,41 @@ fn main() {
             // 押下時はフロントへ `panic-hotkey` イベントを発火し、PanicFlow を起動させる
             let hotkey_handle = handle.clone();
             let spec = hotkey_spec.clone();
-            if let Err(e) = hotkey::register_panic_hotkey(&spec, move || {
+            // 登録失敗時 (他アプリがホットキーを占有 等) に UI へ伝えるための結果通知ハンドラ。
+            // バックグラウンドスレッドの登録成否は戻り値では分からないため on_result で受ける (F-19)。
+            let result_handle = handle.clone();
+            let result_spec = hotkey_spec.clone();
+            if let Err(e) = hotkey::register_panic_hotkey(
+                &spec,
+                move || {
+                    use tauri::Emitter;
+                    tracing::info!("panic-hotkey イベントを発火");
+                    // 破棄されていれば再生成してから前面化
+                    tray::show_or_recreate_main_window(&hotkey_handle);
+                    if let Err(err) = hotkey_handle.emit("panic-hotkey", ()) {
+                        tracing::warn!("panic-hotkey emit 失敗: {}", err);
+                    }
+                },
+                move |res| {
+                    use tauri::Emitter;
+                    if let Err(reason) = res {
+                        tracing::warn!("パニックホットキー登録に失敗: {}", reason);
+                        let payload = serde_json::json!({ "spec": result_spec, "reason": reason });
+                        if let Err(err) = result_handle.emit("hotkey-register-failed", payload) {
+                            tracing::warn!("hotkey-register-failed emit 失敗: {}", err);
+                        }
+                    }
+                },
+            ) {
+                // ここに来るのは parse 失敗 (spawn 前の早期 Err)。on_result は呼ばれないので
+                // ここでも同じイベントを emit して UI に伝える。
                 use tauri::Emitter;
-                tracing::info!("panic-hotkey イベントを発火");
-                // 破棄されていれば再生成してから前面化
-                tray::show_or_recreate_main_window(&hotkey_handle);
-                if let Err(err) = hotkey_handle.emit("panic-hotkey", ()) {
-                    tracing::warn!("panic-hotkey emit 失敗: {}", err);
-                }
-            }) {
                 tracing::warn!("パニックホットキー登録に失敗: {}", e);
+                let payload =
+                    serde_json::json!({ "spec": hotkey_spec.clone(), "reason": e.to_string() });
+                if let Err(err) = handle.emit("hotkey-register-failed", payload) {
+                    tracing::warn!("hotkey-register-failed emit 失敗: {}", err);
+                }
             }
 
             // 外部カーソル変更監視 — コントロールパネル等で書き換えられたら UI を再読込

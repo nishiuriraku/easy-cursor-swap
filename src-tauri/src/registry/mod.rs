@@ -168,14 +168,26 @@ impl RegistryManager {
         let entries = compute_apply_values(cursor_paths);
         for (name, value) in &entries {
             if let Err(e) = cursors_key.set_value(name, value) {
-                // 書き込み失敗時はスナップショットから復元
+                // 書き込み失敗時はスナップショットから復元 (適用前値へロールバック)。
                 tracing::error!("レジストリ書き込み失敗 ({}): {}", name, e);
-                let _ = Self::restore_from_snapshot(&current_values);
-                Self::remove_pending_snapshot()?;
-                return Err(AppError::Registry(format!(
-                    "カーソル {} の書き込みに失敗: {}",
-                    name, e
-                )));
+                // ロールバック結果をログに残す。失敗した場合はパニックボタン誘導を
+                // エラーメッセージ末尾に付記し、ユーザーが手動復旧できるようにする。
+                let mut msg = format!("カーソル {} の書き込みに失敗: {}", name, e);
+                match Self::restore_from_snapshot(&current_values) {
+                    Ok(()) => tracing::info!("書込失敗後のロールバックに成功 (適用前値へ復元)"),
+                    Err(re) => {
+                        tracing::error!("書込失敗後のロールバックにも失敗: {}", re);
+                        msg.push_str(&format!(
+                            " / ロールバックにも失敗 ({}) — Ctrl+Alt+Shift+R でリセットしてください",
+                            re
+                        ));
+                    }
+                }
+                // スナップショット削除失敗は元の書込エラーを潰さないよう warn に留める。
+                if let Err(pe) = Self::remove_pending_snapshot() {
+                    tracing::warn!("pending スナップショットの削除に失敗: {}", pe);
+                }
+                return Err(AppError::Registry(msg));
             }
         }
 
@@ -1726,6 +1738,49 @@ mod tests {
                 current.get(name).map(String::as_str),
                 Some(ARROW_CUR),
                 "役割 {name} が復元値と一致するべき"
+            );
+        }
+    }
+
+    /// `reset_to_windows_default` を直接行使する特性化テスト。
+    ///
+    /// 起動時クラッシュリカバリ (`main.rs`) の経路 (b) は、適用前値の復元ではなく
+    /// この `reset_to_windows_default` で全役割を空文字列にして Windows 既定へ
+    /// 倒す。その「17 役割すべてが空文字列になる」というレジストリ書込契約を特性化する。
+    ///
+    /// レジストリ書込 (全役割 → "") は `reset_to_windows_default` の中で
+    /// `notify_cursor_change` (SPI 再ロード) より**前**に完了する。SPI の
+    /// `WM_SETTINGCHANGE` ブロードキャストは環境により偽陽性 Err を返すことがある
+    /// (応答しないウィンドウのタイムアウト / 全役割が空のときの ERROR_INVALID_PARAMETER 等)
+    /// が、それは書込結果には影響しない。よって戻り値の Err は許容し、書込結果
+    /// (= read_current_cursors) のみを契約として検証する。
+    ///
+    /// HKCU の 17 役割を直接書き換えるため、`apply_cursors_test_lock` を取得し、
+    /// `CursorValuesCleanup` でテスト前の値を退避・復元する。
+    #[test]
+    fn reset_to_windows_default_clears_all_17_roles() {
+        let _apply_lock = apply_cursors_test_lock();
+
+        // HKCU の 17 役割を退避 (Drop で確実に復元)。
+        let _cleanup = CursorValuesCleanup::capture();
+
+        // 戻り値の Err は SPI ブロードキャスト偽陽性のみ許容 (書込は既に完了している)。
+        // Registry 以外のエラー種別なら本物の失敗なので panic させる。
+        if let Err(e) = RegistryManager::reset_to_windows_default() {
+            assert!(
+                matches!(e, AppError::Registry(_)),
+                "reset_to_windows_default の許容外エラー: {e:?}"
+            );
+        }
+
+        let current =
+            RegistryManager::read_current_cursors().expect("read_current_cursors が成功するべき");
+        for role in CursorRole::all() {
+            let name = role.registry_name();
+            assert_eq!(
+                current.get(name).map(String::as_str),
+                Some(""),
+                "役割 {name} は Windows 既定リセットで空文字列になるべき"
             );
         }
     }
