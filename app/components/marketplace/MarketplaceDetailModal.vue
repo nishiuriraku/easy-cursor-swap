@@ -34,6 +34,7 @@ const previewMap = ref<Record<string, string> | null>(null)
 const previewLoading = ref(false)
 const { getMap } = useMarketplacePreviews()
 const { themes } = useThemes()
+const { openExternalUrl } = useExternalUrl()
 
 const alreadyInstalled = computed(() => {
   const id = props.entry?.id
@@ -74,6 +75,12 @@ watch(() => props.entry, fetchPreviews, { immediate: true })
 
 function close() {
   emit('close')
+}
+
+// F-17: homepage を <a :href> 直結ではなく useExternalUrl 経由で開く (第二防御線)。
+// open_url IPC 側で is_allowed_url_scheme が再検証する。
+function openHomepage() {
+  if (props.entry?.homepage) openExternalUrl(props.entry.homepage)
 }
 
 function onInstall() {
@@ -119,9 +126,9 @@ function onInstall() {
         </div>
         <div v-if="entry.homepage" class="md-row">
           <span class="md-k">Homepage</span>
-          <a :href="entry.homepage" target="_blank" rel="noopener noreferrer" class="md-v link">{{
-            entry.homepage
-          }}</a>
+          <button type="button" class="md-v link" @click="openHomepage">
+            {{ entry.homepage }}
+          </button>
         </div>
       </div>
     </template>
@@ -169,7 +176,7 @@ function onInstall() {
   @apply text-fg-dim;
 }
 .md-v.link {
-  @apply text-accent underline;
+  @apply cursor-pointer border-0 bg-transparent p-0 text-left text-accent underline;
 }
 .chips-row {
   @apply inline-flex flex-wrap gap-1;
