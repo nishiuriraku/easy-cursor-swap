@@ -38,6 +38,9 @@ const showDrop = ref(false)
 // 適用確認モーダル制御
 const pendingTheme = ref<ThemeCardData | null>(null)
 const applyBusy = ref(false)
+// .cursorpack インポート (検査 + 取込) 実行中フラグ (LD8)。ファイルダイアログ自体は
+// ネイティブのため busy にせず、選択後の inspect/actuallyImport の間だけ true にする。
+const importBusy = ref(false)
 const applyError = ref<string | null>(null)
 // 詳細モーダルの二次アクション (edit/export/duplicate/delete) 実行中フラグ (LD8)。
 // 該当ボタンにスピナーを出し、実行中はグループを無効化する。
@@ -371,6 +374,7 @@ async function deleteTheme(id: string) {
 let unlistenDrop: (() => void) | null = null
 
 async function importByPath(path: string) {
+  importBusy.value = true
   try {
     // まず軽量検査して既存テーマと衝突するか確認
     const inspection = await inspectCursorpackIpc(path)
@@ -398,6 +402,8 @@ async function importByPath(path: string) {
     const msg = err instanceof Error ? err.message : String(err)
     applyError.value = t('library.errImport', { detail: msg })
     console.error('[Library] import failed:', err)
+  } finally {
+    importBusy.value = false
   }
 }
 
@@ -421,11 +427,14 @@ async function confirmConflictOverwrite() {
   const pending = conflictDialog.value
   if (!pending) return
   conflictDialog.value = null
+  importBusy.value = true
   try {
     await actuallyImport(pending.path)
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     applyError.value = t('library.errImport', { detail: msg })
+  } finally {
+    importBusy.value = false
   }
 }
 
@@ -682,7 +691,11 @@ onUnmounted(() => {
 
 <template>
   <div class="library-host">
-    <LibraryToolbar v-model:search-query="searchQuery" @open-import="openImportDialog" />
+    <LibraryToolbar
+      v-model:search-query="searchQuery"
+      :import-busy="importBusy"
+      @open-import="openImportDialog"
+    />
 
     <!-- メインコンテンツ -->
     <div class="content">
