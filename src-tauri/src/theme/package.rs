@@ -149,17 +149,17 @@ impl ThemeManager {
         use crate::errors::AppError;
         use std::io::{Cursor, Read};
 
-        // 圧縮サイズの SoT は config.rs の DEFAULT_MAX_PACK_COMPRESSED_SIZE。
-        // 残り 2 つ (uncompressed total / per-file size) は本 commit のスコープ外。
-        use crate::config::DEFAULT_MAX_PACK_COMPRESSED_SIZE;
-        const MAX_UNCOMPRESSED_TOTAL: u64 = 200 * 1024 * 1024;
-        const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024;
+        // サイズ上限 3 種はすべて config.rs の DEFAULT_* を SoT として参照する。
+        use crate::config::{
+            DEFAULT_MAX_IMAGE_FILE_SIZE, DEFAULT_MAX_PACK_COMPRESSED_SIZE,
+            DEFAULT_MAX_PACK_UNCOMPRESSED_SIZE,
+        };
 
         if bytes.len() as u64 > DEFAULT_MAX_PACK_COMPRESSED_SIZE {
             return Err(AppError::Theme(format!(
                 ".cursorpack 圧縮サイズ {} bytes が上限 {} を超えています",
                 bytes.len(),
-                DEFAULT_MAX_PACK_COMPRESSED_SIZE
+                DEFAULT_MAX_PACK_COMPRESSED_SIZE,
             )));
         }
 
@@ -230,23 +230,15 @@ impl ThemeManager {
                 continue;
             }
 
-            // 個別ファイルサイズ
-            if entry.size() > MAX_FILE_SIZE {
+            // 個別ファイルサイズ: 申告値 (entry.size()) は信用できないので高速棄却に
+            // とどめ、後段の io::copy + take で実伸長バイト数を真の上限とする。
+            if entry.size() > DEFAULT_MAX_IMAGE_FILE_SIZE {
+                let _ = std::fs::remove_dir_all(&target_dir);
                 return Err(AppError::Theme(format!(
                     "ファイル {} のサイズ {} bytes が上限 {} を超えています",
                     raw_name,
                     entry.size(),
-                    MAX_FILE_SIZE
-                )));
-            }
-
-            // 累積サイズ (Zip 爆弾の最終防衛線)
-            total_uncompressed = total_uncompressed.saturating_add(entry.size());
-            if total_uncompressed > MAX_UNCOMPRESSED_TOTAL {
-                let _ = std::fs::remove_dir_all(&target_dir);
-                return Err(AppError::Theme(format!(
-                    "展開後合計サイズが上限 {} bytes を超えました",
-                    MAX_UNCOMPRESSED_TOTAL
+                    DEFAULT_MAX_IMAGE_FILE_SIZE
                 )));
             }
 
@@ -255,7 +247,30 @@ impl ThemeManager {
                 std::fs::create_dir_all(parent)?;
             }
             let mut out = std::fs::File::create(&dest)?;
-            std::io::copy(&mut entry, &mut out)?;
+            // 申告サイズに依存せず、実ストリーム長を `take` で上限 +1 まで読んで
+            // 実書込バイト数で判定する (申告値を偽った zip 爆弾対策)。
+            let written = std::io::copy(
+                &mut entry.by_ref().take(DEFAULT_MAX_IMAGE_FILE_SIZE + 1),
+                &mut out,
+            )?;
+            if written > DEFAULT_MAX_IMAGE_FILE_SIZE {
+                let _ = std::fs::remove_file(&dest);
+                let _ = std::fs::remove_dir_all(&target_dir);
+                return Err(AppError::Theme(format!(
+                    "ファイル {} の実サイズが上限 {} bytes を超えています",
+                    raw_name, DEFAULT_MAX_IMAGE_FILE_SIZE
+                )));
+            }
+
+            // 累積サイズ (Zip 爆弾の最終防衛線): 申告値ではなく実書込バイト数を加算。
+            total_uncompressed = total_uncompressed.saturating_add(written);
+            if total_uncompressed > DEFAULT_MAX_PACK_UNCOMPRESSED_SIZE {
+                let _ = std::fs::remove_dir_all(&target_dir);
+                return Err(AppError::Theme(format!(
+                    "展開後合計サイズが上限 {} bytes を超えました",
+                    DEFAULT_MAX_PACK_UNCOMPRESSED_SIZE
+                )));
+            }
         }
 
         tracing::info!(

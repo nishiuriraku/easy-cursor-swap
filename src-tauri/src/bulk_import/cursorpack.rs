@@ -5,6 +5,10 @@
 //! メモリ上で PNG バイトを取り出す必要がある。本モジュールはその専用パイプライン。
 
 use super::{BulkImportProgress, ParseCursorpackRequest, ParsedCursorpack, ParsedRole};
+use crate::config::{
+    DEFAULT_MAX_IMAGE_FILE_SIZE, DEFAULT_MAX_PACK_COMPRESSED_SIZE,
+    DEFAULT_MAX_PACK_UNCOMPRESSED_SIZE,
+};
 use crate::errors::AppError;
 use crate::theme::types::AniFrameData;
 use std::collections::HashMap;
@@ -160,6 +164,32 @@ pub fn parse_cursorpack_inner(bytes: &[u8]) -> Result<ParsedCursorpack, AppError
     parse_cursorpack_inner_with_extract(bytes, None)
 }
 
+/// ZIP エントリを「申告サイズに依存せず」実バイト上限まで読み込むヘルパー。
+///
+/// in-memory パイプライン (Creator 取り込み) なので `take(上限 +1)` で打ち切り、
+/// 実伸長サイズが個別上限を超えたら Err。size ガードは `parse_ico_cur` 等の
+/// フォーマット解析より前に効かせるため、読込点ごとにこれを通す。
+/// `label` はエラーメッセージ用 (例: "ロール Arrow のファイル size.cur")。
+fn read_entry_capped<R: std::io::Read>(entry: &mut R, label: &str) -> Result<Vec<u8>, AppError> {
+    let mut buf = Vec::new();
+    entry
+        .by_ref()
+        .take(DEFAULT_MAX_IMAGE_FILE_SIZE + 1)
+        .read_to_end(&mut buf)
+        .map_err(|e| AppError::InvalidCursorpack {
+            reason: format!("{} の読み込みに失敗: {}", label, e),
+        })?;
+    if buf.len() as u64 > DEFAULT_MAX_IMAGE_FILE_SIZE {
+        return Err(AppError::InvalidCursorpack {
+            reason: format!(
+                "{} の実サイズが上限 {} bytes を超えています",
+                label, DEFAULT_MAX_IMAGE_FILE_SIZE
+            ),
+        });
+    }
+    Ok(buf)
+}
+
 /// `parse_cursorpack_inner` の `.ani` 展開先指定版。
 /// `ani_extract_dir` を渡すと、`.ani` ロールのバイトをそこに書き出して
 /// 各 ParsedRole の `ani_source_path` に絶対パスを格納する。
@@ -167,10 +197,24 @@ pub fn parse_cursorpack_inner_with_extract(
     bytes: &[u8],
     ani_extract_dir: Option<&Path>,
 ) -> Result<ParsedCursorpack, AppError> {
+    // 1) 圧縮サイズ上限 (zip 爆弾の入口防御)。フォーマット解析より前に置く。
+    if bytes.len() as u64 > DEFAULT_MAX_PACK_COMPRESSED_SIZE {
+        return Err(AppError::InvalidCursorpack {
+            reason: format!(
+                ".cursorpack 圧縮サイズ {} bytes が上限 {} を超えています",
+                bytes.len(),
+                DEFAULT_MAX_PACK_COMPRESSED_SIZE
+            ),
+        });
+    }
+
     let cursor = std::io::Cursor::new(bytes);
     let mut archive = ZipArchive::new(cursor).map_err(|e| AppError::InvalidCursorpack {
         reason: format!("ZIP オープン失敗: {}", e),
     })?;
+
+    // 累積展開サイズ (zip 爆弾の最終防衛線)。実読込バイト数で加算する。
+    let mut total: u64 = 0;
 
     // theme.json を読む
     let theme: crate::theme::ThemeMetadata = {
@@ -179,12 +223,12 @@ pub fn parse_cursorpack_inner_with_extract(
             .map_err(|_| AppError::InvalidCursorpack {
                 reason: "theme.json が見つかりません".to_string(),
             })?;
-        let mut buf = String::new();
-        entry
-            .read_to_string(&mut buf)
-            .map_err(|e| AppError::InvalidCursorpack {
-                reason: format!("theme.json 読み込み失敗: {}", e),
-            })?;
+        // theme.json も個別上限の対象 (実バイトで打ち切り)。
+        let raw = read_entry_capped(&mut entry, "theme.json")?;
+        total = total.saturating_add(raw.len() as u64);
+        let buf = String::from_utf8(raw).map_err(|e| AppError::InvalidCursorpack {
+            reason: format!("theme.json が UTF-8 ではありません: {}", e),
+        })?;
         serde_json::from_str(&buf).map_err(|e| AppError::InvalidCursorpack {
             reason: format!("theme.json 解析失敗: {}", e),
         })?
@@ -195,7 +239,7 @@ pub fn parse_cursorpack_inner_with_extract(
     // 各ロールを抽出
     let mut roles: HashMap<String, ParsedRole> = HashMap::new();
     for (role_id, def) in &theme.cursors {
-        // primary ファイルを読む
+        // primary ファイルを読む (個別上限を実バイトで打ち切り、累積へ加算)
         let primary_bytes = {
             let mut entry =
                 archive
@@ -206,12 +250,19 @@ pub fn parse_cursorpack_inner_with_extract(
                             role_id, def.file
                         ),
                     })?;
-            let mut buf = Vec::new();
-            entry
-                .read_to_end(&mut buf)
-                .map_err(|e| AppError::InvalidCursorpack {
-                    reason: format!("ロール {} のファイル読み込み失敗: {}", role_id, e),
-                })?;
+            let buf = read_entry_capped(
+                &mut entry,
+                &format!("ロール {} のファイル {}", role_id, def.file),
+            )?;
+            total = total.saturating_add(buf.len() as u64);
+            if total > DEFAULT_MAX_PACK_UNCOMPRESSED_SIZE {
+                return Err(AppError::InvalidCursorpack {
+                    reason: format!(
+                        "展開後合計サイズが上限 {} bytes を超えました",
+                        DEFAULT_MAX_PACK_UNCOMPRESSED_SIZE
+                    ),
+                });
+            }
             buf
         };
 
@@ -261,9 +312,20 @@ pub fn parse_cursorpack_inner_with_extract(
                         Ok(e) => e,
                         Err(_) => continue,
                     };
-                    let mut buf = Vec::new();
-                    if entry.read_to_end(&mut buf).is_err() {
-                        continue;
+                    // サイズ超過は握り潰さず Err (攻撃を素通りさせない)。
+                    // エントリ欠落・破損は従来どおり continue でスキップ。
+                    let buf = read_entry_capped(
+                        &mut entry,
+                        &format!("ロール {} の size_override {}", role_id, ov.file),
+                    )?;
+                    total = total.saturating_add(buf.len() as u64);
+                    if total > DEFAULT_MAX_PACK_UNCOMPRESSED_SIZE {
+                        return Err(AppError::InvalidCursorpack {
+                            reason: format!(
+                                "展開後合計サイズが上限 {} bytes を超えました",
+                                DEFAULT_MAX_PACK_UNCOMPRESSED_SIZE
+                            ),
+                        });
                     }
                     if let Ok(parsed_ov) = crate::cursor::parse_ico_cur(&buf) {
                         if let Some(matching) = parsed_ov.entries.iter().find(|e| e.width == size) {
@@ -316,6 +378,17 @@ pub async fn parse_cursorpack_for_creator(
         let bytes = std::fs::read(&req.path).map_err(|e| AppError::InvalidCursorpack {
             reason: format!("読み込み失敗: {}", e),
         })?;
+        // 圧縮上限の二重チェック (parse_cursorpack_inner_with_extract 側でも検査するが、
+        // ファイル経路でも早期に弾いておく。二重でも害なし)。
+        if bytes.len() as u64 > DEFAULT_MAX_PACK_COMPRESSED_SIZE {
+            return Err(AppError::InvalidCursorpack {
+                reason: format!(
+                    ".cursorpack 圧縮サイズ {} bytes が上限 {} を超えています",
+                    bytes.len(),
+                    DEFAULT_MAX_PACK_COMPRESSED_SIZE
+                ),
+            });
+        }
         // `.ani` ロールのバイトは export 時に rewrite_ani_with_hotspot で再利用するため、
         // `<cursorpack>.extracted/` に書き出してパスを ParsedRole.ani_source_path に格納する。
         // ディレクトリは cursorpack と同じ寿命 (一時テーマ複製では tempDir() 配下) なので
@@ -388,5 +461,138 @@ mod tests {
             uuid::Uuid::parse_str(id).is_ok(),
             "metadata.id should be a parseable UUID, got {id:?}"
         );
+    }
+
+    // ── F-11: parse_cursorpack_inner サイズガード回帰テスト ─────────────
+    //
+    // parse_cursorpack_inner_with_extract の検査順序:
+    //   圧縮上限 → ZipArchive::new → theme.json (read_entry_capped)→
+    //   ロール毎に primary を read_entry_capped (個別+累積)→ parse_ico_cur。
+    // 以前はこの 3 段ガードが皆無で、巨大 .cursorpack を無防備にメモリ展開していた。
+
+    use crate::theme::types::{CursorDefinition, ThemeMetadata};
+    use crate::theme::LocalizedString;
+    use std::collections::HashMap;
+
+    /// 有効な theme.json + 任意の追加エントリで .cursorpack バイト列を作る。
+    /// `cursors` に role→file を指定すると theme.json の cursors に反映される。
+    /// `add_entries` クロージャで悪性ロールファイルなどを追加する。
+    fn build_pack(
+        cursors: HashMap<String, String>,
+        add_entries: impl FnOnce(&mut zip::ZipWriter<std::io::Cursor<&mut Vec<u8>>>),
+    ) -> Vec<u8> {
+        use std::io::Write;
+
+        let cursor_defs: HashMap<String, CursorDefinition> = cursors
+            .into_iter()
+            .map(|(role, file)| {
+                (
+                    role,
+                    CursorDefinition {
+                        file,
+                        hotspot: crate::theme::types::Hotspot::ZERO,
+                        resize_method: "lanczos".to_string(),
+                        size_overrides: None,
+                    },
+                )
+            })
+            .collect();
+
+        let metadata = ThemeMetadata {
+            schema_version: 1,
+            id: uuid::Uuid::new_v4(),
+            name: LocalizedString::Simple("Guard Test Pack".into()),
+            version: "1.0.0".into(),
+            created_at: "2026-06-10T00:00:00Z".into(),
+            requires_os_shadow: false,
+            cursors: cursor_defs,
+            author: None,
+            license: None,
+            homepage: None,
+            description: None,
+            min_app_version: None,
+            signature: None,
+            tags: Vec::new(),
+            source: crate::theme::types::ThemeSource::Local,
+            cloned_from_marketplace_id: None,
+        };
+        let metadata_json = serde_json::to_vec_pretty(&metadata).unwrap();
+
+        let mut buf: Vec<u8> = Vec::new();
+        {
+            let cursor = std::io::Cursor::new(&mut buf);
+            let mut zip = zip::ZipWriter::new(cursor);
+            let opts: zip::write::SimpleFileOptions = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Deflated);
+            zip.start_file("theme.json", opts).unwrap();
+            zip.write_all(&metadata_json).unwrap();
+            add_entries(&mut zip);
+            zip.finish().unwrap();
+        }
+        buf
+    }
+
+    #[test]
+    fn parse_rejects_oversized_compressed_pack() {
+        // 圧縮上限超: ZipArchive 解析より前に弾く。中身は ZIP ですらなくてよい。
+        let oversized = vec![0u8; (DEFAULT_MAX_PACK_COMPRESSED_SIZE + 1) as usize];
+        let result = parse_cursorpack_inner(&oversized);
+        assert!(
+            result.is_err(),
+            "圧縮上限を超える .cursorpack は拒否されるべき"
+        );
+    }
+
+    #[test]
+    fn parse_rejects_oversized_role_file() {
+        // 個別ファイル上限超: theme.json の Arrow.file が指す 11MB ゼロ列を同梱。
+        // read_entry_capped が parse_ico_cur より前に実バイトで弾く。
+        let mut cursors = HashMap::new();
+        cursors.insert("Arrow".to_string(), "cursors/huge.cur".to_string());
+        let payload = vec![0u8; (DEFAULT_MAX_IMAGE_FILE_SIZE + 1) as usize];
+        let bytes = build_pack(cursors, |zip| {
+            use std::io::Write;
+            let opts: zip::write::SimpleFileOptions = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Deflated);
+            zip.start_file("cursors/huge.cur", opts).unwrap();
+            zip.write_all(&payload).unwrap();
+        });
+
+        let result = parse_cursorpack_inner(&bytes);
+        assert!(
+            result.is_err(),
+            "個別ファイル上限を超えるロールファイルは拒否されるべき"
+        );
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("サイズ") && msg.contains("上限"),
+            "サイズ上限超過系のエラーメッセージであるべき: {msg}"
+        );
+    }
+
+    #[test]
+    fn parse_accepts_pack_within_limits() {
+        // 正常系の対照: 上限内の小さなロールファイルなら圧縮/個別ガードは通過する
+        // (parse_ico_cur 段で不正フォーマットとして弾かれることはあっても、
+        //  サイズガードでは弾かれないことを確認する)。
+        let mut cursors = HashMap::new();
+        cursors.insert("Arrow".to_string(), "cursors/tiny.cur".to_string());
+        let bytes = build_pack(cursors, |zip| {
+            use std::io::Write;
+            let opts: zip::write::SimpleFileOptions = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Deflated);
+            zip.start_file("cursors/tiny.cur", opts).unwrap();
+            zip.write_all(b"not a real cur but small").unwrap();
+        });
+
+        let result = parse_cursorpack_inner(&bytes);
+        // サイズガードでは弾かれない: もし Err でもサイズ系メッセージではないこと。
+        if let Err(e) = result {
+            let msg = e.to_string();
+            assert!(
+                !(msg.contains("圧縮サイズ") || msg.contains("実サイズが上限")),
+                "上限内なのにサイズガードで弾かれてはいけない: {msg}"
+            );
+        }
     }
 }

@@ -35,6 +35,17 @@ const CURRENT_SCHEMA_VERSION: u32 = 1;
 /// runtime config 値を読む経路は別 PR で API カスケード変更とともに導入予定。
 pub const DEFAULT_MAX_PACK_COMPRESSED_SIZE: u64 = 50 * 1024 * 1024;
 
+/// pack 展開後合計サイズの既定上限 (200 MB)。zip 爆弾の最終防衛線。
+///
+/// `import_cursorpack_bytes` などの累積カウンタで参照する「default 値の SoT」。
+pub const DEFAULT_MAX_PACK_UNCOMPRESSED_SIZE: u64 = 200 * 1024 * 1024;
+
+/// pack 内 1 ファイルあたりの実サイズ既定上限 (10 MB)。
+///
+/// 申告サイズ (`entry.size()`) ではなく実伸長バイト数を `io::copy` の `take` で
+/// 打ち切る基準としても使う「default 値の SoT」。
+pub const DEFAULT_MAX_IMAGE_FILE_SIZE: u64 = 10 * 1024 * 1024;
+
 /// アプリケーション設定（Source of Truth）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
@@ -152,10 +163,8 @@ impl Default for AppConfig {
             },
             security: SecurityConfig {
                 max_pack_compressed_size: DEFAULT_MAX_PACK_COMPRESSED_SIZE,
-                // 200 MB
-                max_pack_uncompressed_size: 200 * 1024 * 1024,
-                // 10 MB
-                max_image_file_size: 10 * 1024 * 1024,
+                max_pack_uncompressed_size: DEFAULT_MAX_PACK_UNCOMPRESSED_SIZE,
+                max_image_file_size: DEFAULT_MAX_IMAGE_FILE_SIZE,
                 // 1 GB
                 storage_warning_threshold: 1024 * 1024 * 1024,
             },
