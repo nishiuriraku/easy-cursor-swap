@@ -53,6 +53,7 @@
     "vitest": "^4.1.6"
   },
   "overrides": {
-    "js-cookie": ">=3.0.7"
+    "js-cookie": ">=3.0.7",
+    "shell-quote": ">=1.8.4"
   }
 }
