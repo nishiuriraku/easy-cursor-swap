@@ -135,27 +135,28 @@ async function openLogFolder() {
           :label="t('settings.crashReportSubmitLabel')"
           :desc="t('settings.crashReportSubmitDesc')"
         >
-          <button
-            class="btn"
-            :disabled="crashBusy || crashReportsCount === 0"
+          <UiButton
+            :loading="crashBusy"
+            :disabled="crashReportsCount === 0"
+            icon-left="Import"
             @click="$emit('submit-crash')"
           >
-            <span v-if="crashBusy" class="spinner" style="width: 13px; height: 13px" />
-            <UiIcon v-else name="Import" :size="13" />{{ t('settings.btnSubmit') }}
-          </button>
+            {{ t('settings.btnSubmit') }}
+          </UiButton>
         </SettingsRow>
         <SettingsRow
           anchor="clearCrash"
           :label="t('settings.crashReportClearLabel')"
           :desc="t('settings.crashReportClearDesc')"
         >
-          <button
-            class="btn danger"
+          <UiButton
+            variant="danger"
             :disabled="crashBusy || crashReportsCount === 0"
+            icon-left="X"
             @click="$emit('clear-crash')"
           >
-            <UiIcon name="X" :size="13" />{{ t('settings.btnClear') }}
-          </button>
+            {{ t('settings.btnClear') }}
+          </UiButton>
         </SettingsRow>
         <div v-if="crashMessage" class="profile-msg selectable">
           {{ crashMessage }}
@@ -227,16 +228,5 @@ async function openLogFolder() {
   @apply mt-2 rounded-[8px] border px-3 py-2 text-[12px];
   background: rgba(106, 213, 184, 0.06);
   border-color: rgba(106, 213, 184, 0.4);
-}
-.spinner {
-  @apply inline-block size-[13px] rounded-full;
-  border: 2px solid var(--fg-mute);
-  border-top-color: transparent;
-  animation: spin 800ms linear infinite;
-}
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 </style>

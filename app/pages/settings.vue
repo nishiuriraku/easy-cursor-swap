@@ -744,14 +744,18 @@ function selectSection(id: SectionId) {
         />
       </div>
       <div class="tb-actions">
-        <button class="btn ghost" :disabled="!dirty || saving" @click="discardChanges">
+        <UiButton variant="ghost" :disabled="!dirty || saving" @click="discardChanges">
           {{ t('common.discard') }}
-        </button>
-        <button class="btn primary" :disabled="!dirty || saving" @click="save">
-          <span v-if="saving" class="spinner" style="width: 13px; height: 13px" />
-          <UiIcon v-else name="Check" :size="13" />
+        </UiButton>
+        <UiButton
+          variant="primary"
+          :loading="saving"
+          :disabled="!dirty"
+          icon-left="Check"
+          @click="save"
+        >
           {{ saving ? t('common.saving') : t('common.save') }}
-        </button>
+        </UiButton>
       </div>
     </div>
 

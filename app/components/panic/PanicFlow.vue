@@ -246,7 +246,7 @@ function logMark(s: LogEntry['status']): string {
               <UiIcon name="Check" :size="13" />{{ t('panic.runStage', { n: stage }) }}
             </button>
             <button v-else-if="phase === 'running'" class="btn" disabled>
-              <span class="spinner" style="width: 13px; height: 13px" />
+              <UiSpinner :size="13" />
               {{ t('panic.running') }}
             </button>
             <button v-else class="btn primary" @click="close">

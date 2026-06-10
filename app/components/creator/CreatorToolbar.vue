@@ -56,16 +56,16 @@ defineEmits<{
       <span v-else class="tag" style="color: var(--rose); border-color: rgba(255, 107, 138, 0.3)">
         <UiIcon name="Alert" :size="11" />{{ t('creator.unsignedTag') }}
       </span>
-      <button
-        class="btn primary"
-        :disabled="exportBusy || !arrowAssigned"
+      <UiButton
+        variant="primary"
+        :loading="exportBusy"
+        :disabled="!arrowAssigned"
         :title="t('creator.save')"
         @click="$emit('save')"
       >
-        <span v-if="exportBusy" class="spinner" style="width: 13px; height: 13px" />
-        <UiIcon v-else name="Save" :size="14" />
+        <UiIcon v-if="!exportBusy" name="Save" :size="14" />
         {{ exportBusy ? t('creator.exportBusy') : t('creator.save') }}…
-      </button>
+      </UiButton>
     </div>
   </div>
 </template>
@@ -122,21 +122,5 @@ defineEmits<{
 
 .tag.ok {
   border-color: rgba(106, 213, 184, 0.3);
-}
-
-.spinner {
-  display: inline-block;
-  width: 13px;
-  height: 13px;
-  border: 2px solid var(--fg-mute);
-  border-top-color: transparent;
-  border-radius: 50%;
-  animation: spin 800ms linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 </style>
