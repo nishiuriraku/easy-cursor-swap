@@ -68,6 +68,9 @@ jobs:
       - name: npm ci
         run: npm ci
 
+      - name: npm audit
+        run: npm audit --audit-level=high
+
       - name: Nuxt prepare (型生成)
         run: npx nuxi prepare
 
@@ -95,3 +98,21 @@ jobs:
       - run: npm ci
       - name: Compare ja/en keys
         run: node scripts/check-i18n.mjs
+
+  # -------------------------------------------------------------
+  # 依存監査: cargo audit (脆弱性のみ fail / unmaintained 警告は無視)
+  # rustsec/audit-check は informational advisory を check status に
+  # 反映しないため、unmaintained/yanked では fail しない。
+  # -------------------------------------------------------------
+  audit:
+    name: cargo audit (RustSec)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: cargo audit
+        uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          working-directory: src-tauri

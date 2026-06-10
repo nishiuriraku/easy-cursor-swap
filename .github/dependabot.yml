@@ -1,0 +1,28 @@
+version: 2
+updates:
+  # Rust (Cargo) — src-tauri 配下の Cargo.toml / Cargo.lock
+  - package-ecosystem: cargo
+    directory: /src-tauri
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+
+  # フロントエンド (npm) — ルートの package.json / package-lock.json
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+
+  # GitHub Actions ワークフロー
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: ci(deps)
