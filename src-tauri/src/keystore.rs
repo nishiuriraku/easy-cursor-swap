@@ -568,4 +568,136 @@ mod tests {
         // 削除済みでも delete はエラーにならない (idempotent)
         Keystore::delete_github_oauth_token().unwrap();
     }
+
+    // ------------------------------------------------------------------------
+    // .cfkey 暗号エクスポート / インポート 往復テスト (M0-2)
+    // ------------------------------------------------------------------------
+
+    /// CUSTOM_CURSORS_DIR_OVERRIDE を一時ディレクトリへ向け、env var を
+    /// プロセス全体で直列化するためのロックも取得する共通前置き。
+    /// 戻り値の RAII ガード群 (TempDir / MutexGuard / EnvGuard) は呼び出し側で
+    /// 生かし続ける必要がある (ドロップされると env / ロックが解放される)。
+    fn setup_keystore_env() -> (
+        tempfile::TempDir,
+        std::sync::MutexGuard<'static, ()>,
+        EnvGuard,
+    ) {
+        // env var の競合を避けるためプロセス共有ロックを最初に取得する。
+        let lock = crate::config::cursors_dir_override_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let tmp = tempfile::TempDir::new().unwrap();
+        // パニック時でも env var を確実に復元するよう RAII ガードを先に設置する。
+        let env_guard = EnvGuard {
+            key: "CUSTOM_CURSORS_DIR_OVERRIDE",
+            prev: std::env::var("CUSTOM_CURSORS_DIR_OVERRIDE").ok(),
+        };
+        std::env::set_var("CUSTOM_CURSORS_DIR_OVERRIDE", tmp.path());
+        (tmp, lock, env_guard)
+    }
+
+    #[test]
+    fn cfkey_export_import_round_trip_preserves_identity() {
+        // 正常往復: generate → export → delete → import で
+        // key_id / public_key_b64 が完全に一致し、秘密鍵も実復元されることを確認する。
+        let (_tmp, _lock, _env) = setup_keystore_env();
+
+        // 鍵ペアを生成し、エクスポート前の同一性情報を控える。
+        Keystore::generate(true).unwrap();
+        let before = Keystore::info().unwrap();
+        assert!(before.has_keypair);
+        let before_key_id = before.key_id.clone().unwrap();
+        let before_pub = before.public_key_b64.clone().unwrap();
+
+        // 正しいパスフレーズでエクスポートする。
+        let passphrase = "正しいパスフレーズ";
+        let blob = Keystore::export_private_key(passphrase).unwrap();
+        // CFKEY1 ブロブの構造 (magic 8 + salt 16 + nonce 24 + ciphertext 48 = 96 バイト)。
+        assert_eq!(&blob[..8], b"CFKEY1\n\0");
+        assert_eq!(blob.len(), 8 + 16 + 24 + 48);
+
+        // 鍵ペアを削除し、消えたことを確認する。
+        Keystore::delete().unwrap();
+        assert!(!Keystore::info().unwrap().has_keypair);
+
+        // 同じパスフレーズでインポートし、同一性が復元されることを確認する。
+        let after = Keystore::import_private_key(&blob, passphrase).unwrap();
+        assert!(after.has_keypair);
+        assert_eq!(after.key_id.as_deref(), Some(before_key_id.as_str()));
+        assert_eq!(after.public_key_b64.as_deref(), Some(before_pub.as_str()));
+
+        // info() からも一致を再確認する。
+        let reloaded = Keystore::info().unwrap();
+        assert_eq!(reloaded.key_id, Some(before_key_id));
+        assert_eq!(reloaded.public_key_b64, Some(before_pub));
+
+        // 秘密鍵の実復元を sign → verify の往復で確認する。
+        let message = b"M0-2 round trip message";
+        let sig = Keystore::sign(message).unwrap();
+        assert!(Keystore::verify(message, &sig).unwrap());
+    }
+
+    #[test]
+    fn cfkey_import_with_wrong_passphrase_fails() {
+        // 誤パスフレーズ: 別のパスフレーズでインポートすると復号に失敗する。
+        let (_tmp, _lock, _env) = setup_keystore_env();
+
+        Keystore::generate(true).unwrap();
+        let blob = Keystore::export_private_key("正しいパスフレーズ").unwrap();
+
+        let result = Keystore::import_private_key(&blob, "誤ったパスフレーズ");
+        assert!(result.is_err());
+        // エラーメッセージに復号失敗系の文言が含まれること。
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("復号失敗"),
+            "想定外のエラーメッセージ: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn cfkey_import_with_tampered_ciphertext_fails() {
+        // 改竄: ciphertext の最終バイトを反転させると AEAD 認証に失敗する。
+        let (_tmp, _lock, _env) = setup_keystore_env();
+
+        Keystore::generate(true).unwrap();
+        let passphrase = "正しいパスフレーズ";
+        let mut blob = Keystore::export_private_key(passphrase).unwrap();
+
+        // 末尾 (AEAD タグ領域) を 1 ビット反転する。
+        let last = blob.len() - 1;
+        blob[last] ^= 0x01;
+
+        // 正しいパスフレーズでも改竄は検出され失敗する。
+        let result = Keystore::import_private_key(&blob, passphrase);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn cfkey_import_with_broken_magic_fails() {
+        // magic 破壊: 先頭バイトを書き換えると magic 不一致で弾かれる。
+        let (_tmp, _lock, _env) = setup_keystore_env();
+
+        Keystore::generate(true).unwrap();
+        let mut blob = Keystore::export_private_key("正しいパスフレーズ").unwrap();
+
+        // magic の先頭バイトを別の値に書き換える。
+        blob[0] = b'X';
+        let result = Keystore::import_private_key(&blob, "正しいパスフレーズ");
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("magic"), "想定外のエラーメッセージ: {}", msg);
+
+        // おまけ: 極端に短いブロブは「短すぎます」で弾かれる。
+        let short = vec![0u8; 10];
+        let short_result = Keystore::import_private_key(&short, "正しいパスフレーズ");
+        assert!(short_result.is_err());
+        let short_msg = short_result.unwrap_err().to_string();
+        assert!(
+            short_msg.contains("短すぎます"),
+            "想定外のエラーメッセージ: {}",
+            short_msg
+        );
+    }
 }
