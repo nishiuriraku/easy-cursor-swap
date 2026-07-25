@@ -29,6 +29,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 一括取り込み (フォルダ / ファイル) の解決・解析フェーズで進捗が一切表示されず無反応に見えていた不具合を修正。スタート画面からの取り込みでは進捗オーバーレイが `stage !== 'start'` の分岐内に置かれていたため描画されておらず、配置を分岐外へ移して解析中もステージ進捗とキャンセルが見えるようにしました。
 - Creator のエクスポート進捗バーが未定義の CSS トークン (`--bg-elev2` / `--bg-elev1` / `--mint` / `--border`) を参照しており、背景とバーが正しく描画されていなかった問題を、共通 `UiProgress` (設計トークン `--accent` / `--line` ベース) への移行で解消しました。ライト / ダーク両テーマで確実に視認できます。
 - primary (アクセント色塗り) ボタンのローディングスピナーが背景と同化して見えなかった不具合を修正。共通 `.spinner` の回転弧が `var(--accent)` で、primary ボタンの `bg-accent` と同色だったため不可視でした。塗り / 色付き背景のボタン (primary / danger) ではスピナーをボタンの文字色 (`currentColor`) で描き直し、確実にコントラストを出すようにしました (適用 / 保存 / 書き出し等の緑ボタン)。
+- 起動時クラッシュリカバリ (apply 途中の電源断などで `_pending_apply.snapshot` が残置された状態で再起動した場合) は Windows 既定への強制リセットを意図的に採用している旨を、コメント / ログ / `docs/` 側記述で統一。pre-apply exact restore ではなく Windows 既定化である理由を「クラッシュ後は最も安全な既定に倒す」設計判断として明文化 (`c100e85` / AR-M1-1)。
+- 自動ロールバック (Health::attempt_rollback) が installer URL を `_x64-setup.exe` 固定で取得していたため、ARM64 機では 3 連続起動失敗時に x64 ビルドをサイレント上書きインストールし、回復不能ループに陥る可能性があった問題を修正。`std::env::consts::ARCH` で URL を選択するようにし、minisign 検証も arch 不一致を弾けるようになりました (`6876cc2` / AR-M1-3)。
+- `.cursorpack` 取り込み経路 (bulk_import) で、zip 展開時の per-file / 累積サイズ上限が zip ヘッダの `entry.size()` (申告値) に依存しており、申告偽装 zip 爆弾への最終防衛線がなかった問題を修正。`entry.take(MAX)` で実ストリームバイト上限を課し、`io::copy` が実際に書き込んだバイト数を累積判定に使用。本流 (`theme/package.rs`) と同じ上限定数を共有して `bulk_import/cursorpack.rs` / `theme/package.rs` / `backup.rs` の 3 経路で対称化しました (`7824174` / AR-M1-5)。
+- マーケットプレイス詳細モーダルでテーマ作者の `homepage` URL が Rust / フロントどちらの検証も通らず `<a :href>` に直接バインドされていた問題を修正。`fetch_index` 返却前に `is_allowed_url_scheme` でスキーム (http/https のみ) を検証し、不正な値は `None` に正規化。`preview_base_url` だけでなく `download_url` の https 強制と GitHub username 文字種検証も同コミットで対応 (`23984fb` / AR-M1-6)。
+- `HOTKEY_CALLBACK` / `CURSOR_CHANGE_CALLBACK` の `lock().unwrap()` がポイズン時に二重パニック → setup 内クラッシュ → 3 連続失敗カウンタ経由で自動ロールバックを誤起動する可能性があった問題を修正。`unwrap_or_else(|e| e.into_inner())` でポイズン回収し、`apply_cursors` のロールバック失敗を `let _ =` で完全黙殺せず `tracing::error!` + 返却エラーへの付記に統一 (`c100e85` / AR-M1-7)。
+- `RegisterHotKey` 失敗 (キー衝突等) がトレイ内 log のみで UI / config に伝播せず、ユーザーがパニックキーを「効くと信じられているのに無反応」状態に陥る可能性があった問題を修正。登録結果を `apply_tray_state` 経由で起動時のバナー (起動前ダイアログ) とトレイ通知に伝播させ、設定変更時はインラインで再検証 (`c100e85` / AR-M1-8)。
 
 ## [0.0.7] - 2026-06-09
 

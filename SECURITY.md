@@ -41,7 +41,7 @@ If you don't hear back within 7 days, feel free to send a follow-up via the advi
 
 - The EasyCursorSwap desktop application (Tauri runtime + Rust backend + Vue frontend)
 - The installer (NSIS / MSI) and Tauri Updater signature flow
-- Sample assets and tooling shipped under this repo (e.g. `tools/`, `scripts/`)
+- Sample assets and tooling shipped under this repo (e.g. `scripts/`)
 - The `.cursorpack` / `.cursorprofile` archive formats and their validation logic
 
 ## Out of scope

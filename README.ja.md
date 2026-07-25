@@ -91,7 +91,7 @@ EasyCursorSwap は設定 → 更新 で **自動アップデートが有効** �
 
 ### 前提条件
 
-- [Rust](https://rustup.rs/)（stable、1.82 以降。`src-tauri/Cargo.toml` の `rust-version` で固定）
+- [Rust](https://rustup.rs/)（stable、**1.95.0 を `src-tauri/rust-toolchain.toml` で固定**。MSRV 1.82）
 - [Node.js](https://nodejs.org/) 20 以降
 - [WebView2](https://developer.microsoft.com/ja-jp/microsoft-edge/webview2/)（Windows 11 は標準搭載）
 
@@ -103,7 +103,7 @@ cd easy-cursor-swap
 npm install
 
 # 開発モードで起動（Tauri dev ウィンドウ + Nuxt HMR）
-npx tauri dev
+npm run tauri:dev
 
 # Rust の型チェックのみ
 cargo check --manifest-path src-tauri/Cargo.toml
@@ -146,7 +146,7 @@ easy-cursor-swap/
 │   ├── src/
 │   │   ├── main.rs             # エントリポイント: トレイ / ヘルスチェック
 │   │   ├── lib.rs              # モジュール宣言（23 モジュール）
-│   │   ├── commands/           # Tauri IPC コマンドハンドラー（9 サブモジュール / 52 エンドポイント）
+│   │   ├── commands/           # Tauri IPC コマンドハンドラー（9 サブモジュール / 53 エンドポイント）
 │   │   ├── config.rs           # 設定マネージャー（RwLock / スキーママイグレーション / バックアップ）
 │   │   ├── cursor/             # PNG → .cur / .ani パイプライン（6 サイズ / ホットスポット / ANI 入出力）
 │   │   ├── registry/           # HKCU レジストリ読み書き / Schemes / SPI_SETCURSORS

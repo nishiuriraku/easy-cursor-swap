@@ -92,7 +92,7 @@ silently.
 
 ### Prerequisites
 
-- [Rust](https://rustup.rs/) (stable, 1.82+; pinned via `src-tauri/Cargo.toml` `rust-version`)
+- [Rust](https://rustup.rs/) (stable, **1.95.0 pinned via `src-tauri/rust-toolchain.toml`**; MSRV 1.82)
 - [Node.js](https://nodejs.org/) 20+
 - [WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) (Windows 11 includes this)
 
@@ -104,7 +104,7 @@ cd easy-cursor-swap
 npm install
 
 # Run in development mode (Tauri dev window + Nuxt HMR)
-npx tauri dev
+npm run tauri:dev
 
 # Type-check Rust only
 cargo check --manifest-path src-tauri/Cargo.toml
@@ -147,7 +147,7 @@ easy-cursor-swap/
 │   ├── src/
 │   │   ├── main.rs             # Entry point: tray, health check
 │   │   ├── lib.rs              # Module declarations (23 modules)
-│   │   ├── commands/           # Tauri IPC command handlers (52 endpoints across 9 sub-modules)
+│   │   ├── commands/           # Tauri IPC command handlers (53 endpoints across 9 sub-modules)
 │   │   ├── config.rs           # Config manager (RwLock, schema migration, backups)
 │   │   ├── cursor/             # PNG → .cur / .ani pipeline (6 sizes, hotspot, ANI read/write)
 │   │   ├── registry/           # HKCU registry read/write, Schemes, SPI_SETCURSORS
