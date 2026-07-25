@@ -1,6 +1,6 @@
 # EasyCursorSwap - 配布手順
 
-仕様書 Phase 8-2/8-3 に対応する配布フロー雛形。
+現行 NSIS / MSI (GitHub Releases) + Microsoft Store (MSIX) 2 ルートの runbook。Authenticode コード署名は Microsoft Store / MSIX を正準経路とする (Wave 0A 2026-07-25 方針)。SignPath Foundation への再申請はしない。
 
 ## 配布形態
 
@@ -120,13 +120,17 @@ GitHub Releases の `latest.json` フォーマット:
 
 ```json
 {
-  "version": "1.0.1",
+  "version": "0.0.7",
   "notes": "リリースノート",
-  "pub_date": "2026-05-20T10:00:00Z",
+  "pub_date": "2026-06-09T00:00:00Z",
   "platforms": {
     "windows-x86_64": {
       "signature": "...Tauri-signer 署名...",
-      "url": "https://github.com/nishiuriraku/easy-cursor-swap/releases/download/v1.0.1/EasyCursorSwap_1.0.1_x64-setup.nsis.zip"
+      "url": "https://github.com/nishiuriraku/easy-cursor-swap/releases/download/v0.0.7/EasyCursorSwap_0.0.7_x64-setup.nsis.zip"
+    },
+    "windows-aarch64": {
+      "signature": "...Tauri-signer 署名...",
+      "url": "https://github.com/nishiuriraku/easy-cursor-swap/releases/download/v0.0.7/EasyCursorSwap_0.0.7_arm64-setup.nsis.zip"
     }
   }
 }
@@ -134,7 +138,7 @@ GitHub Releases の `latest.json` フォーマット:
 
 公開鍵は `tauri signer generate` で発行し、`tauri.conf.json` の `plugins.updater.pubkey` に投入。
 
-## v1.0 既知制約 (README 明記)
+## 既知制約 (v0.0.7 / README 明記)
 
 - Windows 10 22H2 以降 / Windows 11 のみサポート (Win10 21H2 以前は非対象)
 - RDP / Citrix / RemoteApp は動作対象外 (起動時バナーで警告)
