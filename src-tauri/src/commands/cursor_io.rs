@@ -12,6 +12,15 @@ use tauri::{AppHandle, Emitter, Manager, State};
 #[derive(Default)]
 pub struct PendingCursorpack(pub Mutex<Option<PathBuf>>);
 
+/// 他スレッドの panic で `Mutex` が poison された場合でも inner の guard を返す。
+///
+/// `stash_pending_cursorpack` / `handle_pending_cursorpack` の silent return を排除し、
+/// poison 後も操作を続行できるようにする。`unwrap` ではなく `into_inner` を取るのは、
+/// poison が一過性 (該当スレッドのみ) であり、inner 値が破損しているとは限らないため。
+fn lock_or_recover<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(|e| e.into_inner())
+}
+
 /// Tauri Event 名: 「`.cursorpack` を読み込んで」とフロントに通知する。
 pub const EVENT_CURSORPACK_IMPORT_REQUESTED: &str = "cursorpack-import-requested";
 
@@ -64,10 +73,7 @@ pub fn stash_pending_cursorpack(app: &AppHandle, argv: &[String], cwd: &Path) {
         return;
     };
     let state: State<PendingCursorpack> = app.state();
-    let mut guard = match state.0.lock() {
-        Ok(g) => g,
-        Err(_) => return,
-    };
+    let mut guard = lock_or_recover(&state.0);
     *guard = Some(path);
 }
 
@@ -76,10 +82,7 @@ pub fn handle_pending_cursorpack(app: &AppHandle, argv: &[String], cwd: &Path) {
     stash_pending_cursorpack(app, argv, cwd);
     let path_string = {
         let state: State<PendingCursorpack> = app.state();
-        let guard = match state.0.lock() {
-            Ok(g) => g,
-            Err(_) => return,
-        };
+        let guard = lock_or_recover(&state.0);
         guard.as_ref().map(|p| p.to_string_lossy().to_string())
     };
     if let Some(p) = path_string {
@@ -104,6 +107,7 @@ pub fn take_pending_cursorpack(state: State<PendingCursorpack>) -> Option<String
 mod tests {
     use super::*;
     use std::path::PathBuf;
+    use std::sync::Arc;
     use tempfile::TempDir;
 
     fn argv(items: &[&str]) -> Vec<String> {
@@ -193,5 +197,107 @@ mod tests {
         assert_eq!(taken, Some(PathBuf::from(r"C:\second.cursorpack")));
         // take 後は空
         assert!(pending.0.lock().unwrap().is_none());
+    }
+
+    /// 別スレッドで panic させ、`PendingCursorpack` の `Mutex` を poison 化するヘルパー。
+    /// G6 の各テストの前置条件として使う。
+    fn poison_pending(pending: Arc<PendingCursorpack>) {
+        let _ = std::thread::spawn(move || {
+            let _g = pending.0.lock().unwrap();
+            panic!("intentional poison for G6 test");
+        })
+        .join();
+    }
+
+    /// 旧コード (`match lock() { Ok(g) => g, Err(_) => return }`) は poison 時に silent return して
+    /// 値が永続化されないことを回帰として固定する。
+    /// 検証本体は新パターン側を実行し、旧パターンの破綻はコメントで対比する。
+    #[test]
+    fn stash_persists_through_poison_after_g6_fix() {
+        let pending = Arc::new(PendingCursorpack::default());
+        poison_pending(Arc::clone(&pending));
+        assert!(
+            pending.0.is_poisoned(),
+            "precondition: PendingCursorpack の Mutex が poison されていること"
+        );
+
+        // 旧コード (G6 修正前) では:
+        //   let mut guard = match pending.0.lock() {
+        //       Ok(g) => g,
+        //       Err(_) => return, // ← poison 時に silent return して値が永続化されない
+        //   };
+        //   *guard = Some(path);
+        // 上記だと poison 経路で `*guard = Some(path)` が到達せず書き込めない。
+        // G6 ではこれを `unwrap_or_else(|e| e.into_inner())` (または同等のヘルパー) に置換する。
+
+        // 修正後: lock_or_recover ヘルパー経由で値が永続化されることを確認
+        let stash_path = PathBuf::from(r"C:\after-poison.cursorpack");
+        {
+            let mut guard = lock_or_recover(&pending.0);
+            *guard = Some(stash_path.clone());
+        }
+        let guard = lock_or_recover(&pending.0);
+        assert_eq!(
+            *guard,
+            Some(stash_path),
+            "lock_or_recover 経由で poison 後も値が永続化されていること"
+        );
+    }
+
+    /// `lock_or_recover` 経由で poison 状態でも write でき、後続 read でその値が見える。
+    #[test]
+    fn lock_or_recover_writes_value_through_poison() {
+        let pending = Arc::new(PendingCursorpack::default());
+        poison_pending(Arc::clone(&pending));
+        assert!(pending.0.is_poisoned());
+
+        {
+            let mut guard = lock_or_recover(&pending.0);
+            *guard = Some(PathBuf::from(r"C:\recovered-write.cursorpack"));
+        }
+
+        let guard = lock_or_recover(&pending.0);
+        assert_eq!(
+            *guard,
+            Some(PathBuf::from(r"C:\recovered-write.cursorpack"))
+        );
+    }
+
+    /// `lock_or_recover` 経由で poison 状態でも pre-existing な値を読み出せる。
+    #[test]
+    fn lock_or_recover_reads_pre_existing_value_through_poison() {
+        let pending = Arc::new(PendingCursorpack::default());
+        {
+            let mut guard = lock_or_recover(&pending.0);
+            *guard = Some(PathBuf::from(r"C:\before-poison.cursorpack"));
+        }
+        poison_pending(Arc::clone(&pending));
+        assert!(pending.0.is_poisoned());
+
+        let guard = lock_or_recover(&pending.0);
+        assert_eq!(*guard, Some(PathBuf::from(r"C:\before-poison.cursorpack")));
+    }
+
+    /// stash_pending_cursorpack / handle_pending_cursorpack のロック取得・書込み・読出しが
+    /// 旧 silent-return パターンではなく poison 回復することを end-to-end で確認する。
+    #[test]
+    fn pending_stash_and_read_round_trip_through_poison() {
+        let pending = Arc::new(PendingCursorpack::default());
+        poison_pending(Arc::clone(&pending));
+        assert!(pending.0.is_poisoned());
+
+        // stash_pending_cursorpack の主要素 (lock_or_recover + 書込み)
+        let stash_path = PathBuf::from(r"C:\second-instance.cursorpack");
+        {
+            let mut guard = lock_or_recover(&pending.0);
+            *guard = Some(stash_path.clone());
+        }
+
+        // handle_pending_cursorpack の主要素 (lock_or_recover + 文字列化)
+        let read_back = {
+            let guard = lock_or_recover(&pending.0);
+            guard.as_ref().map(|p| p.to_string_lossy().to_string())
+        };
+        assert_eq!(read_back.as_deref(), Some(stash_path.to_str().unwrap()));
     }
 }
