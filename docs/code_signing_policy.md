@@ -1,18 +1,21 @@
 # Code Signing Policy
 
-EasyCursorSwap (easy-cursor-swap) は [SignPath Foundation](https://signpath.org/) が
-提供する OSS 向け Authenticode コードサイニング証明書での Windows インストーラー
-(`.exe` / `.msi`) 署名運用を目指しています。
+EasyCursorSwap (easy-cursor-swap) の Windows インストーラー (`.msi` / NSIS `.exe` /
+Store 用 `.msix`) は、**Microsoft Store 経由の MSIX 自動署名** を正準の Authenticode
+取得経路とします。GitHub Releases で配布する NSIS / MSI は当面 **無署名** で配布
+し、Tauri Updater 用の Ed25519 (minisign) 署名で改ざん防止を維持します。
 
-> **現状 (2026-05-21):** SignPath Foundation OSS 一次申請は **保留** となりました。
-> 理由は外部認知シグナル (GitHub stars / 紹介記事 / 言及など) の不足で、本ポリシー
-> 文書や技術要件には問題なしとの判定です。当面は **無署名 + SmartScreen 警告案内**
-> の運用を継続し、外部認知が育った段階で再申請します。詳細とロードマップは
+> **方針変更 (2026-07-25):** [SignPath Foundation](https://signpath.org/) への
+> 再申請は行いません。Microsoft Store / MSIX の自動署名で代替可能 (パートナー登録
+> + Identity Validation のみ) であり、外部認知シグナル蓄積コストより低コストで
+> SmartScreen 即時信用を得られるため。詳細は
 > [docs/authenticode_signing.md](authenticode_signing.md) を参照してください。
 
-本ポリシーは SignPath Foundation の OSS 適格要件
-([signpath.org/terms.html](https://signpath.org/terms.html)) を満たすための
-公開ドキュメントであり、再申請時にもそのまま参照されます。
+本ポリシーは GitHub Releases (NSIS / MSI) と Microsoft Store (MSIX) の **両方** の
+配布経路に適用され、Privacy / Build Reproducibility / Team 構成などの公開要件を
+統合的に記述します。SignPath 旧ポリシーは 2026-05-21 時点の OSS 適格要件に準拠
+していましたが、本ファイルでは Store パートナー登録要件に沿った記述に再構成して
+います。
 
 ---
 
@@ -25,14 +28,16 @@ EasyCursorSwap (easy-cursor-swap) は [SignPath Foundation](https://signpath.org
 | License               | MIT ([LICENSE](../LICENSE))                                 |
 | Distribution channel  | GitHub Releases (signed installers) + Tauri Updater         |
 | Marketplace index     | https://github.com/nishiuriraku/easy-cursor-swap-index      |
-| Authenticode provider | **申請保留中** — SignPath Foundation OSS、2026-05-21 一次申請が外部認知不足で保留、再申請準備中 ([docs/authenticode_signing.md](authenticode_signing.md)) |
+| Authenticode provider | **Microsoft Store (MSIX 自動署名)** を正準経路とする方針に変更 (2026-07-25)。GitHub Releases の NSIS / MSI は当面無署名 ([docs/authenticode_signing.md](authenticode_signing.md)) |
 
 ---
 
 ## Team
 
-easy-cursor-swap は個人開発プロジェクトです。SignPath Foundation が定める
-Author / Reviewer / Approver の 3 ロールを単一メンテナが兼務します。
+easy-cursor-swap は個人開発プロジェクトです。Microsoft Store パートナー登録 /
+GitHub Releases 公開 / 公式インデックス運用など、Author / Reviewer / Approver の
+3 ロールを単一メンテナが兼務します (Microsoft Partner Center の "individual
+developer" 登録が前提)。
 
 | Role                       | GitHub handle                                          | Contact                  |
 | -------------------------- | ------------------------------------------------------ | ------------------------ |
@@ -42,16 +47,19 @@ Author / Reviewer / Approver の 3 ロールを単一メンテナが兼務しま
 
 - **GitHub**: 全アカウントで 2FA 必須
   ([Settings → Security](https://github.com/settings/security) で有効化)
-- **SignPath.io**: アカウントログインで MFA 必須
-- **GitHub Secrets**: SignPath API Token はリポジトリ Settings の Secrets として
+- **Microsoft Partner Center**: アカウントログインで MFA 必須 (Authenticator app
+  または SMS / メール)
+- **GitHub Secrets**: Tauri Updater の Ed25519 秘密鍵 (`TAURI_SIGNING_PRIVATE_KEY`)
+  およびクラッシュレポート用 credentials はリポジトリ Settings の Secrets として
   暗号化保存。閲覧不可な書き込み専用フローで Actions に渡す
 
 ### Access Control
 
-- SignPath API Token のスコープは **`easy-cursor-swap` プロジェクト 1 つのみ**。
-- `release-signing` ポリシーは **`refs/tags/v[0-9]+.[0-9]+.[0-9]+`** にマッチする
-  タグ push でのみ発動。フォーク PR からの署名要求は SignPath 側 GitHub Actions
-  メタデータ検証で自動拒否される。
+- Partner Center アカウントは個人開発者登録 (Organization ではない) とし、
+  `easy-cursor-swap` 1 アプリのみ公開。同一 Microsoft Account で他アプリを登録
+  する場合は手順を分離して監査可能にする。
+- `release.yml` の tag push トリガーは **`refs/tags/v[0-9]+.[0-9]+.[0-9]+`** のみ。
+  フォーク PR からの release 起動は GitHub Actions の標準機能で拒否される。
 - 鍵交換 / 鍵失効手順は [docs/key_rotation.md](key_rotation.md) を参照。
 
 ---
@@ -110,7 +118,7 @@ EasyCursorSwap は Windows レジストリの **`HKCU\Control Panel\Cursors` 以
 | Targets               | `x86_64-pc-windows-msvc`, `aarch64-pc-windows-msvc`      |
 | Output bundles        | NSIS (`.exe`) + MSI (`.msi`), per-user installer         |
 | Updater signing       | Ed25519 (minisign) — see [updater_signing.md](updater_signing.md) |
-| Authenticode signing  | **未設定** (SignPath Foundation 申請保留中 — 再申請準備中)、`release.yml` の SignPath ステップは SIGNPATH_* secret 未設定時に skip される設計 |
+| Authenticode signing  | **GitHub Releases (NSIS / MSI) は当面無署名** + **Microsoft Store (MSIX) は自動署名** を方針化 (2026-07-25)。`release.yml` から SignPath 関連 step は撤去済 (Wave 0A)、MSIX ビルド経路は別 workflow (`build-msix-artifacts.yml`) で扱う予定 |
 
 ソースコードは MIT ライセンスで完全公開されており、第三者がローカルで同一バイナリを
 再現できることを目標としています。再現性に影響する変更は CHANGELOG に明記します。
@@ -142,4 +150,4 @@ EasyCursorSwap は Windows レジストリの **`HKCU\Control Panel\Cursors` 以
 セキュリティ上の懸念や署名済みバイナリへの疑義は GitHub Issues ではなく
 [`SECURITY.md`](../SECURITY.md) の手順に従って報告してください。
 
-最終更新: 2026-05-21 (SignPath Foundation 一次申請保留を反映)
+最終更新: 2026-07-25 (方針変更: Microsoft Store / MSIX 自動署名への移行を反映)

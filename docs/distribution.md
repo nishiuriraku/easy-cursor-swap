@@ -63,33 +63,37 @@ signtool sign /a /v /fd SHA256 /f cert.pfx /p "<password>" EasyCursorSwap.msix
 - 配布物は EV/OV 証明書で署名 (SmartScreen レピュテーション獲得) — **将来目標**
 - OSS 向けの無償署名サービスを第一候補
 
-> **現状 (2026-05-21):** Authenticode 署名は **未取得**。SignPath Foundation OSS
-> 申請は外部認知不足で保留となり、再申請準備中。`release.yml` の SignPath ステップ
-> は SIGNPATH_* secret 未設定時に自動 skip するため、CI は無影響。詳細と再申請
-> ロードマップは [`authenticode_signing.md`](authenticode_signing.md) を参照。
+> **現状 (2026-07-25):** `release.yml` から SignPath 関連 step は撤去済
+> (Wave 0A)。Microsoft Store / MSIX 自動署名を正準経路とする方針に変更。
+> GitHub Releases 配布の NSIS / MSI は当面 **無署名** で継続し、SmartScreen 警告は
+> README / リリースノート側で `Run anyway` を案内。詳細と方針変更理由は
+> [`authenticode_signing.md`](authenticode_signing.md) を参照。
 
 ### 候補
 
 候補の全体像と推奨パスは [`authenticode_signing.md`](authenticode_signing.md) を
 正本とする。本ファイルは概要のみ:
 
-| サービス                            | 種類          | 条件                                                  | 状態 (2026-05-21)              |
-| ----------------------------------- | ------------- | ----------------------------------------------------- | ------------------------------ |
-| [SignPath.io](https://signpath.org/) Foundation | OV    | OSS プロジェクト無償、外部認知シグナル要件あり        | 一次審査保留、再申請準備中    |
-| Certum Open Source (SimplySign)     | OV            | €29〜€69/年、個人 OSS 開発者向け、クラウド HSM        | 暫定有料案 (再申請長期化時)    |
-| Microsoft Trusted Signing           | OV (相当)     | $9.99/月、Azure 経由                                  | 個人 onboarding 一時停止中     |
-| SSL.com Code Signing                | EV/OV         | 商用、有料                                            | 参考のみ                       |
+| サービス                                       | 種類          | 条件                                              | 状態 (2026-07-25)              |
+| ---------------------------------------------- | ------------- | ------------------------------------------------- | ------------------------------ |
+| **Microsoft Store (MSIX 自動署名)**            | OV (相当)     | Partner Center 登録 + Identity Validation          | **採用方針** (Wave 4A で CI 化) |
+| Microsoft Trusted Signing                      | OV (相当)     | $9.99/月、Azure 経由                              | 個人 onboarding 一時停止中     |
+| Certum Open Source (SimplySign)                | OV            | €29〜€69/年、個人 OSS 開発者向け、クラウド HSM    | Store で代替可能なため優先度低  |
+| SSL.com Code Signing                           | EV/OV         | 商用、有料                                        | 参考のみ                       |
+| [SignPath.io](https://signpath.org/) Foundation | OV            | OSS プロジェクト無償、外部認知シグナル要件あり    | **再申請しない** (2026-07-25)   |
 
-### SignPath.io 申請手順
+### Microsoft Store / MSIX 移行手順 (方針)
 
 詳細は [`authenticode_signing.md`](authenticode_signing.md) を参照。サマリ:
 
-1. https://signpath.org/apply から OSS Foundation 申請
-2. 必要書類: GitHub repo URL、ライセンス、メンテナ情報、公開済み Code Signing Policy URL
-3. `.github/workflows/release.yml` の SignPath ステップは既に配線済 (skip-guard 付き)
-4. 承認後に GitHub Secrets (`SIGNPATH_API_TOKEN` / `SIGNPATH_ORGANIZATION_ID`) を
-   投入すれば自動的に有効化される
-5. **2026-05-21 時点では一次審査保留**。再申請は外部認知シグナル蓄積後
+1. Microsoft Partner Center で individual developer 登録 (Identity Validation)
+2. `build-msix-artifacts.yml` (別 workflow、Wave 4A) で `makeappx` + test 自己署名
+   (`CN=EasyCursorSwap-Dev`) で MSIX をビルドし、CI runner で `Add-AppxPackage`
+   → sentinel HKCU write → cleanup のスモーク
+3. AppxManifest は `distribution/msix/AppxManifest.xml` を参照 (`rescap:unvirtualizedResources`
+   + `rescap6:RegistryWriteVirtualization=disabled` 設定済)
+4. Partner Center 経由で本番 MSIX を提出 (Microsoft が自動署名)
+5. **2026-07-25 時点では方針確定のみ**。実装は Wave 4A〜4C の範囲
 
 ## SmartScreen レピュテーション獲得
 

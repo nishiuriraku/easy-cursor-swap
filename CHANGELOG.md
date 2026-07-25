@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 非同期処理中のローディングフィードバックをアプリ全体へ整備したリリース。これまで読み込み中に空白・無反応に見えていた箇所 (テーマ/インデックスのグリッドとプレビュー、アップデートのダウンロード、一括取り込みの解決・解析、各種ボタン操作、Creator のエクスポート) に、共通のスケルトン / スピナー / 確定プログレスバー / ステージ表示を一貫した語彙で適用。HKCU 限定 / 適用トランザクション性 / アーカイブ検閲 / PII レダクション / `v-html` 不採用 の 5 大不変条件はすべて維持。
 
+加えて、Authenticode コード署名の取得経路を **SignPath Foundation 再申請から Microsoft Store (MSIX 自動署名) へ移行** する方針変更を反映 (Wave 0A)。SignPath 一次申請 (2026-05-21 保留) への再申請は行わず、ストア提出時に Microsoft が自動署名する経路を正準とする方針に切り替えた。NSIS / MSI (GitHub Releases) は当面無署名のまま継続し、Tauri Updater 用の Ed25519 (minisign) 署名は引き続き有効 (改ざん防止は維持)。`release.yml` から SignPath 関連 step 群を撤去し、CI の責務を NSIS / MSI のビルドと minisign 署名に限定した。
+
+### Changed
+
+- Authenticode コード署名の正準取得経路を **Microsoft Store (MSIX 自動署名)** に変更 (2026-07-25 方針)。`docs/authenticode_signing.md` / `docs/code_signing_policy.md` / `docs/distribution.md` / `docs/updater_signing.md` / `docs/release_procedure.md` および README (en / ja) を「再申請しない・Store 署名へ移行」方針に書き換え、SignPath 旧ポリシー文書を「経緯 (履歴)」セクションへ移動。`.github/workflows/release.yml` から SignPath step 群 (Check SignPath secrets / Collect installers / Upload unsigned / Submit to SignPath / Replace bundle / Re-sign with minisign after Authenticode / Verify updater metadata integrity / Upload signed installers to Draft Release) を撤去し、`permissions` から `actions: read` (SignPath artifact 取得用) と `id-token: write` (将来の OIDC 認証用) を削除。`scripts/release/patch-latest-json.mjs` のヘッダーコメントを更新 (SignPath 後の手動 .sig 再生成ではなく、汎用 latest.json パッチャーとして明記)。MSIX ビルド経路は別 workflow (`build-msix-artifacts.yml`) で扱う予定 (Wave 4A)。
+
+### Removed
+
+- `.github/workflows/release.yml` から SignPath 関連の 8 step を削除 (skip-guard / submit / replace / re-sign / verify / upload を含む)。`release.yml` の責務は NSIS / MSI ビルド + minisign 署名 + Draft Release アップロードのみに戻る。
+- `docs/authenticode_signing.md` から SignPath Foundation 申請手順 / Artifact Configuration / GitHub Secrets・Variables のセットアップ手順を撤去 (方針不採用)。`docs/authenticode_signing.md` の Foundation 承認後の運用切替セクション (SignPath UI / Signing Policy / API Token / 運用フロー) を削除し、SignPath 経緯は同ファイル末尾の「SignPath Foundation 一次申請の経緯 (履歴)」セクションに集約。`docs/code_signing_policy.md` の SignPath Foundation 関連記述 (MFA / Access Control / Authenticode provider) を Microsoft Partner Center 前提の記述に置換。
+
 ### Added
 
 - 非同期処理中のローディングフィードバックをアプリ全体に整備しました。再利用可能な共通プリミティブ `UiSpinner` / `UiSkeleton` / `UiSkeletonCard` / `UiProgress` (確定 / 不確定バー) / `UiStageStepper` (名前付きステージ表示) を `components/ui/` に新設し、次の箇所へ適用: テーマライブラリ・公式インデックスのカードグリッドとプレビュー行列に読み込み中スケルトン、アップデートのダウンロードに確定進捗バー、公式インデックスのインストール・テーマ適用・インポート / 複製 / エクスポート / 削除・鍵の生成 / インポート / エクスポート (Argon2id)・プロファイル入出力・クラッシュレポート送信・設定復旧・設定保存・パニック復旧の各ボタンに実行中スピナーと自動 disabled。一括取り込み (フォルダ / ファイル) には専用の全画面進捗オーバーレイ (ステージ表示 + 確定バー + キャンセル)、Creator のエクスポートにはステージステッパー (ロール → パッケージ → 署名) + 確定バーを表示します。状態変更系ボタンを共通 `UiButton` の `loading` 表現に統一し、5 箇所に重複していた `.spinner` CSS リングを撤去しました。

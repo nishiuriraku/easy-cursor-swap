@@ -56,15 +56,17 @@ Download the latest installer from the
 Both are signed with a minisign key (verified by the built-in updater).
 See [docs/updater_signing.md](docs/updater_signing.md) for signature verification instructions.
 
-> **SmartScreen notice:** Authenticode (Windows code signing) is **not yet
-> provisioned** — the [SignPath Foundation](https://signpath.org/) OSS
-> application was deferred on 2026-05-21 pending broader project visibility,
-> and reapplication is planned once external recognition (stars, mentions,
-> coverage) grows. Until then, Windows SmartScreen may show an "Unknown
-> publisher" warning; click **More info → Run anyway** to proceed.
-> Releases remain verifiable via the Tauri Updater's Ed25519 (minisign)
-> signature; the source is MIT-licensed and built reproducibly in public
-> GitHub Actions. See [docs/code_signing_policy.md](docs/code_signing_policy.md)
+> **SmartScreen notice:** Authenticode (Windows code signing) for the
+> NSIS / MSI installers distributed via GitHub Releases is **not yet
+> provisioned**. We will not re-apply to [SignPath Foundation](https://signpath.org/);
+> instead the canonical Authenticode path is via the **Microsoft Store MSIX**
+> distribution, where Microsoft automatically signs the package (SmartScreen
+> warning disappears). Until the Store track is live, the NSIS / MSI
+> installers on GitHub Releases remain unsigned; Windows SmartScreen may
+> show an "Unknown publisher" warning — click **More info → Run anyway**
+> to proceed. Releases remain verifiable via the Tauri Updater's Ed25519
+> (minisign) signature; the source is MIT-licensed and built reproducibly
+> in public GitHub Actions. See [docs/code_signing_policy.md](docs/code_signing_policy.md)
 > for the full signing policy and current status.
 
 ### Auto Updates

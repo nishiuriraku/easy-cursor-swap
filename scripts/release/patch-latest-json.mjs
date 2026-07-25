@@ -3,16 +3,16 @@
  * Tauri Updater latest.json の signature フィールドを、再生成された .sig
  * ファイルの内容で上書きする。
  *
- * 背景: SignPath で Authenticode 署名するとバイナリが書き換わるため、
- *       tauri-action が最初に作った .sig は無効。SignPath 後に
- *       `npx tauri signer sign` を再走させて .sig を作り直し、
- *       latest.json の中身を新内容で更新する必要がある。
+ * 背景: なんらかの理由で `.exe` / `.msi` バイナリが (Authenticode 署名や
+ *       リパックなどにより) 書き換わったとき、tauri-action が最初に作った
+ *       `.sig` は無効になる。`npx tauri signer sign` を再走させて `.sig` を
+ *       作り直し、latest.json の中身を新内容で更新する必要がある。
  *
- * Note (2026-05-21): SignPath Foundation OSS 一次申請は外部認知不足で保留中
- *       (docs/authenticode_signing.md 参照)。release.yml はこのスクリプトを
- *       `signpath-check.outputs.enabled == 'true'` の条件付きでのみ実行する
- *       ため、現状は呼び出されない。再申請承認後に SIGNPATH_* secret を投入
- *       すると自動的に再活性化される。スクリプト本体は変更不要。
+ * Note (2026-07-25): SignPath Foundation への再申請は行わない方針に変更したため、
+ *       release.yml から SignPath 関連 step は撤去された。本スクリプトは
+ *       release.yml から呼び出されなくなったが、手動で Authenticode 署名や
+ *       リパックを行う場合のユーティリティとして残す。スクリプト本体は
+ *       変更不要 (汎用 latest.json パッチャー)。
  *
  * Usage:
  *   node scripts/release/patch-latest-json.mjs <bundle-dir>
