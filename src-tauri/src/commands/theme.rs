@@ -32,7 +32,7 @@ pub fn get_themes(config: State<'_, ConfigManager>) -> Result<Vec<ThemeSummary>,
                 "active_theme_id={} はレジストリ実態と一致しないためクリアします",
                 id
             );
-            let _ = config.update(|c| c.general.active_theme_id = None);
+            clear_active_theme_id_with_warn(&config, "get_themes");
             active_id = None;
         }
     }
@@ -181,7 +181,7 @@ pub fn delete_theme(config: State<'_, ConfigManager>, theme_id: String) -> Resul
     // 削除されたテーマが (active_in_registry でなくても) config 側に残っていれば掃除
     if let Ok(c) = config.get() {
         if c.general.active_theme_id == Some(id) {
-            let _ = config.update(|c| c.general.active_theme_id = None);
+            clear_active_theme_id_with_warn(&config, "delete_theme");
         }
     }
     Ok(())
@@ -216,13 +216,90 @@ pub fn repackage_theme(theme_id: String, output_path: String) -> Result<u64, App
     ThemeManager::repackage_theme(id, &path)
 }
 
+/// `config.update` 失敗時の警告経路を一箇所に集約したヘルパー。
+///
+/// `get_themes` (レジストリ実態と乖離した `active_theme_id` のクリア) と
+/// `delete_theme` (削除済みテーマ ID の掃除) から呼ばれる。config.json への
+/// 永続化が失敗しても UI 操作は確定させる方針 (G4 の `update_config` と同じ) を
+/// 採り、戻り値は `()` (UI には伝播しない)。失敗時は `tracing::warn!` で
+/// context ラベル + 復旧パス (設定画面での別テーマ適用 / 再起動後のレジストリ
+/// 実態からの自動再同期) をログに残し、運用での解消に備える。
+fn clear_active_theme_id_with_warn(config: &ConfigManager, context: &str) {
+    if let Err(err) = config.update(|c| c.general.active_theme_id = None) {
+        tracing::warn!(
+            "{}: active_theme_id クリア失敗 (config.json への保存がブロックされた可能性、\
+             in-memory 状態はコミットされない)。復旧: 設定画面から別テーマを適用するか、\
+             アプリ再起動後にレジストリ実態から自動再同期されます: {}",
+            context,
+            err
+        );
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::cursors_dir_override_lock;
+    use crate::config::{cursors_dir_override_lock, ConfigManager};
     use crate::theme::types::{LocalizedString, ThemeMetadata, ThemeSource};
     use std::collections::HashMap;
+    use std::io;
+    use std::sync::{Arc, Mutex};
     use tempfile::TempDir;
+
+    /// 共有バッファに `tracing` 出力を書き出す `MakeWriter`。
+    /// `Send + Sync` を満たすため `Arc<Mutex<Vec<u8>>>` で保持する。
+    #[derive(Clone, Default)]
+    struct LogCapture(Arc<Mutex<Vec<u8>>>);
+
+    impl LogCapture {
+        fn into_string(self) -> String {
+            String::from_utf8(self.0.lock().unwrap().clone()).unwrap()
+        }
+    }
+
+    impl io::Write for LogCapture {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(buf);
+            Ok(buf.len())
+        }
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for LogCapture {
+        type Writer = LogCapture;
+        fn make_writer(&'a self) -> Self::Writer {
+            self.clone()
+        }
+    }
+
+    /// WARN 以上のイベントを `LogCapture` に流して `f` を実行する。
+    /// 戻り値はキャプチャした UTF-8 文字列。
+    fn capture_warns<F: FnOnce()>(f: F) -> String {
+        let capture = LogCapture::default();
+        let subscriber = tracing_subscriber::fmt()
+            .with_writer(capture.clone())
+            .with_max_level(tracing::Level::WARN)
+            .with_target(false)
+            .without_time()
+            .finish();
+        tracing::subscriber::with_default(subscriber, f);
+        capture.into_string()
+    }
+
+    /// プロセス ID + ナノ秒 nonce で衝突回避する test tempdir ヘルパー。
+    /// 既存 `config.rs::tests::make_tempdir` と同方針 (グローバル env を触らない)。
+    fn make_tempdir(label: &str) -> std::path::PathBuf {
+        let pid = std::process::id();
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("ecs-theme-test-{}-{}-{}", label, pid, nonce));
+        std::fs::create_dir_all(&dir).expect("tempdir 作成");
+        dir
+    }
 
     fn write_theme_with_source(dir: &std::path::Path, id: uuid::Uuid, source: ThemeSource) {
         let metadata = ThemeMetadata {
@@ -292,5 +369,88 @@ mod tests {
         let result = repackage_theme(id.to_string(), out.to_string_lossy().to_string());
         std::env::remove_var("CUSTOM_CURSORS_DIR_OVERRIDE");
         assert!(result.is_ok(), "local テーマは guard をパス: {result:?}");
+    }
+
+    // ===== G5: `let _ = config.update(...)` の silent failure を `tracing::warn!` 化する回帰テスト =====
+    //
+    // 元コード (`get_themes` line 35 / `delete_theme` line 184) はディスク書込み失敗時に
+    // エラーを握り潰し、復旧の手がかりをログに残さなかった。`clear_active_theme_id_with_warn`
+    // ヘルパーで警告 + 復旧パスを必ずログに出す方針に置き換えたので、以下を固定する:
+    //
+    //  1. ディスク失敗時に context ラベル + 復旧パスを含む WARN が出る
+    //  2. 成功時は WARN を出さない (ノイズを増やさない)
+    //  3. 成功時は in-memory の `active_theme_id` が None にクリアされる
+    //
+    // IPC コマンド (`get_themes` / `delete_theme`) は `State<'_, ConfigManager>` を要求するため
+    // 直接呼びにくいが、内部で呼ぶ本ヘルパーを独立に検証すれば両 callsite の挙動が固定できる。
+
+    /// `config.update` がディスク失敗する状況下では、context ラベル + 復旧パスを
+    /// 含む WARN ログが出ることを確認する (silent failure 退行の検知)。
+    #[test]
+    fn clear_active_theme_id_with_warn_logs_failure_context() {
+        let dir = make_tempdir("warn_fail");
+        let path = dir.join("config.json");
+        let mgr = ConfigManager::init_at(&path).expect("init_at");
+
+        // init_at 後にターゲットをディレクトリ化して以降の update を rename 失敗させる
+        std::fs::remove_file(&path).unwrap();
+        std::fs::create_dir(&path).unwrap();
+
+        let logs = capture_warns(|| {
+            clear_active_theme_id_with_warn(&mgr, "get_themes");
+        });
+
+        assert!(logs.contains("WARN"), "WARN レベルで出力されるべき: {logs}");
+        assert!(
+            logs.contains("get_themes"),
+            "context ラベルが含まれるべき: {logs}"
+        );
+        assert!(
+            logs.contains("active_theme_id クリア失敗"),
+            "失敗理由の定型句が含まれるべき: {logs}"
+        );
+        assert!(logs.contains("復旧"), "復旧パスを含むべき: {logs}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// 成功時に WARN を出さない (正常系のログノイズを増やさない) ことを確認する。
+    #[test]
+    fn clear_active_theme_id_with_warn_succeeds_silently() {
+        let dir = make_tempdir("warn_ok");
+        let path = dir.join("config.json");
+        let mgr = ConfigManager::init_at(&path).expect("init_at");
+
+        let logs = capture_warns(|| {
+            clear_active_theme_id_with_warn(&mgr, "delete_theme");
+        });
+
+        assert!(
+            !logs.contains("WARN") && !logs.contains("active_theme_id クリア失敗"),
+            "成功時は WARN を出さないはず: {logs}"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// 成功時は in-memory の `active_theme_id` が None にクリアされることを確認する
+    /// (元の `let _ = config.update(...)` が成立していた不変条件)。
+    #[test]
+    fn clear_active_theme_id_with_warn_clears_in_memory_state() {
+        let dir = make_tempdir("clear_state");
+        let path = dir.join("config.json");
+        let mgr = ConfigManager::init_at(&path).expect("init_at");
+
+        // 事前に active_theme_id をセット
+        let target = uuid::Uuid::new_v4();
+        mgr.update(|c| c.general.active_theme_id = Some(target))
+            .expect("事前セット");
+        assert_eq!(mgr.get().unwrap().general.active_theme_id, Some(target));
+
+        clear_active_theme_id_with_warn(&mgr, "get_themes");
+
+        assert!(
+            mgr.get().unwrap().general.active_theme_id.is_none(),
+            "成功時は in-memory の active_theme_id が None になるはず"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
