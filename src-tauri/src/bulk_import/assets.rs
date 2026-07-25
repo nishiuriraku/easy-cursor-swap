@@ -69,7 +69,16 @@ fn walk_dir_inner(
         // 既に訪問済み → symlink/junction ループ。打ち切り。
         return;
     }
+    // read_dir に失敗するケース (パスがディレクトリではなかった / 権限剥奪 / 消失等)
+    // も当該ディレクトリの中身ごとスキップするが、silent skip は silent failure の
+    // 温床になるので G20 で WARN を 1 行発火する。PII 不変条件に従い raw path は
+    // `logging::redact_path` で `~/...` 形式に縮約してから渡す (canonicalize 側で
+    // 既に visit 済みに登録済みなので、ここで return しても visited のサイズは爆発しない)。
     let Ok(rd) = std::fs::read_dir(dir) else {
+        tracing::warn!(
+            path = %crate::logging::redact_path(dir),
+            "bulk_import walk_dir: read_dir に失敗したためこのディレクトリ配下はスキップします",
+        );
         return;
     };
     for entry in rd.flatten() {
@@ -612,6 +621,106 @@ mod tests {
                 Ok(false)
             }
             Err(e) => Err(e),
+        }
+    }
+
+    /// `tracing` 出力を文字列としてキャプチャする簡易 helper。
+    /// `commands/theme.rs::tests` の同名 helper とは独立。`tracing::subscriber` の
+    /// グローバル副作用を避けるため `with_default` のスコープ内で完結させる。
+    fn capture_warns<F: FnOnce()>(f: F) -> String {
+        use std::io;
+        use std::sync::{Arc, Mutex};
+
+        #[derive(Clone, Default)]
+        struct LogCapture(Arc<Mutex<Vec<u8>>>);
+
+        impl LogCapture {
+            fn into_string(self) -> String {
+                String::from_utf8(self.0.lock().unwrap().clone()).unwrap()
+            }
+        }
+
+        impl io::Write for LogCapture {
+            fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+                self.0.lock().unwrap().extend_from_slice(buf);
+                Ok(buf.len())
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+
+        impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for LogCapture {
+            type Writer = LogCapture;
+            fn make_writer(&'a self) -> Self::Writer {
+                self.clone()
+            }
+        }
+
+        let capture = LogCapture::default();
+        let subscriber = tracing_subscriber::fmt()
+            .with_writer(capture.clone())
+            .with_max_level(tracing::Level::WARN)
+            .with_target(false)
+            .without_time()
+            .finish();
+        tracing::subscriber::with_default(subscriber, f);
+        capture.into_string()
+    }
+
+    /// `walk_dir` が `read_dir` で失敗したときに silent skip せず、`tracing::warn!` を
+    /// 発火することを保証する (Wave 1D G20)。
+    ///
+    /// フィクスチャ: 実体は regular file のパスを `walk_dir` に渡す。canonicalize は
+    /// 成功するが `read_dir` はディレクトリではないため Err を返す。これにより
+    /// ファイルシステム状態 (権限剥奪 / TOCTOU) に依存せず確実に read_dir 失敗経路を
+    /// 踏める。canonicalize 失敗経路は G20 のスコープ外 (別タスク) で、本テストは触らない。
+    ///
+    /// PII 検証: 出力ログには raw absolute path の代わりに `logging::redact_path` が
+    /// 適用されるべき。tempdir はユーザーホーム配下にあるため `~/...` 形式に短縮され、
+    /// ユーザー名 (ホームの file_name) は含まれない。
+    #[test]
+    fn walk_dir_warns_and_skips_when_read_dir_fails() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        // canonicalize が成功する regular file を渡す。read_dir は Err で返る。
+        let fake_dir = tmp.path().join("not_a_directory");
+        std::fs::write(&fake_dir, b"not a directory").expect("write file");
+
+        let redacted = crate::logging::redact_path(&fake_dir);
+
+        let logs = capture_warns(|| {
+            let mut out: Vec<String> = Vec::new();
+            walk_dir(&fake_dir, false, &mut out);
+            // read_dir が失敗しても panic せず out は空のまま返ること (skip 動作保持)。
+            assert!(
+                out.is_empty(),
+                "read_dir 失敗時は out に何も積まないべき、実際: {:?}",
+                out
+            );
+        });
+
+        // G20: silent skip を WARN で明示する。silent failure 退行検知のための最低限の保証。
+        assert!(logs.contains("WARN"), "WARN レベルで出力されるべき: {logs}");
+        // canonicalize 失敗経路と区別するため、read_dir 由来の文脈語が含まれていること。
+        assert!(
+            logs.contains("read_dir") || logs.contains("ディレクトリ走査"),
+            "read_dir 由来のコンテキストが含まれるべき: {logs}"
+        );
+        // PII: redact_path 適用後のパスが含まれるべき (ユーザー名の生出力を避ける)。
+        assert!(
+            logs.contains(&redacted),
+            "redact 後のパスが含まれるべき (got redacted={redacted:?}): {logs}"
+        );
+        // PII: ホームディレクトリ由来の username が生で漏れていないこと。
+        if let Some(home) = dirs::home_dir() {
+            if let Some(username) = home.file_name().and_then(|n| n.to_str()) {
+                if !username.is_empty() {
+                    assert!(
+                        !logs.contains(username) || redacted == format!("~/{}", username),
+                        "username 生出力がログに漏れていないこと: username={username:?} logs={logs}"
+                    );
+                }
+            }
         }
     }
 
