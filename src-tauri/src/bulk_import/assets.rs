@@ -8,7 +8,8 @@ use super::{
     ResolveFailure, ResolvedAsset, MAX_FILE_BYTES, MAX_TOTAL_BYTES,
 };
 use crate::errors::AppError;
-use std::path::Path;
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Emitter, Manager, State};
 
 const SUPPORTED_EXTS: &[&str] = &["png", "svg", "cur", "ico", "ani"];
@@ -37,7 +38,37 @@ pub fn collect_target_files(paths: &[String], recursive: bool) -> Vec<String> {
     out
 }
 
+/// ディレクトリを再帰走査して対応拡張子のファイルパスを集める。
+///
+/// symlink / junction による自己ループで無限再帰しないよう、各ディレクトリの
+/// canonical path を  HashSet に記録し、2 度目の訪問では即座に return する。
+/// canonicalize は symlink を 1 段展開して絶対パス化するため、`dir/loop` が `dir` 自身
+/// を指す symlink なら canonical が一致して重複訪問が検出される。
+/// recursive = false (既定) の挙動は変えず、トップディレクトリのみをスキャンする。
 fn walk_dir(dir: &Path, recursive: bool, out: &mut Vec<String>) {
+    let mut visited: HashSet<PathBuf> = HashSet::new();
+    walk_dir_inner(dir, recursive, out, &mut visited);
+}
+
+/// walk_dir の再帰本体。visited に訪問済み canonical path を積み、
+/// canonicalize 失敗時 (権限なし等) は黙ってスキップする。
+/// canonicalize は I/O を伴うためロックは持たず、visited は関数引数で受け渡して
+/// ヒープ再確保を避ける。
+fn walk_dir_inner(
+    dir: &Path,
+    recursive: bool,
+    out: &mut Vec<String>,
+    visited: &mut HashSet<PathBuf>,
+) {
+    // canonicalize に失敗するケース (権限なし / パスが消えた等) はそのディレクトリの
+    // 中身ごとスキップして上位呼び出し側へ戻る。warning ログは G20 で別タスク扱い。
+    let Ok(canonical) = dir.canonicalize() else {
+        return;
+    };
+    if !visited.insert(canonical) {
+        // 既に訪問済み → symlink/junction ループ。打ち切り。
+        return;
+    }
     let Ok(rd) = std::fs::read_dir(dir) else {
         return;
     };
@@ -50,7 +81,7 @@ fn walk_dir(dir: &Path, recursive: bool, out: &mut Vec<String>) {
                 }
             }
         } else if recursive && path.is_dir() {
-            walk_dir(&path, true, out);
+            walk_dir_inner(&path, true, out, visited);
         }
     }
 }
@@ -563,5 +594,72 @@ mod tests {
         )
         .unwrap();
         assert_eq!(result.assets.len(), 1);
+    }
+
+    /// Windows でディレクトリ symlink が作成できない環境 (Developer Mode オフ / 非管理者) では
+    /// フィクスチャ作成自体が成立しないので、その場合はテストをスキップする。
+    /// CI (GitHub Actions Windows runner) とローカル開発者の双方で再現できるよう、
+    /// symlink 生成成否を `Ok(true)` / `Ok(false)` で呼び分け側へ伝える。
+    #[cfg(windows)]
+    fn try_make_dir_symlink(link: &Path, target: &Path) -> std::io::Result<bool> {
+        use std::os::windows::fs::symlink_dir;
+        match symlink_dir(target, link) {
+            Ok(()) => Ok(true),
+            Err(e)
+                if e.kind() == std::io::ErrorKind::PermissionDenied
+                    || e.kind() == std::io::ErrorKind::Unsupported =>
+            {
+                Ok(false)
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    /// `walk_dir` がディレクトリ symlink ループを検出して終了できることを保証する。
+    ///
+    /// フィクスチャ: `tmp/cycle_dir/` の中に `loop` というディレクトリ symlink を張り、
+    /// `loop` が `cycle_dir` 自身を指す形にする。`recursive: true` で走査すると、
+    /// 修正前コードは無限に再帰 → スタックオーバーフローで panic。修正後は canonicalize
+    /// + 訪問済み HashSet により同じ canonical path を 2 度訪れず有限時間で完走する。
+    ///
+    /// `recursive: false` 既定の挙動は本テストでは直接触らない (別テストで保証)。
+    #[cfg(windows)]
+    #[test]
+    fn walk_dir_does_not_loop_on_directory_symlink_cycle() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let cycle_dir = tmp.path().join("cycle_dir");
+        std::fs::create_dir(&cycle_dir).expect("create cycle_dir");
+        // 中身の実ファイル (PNG 1 個)。canonical 走査で循環しない限り 1 件見つかるはず。
+        let one_pix = include_bytes!("../../tests/fixtures/1x1.png");
+        std::fs::write(cycle_dir.join("inside.png"), one_pix).expect("write inside.png");
+        // cycle_dir/loop -> cycle_dir という symlink を作る。これが canonical 上の cycle。
+        let link_path = cycle_dir.join("loop");
+        let created = try_make_dir_symlink(&link_path, &cycle_dir).expect("symlink_dir");
+        if !created {
+            eprintln!(
+                "skipping: ディレクトリ symlink が作成できない環境 (Developer Mode / SeCreateSymbolicLinkPrivilege)。 Windows の Developer Mode を有効にしてから再実行すること。",
+            );
+            return;
+        }
+
+        // walk_dir は `collect_target_files` の private helper だが、ここでは
+        // recursive=true で呼び出してループを踏む (RED 期待)。
+        let mut out = Vec::new();
+        walk_dir(&cycle_dir, true, &mut out);
+
+        // canonicalize 後の cycle_dir と「loop」が同じ canonical path を持つので、
+        // 訪問済みセットに投入されるべき。修正後は無限再帰せず完了する。
+        // 1 件 (inside.png) のみが返る。ループ内の同名が再カウントされない。
+        assert_eq!(
+            out.len(),
+            1,
+            "symlink loop 配下の inside.png は 1 度だけ拾われるべき、実際: {:?}",
+            out
+        );
+        assert!(
+            out.iter().any(|p| p.ends_with("inside.png")),
+            "inside.png が見つからない: {:?}",
+            out
+        );
     }
 }
