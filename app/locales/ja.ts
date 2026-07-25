@@ -660,4 +660,8 @@ export default {
     toastExportFailed: 'エクスポート失敗: {error}',
     toastRetryFailed: '再試行失敗: {error}',
   },
+  updater: {
+    // 起動時の自動アップデート告知トースト (useUpdaterBootstrap)
+    toastUpdateAvailable: '新しいバージョン v{version} が利用可能です。設定 → 更新からダウンロードできます。',
+  },
 } as const

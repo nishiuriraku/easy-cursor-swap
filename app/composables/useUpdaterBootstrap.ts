@@ -90,9 +90,10 @@ async function run(): Promise<void> {
     console.warn('[updater-bootstrap] major bump check failed, falling through to notify:', e)
   }
 
+  const { t } = useI18n()
   await notify({
     title: 'EasyCursorSwap',
-    body: `新しいバージョン v${info.version} が利用可能です。設定 → 更新からダウンロードできます。`,
+    body: t('updater.toastUpdateAvailable', { version: info.version }),
     level: 'info',
   })
 }

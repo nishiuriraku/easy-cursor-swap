@@ -661,4 +661,8 @@ export default {
     toastExportFailed: 'Export failed: {error}',
     toastRetryFailed: 'Retry failed: {error}',
   },
+  updater: {
+    // Startup auto-update notification toast (useUpdaterBootstrap)
+    toastUpdateAvailable: 'New version v{version} is available. Download it from Settings → Updates.',
+  },
 } as const

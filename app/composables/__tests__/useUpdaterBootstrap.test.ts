@@ -22,6 +22,18 @@ vi.mock('../useTauri', () => ({
   invokeTauri: (cmd: string, args?: Record<string, unknown>) => invokeTauriMock(cmd, args),
 }))
 
+// i18n: 実 useI18n を差し替え、翻訳経路 (t) が使われたことを検証できるようにする (G18)。
+// version を補間して返すので、既存の「body に version が含まれる」検証も通る。
+const tMock = vi.fn((key: string, params?: Record<string, string | number>) => {
+  if (key === 'updater.toastUpdateAvailable') {
+    return `New version v${params?.version} is available.`
+  }
+  return key
+})
+vi.mock('../useI18n', () => ({
+  useI18n: () => ({ t: tMock }),
+}))
+
 import { bootstrapUpdaterCheck } from '../useUpdaterBootstrap'
 
 const LAST_CHECK_KEY = 'ecs.updater.last_check_at'
@@ -65,6 +77,7 @@ describe('useUpdaterBootstrap', () => {
     checkMock.mockReset()
     notifyMock.mockClear()
     invokeTauriMock.mockReset()
+    tMock.mockClear()
     // デフォルトでは major bump check は false (= 通常更新) を返す。
     // 個別 it で必要なら invokeTauriMock.mockResolvedValue(true) で上書きする。
     invokeTauriMock.mockResolvedValue(false)
@@ -149,5 +162,19 @@ describe('useUpdaterBootstrap', () => {
     await flush()
 
     expect(notifyMock).toHaveBeenCalledOnce()
+  })
+
+  it('通知本文は t(updater.toastUpdateAvailable, {version}) 経由で生成する (G18)', async () => {
+    configRef.value = mkConfig(true)
+    localStorage.setItem(LAST_CHECK_KEY, String(Date.now() - 25 * 60 * 60 * 1000))
+    checkMock.mockResolvedValue({ version: '0.2.0', currentVersion: '0.1.0' })
+
+    bootstrapUpdaterCheck()
+    await flush()
+
+    // ハードコード日本語ではなく i18n キー経由であること
+    expect(tMock).toHaveBeenCalledWith('updater.toastUpdateAvailable', { version: '0.2.0' })
+    const arg = notifyMock.mock.calls[0]?.[0] as { body: string } | undefined
+    expect(arg?.body).toBe('New version v0.2.0 is available.')
   })
 })
