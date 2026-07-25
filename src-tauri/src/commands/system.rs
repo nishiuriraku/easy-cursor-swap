@@ -80,7 +80,9 @@ pub fn get_config(config: State<'_, ConfigManager>) -> Result<AppConfig, AppErro
 /// アプリケーション設定を更新する。
 ///
 /// 副作用として `general.auto_start` をレジストリ (HKCU\...\Run) に同期する。
-/// 同期に失敗してもログを出すのみで設定保存自体はエラーとしない (UI 操作の妨げを防ぐため)。
+/// 同期に失敗してもログを出すのみで設定保存自体はエラーとしない (UI 操作の
+/// 妨げを防ぐため)。ただし警告ログには config 巻き戻し案を明示し、ユーザーが
+/// 個別に再同期できる動線を残す。
 #[tauri::command]
 pub fn update_config(
     config: State<'_, ConfigManager>,
@@ -90,8 +92,25 @@ pub fn update_config(
     let saved = config.update(|c| {
         *c = updates;
     })?;
+    // 自動起動のレジストリ同期は antivirus / セキュリティソフト等がロックしたり
+    // HKCU ポリシーで禁じられたりして失敗し得る。設定保存自体は atomic write で
+    // 成功しているため UI 操作 (設定変更) は確定させ、レジストリ側の不整合は
+    // 運用で解消する方針。
+    //
+    // 復旧パス:
+    //   1. 次回アプリ起動時、`autostart::sync_from_registry` (将来追加) または
+    //      設定画面からの再トグルでレジストリ実体と config を再整合させる
+    //   2. 一時的な AV 干渉なら、リトライ (設定画面で auto_start を再トグル)
+    //      で復旧することが多い
     if let Err(e) = autostart::set_enabled(auto_start) {
-        tracing::warn!("自動起動レジストリ同期失敗: {}", e);
+        tracing::warn!(
+            "update_config: 自動起動レジストリ同期失敗 (config.json への保存は成功, \
+             auto_start={} は config に反映済)。OS 側 Run キー (HKCU\\...\\Run) への反映が \
+             ブロックされた可能性があります。復旧: 設定 → 一般 → 自動起動 を再トグルするか、 \
+             アプリ再起動後にレジストリ実体から config を再同期してください: {}",
+            auto_start,
+            e
+        );
     }
     Ok(saved)
 }

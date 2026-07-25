@@ -27,6 +27,59 @@ pub struct BackupInfo {
 /// 設定スキーマの現在のバージョン
 const CURRENT_SCHEMA_VERSION: u32 = 1;
 
+/// 設定ファイル書込時に使う temp 拡張子。同じディレクトリに `config.json` と
+/// `config.json.tmp` が並ぶ形になり、電源断 / プロセス落ちで原子的置換が
+/// 中断しても temp ファイルが残るのみで本ファイルは無傷。
+const CONFIG_TEMP_SUFFIX: &str = "json.tmp";
+
+/// 指定パスへファイル内容を atomic 的に書き込む。
+///
+/// `fs::write` 直書きは電源断 / プロセス落ちで対象ファイルが中途半端な
+/// サイズ/内容になり、次回起動時の `serde_json::from_str` 失敗 → `config.corrupt.*`
+/// 退避 → デフォルト復元 → ユーザー設定消失、という復旧不能な連鎖を起こす。
+/// 本ヘルパーは temp ファイルへ書いてから `fs::rename` で 1 ステップで
+/// 置換することで、ディスク側で常に「旧ファイル」か「新ファイル」のいずれかが
+/// 完全に観測できる状態しか存在しなくなる。
+///
+/// 失敗時は temp ファイルを削除して元のパスを一切変更しない (呼び出し側が
+/// in-memory ロールバックを判断する)。
+fn atomic_write(path: &Path, content: &str) -> AppResult<()> {
+    let parent = path.parent().ok_or_else(|| {
+        AppError::Config(format!(
+            "設定ファイルの親ディレクトリが取得できません: {}",
+            path.display()
+        ))
+    })?;
+    if !parent.exists() {
+        fs::create_dir_all(parent)?;
+    }
+
+    let temp = path.with_extension(CONFIG_TEMP_SUFFIX);
+    // 前回クラッシュ時に temp が残っていても今回書込みで上書きする前に掃除する
+    // (複数 temp が累積する事態を防ぐ)。
+    let _ = fs::remove_file(&temp);
+
+    fs::write(&temp, content).map_err(|e| {
+        AppError::Config(format!(
+            "設定ファイル temp への書き出し失敗 ({}): {}",
+            crate::logging::redact_path(&temp),
+            e
+        ))
+    })?;
+
+    if let Err(e) = fs::rename(&temp, path) {
+        // rename 失敗: temp が残骸として残らないよう掃除してからエラーを返す。
+        let _ = fs::remove_file(&temp);
+        return Err(AppError::Config(format!(
+            "設定ファイル atomic 置換失敗 ({} → {}): {}",
+            crate::logging::redact_path(&temp),
+            crate::logging::redact_path(path),
+            e
+        )));
+    }
+    Ok(())
+}
+
 /// pack (.cursorpack) 圧縮サイズの既定上限 (50 MB)。
 ///
 /// `import_cursorpack_bytes` / `inspect_cursorpack_bytes` / `submit_theme_auto` の
@@ -229,30 +282,12 @@ impl ConfigManager {
     ///     - 同じか古い → そのまま使用 (旧フィールド欠落は `serde(default)` で透過補填)
     ///     - 新しい → アプリ更新が必要 → エラー (`Config(...)` を返し、main 側で専用画面表示)
     ///  3. ファイルあり → パース失敗 → `config.corrupt.{ts}.json` に退避してデフォルトで再作成
+    ///
+    /// 書込みはどちらも [`atomic_write`] 経由で temp+rename するため、
+    /// 電源断 / プロセス落ちで設定ファイルが中途半端な状態にならない。
     pub fn init() -> AppResult<Self> {
         let config_path = Self::config_file_path()?;
-
-        let config = if config_path.exists() {
-            let content = fs::read_to_string(&config_path)?;
-            match serde_json::from_str::<AppConfig>(&content) {
-                Ok(parsed) => Self::handle_versioned(parsed)?,
-                Err(e) => {
-                    // パース失敗 → 退避して新規作成
-                    Self::backup_corrupt(&config_path, &content, &e.to_string())?;
-                    let fresh = AppConfig::default();
-                    fs::write(&config_path, serde_json::to_string_pretty(&fresh)?)?;
-                    tracing::warn!("設定ファイルが破損していたためデフォルトで再作成しました");
-                    fresh
-                }
-            }
-        } else {
-            let fresh = AppConfig::default();
-            if let Some(parent) = config_path.parent() {
-                fs::create_dir_all(parent)?;
-            }
-            fs::write(&config_path, serde_json::to_string_pretty(&fresh)?)?;
-            fresh
-        };
+        let config = Self::load_or_initialize(&config_path)?;
 
         let cursors_dir = Self::cursors_dir()?;
         if !cursors_dir.exists() {
@@ -263,6 +298,43 @@ impl ConfigManager {
             config: RwLock::new(config),
             config_path,
         })
+    }
+
+    /// テスト専用コンストラクタ。本番コードは `init()` を使う。
+    ///
+    /// ロックや env var を経由せず、与えられたパスをそのまま Source of Truth として
+    /// 初期化する。`() テストの tempdir ベースで実ファイルへの永続化を検証する
+    /// 用途を想定 (atomic_write 経路の回帰検知)。
+    #[cfg(test)]
+    pub(crate) fn init_at(config_path: &Path) -> AppResult<Self> {
+        let config = Self::load_or_initialize(config_path)?;
+        Ok(Self {
+            config: RwLock::new(config),
+            config_path: config_path.to_path_buf(),
+        })
+    }
+
+    /// 設定ファイルを読み込み、必要ならデフォルトを atomic 書きする共通処理。
+    /// `init()` / `init_at()` 両方から呼ばれる。
+    fn load_or_initialize(config_path: &Path) -> AppResult<AppConfig> {
+        if config_path.exists() {
+            let content = fs::read_to_string(config_path)?;
+            match serde_json::from_str::<AppConfig>(&content) {
+                Ok(parsed) => Self::handle_versioned(parsed),
+                Err(e) => {
+                    // パース失敗 → 退避して新規作成
+                    Self::backup_corrupt(config_path, &content, &e.to_string())?;
+                    let fresh = AppConfig::default();
+                    atomic_write(config_path, &serde_json::to_string_pretty(&fresh)?)?;
+                    tracing::warn!("設定ファイルが破損していたためデフォルトで再作成しました");
+                    Ok(fresh)
+                }
+            }
+        } else {
+            let fresh = AppConfig::default();
+            atomic_write(config_path, &serde_json::to_string_pretty(&fresh)?)?;
+            Ok(fresh)
+        }
     }
 
     /// schema_version を検査し、CURRENT_SCHEMA_VERSION より新しければエラーを返す。
@@ -301,22 +373,43 @@ impl ConfigManager {
     }
 
     /// 設定を更新し、ディスクに永続化する
+    ///
+    /// 永続化は [`atomic_write`] 経由 (temp 書き出し + `fs::rename`) で原子的に
+    /// 行う。書込みが失敗した場合は in-memory 状態もコミットせず、呼び出し側に
+    /// エラーを返す。これにより「メモリ側は新状態、ディスクは旧/空」という
+    /// 最悪の不整合を残さない。
+    ///
+    /// ロック獲得を `read` → クローン用 `draft` 作成 → `write` コミット、の
+    /// 2 段にする理由は、rename 失敗時に `*config` へ書き戻す操作 (= 副作用)
+    /// を「アトミック失敗」の中でする必要をなくすため。
     pub fn update<F>(&self, updater: F) -> AppResult<AppConfig>
     where
         F: FnOnce(&mut AppConfig),
     {
-        let mut config = self
+        // 1. 現在のスナップショットを取り、updater を適用した draft を作る
+        //    (read lock 内で完結するため、副作用は発生しない)。
+        let draft = {
+            let guard = self
+                .config
+                .read()
+                .map_err(|e| AppError::Config(format!("設定のロックに失敗: {}", e)))?;
+            let mut draft = guard.clone();
+            updater(&mut draft);
+            draft
+        };
+
+        // 2. ディスクへ atomic 書き出し。失敗時は in-memory を一切変えない。
+        let content = serde_json::to_string_pretty(&draft)?;
+        atomic_write(&self.config_path, &content)?;
+
+        // 3. 書込み成功を確認できたので、ようやく in-memory を commit。
+        let mut guard = self
             .config
             .write()
             .map_err(|e| AppError::Config(format!("設定のロックに失敗: {}", e)))?;
+        *guard = draft.clone();
 
-        updater(&mut config);
-
-        // ディスクに保存
-        let content = serde_json::to_string_pretty(&*config)?;
-        fs::write(&self.config_path, content)?;
-
-        Ok(config.clone())
+        Ok(draft)
     }
 
     /// 設定ディレクトリ内のバックアップファイル一覧を返す。
@@ -398,8 +491,8 @@ impl ConfigManager {
         let restored: AppConfig = serde_json::from_str(&content)
             .map_err(|e| AppError::Config(format!("バックアップファイルが無効です: {}", e)))?;
 
-        // config.json を上書き
-        fs::write(&self.config_path, serde_json::to_string_pretty(&restored)?)?;
+        // config.json を atomic 書込み (temp → rename) で置換
+        atomic_write(&self.config_path, &serde_json::to_string_pretty(&restored)?)?;
 
         // in-memory 更新
         let mut guard = self
@@ -630,5 +723,181 @@ mod tests {
         if let Some(home) = dirs::home_dir() {
             assert!(dir.starts_with(&home));
         }
+    }
+
+    // ===== G4: `update_config` を atomic write + rename 化する回帰テスト =====
+    //
+    // 既存の `fs::write` 直書きは電源断 / プロセス落ちで config.json を中途半端な
+    // 状態 (末尾が切れた JSON) にしてしまう。temp ファイルへ書いてから `rename` で
+    // 置換する atomic_write ヘルパーでこのクラスを潰す。
+    //
+    // テスト戦略:
+    //  - `atomic_write` ヘルパー自体は副作用が単純 (ファイル 1 個) なので直接検証
+    //  - `ConfigManager::update` は tempdir ベースの test-only コンストラクタ
+    //    `init_at` 経由で生成し、原子的書き戻しと in-memory ロールバックを検証
+
+    /// テスト専用の作業ディレクトリ。プロセス ID + ナノ秒 nonce で衝突回避。
+    /// 既存 `cursors_dir_is_under_home` と同様にグローバル env を触らない設計。
+    fn make_tempdir(label: &str) -> PathBuf {
+        let pid = std::process::id();
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("ecs-config-test-{}-{}-{}", label, pid, nonce));
+        fs::create_dir_all(&dir).expect("tempdir 作成");
+        dir
+    }
+
+    /// atomic_write: 新規パスへの書き込み
+    #[test]
+    fn atomic_write_creates_target_file() {
+        let dir = make_tempdir("create");
+        let path = dir.join("config.json");
+        super::atomic_write(&path, "{\"a\":1}").expect("atomic_write 成功");
+        assert!(path.exists(), "書き込み先が存在するべき");
+        assert_eq!(fs::read_to_string(&path).unwrap(), "{\"a\":1}");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// atomic_write: 既存ファイルの内容を置換する
+    #[test]
+    fn atomic_write_overwrites_existing_file() {
+        let dir = make_tempdir("overwrite");
+        let path = dir.join("config.json");
+        super::atomic_write(&path, "initial").unwrap();
+        super::atomic_write(&path, "updated").unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), "updated");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// atomic_write: rename 失敗時 (target がディレクトリ) は元のファイルが消えない
+    /// (rename 前の状態に戻る) ことを確認する。fs::write 直書きだと
+    /// target ディレクトリ配下の該当パスが真っ先に消えて壊れるため、これで
+    /// ロールバック挙動の差分が固定できる。
+    #[test]
+    fn atomic_write_preserves_existing_file_on_failure() {
+        let dir = make_tempdir("preserve");
+        let path = dir.join("config.json");
+        super::atomic_write(&path, "original").unwrap();
+        // ターゲットを「ディレクトリ化」して rename を失敗させる
+        fs::remove_file(&path).unwrap();
+        fs::create_dir(&path).unwrap();
+
+        let result = super::atomic_write(&path, "new-content");
+        assert!(result.is_err(), "rename 失敗時はエラーを返すべき");
+
+        // 失敗後にファイル/ディレクトリが「壊れた中途半端な状態」になっていないこと
+        // (ディレクトリが残っている = ターゲット内容は破壊されていない)
+        assert!(
+            path.is_dir(),
+            "rename 失敗時にターゲットディレクトリが消えるべきでない"
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// atomic_write: rename 失敗時は temp ファイルを掃除して残骸を残さない
+    #[test]
+    fn atomic_write_cleans_temp_on_failure() {
+        let dir = make_tempdir("cleanup");
+        let path = dir.join("config.json");
+        super::atomic_write(&path, "original").unwrap();
+        fs::remove_file(&path).unwrap();
+        fs::create_dir(&path).unwrap();
+
+        let _ = super::atomic_write(&path, "new-content");
+        let temp = path.with_extension("json.tmp");
+        assert!(
+            !temp.exists(),
+            "失敗時に temp ファイルが残骸として残ってはいけない: {}",
+            temp.display()
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// `update` が atomic 経路で永続化されること: 書き戻し後の content に
+    /// 上書きしたフィールドが反映されており、別 ConfigManager で再読込しても
+    /// 同じ状態になることを検証する (ラウンドトリップの原子性)。
+    #[test]
+    fn update_persists_changes_atomically() {
+        let dir = make_tempdir("persist");
+        let path = dir.join("config.json");
+        let mgr = ConfigManager::init_at(&path).expect("init_at");
+
+        mgr.update(|c| {
+            c.general.language = "en".to_string();
+        })
+        .expect("update 成功");
+
+        // ファイル内容に反映されている
+        let content = fs::read_to_string(&path).unwrap();
+        assert!(
+            content.contains("\"language\": \"en\""),
+            "language=en がファイルに書かれていない: {}",
+            content
+        );
+
+        // 別 ConfigManager で再読込しても同じ
+        let mgr2 = ConfigManager::init_at(&path).expect("init_at reload");
+        assert_eq!(mgr2.get().unwrap().general.language, "en");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// `update` のディスク書き込みが失敗した場合、in-memory 状態も変更されない
+    /// (atomicity: メモリとディスクの不整合を残さない)。
+    #[test]
+    fn update_rolls_back_in_memory_state_on_disk_failure() {
+        let dir = make_tempdir("rollback");
+        let path = dir.join("config.json");
+        let mgr = ConfigManager::init_at(&path).expect("init_at");
+
+        // 初期状態 (default) を記録
+        let before = mgr.get().unwrap().general.language.clone();
+        assert_eq!(before, "auto");
+
+        // init 完了後にターゲットをディレクトリ化 → 以降の update は rename 失敗する
+        fs::remove_file(&path).unwrap();
+        fs::create_dir(&path).unwrap();
+
+        let result = mgr.update(|c| {
+            c.general.language = "en".to_string();
+        });
+        assert!(result.is_err(), "disk 失敗時は update がエラーを返すべき");
+
+        // メモリ側が書き換えられていない (temp への update は commit しない)
+        let after = mgr.get().unwrap().general.language.clone();
+        assert_eq!(
+            after, "auto",
+            "disk 失敗時に in-memory 状態が変更されてはいけない"
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// `update` で複数フィールドが同時に更新されるケースも原子的に反映される
+    /// (temp 経由で書き戻し → in-memory へ一括コミット)。
+    #[test]
+    fn update_commits_multiple_fields_atomically() {
+        let dir = make_tempdir("multi");
+        let path = dir.join("config.json");
+        let mgr = ConfigManager::init_at(&path).expect("init_at");
+
+        mgr.update(|c| {
+            c.general.language = "ja".to_string();
+            c.general.crash_reporting = true;
+            c.logging.level = "DEBUG".to_string();
+        })
+        .expect("update 成功");
+
+        let cfg = mgr.get().unwrap();
+        assert_eq!(cfg.general.language, "ja");
+        assert!(cfg.general.crash_reporting);
+        assert_eq!(cfg.logging.level, "DEBUG");
+
+        // 永続化内容にも 3 フィールド全部入っている
+        let content = fs::read_to_string(&path).unwrap();
+        assert!(content.contains("\"language\": \"ja\""));
+        assert!(content.contains("\"crash_reporting\": true"));
+        assert!(content.contains("\"level\": \"DEBUG\""));
+        let _ = fs::remove_dir_all(&dir);
     }
 }
