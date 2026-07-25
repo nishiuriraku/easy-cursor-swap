@@ -51,6 +51,9 @@ export function useCreatorBulkImportFlow(deps: CreatorBulkImportFlowDeps) {
   const bulkCursorpack = ref<ParsedCursorpack | null>(null)
   const bulkSourceLabel = ref('')
 
+  // ユーザー向けメッセージは t() で生成 (G17: ja/en parity)
+  const { t } = useI18n()
+
   /**
    * 拡張子分岐の本体。`pickBulkAuto` から、または将来のドラッグ&ドロップから呼ばれる想定。
    *
@@ -85,30 +88,31 @@ export function useCreatorBulkImportFlow(deps: CreatorBulkImportFlowDeps) {
         // 誤 overwrite 提案を防ぐ)。
         sourceThemeId.value = null
       } catch (err) {
-        importMessage.value = `cursorpack 取り込み失敗: ${err instanceof Error ? err.message : String(err)}`
+        importMessage.value = t('creator.bulkImportParseFailed', {
+          detail: err instanceof Error ? err.message : String(err),
+        })
       }
       return
     }
 
     if (packs.length >= 2) {
-      importMessage.value = '.cursorpack は 1 つだけ選択してください'
+      importMessage.value = t('creator.bulkImportOnlyOneCursorpack')
       return
     }
 
     if (packs.length === 1 && others.length > 0) {
-      importMessage.value =
-        '.cursorpack は他のファイルと同時に取り込めません (.cursorpack 以外を取り込みました)'
+      importMessage.value = t('creator.bulkImportCursorpackExclusive')
     }
 
     if (others.length === 0) return
-    await runBulkResolve(others, false, `${others.length} 個のファイル`)
+    await runBulkResolve(others, false, t('creator.bulkImportFilesLabel', { count: others.length }))
   }
 
   async function runBulkResolve(paths: string[], recursive: boolean, label: string) {
     try {
       const r = await bulkImport.resolveAssets(paths, recursive)
       if (r.assets.length === 0) {
-        importMessage.value = '対応ファイルが見つかりません'
+        importMessage.value = t('creator.bulkImportNoSupportedFiles')
         return
       }
       bulkResolved.value = r.assets
@@ -116,7 +120,7 @@ export function useCreatorBulkImportFlow(deps: CreatorBulkImportFlowDeps) {
       bulkSourceLabel.value = label
       bulkModalOpen.value = true
       if (r.failures.length > 0) {
-        importMessage.value = `${r.failures.length} 件のファイルをスキップしました`
+        importMessage.value = t('creator.bulkImportSkippedFiles', { count: r.failures.length })
       }
     } catch (err) {
       // ユーザーによるキャンセルは「失敗」ではないので静かに中断する。
@@ -124,7 +128,9 @@ export function useCreatorBulkImportFlow(deps: CreatorBulkImportFlowDeps) {
         importMessage.value = null
         return
       }
-      importMessage.value = `一括インポート失敗: ${err instanceof Error ? err.message : String(err)}`
+      importMessage.value = t('creator.bulkImportFailed', {
+        detail: err instanceof Error ? err.message : String(err),
+      })
     }
   }
 
@@ -146,7 +152,7 @@ export function useCreatorBulkImportFlow(deps: CreatorBulkImportFlowDeps) {
     }
 
     bulkModalOpen.value = false
-    importMessage.value = `${payload.roleAssets.length} 件のロールを適用しました`
+    importMessage.value = t('creator.bulkImportRolesApplied', { count: payload.roleAssets.length })
   }
 
   function cancelBulkImport() {

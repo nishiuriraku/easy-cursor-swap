@@ -216,6 +216,16 @@ export default {
       warning: '保存していない変更は復元できません',
       confirm: '破棄して続行',
     },
+    // 一括インポートフロー (useCreatorBulkImportFlow) のトースト/ラベル
+    bulkImportParseFailed: 'cursorpack 取り込み失敗: {detail}',
+    bulkImportOnlyOneCursorpack: '.cursorpack は 1 つだけ選択してください',
+    bulkImportCursorpackExclusive:
+      '.cursorpack は他のファイルと同時に取り込めません (.cursorpack 以外を取り込みました)',
+    bulkImportFilesLabel: '{count} 個のファイル',
+    bulkImportNoSupportedFiles: '対応ファイルが見つかりません',
+    bulkImportSkippedFiles: '{count} 件のファイルをスキップしました',
+    bulkImportFailed: '一括インポート失敗: {detail}',
+    bulkImportRolesApplied: '{count} 件のロールを適用しました',
   },
   panic: {
     title: 'リセットを実行',

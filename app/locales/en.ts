@@ -217,6 +217,16 @@ export default {
       warning: 'Unsaved changes cannot be recovered',
       confirm: 'Discard and continue',
     },
+    // Bulk import flow (useCreatorBulkImportFlow) toasts / labels
+    bulkImportParseFailed: 'Failed to import .cursorpack: {detail}',
+    bulkImportOnlyOneCursorpack: 'Select only one .cursorpack at a time',
+    bulkImportCursorpackExclusive:
+      '.cursorpack cannot be imported together with other files (non-.cursorpack files were imported)',
+    bulkImportFilesLabel: '{count} files',
+    bulkImportNoSupportedFiles: 'No supported files found',
+    bulkImportSkippedFiles: '{count} file(s) skipped',
+    bulkImportFailed: 'Bulk import failed: {detail}',
+    bulkImportRolesApplied: 'Applied {count} role(s)',
   },
   panic: {
     title: 'Run Reset',
