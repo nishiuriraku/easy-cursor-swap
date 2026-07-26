@@ -354,10 +354,20 @@ function applyConfigToLocal() {
   // Wave 1B-2: 適用トースト表示フラグを UI ローカル ref に反映。
   // undefined (V1 等の旧データ) の場合は V2 既定値 true を採用。
   general.value.showApplyToast = c.general.show_apply_toast ?? true
+  // Wave 1B-3: カーソル影 ON/OFF 制御フラグ。V2 既定 true。
+  general.value.applyShadowControl = c.general.apply_shadow_control ?? true
   startup.value.autoStart = c.general.auto_start
+  // Wave 1B-4: --autostart 起動時のウィンドウ最小化。V2 既定 false。
+  startup.value.startMinimized = c.general.start_minimized ?? false
   updates.value.autoUpdate = c.general.auto_update
 
   library.value.totalLimitWarnGb = c.security.storage_warning_threshold / BYTES_PER_GB
+  // Wave 1B-6: ストレージ警告トースト表示フラグ。V2 既定 true。
+  library.value.storageWarnEnabled = c.general.show_storage_warning ?? true
+
+  // Wave 1B-5: 未署名インポート制御 2 フラグ。V2 既定 false / true。
+  security.value.requireSignedThemes = c.security.require_signed_themes ?? false
+  security.value.warnUnsignedImport = c.security.warn_unsigned_import ?? true
 
   logging.value.logLevel = (c.logging.level as typeof logging.value.logLevel) ?? 'INFO'
   logging.value.retentionDays = c.logging.retention_days
@@ -380,12 +390,22 @@ function flushLocalToConfig() {
     // Wave 1B-2: 適用トースト表示フラグを draft に書き戻し。
     // (旧 V1 データで undefined の場合は V2 既定値 true を採用)
     draft.general.show_apply_toast = general.value.showApplyToast ?? true
+    // Wave 1B-3: 影制御フラグを draft に書き戻し。V2 既定 true。
+    draft.general.apply_shadow_control = general.value.applyShadowControl ?? true
     draft.general.auto_start = startup.value.autoStart
+    // Wave 1B-4: --autostart 起動時ウィンドウ最小化。V2 既定 false。
+    draft.general.start_minimized = startup.value.startMinimized ?? false
     draft.general.auto_update = updates.value.autoUpdate
 
     draft.security.storage_warning_threshold = Math.round(
       library.value.totalLimitWarnGb * BYTES_PER_GB,
     )
+    // Wave 1B-5: 未署名インポート制御 2 フラグ。V2 既定 false / true。
+    draft.security.require_signed_themes = security.value.requireSignedThemes ?? false
+    draft.security.warn_unsigned_import = security.value.warnUnsignedImport ?? true
+
+    // Wave 1B-6: ストレージ警告トースト表示フラグ。V2 既定 true。
+    draft.general.show_storage_warning = library.value.storageWarnEnabled ?? true
 
     draft.logging.level = logging.value.logLevel
     draft.logging.retention_days = logging.value.retentionDays
