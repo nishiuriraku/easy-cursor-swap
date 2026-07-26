@@ -351,6 +351,9 @@ function applyConfigToLocal() {
   suppressDirty = true
   general.value.language = (c.general.language as 'ja' | 'en' | 'auto') ?? 'auto'
   general.value.crashReporting = c.general.crash_reporting
+  // Wave 1B-2: 適用トースト表示フラグを UI ローカル ref に反映。
+  // undefined (V1 等の旧データ) の場合は V2 既定値 true を採用。
+  general.value.showApplyToast = c.general.show_apply_toast ?? true
   startup.value.autoStart = c.general.auto_start
   updates.value.autoUpdate = c.general.auto_update
 
@@ -374,6 +377,9 @@ function flushLocalToConfig() {
   return persistConfig((draft) => {
     draft.general.language = general.value.language
     draft.general.crash_reporting = general.value.crashReporting
+    // Wave 1B-2: 適用トースト表示フラグを draft に書き戻し。
+    // (旧 V1 データで undefined の場合は V2 既定値 true を採用)
+    draft.general.show_apply_toast = general.value.showApplyToast ?? true
     draft.general.auto_start = startup.value.autoStart
     draft.general.auto_update = updates.value.autoUpdate
 
