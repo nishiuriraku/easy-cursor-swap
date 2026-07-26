@@ -17,6 +17,7 @@
 pub mod env;
 pub mod roles;
 pub mod scheme;
+pub mod transaction;
 
 pub use env::expand_env_vars;
 pub use roles::CursorRole;
@@ -151,58 +152,22 @@ impl RegistryManager {
     ///
     /// この方針により、前回適用テーマのパスが空きスロットに残留して
     /// 次のテーマと混在する不具合を防ぐ。
+    ///
+    /// Wave 1C: 内部実装を [`crate::registry::transaction::run_cursor_transaction`]
+    /// に委譲する。snapshot → mutation → notify → commit / rollback の契約は
+    /// transaction モジュール側で一元管理される。
     pub fn apply_cursors(cursor_paths: &HashMap<String, PathBuf>) -> AppResult<()> {
-        use winreg::enums::*;
-        use winreg::RegKey;
-
-        // 1. 現在の設定をスナップショット保存
-        let current_values = Self::read_current_cursors()?;
-        Self::save_pending_snapshot(&current_values, None)?;
-
-        // 2. レジストリ書き込み
-        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-        let cursors_key = hkcu
-            .open_subkey_with_flags("Control Panel\\Cursors", KEY_WRITE)
-            .map_err(|e| AppError::Registry(format!("Cursors キーを開けません: {}", e)))?;
-
         let entries = compute_apply_values(cursor_paths);
-        for (name, value) in &entries {
-            if let Err(e) = cursors_key.set_value(name, value) {
-                // 書き込み失敗時はスナップショットから復元 (適用前値へロールバック)。
-                tracing::error!("レジストリ書き込み失敗 ({}): {}", name, e);
-                // ロールバック結果をログに残す。失敗した場合はパニックボタン誘導を
-                // エラーメッセージ末尾に付記し、ユーザーが手動復旧できるようにする。
-                let mut msg = format!("カーソル {} の書き込みに失敗: {}", name, e);
-                match Self::restore_from_snapshot(&current_values) {
-                    Ok(()) => tracing::info!("書込失敗後のロールバックに成功 (適用前値へ復元)"),
-                    Err(re) => {
-                        tracing::error!("書込失敗後のロールバックにも失敗: {}", re);
-                        msg.push_str(&format!(
-                            " / ロールバックにも失敗 ({}) — Ctrl+Alt+Shift+R でリセットしてください",
-                            re
-                        ));
-                    }
-                }
-                // スナップショット削除失敗は元の書込エラーを潰さないよう warn に留める。
-                if let Err(pe) = Self::remove_pending_snapshot() {
-                    tracing::warn!("pending スナップショットの削除に失敗: {}", pe);
-                }
-                return Err(AppError::Registry(msg));
-            }
-        }
-
-        // 3. SystemParametersInfoW で即時反映
-        Self::notify_cursor_change()?;
-
-        // 4. スナップショット削除（成功）
-        Self::remove_pending_snapshot()?;
-
-        tracing::info!(
-            "カーソル設定を適用しました (上書き={} / 既定継承={})",
-            cursor_paths.len(),
-            17 - cursor_paths.len()
-        );
-        Ok(())
+        let write_values: HashMap<String, String> = entries
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v))
+            .collect();
+        let spec = crate::registry::transaction::TransactionSpec {
+            mode: crate::registry::transaction::TransactionMode::NormalTransactional,
+            theme_id: None,
+            write_values: &write_values,
+        };
+        crate::registry::transaction::run_cursor_transaction(&spec)
     }
 
     /// 適用したテーマを `Control Panel\Cursors\Schemes\<scheme_name>` に登録する。
@@ -355,6 +320,12 @@ impl RegistryManager {
 
     /// スナップショットからレジストリを復元する
     fn restore_from_snapshot(values: &HashMap<String, String>) -> AppResult<()> {
+        Self::restore_from_snapshot_pub(values)
+    }
+
+    /// `restore_from_snapshot` の公開版。Wave 1C の `transaction` モジュールから
+    /// ロールバック経路で呼ばれる。
+    pub fn restore_from_snapshot_pub(values: &HashMap<String, String>) -> AppResult<()> {
         use winreg::enums::*;
         use winreg::RegKey;
 
@@ -367,7 +338,7 @@ impl RegistryManager {
             let _ = cursors_key.set_value(name, value);
         }
 
-        Self::notify_cursor_change()?;
+        Self::notify_cursor_change_pub()?;
         Ok(())
     }
 
@@ -397,6 +368,13 @@ impl RegistryManager {
     /// SystemParametersInfoW を呼び出してカーソル変更を即時反映する
     #[cfg(windows)]
     fn notify_cursor_change() -> AppResult<()> {
+        Self::notify_cursor_change_pub()
+    }
+
+    /// `notify_cursor_change` の公開版。Wave 1C の `transaction` モジュールから
+    /// commit 経路で呼ばれる。`apply_cursors` などからは元の private 版が使われる。
+    #[cfg(windows)]
+    pub fn notify_cursor_change_pub() -> AppResult<()> {
         use windows::Win32::UI::WindowsAndMessaging::{
             SystemParametersInfoW, SPIF_SENDCHANGE, SPIF_UPDATEINIFILE, SPI_SETCURSORS,
         };
@@ -440,6 +418,11 @@ impl RegistryManager {
 
     #[cfg(not(windows))]
     fn notify_cursor_change() -> AppResult<()> {
+        Self::notify_cursor_change_pub()
+    }
+
+    #[cfg(not(windows))]
+    pub fn notify_cursor_change_pub() -> AppResult<()> {
         // Windows 以外ではスキップ
         tracing::warn!("Windows 以外の環境では SystemParametersInfoW は使用できません");
         Ok(())
@@ -1191,7 +1174,10 @@ mod tests {
     /// 17 役割という UUID 分離できないグローバル値を書き換える。これらを触るテストを
     /// 並列実行すると互いの書込・復元が干渉するため、このミューテックスを先頭で取得して
     /// シリアライズする (`cursor_size_test_lock` と同型)。
-    fn apply_cursors_test_lock() -> std::sync::MutexGuard<'static, ()> {
+    ///
+    /// Wave 1C: `crate::registry::transaction::tests` からも同じ lock を取得する
+    /// 必要があるので `pub` 化した。
+    pub fn apply_cursors_test_lock() -> std::sync::MutexGuard<'static, ()> {
         static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
         LOCK.get_or_init(|| Mutex::new(()))
             .lock()
