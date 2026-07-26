@@ -87,6 +87,12 @@ pub fn get_config(config: State<'_, ConfigManager>) -> Result<AppConfig, AppErro
 /// する。同期に失敗してもログを出すのみで設定保存自体はエラーとしない (UI 操作
 /// の妨げを防ぐため)。ただし警告ログには config 巻き戻し案を明示し、ユーザー
 /// が個別に再同期できる動線を残す。
+///
+/// さらに patch に `logging.level` があれば、persistence 成功後に reload
+/// handle で EnvFilter を差し替える (Wave 2B / Task 4)。無効値でも patch
+/// 検証 (apply_patch) 時点で `AppError::Config` が返るので reload 経路では
+/// 到達しない。reload 自体に失敗したらエラーを返す (= persistence はロールバック
+/// しない / 次の IPC 呼出で再設定すれば次回は reload 成功する設計)。
 #[tauri::command]
 pub fn update_config(
     config: State<'_, ConfigManager>,
@@ -96,6 +102,7 @@ pub fn update_config(
     // (= 現在の config 値を維持)。「旧 UI が `auto_start` 変更なしでも
     // 同期を再走させる」ような副作用を避ける。
     let auto_start = updates.general.as_ref().and_then(|g| g.auto_start);
+    let new_logging_level = updates.logging.as_ref().and_then(|l| l.level.clone());
     let saved = config.apply_patch(updates)?;
     if let Some(target) = auto_start {
         // 自動起動のレジストリ同期は antivirus / セキュリティソフト等がロックしたり
@@ -112,6 +119,10 @@ pub fn update_config(
                 e
             );
         }
+    }
+    if let Some(level) = new_logging_level {
+        // persistence 後は reload するだけ。失敗時は visible error (永続化は維持)
+        crate::logging::set_logging_level(&level)?;
     }
     Ok(saved)
 }

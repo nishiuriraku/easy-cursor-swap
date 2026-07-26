@@ -218,6 +218,18 @@ fn main() {
         }
     };
 
+    // 設定読込後、config.json の logging.level を反映 (Wave 2B / Task 4)。
+    // 無効値 (改ざん等) でも起動は止めない: warn を出して INFO のまま。
+    if let Ok(cfg) = config_manager.get() {
+        if let Err(e) = logging::set_logging_level(&cfg.logging.level) {
+            tracing::warn!(
+                "config.json の logging.level='{}' は無効: {} (INFO のまま起動します)",
+                cfg.logging.level,
+                e
+            );
+        }
+    }
+
     // 自動起動レジストリ (HKCU\...\Run) を config に追従させる
     // ユーザーが手動で削除していても起動のたびに復元される (config が Source of Truth)
     {
