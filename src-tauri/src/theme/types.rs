@@ -210,6 +210,7 @@ pub struct ThemeMetadata {
 /// 多言語対応文字列
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
+#[cfg_attr(feature = "typegen", derive(ts_rs::TS))]
 pub enum LocalizedString {
     /// 単純な文字列
     Simple(String),

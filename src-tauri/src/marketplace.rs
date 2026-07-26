@@ -47,6 +47,8 @@ const ALLOWED_DOWNLOAD_HOSTS: &[&str] = &[
 
 /// `index.json` のスキーマ。
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(ts_rs::TS))]
+#[cfg_attr(feature = "typegen", ts(export))]
 pub struct MarketplaceIndex {
     pub schema_version: u32,
     pub commit: Option<String>,
@@ -69,6 +71,8 @@ pub struct MarketplaceIndex {
 /// この非対称 (audit E1 / E2) は serde の directional `rename_all` で表現する。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+#[cfg_attr(feature = "typegen", derive(ts_rs::TS))]
+#[cfg_attr(feature = "typegen", ts(export, rename_all = "camelCase"))]
 pub struct MarketplaceEntry {
     pub id: uuid::Uuid,
     pub name: crate::theme::LocalizedString,
@@ -120,6 +124,8 @@ pub struct AuthorRecord {
 /// JS 側は camelCase、Rust 側は snake_case で扱う。
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "typegen", derive(ts_rs::TS))]
+#[cfg_attr(feature = "typegen", ts(export, rename_all = "camelCase"))]
 pub struct MarketplaceInstallRequest {
     pub download_url: String,
     pub sha256: String,

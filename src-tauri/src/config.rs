@@ -13,6 +13,8 @@ use uuid::Uuid;
 
 /// バックアップファイルの情報
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(ts_rs::TS))]
+#[cfg_attr(feature = "typegen", ts(export))]
 pub struct BackupInfo {
     /// ファイル名 (例: "config.corrupt.1746123456.json")
     pub file_name: String,
@@ -123,6 +125,8 @@ fn default_true() -> bool {
 
 /// アプリケーション設定（Source of Truth）
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(ts_rs::TS))]
+#[cfg_attr(feature = "typegen", ts(export))]
 pub struct AppConfig {
     /// 設定スキーマバージョン（マイグレーション用）
     pub schema_version: u32,
@@ -145,6 +149,7 @@ pub struct AppConfig {
 
 /// 一般設定
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(ts_rs::TS))]
 pub struct GeneralConfig {
     /// OS起動時に自動起動するか
     pub auto_start: bool,
@@ -204,6 +209,7 @@ pub struct GeneralConfig {
 
 /// テーマ利用統計 (1 テーマあたり)
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(ts_rs::TS))]
 pub struct ThemeUsage {
     /// 累積適用回数
     pub apply_count: u32,
@@ -213,6 +219,7 @@ pub struct ThemeUsage {
 
 /// セキュリティ閾値設定
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(ts_rs::TS))]
 pub struct SecurityConfig {
     /// .cursorpack 圧縮時サイズ上限 (バイト)
     pub max_pack_compressed_size: u64,
@@ -241,6 +248,7 @@ pub struct SecurityConfig {
 
 /// ログ設定
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(ts_rs::TS))]
 pub struct LoggingConfig {
     /// ログレベル ("TRACE" / "DEBUG" / "INFO" / "WARN" / "ERROR")
     pub level: String,
@@ -254,6 +262,7 @@ pub struct LoggingConfig {
 /// アクセストークン本体は `keystore.rs` の DPAPI スロット (`_keys/github_oauth.token`)
 /// に別保管し、ここはユーザーへの表示と「いつ連携したか」の記録のみ持つ。
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(ts_rs::TS))]
 pub struct GithubAccount {
     /// GitHub のログイン名 (例: "octocat")
     pub login: String,
