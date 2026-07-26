@@ -6,7 +6,8 @@
  * readonly ガードが効かないバグがあった (2026-05-14 修正)。
  */
 import type { ThemeCardData } from '~/types/theme'
-import type { MarketplaceName } from '~/types/marketplace'
+import type { IpcThemeSummary } from '~/types/theme-ipc'
+export type { IpcThemeSummary } from '~/types/theme-ipc'
 import { mapSourceToKind } from '~/composables/useThemes'
 import { pickLocalizedName } from '~/composables/pickLocalizedName'
 
@@ -21,28 +22,7 @@ import { pickLocalizedName } from '~/composables/pickLocalizedName'
  * 現在の locale に解決する。生で表示すると `{ja: "...", en: "..."}` という
  * JSON 風のテキストがそのままカードのタイトル欄に出る。
  */
-export interface IpcThemeSummary {
-  id: string
-  name: MarketplaceName
-  author: string | null
-  version: string
-  created_at: string
-  is_active: boolean
-  is_favorite: boolean
-  apply_count: number
-  included_roles: string[]
-  path: string
-  tags: string[]
-  size_bytes: number
-  signed: boolean
-  last_applied_at: string | null
-  description?: MarketplaceName | null
-  schema_version: number
-  license?: string | null
-  homepage?: string | null
-  /** `theme.json` の `source` フィールド。`mapSourceToKind` 経由で `kind` に反映する。 */
-  source?: string
-}
+// `IpcThemeSummary` の正準定義は `~/types/theme-ipc.ts` (Wave 2B / Task 5d)。
 
 export function mapLocalSummaryToCard(tt: IpcThemeSummary, locale: string): ThemeCardData {
   return {

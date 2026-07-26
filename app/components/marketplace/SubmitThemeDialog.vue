@@ -11,7 +11,7 @@
  * フッターは step / submitDone の状態を見て切り替えるため親に残す。
  */
 import type { GithubAccount, SubmitStage } from '~/types/githubAuth'
-import type { MarketplaceName } from '~/types/marketplace'
+import type { IpcThemeSummary } from '~/types/theme-ipc'
 import { ALLOWED_MARKETPLACE_TAGS } from '~/types/marketplace'
 
 const { t } = useI18n()
@@ -24,25 +24,12 @@ const emit = defineEmits<{
   'update:open': [value: boolean]
 }>()
 
-// ローカルテーマ一覧の型 (Rust ThemeSummary に対応)。
-// `name` は Rust 側 `LocalizedString` の生形 (`string | { [locale]: string }`) で渡ってくるため
-// 表示時は `pickLocalizedName` を介す。公式インデックス entry の `name` も localized object を
-// 許容するので、`entryJson` ではそのまま JSON 化する (`MarketplaceEntry.name` 型と整合)。
-//
-// `source` は Rust `ThemeSource` (serde lowercase) の `"local" | "marketplace"`。
-// `cloned_from_marketplace_id` は duplicate_theme が引き継いだ複製元 UUID。どちらかが truthy
-// なら公式インデックスへの再提出を許してはならないのでダイアログ側でも除外する
-// (Rust submit_theme_auto も同条件で hard-reject するので二重防御)。
-interface ThemeSummary {
-  id: string
-  name: MarketplaceName
-  author: string | null
-  version: string
-  included_roles: string[]
-  is_active: boolean
-  source?: string
-  cloned_from_marketplace_id?: string | null
-}
+// テーマ一覧の型は `~/types/theme-ipc.ts` の `IpcThemeSummary` に正準化した
+// (Wave 2B / Task 5d)。`source` が `'marketplace'` か `cloned_from_marketplace_id`
+// が truthy のテーマは公式インデックスへの再提出を許してはならないので
+// ダイアログ側でも除外する (Rust submit_theme_auto も同条件で hard-reject する
+// 二重防御)。
+type ThemeSummary = IpcThemeSummary
 
 const { info: keystoreInfo, refresh: refreshKeystore } = useKeystore()
 
