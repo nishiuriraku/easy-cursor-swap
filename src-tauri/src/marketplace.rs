@@ -428,12 +428,11 @@ impl MarketplaceClient {
 }
 
 /// Base64 公開鍵から `key_id` (公開鍵 SHA-256 の先頭 16 文字) を計算する。
-pub fn compute_key_id(pubkey_b64: &str) -> AppResult<String> {
-    let raw = base64::engine::general_purpose::STANDARD
-        .decode(pubkey_b64)
-        .map_err(|e| AppError::Theme(format!("公開鍵 Base64 デコード失敗: {}", e)))?;
-    Ok(hex::encode(Sha256::digest(&raw))[..16].to_string())
-}
+///
+/// Wave 2B / Task 5: 旧 `marketplace::compute_key_id` 実装は `keystore::compute_key_id`
+/// と逐語重複だったため正準を `keystore.rs` に統一し、このラッパで再エクスポート
+/// する。`marketplace` 内では `keystore::compute_key_id` を直接呼び出す。
+pub use crate::keystore::compute_key_id;
 
 fn decode_verifying_key(pubkey_b64: &str) -> AppResult<VerifyingKey> {
     let raw = base64::engine::general_purpose::STANDARD
