@@ -92,15 +92,23 @@ pub fn handle_pending_cursorpack(app: &AppHandle, argv: &[String], cwd: &Path) {
     }
 }
 
+/// `take_pending_cursorpack` IPC のコアロジック。
+///
+/// `PendingCursorpack.0` の `Mutex` を `lock_or_recover` 経由で取得して
+/// `Option::take` で pending path を 1 件取り出す。`Mutex` が poison されていても
+/// inner を引き継いで取りこぼさず、`take` の意味論 (消費 → `None`) を維持する。
+/// テストから直接踏む最小 private 境界として公開している。
+fn try_take(pending: &PendingCursorpack) -> Option<PathBuf> {
+    lock_or_recover(&pending.0).take()
+}
+
 /// フロントが mount 完了後に呼ぶ IPC。pending パスを 1 件取り出す。
+///
+/// `Mutex` が他スレッド panic 由来で poison されていても、`try_take` 経由で
+/// stash 済みの path をロストせず返す (旧コードの `.lock().ok()` silent drop を排除)。
 #[tauri::command]
 pub fn take_pending_cursorpack(state: State<PendingCursorpack>) -> Option<String> {
-    state
-        .0
-        .lock()
-        .ok()
-        .and_then(|mut g| g.take())
-        .map(|p| p.to_string_lossy().to_string())
+    try_take(state.inner()).map(|p| p.to_string_lossy().to_string())
 }
 
 #[cfg(test)]
@@ -299,5 +307,42 @@ mod tests {
             guard.as_ref().map(|p| p.to_string_lossy().to_string())
         };
         assert_eq!(read_back.as_deref(), Some(stash_path.to_str().unwrap()));
+    }
+
+    /// `take_pending_cursorpack` IPC のコアロジック (`try_take`) が `Mutex` poison 状態でも
+    /// pending path を取り出せることを確認する回帰テスト。
+    ///
+    /// 旧コードの `take_pending_cursorpack` は `state.0.lock().ok()` で silent drop しており、
+    /// 別スレッド panic 由来の poison で IPC が `None` を返しユーザの `.cursorpack`
+    /// 取り込み要求が消失していた。修正後は `lock_or_recover` 経由で inner を引き継ぎ
+    /// `take()` するため、poison 状態でも stash 済みの pending path を返却する。
+    /// 検証対象は公開 IPC 本体ではなく最小の private 境界 (`try_take`) に直接踏み込む。
+    #[test]
+    fn try_take_recovers_pending_path_through_poison() {
+        let pending = Arc::new(PendingCursorpack::default());
+        let path = PathBuf::from(r"C:\poisoned-take.cursorpack");
+
+        // 前置: pending path を stash しておく (この時点では Mutex は健全)。
+        {
+            let mut guard = lock_or_recover(&pending.0);
+            *guard = Some(path.clone());
+        }
+
+        // 別スレッド panic で Mutex を意図的に poison する。
+        poison_pending(Arc::clone(&pending));
+        assert!(
+            pending.0.is_poisoned(),
+            "precondition: Mutex が poison されていること"
+        );
+
+        // take_pending_cursorpack IPC のコアロジック (`try_take`) を直接実行。
+        let taken = try_take(&pending);
+        assert_eq!(
+            taken,
+            Some(path.clone()),
+            "poison 状態でも pending path を返却しなければならない (.lock().ok() の silent drop 回帰)"
+        );
+        // `take` の意味論: 二度目は `None` (mutex 状態と無関係に成立する)。
+        assert_eq!(try_take(&pending), None);
     }
 }
