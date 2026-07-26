@@ -15,6 +15,7 @@
 //! ts-rs にも `rename_all = "camelCase"` を渡すことで、IPC シリアライズ境界の
 //! ペイロード型 (TS 側 camelCase) と一致させる。
 
+use app_lib::config::patch::AppConfigPatch;
 use app_lib::config::{AppConfig, BackupInfo};
 use app_lib::marketplace::{MarketplaceEntry, MarketplaceIndex, MarketplaceInstallRequest};
 use ts_rs::{Config, TS};
@@ -24,6 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 読み取って出力ディレクトリを決定。指定なしなら `./bindings/` にフォールバック。
     let config = Config::from_env();
     AppConfig::export_all(&config)?;
+    AppConfigPatch::export_all(&config)?;
     BackupInfo::export_all(&config)?;
     MarketplaceInstallRequest::export_all(&config)?;
     MarketplaceEntry::export_all(&config)?;

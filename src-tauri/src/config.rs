@@ -44,6 +44,12 @@ pub const CURRENT_SCHEMA_VERSION: u32 = 2;
 /// 設定スキーマ v1 のスナップショットモジュール。
 pub mod v1;
 
+/// 設定 update 用の typed patch (Wave 2B / Task 3)。
+/// `update_config` IPC の入力型を `AppConfigPatch` に固定し、フロントから
+/// `schema_version` / `github_account` / セキュリティ閾値 / 履歴系フィールド
+/// (`favorites` / `usage` / `active_theme_id`) を書き換えられないようにする。
+pub mod patch;
+
 /// 設定ファイル書込時に使う temp 拡張子。同じディレクトリに `config.json` と
 /// `config.json.tmp` が並ぶ形になり、電源断 / プロセス落ちで原子的置換が
 /// 中断しても temp ファイルが残るのみで本ファイルは無傷。
@@ -552,6 +558,40 @@ impl ConfigManager {
         Ok(draft)
     }
 
+    /// `update_config` IPC から呼ばれる typed-patch 適用の正準エントリ。
+    ///
+    /// `update<F>` クロージャ版と異なり、patch に存在しないフィールドは
+    /// 一切触らない (`schema_version` / `github_account` / セキュリティ閾値 /
+    /// `favorites` / `usage` / `active_theme_id` は patch に含まれないため、
+    /// フロントから上書きされることは決してない)。
+    ///
+    /// ディスク永続化は `update<F>` と同じく atomic_write 経由。
+    /// 失敗時は in-memory を変えない (Task 0 baseline で確認済みの安全網)。
+    pub fn apply_patch(&self, patch: patch::AppConfigPatch) -> AppResult<AppConfig> {
+        // 1. draft 作成 (read lock 内、副作用なし)
+        let draft = {
+            let guard = self
+                .config
+                .read()
+                .map_err(|e| AppError::Config(format!("設定のロックに失敗: {}", e)))?;
+            let mut draft = guard.clone();
+            patch.apply_to(&mut draft);
+            draft
+        };
+
+        // 2. ディスクへ atomic 書き出し
+        let content = serde_json::to_string_pretty(&draft)?;
+        atomic_write(&self.config_path, &content)?;
+
+        // 3. in-memory commit
+        let mut guard = self
+            .config
+            .write()
+            .map_err(|e| AppError::Config(format!("設定のロックに失敗: {}", e)))?;
+        *guard = draft.clone();
+        Ok(draft)
+    }
+
     /// 設定ディレクトリ内のバックアップファイル一覧を返す。
     ///
     /// 対象: `config.corrupt.*.json` (パースエラー時の退避ファイル)
@@ -846,6 +886,84 @@ mod tests {
         let cfg = AppConfig::default();
         assert_eq!(cfg.schema_version, super::CURRENT_SCHEMA_VERSION);
         assert_eq!(cfg.schema_version, 2);
+    }
+
+    // ── Wave 2B / Task 3: typed-patch apply テスト ───────────────────
+
+    /// `apply_patch` 経由で `general.show_apply_toast` を変更できる。
+    #[test]
+    fn apply_patch_changes_general_field() {
+        let dir = make_tempdir("patch-1");
+        let path = dir.join("config.json");
+        let cm = ConfigManager::init_at(&path).unwrap();
+        assert!(cm.get().unwrap().general.show_apply_toast);
+
+        let patch = patch::AppConfigPatch {
+            general: Some(patch::GeneralConfigPatch {
+                show_apply_toast: Some(false),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let updated = cm.apply_patch(patch).unwrap();
+        assert!(!updated.general.show_apply_toast);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// `apply_patch` は patch に含まれないフィールドを一切変更しない
+    /// (e.g. `github_account` を patch 経由で送ろうとしても無視される)。
+    ///
+    /// serde unknown field 拒否 + 型が patch に存在しない二重防御。
+    #[test]
+    fn apply_patch_does_not_touch_github_account_or_schema_version() {
+        let dir = make_tempdir("patch-2");
+        let path = dir.join("config.json");
+        let cm = ConfigManager::init_at(&path).unwrap();
+        let baseline_schema = cm.get().unwrap().schema_version;
+        let baseline_github_login = cm
+            .get()
+            .unwrap()
+            .github_account
+            .as_ref()
+            .map(|g| g.login.clone());
+
+        let patch = patch::AppConfigPatch {
+            logging: Some(patch::LoggingConfigPatch {
+                level: Some("DEBUG".to_string()),
+            }),
+            ..Default::default()
+        };
+        let updated = cm.apply_patch(patch).unwrap();
+        assert_eq!(updated.schema_version, baseline_schema);
+        assert_eq!(
+            updated.github_account.as_ref().map(|g| g.login.clone()),
+            baseline_github_login
+        );
+        assert_eq!(updated.logging.level, "DEBUG");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// `general.auto_start` を含む patch は disk に永続化される。
+    /// (Task 0 baseline で確認された in-memory / disk 不整合の安全網が
+    /// patch 経路でも機能することの回帰防止)
+    #[test]
+    fn apply_patch_persists_to_disk_atomically() {
+        let dir = make_tempdir("patch-3");
+        let path = dir.join("config.json");
+        let cm = ConfigManager::init_at(&path).unwrap();
+        let patch = patch::AppConfigPatch {
+            general: Some(patch::GeneralConfigPatch {
+                language: Some("en".to_string()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        cm.apply_patch(patch).unwrap();
+
+        let content = std::fs::read_to_string(&path).unwrap();
+        let reloaded: AppConfig = serde_json::from_str(&content).unwrap();
+        assert_eq!(reloaded.general.language, "en");
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
