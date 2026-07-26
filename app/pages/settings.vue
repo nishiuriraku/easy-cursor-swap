@@ -181,17 +181,16 @@ const updaterErrorDisplay = computed(() => {
   return t(key, { message })
 })
 
-// useUpdaterBootstrap.ts と同じ localStorage キー / クールダウン定義を持つ。
-// 共有定数化はまだ 2 箇所重複だけなので YAGNI で保留する (3 箇所目が出たら集約)。
-const LAST_CHECK_KEY = 'ecs.updater.last_check_at'
-const CHECK_COOLDOWN_MS = 24 * 60 * 60 * 1000
+// Wave 2B / Task 5: localStorage キーとクールダウンは `useUpdaterBootstrap` と
+// 共有の `~/composables/updaterConstants` から取得する (3 箇所目の重複を待たない)。
+import { LAST_UPDATE_CHECK_KEY, UPDATE_CHECK_COOLDOWN_MS } from '~/composables/updaterConstants'
 
 /** 次回自動チェック (= 起動時 bootstrap が走るタイミング) までの残り時間を文字列で返す。 */
 const autoCheckHint = computed(() => {
   if (typeof localStorage === 'undefined') return t('settings.autoCheckHintReady')
-  const raw = Number(localStorage.getItem(LAST_CHECK_KEY) ?? '0')
+  const raw = Number(localStorage.getItem(LAST_UPDATE_CHECK_KEY) ?? '0')
   if (!Number.isFinite(raw) || raw === 0) return t('settings.autoCheckHintReady')
-  const remainingMs = raw + CHECK_COOLDOWN_MS - Date.now()
+  const remainingMs = raw + UPDATE_CHECK_COOLDOWN_MS - Date.now()
   if (remainingMs <= 0) return t('settings.autoCheckHintReady')
   const hours = Math.max(1, Math.ceil(remainingMs / (60 * 60 * 1000)))
   return t('settings.autoCheckHintHours', { hours })
@@ -200,7 +199,7 @@ const autoCheckHint = computed(() => {
 /** クールダウンを破って次回起動時に再チェックさせる。即時 check はしない (UX 上シンプル化)。 */
 function onForceRecheck() {
   if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(LAST_CHECK_KEY, '0')
+    localStorage.setItem(LAST_UPDATE_CHECK_KEY, '0')
   }
   updaterMessage.value = t('settings.autoCheckHintReady')
 }

@@ -13,16 +13,11 @@
  *     localStorage が消えても再チェックが走るだけで副作用なし → 設定ファイルの schema を汚さない。
  *   - 通知の permission リクエストは `useNotify` 側でキャッシュ済 (起動時に 1 度だけ)。
  */
-
-/** クールダウン期間 (ms)。24 時間。 */
-const CHECK_COOLDOWN_MS = 24 * 60 * 60 * 1000
-
-/** localStorage キー (composable 専用)。 */
-const LAST_CHECK_KEY = 'ecs.updater.last_check_at'
+import { LAST_UPDATE_CHECK_KEY, UPDATE_CHECK_COOLDOWN_MS } from './updaterConstants'
 
 function readLastCheckedAt(): number {
   if (typeof localStorage === 'undefined') return 0
-  const raw = localStorage.getItem(LAST_CHECK_KEY)
+  const raw = localStorage.getItem(LAST_UPDATE_CHECK_KEY)
   if (!raw) return 0
   const v = Number(raw)
   return Number.isFinite(v) ? v : 0
@@ -31,7 +26,7 @@ function readLastCheckedAt(): number {
 function writeLastCheckedAt(ts: number): void {
   if (typeof localStorage === 'undefined') return
   try {
-    localStorage.setItem(LAST_CHECK_KEY, String(ts))
+    localStorage.setItem(LAST_UPDATE_CHECK_KEY, String(ts))
   } catch {
     // QuotaExceeded などは無視 (このフィールドは消えても再チェックが走るだけ)
   }
@@ -60,7 +55,7 @@ async function run(): Promise<void> {
 
   const now = Date.now()
   const last = readLastCheckedAt()
-  if (now - last < CHECK_COOLDOWN_MS) {
+  if (now - last < UPDATE_CHECK_COOLDOWN_MS) {
     return
   }
 
