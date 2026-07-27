@@ -109,21 +109,21 @@ pub async fn export_cursorpack_streamed(
     let (sender, receiver) =
         std::sync::mpsc::sync_channel::<BuildProgress>(PROGRESS_CHANNEL_CAPACITY);
 
-    // ブロッキングワーカーを spawn_blocking で起動。sender は move でワーカーへ渡す。
-    let req_for_worker = req.clone();
-    let app_for_worker = app.clone();
-    let worker_join = tauri::async_runtime::spawn_blocking(move || {
-        run_export_blocking(app_for_worker, req_for_worker, sender)
-    });
+    // ブロッキングワーカー (req + sender + app) を spawn_blocking で起動。`app` は
+    // `app.state::<CancelRegistry>()` のため move で渡す必要がある。req には Clone が
+    // 不要なので (Wave 2AB / Task 6 fix) そのまま move。drain 側は別途 1 度だけ clone
+    // して所有権を分ける (= req clone / 余計な app clone を排除)。
+    let app_for_drain = app.clone();
+    let worker_join =
+        tauri::async_runtime::spawn_blocking(move || run_export_blocking(app, req, sender));
 
     // 進捗ドレインタスク: receiver.recv() で channel から build-progress を取り出し、
     // Tauri emit でフロントへ配送する。sender が drop されると (worker 完了時)
     // RecvError が返るので while let ループを抜けて自然終了する。
-    let app_for_emit = app.clone();
     let drain_join = tauri::async_runtime::spawn_blocking(move || {
         use tauri::Emitter;
         while let Ok(progress) = receiver.recv() {
-            if let Err(e) = app_for_emit.emit("build-progress", &progress) {
+            if let Err(e) = app_for_drain.emit("build-progress", &progress) {
                 tracing::warn!("build-progress emit 失敗: {}", e);
             }
         }
@@ -612,7 +612,7 @@ mod tests {
         };
 
         // roles が空 → role ループはスキップされ package 段階のキャンセルに合流する
-        let result = run_export_inner(req.clone(), &tx, || true);
+        let result = run_export_inner(req, &tx, || true);
         assert!(
             result.is_err(),
             "expected Err when is_cancelled returns true at package stage"
@@ -664,7 +664,7 @@ mod tests {
             sign: false,
         };
         let mut first_check = true;
-        let result = run_export_inner(req.clone(), &tx, || {
+        let result = run_export_inner(req, &tx, || {
             // 最初のチェックポイントだけキャンセル要求を返す (std::mem::take で
             // clippy::manual_take を回避しつつ意図を明示する)。
             std::mem::take(&mut first_check)
@@ -716,7 +716,7 @@ mod tests {
             existing_theme_id: None,
             sign: false,
         };
-        let result = run_export_inner(req.clone(), &tx, || false);
+        let result = run_export_inner(req, &tx, || false);
         assert!(result.is_ok(), "normal path should succeed: {result:?}");
         drop(tx);
 

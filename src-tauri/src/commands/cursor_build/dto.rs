@@ -56,7 +56,7 @@ pub struct ExportResult {
 }
 
 /// 1 役割分の入力 (PNG バイト列 + ホットスポット比率 + リサンプル指定)
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RoleBuildEntry {
     pub role: String,
@@ -78,7 +78,7 @@ pub struct RoleBuildEntry {
 }
 
 /// サイズ別オーバーライド (PNG + optional 独立 hotspot)。
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SizedOverridePayload {
     pub png_bytes: Vec<u8>,
@@ -87,7 +87,7 @@ pub struct SizedOverridePayload {
 }
 
 /// ストリーム式 .cursorpack ビルドリクエスト
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StreamedExportRequest {
     /// フロント側が生成した一意 ID。`build-progress` イベントの相関キー兼キャンセル ID。
