@@ -287,8 +287,20 @@ pub fn bulk_resolve_inner(
     for (idx, path) in files.iter().enumerate() {
         // 各ファイル処理の前にキャンセル要求を polling する。要求があれば
         // 以降のファイルを処理せず即座に打ち切る。
+        // UI 側 (`useCreatorBulkImportFlow` / `useBulkImport`) は `stage` の遷移を
+        // 見てスピナー / キャンセル確定表示を切り替えるので、cancelled を明示的に
+        // 発火してから返す (Wave 2AB Task 7 I-2 parked finding)。
         if let Some(check) = should_cancel {
             if check() {
+                if let Some(cb) = on_progress {
+                    cb(BulkImportProgress {
+                        job_id: job_id.to_string(),
+                        stage: "cancelled",
+                        current: idx as u32,
+                        total,
+                        message: Some("キャンセル要求を受信".into()),
+                    });
+                }
                 return Err(AppError::BulkImportCancelled);
             }
         }
@@ -603,6 +615,53 @@ mod tests {
         )
         .unwrap();
         assert_eq!(result.assets.len(), 1);
+    }
+
+    /// キャンセル要求が立ったとき、`bulk_resolve_inner` は:
+    /// 1. `Err(AppError::BulkImportCancelled)` を返す (既存テストで保証)
+    /// 2. UI 側がステージ遷移 (resolve → cancelled) で UI を戻せるよう、
+    ///    `on_progress` に対し `stage == "cancelled"` のイベントを 1 回発火する
+    ///    (Wave 2AB Task 7 I-2 parked finding)。
+    ///
+    /// 旧コードはこの emit が抜けており、UI 側でキャンセル確定表示が出ず、
+    /// 進捗バーが `parse` のまま固まる現象があった。fix で emit を 1 行追加。
+    #[test]
+    fn bulk_resolve_emits_cancelled_stage_when_cancel_set() {
+        use std::sync::{Arc, Mutex};
+
+        let tmp = tempfile::tempdir().unwrap();
+        let one_pix = include_bytes!("../../tests/fixtures/1x1.png");
+        std::fs::write(tmp.path().join("a.png"), one_pix).unwrap();
+        std::fs::write(tmp.path().join("b.png"), one_pix).unwrap();
+
+        let events: Arc<Mutex<Vec<BulkImportProgress>>> = Arc::new(Mutex::new(Vec::new()));
+        let events_for_cb = events.clone();
+        let cb = move |p: BulkImportProgress| {
+            events_for_cb.lock().unwrap().push(p);
+        };
+
+        let cancel = || true;
+        let result = bulk_resolve_inner(
+            &[tmp.path().to_string_lossy().to_string()],
+            false,
+            "cancel-emit-job",
+            Some(&cb),
+            Some(&cancel),
+        );
+
+        // (1) エラー型は変わらない。
+        match result {
+            Err(AppError::BulkImportCancelled) => {}
+            other => panic!("expected BulkImportCancelled, got {:?}", other),
+        }
+
+        // (2) cancelled ステージが 1 回以上 emit されている。
+        let captured = events.lock().unwrap();
+        assert!(
+            captured.iter().any(|p| p.stage == "cancelled"),
+            "stage == \"cancelled\" の progress event が emit されるべき、実際: {:?}",
+            *captured
+        );
     }
 
     /// Windows でディレクトリ symlink が作成できない環境 (Developer Mode オフ / 非管理者) では
