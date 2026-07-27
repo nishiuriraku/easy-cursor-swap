@@ -214,39 +214,42 @@ pub async fn submit_theme_auto(
     // Tauri コマンド (cancel など) がフリーズしない。
     let parsed_id_for_blocking = parsed_id;
     let lineage_for_preflight = lineage_meta.cloned_from_marketplace_id;
-    let preflight = tauri::async_runtime::spawn_blocking(move || -> Result<SubmitPreflight, AppError> {
-        let pack_bytes = build_cursorpack_for_submit(parsed_id_for_blocking)?;
-        if (pack_bytes.len() as u64) > DEFAULT_MAX_PACK_COMPRESSED_SIZE {
-            return Err(AppError::Theme(format!(
-                ".cursorpack が {}MB 超: 提出できません",
-                DEFAULT_MAX_PACK_COMPRESSED_SIZE / 1024 / 1024
-            )));
-        }
-        let sha256 = sha256_hex(&pack_bytes);
-        // .cursorpack 全体の SHA-256 (16進文字列) を署名対象とする。
-        // 公式 marketplace のインストール側も同じ規約を使う。
-        let signature_b64 = Keystore::sign(sha256.as_bytes())?;
-        let key_info = Keystore::info()?;
-        let pubkey_id = key_info
-            .key_id
-            .ok_or_else(|| AppError::Theme("署名鍵が未生成です".to_string()))?;
-        let meta = load_theme_meta_for_submit(parsed_id_for_blocking)?;
-        Ok(SubmitPreflight {
-            theme_id: parsed_id_for_blocking,
-            theme_id_str: parsed_id_for_blocking.to_string(),
-            tags: normalized_tags,
-            pack_bytes,
-            sha256,
-            signature_b64,
-            pubkey_id,
-            meta,
-            cloned_from_marketplace_id: lineage_for_preflight,
+    let preflight =
+        tauri::async_runtime::spawn_blocking(move || -> Result<SubmitPreflight, AppError> {
+            let pack_bytes = build_cursorpack_for_submit(parsed_id_for_blocking)?;
+            if (pack_bytes.len() as u64) > DEFAULT_MAX_PACK_COMPRESSED_SIZE {
+                return Err(AppError::Theme(format!(
+                    ".cursorpack が {}MB 超: 提出できません",
+                    DEFAULT_MAX_PACK_COMPRESSED_SIZE / 1024 / 1024
+                )));
+            }
+            let sha256 = sha256_hex(&pack_bytes);
+            // .cursorpack 全体の SHA-256 (16進文字列) を署名対象とする。
+            // 公式 marketplace のインストール側も同じ規約を使う。
+            let signature_b64 = Keystore::sign(sha256.as_bytes())?;
+            let key_info = Keystore::info()?;
+            let pubkey_id = key_info
+                .key_id
+                .ok_or_else(|| AppError::Theme("署名鍵が未生成です".to_string()))?;
+            let meta = load_theme_meta_for_submit(parsed_id_for_blocking)?;
+            Ok(SubmitPreflight {
+                theme_id: parsed_id_for_blocking,
+                theme_id_str: parsed_id_for_blocking.to_string(),
+                tags: normalized_tags,
+                pack_bytes,
+                sha256,
+                signature_b64,
+                pubkey_id,
+                meta,
+                cloned_from_marketplace_id: lineage_for_preflight,
+            })
         })
-    })
-    .await
-    .map_err(|e| AppError::Theme(format!("pack build join エラー: {}", e)))??;
+        .await
+        .map_err(|e| AppError::Theme(format!("pack build join エラー: {}", e)))??;
 
-    emit_progress(&app, "auth");
+    // `auth` 進捗は `run_submit_pipeline` 側の `AppHandleSink` で発火させる。
+    // IPC 側で二重発火するとシーケンスが `build, auth, auth, fork, ...` になり
+    // フロントが期待する 9 ステージと一致しないため、ここで emit しない。
     let token = Keystore::load_github_oauth_token()?
         .ok_or_else(|| AppError::Theme("GitHub と未連携です".to_string()))?;
     let client = Client::new(token);

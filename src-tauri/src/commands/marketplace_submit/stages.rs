@@ -16,6 +16,7 @@
 //!   (= 提出全体を止めない) ため、結果を warn ログだけで継続する。
 
 use crate::commands::marketplace_submit::ThemeMetaForSubmit;
+use crate::config::DEFAULT_MAX_IMAGE_FILE_SIZE;
 use crate::errors::{AppError, AppResult};
 use crate::github::client::GithubGateway;
 use crate::github::types::SubmitResult;
@@ -129,8 +130,7 @@ where
     // upstream 本体 (= 同じ owner / 同じ repo) を返す。この場合 `merge-upstream` も
     // 「自分の main を自分の main に merge」になり 422 で落ちる。
     // 自前の fork でない (= upstream owner 本人) なら sync をスキップする。
-    let is_self_owned =
-        fork.owner.login == UPSTREAM_OWNER && fork.name == UPSTREAM_REPO;
+    let is_self_owned = fork.owner.login == UPSTREAM_OWNER && fork.name == UPSTREAM_REPO;
 
     // ── stage 3: sync_fork ───────────────────────────────────
     sink.emit("sync_fork");
@@ -148,12 +148,7 @@ where
     let branch = format!("submit/{}", preflight.theme_id_str);
     sink.emit("branch");
     gateway
-        .create_or_reset_branch(
-            &fork.owner.login,
-            &fork.name,
-            &branch,
-            &fork.default_branch,
-        )
+        .create_or_reset_branch(&fork.owner.login, &fork.name, &branch, &fork.default_branch)
         .await?;
 
     // ── stage 5: upload_pack ─────────────────────────────────
@@ -174,13 +169,23 @@ where
     // .cursorpack 内の `previews/<role>.png` を抽出し、
     // `previews/<theme_id>/<role>.png` として upstream に置けるように fork へアップロードする。
     // 失敗しても提出全体は止めず警告のみ (entry の preview_base_url は省略)。
-    let uploaded_previews =
-        upload_previews_from_pack(gateway, &fork.owner.login, &fork.name, &branch, &preflight.theme_id_str, &preflight.pack_bytes)
-            .await
-            .unwrap_or_else(|e| {
-                tracing::warn!("preview アップロード失敗 (続行): {}", e);
-                false
-            });
+    //
+    // ZIP 展開は CPU 重め (= zip bomb / 巨大 entry decode) なので、抽出部のみ
+    // `spawn_blocking` で逃がし async executor を占有しない。アップロード自体は
+    // GitHub への HTTP 呼び出しなので async のまま (= tokio runtime を使う)。
+    let uploaded_previews = upload_previews_from_pack(
+        gateway,
+        &fork.owner.login,
+        &fork.name,
+        &branch,
+        &preflight.theme_id_str,
+        preflight.pack_bytes.clone(),
+    )
+    .await
+    .unwrap_or_else(|e| {
+        tracing::warn!("preview アップロード失敗 (続行): {}", e);
+        false
+    });
 
     // ── stage 7: upload_entry ────────────────────────────────
     sink.emit("upload_entry");
@@ -189,6 +194,16 @@ where
     // 空配列の場合は metadata の tags をそのまま使う。
     if !preflight.tags.is_empty() {
         meta.tags = preflight.tags.clone();
+    }
+    // セキュリティ不変条件: `meta.tags` はネットワーク送信前に必ず allow-list
+    // を通すこと。`preflight.tags` (= ユーザー入力) は IPC preflight で検証済み
+    // だが、`preflight.meta.tags` は theme.json のメタデータをそのまま反映するため
+    // allow-list 作成前の古いテーマでも非許容タグを持ち得る。
+    // 不正タグが混入したまま network write に到達すると、upstream index の
+    // `schemas/index-entry.json#tags.items.enum` 検証で PR が落ちる (= token 浪費)。
+    // 早期に拒否するため、最終的な `meta.tags` を再度 `validate_tags` に通す。
+    if !meta.tags.is_empty() {
+        meta.tags = validate_tags(meta.tags.clone())?;
     }
     let download_url = format!(
         "https://raw.githubusercontent.com/{}/{}/main/themes/{}.cursorpack",
@@ -277,20 +292,60 @@ pub(crate) fn validate_tags(tags: Vec<String>) -> AppResult<Vec<String>> {
 ///
 /// 戻り値は「1 件以上 PNG を upload できたか」。すべて失敗 / 該当ファイル無しの
 /// 場合は `false` を返し、呼び出し側は entry の `preview_base_url` を省略する。
+///
+/// ZIP 展開は CPU 重め (= zip bomb / 巨大 entry decode) なので、抽出部のみ
+/// `tokio::task::spawn_blocking` で逃がし async executor を占有しない。
+/// アップロード自体は GitHub への HTTP 呼び出しなので async のまま
+/// (= tokio runtime を使う) にする。
 async fn upload_previews_from_pack<C: GithubGateway>(
     gateway: &C,
     owner: &str,
     repo: &str,
     branch: &str,
     theme_id: &str,
-    pack_bytes: &[u8],
+    pack_bytes: Vec<u8>,
 ) -> AppResult<bool> {
+    // ── Phase 1: ZIP 展開 (blocking) ──
+    // `pack_bytes` は zip decoder に消費されるので、抽出結果は所有権ごと渡される。
+    let extracts: Vec<(String, Vec<u8>)> =
+        tauri::async_runtime::spawn_blocking(move || extract_preview_pngs_from_pack(&pack_bytes))
+            .await
+            .map_err(|e| AppError::Theme(format!("preview extract join エラー: {}", e)))??;
+
+    if extracts.is_empty() {
+        tracing::warn!("preview PNG が cursorpack に含まれていません");
+        return Ok(false);
+    }
+
+    // ── Phase 2: HTTP upload (async) ──
+    let mut success = 0usize;
+    for (role, bytes) in &extracts {
+        let path = format!("previews/{}/{}.png", theme_id, role);
+        let msg = format!("feat: add preview {} for {}", role, theme_id);
+        if let Err(e) = gateway
+            .put_contents(owner, repo, branch, &path, bytes, &msg)
+            .await
+        {
+            tracing::warn!("preview upload 失敗 ({}): {}", role, e);
+            continue;
+        }
+        success += 1;
+    }
+    Ok(success > 0)
+}
+
+/// `.cursorpack` 内の `previews/<role>.png` を同期処理で (role, bytes) のリストへ展開する。
+///
+/// 防御 (defense-in-depth):
+/// - role 名: ASCII 英数字 + アンダースコアのみ (1〜32 文字)。
+/// - 各 preview のサイズは `DEFAULT_MAX_IMAGE_FILE_SIZE` (10 MB) で上限カット。
+///   zip の `entry.size()` は信頼できない (= zip bomb) ので `take(MAX+1)` で
+///   実ストリーム長を読んで判定する。
+fn extract_preview_pngs_from_pack(pack_bytes: &[u8]) -> AppResult<Vec<(String, Vec<u8>)>> {
     let reader = std::io::Cursor::new(pack_bytes);
     let mut archive = zip::ZipArchive::new(reader)
         .map_err(|e| AppError::Theme(format!(".cursorpack ZIP オープン失敗: {}", e)))?;
 
-    // ZIP 内エントリ名から (role, bytes) を抽出。`previews/<role>.png` 形式のみ採用し、
-    // 役割名は ASCII 英数字 + アンダースコアに正規化されたものに限定する。
     let mut uploads: Vec<(String, Vec<u8>)> = Vec::new();
     for i in 0..archive.len() {
         let mut f = archive
@@ -310,31 +365,25 @@ async fn upload_previews_from_pack<C: GithubGateway>(
         {
             continue;
         }
+        // `.take(MAX+1)` で上限超過を実ストリーム長で検出 (zip bomb 対策)。
+        let mut limited = (&mut f).take(DEFAULT_MAX_IMAGE_FILE_SIZE + 1);
         let mut bytes = Vec::new();
-        f.read_to_end(&mut bytes)
+        limited
+            .read_to_end(&mut bytes)
             .map_err(|e| AppError::Theme(format!("preview 読込失敗: {}", e)))?;
-        uploads.push((role.to_string(), bytes));
-    }
-
-    if uploads.is_empty() {
-        tracing::warn!("preview PNG が cursorpack に含まれていません");
-        return Ok(false);
-    }
-
-    let mut success = 0usize;
-    for (role, bytes) in &uploads {
-        let path = format!("previews/{}/{}.png", theme_id, role);
-        let msg = format!("feat: add preview {} for {}", role, theme_id);
-        if let Err(e) = gateway
-            .put_contents(owner, repo, branch, &path, bytes, &msg)
-            .await
-        {
-            tracing::warn!("preview upload 失敗 ({}): {}", role, e);
+        if (bytes.len() as u64) > DEFAULT_MAX_IMAGE_FILE_SIZE {
+            // 巨大すぎる preview はスキップ (= 提出全体が止まらない / 既存の
+            // 「warn ログだけで続行」soft-fail semantics を保つ)。
+            tracing::warn!(
+                "preview {} が上限 {} bytes を超過、スキップ",
+                role,
+                DEFAULT_MAX_IMAGE_FILE_SIZE
+            );
             continue;
         }
-        success += 1;
+        uploads.push((role.to_string(), bytes));
     }
-    Ok(success > 0)
+    Ok(uploads)
 }
 
 #[cfg(test)]
@@ -470,10 +519,7 @@ mod tests {
 
     impl GithubGateway for StrictGateway {
         async fn get_authenticated_user(&self) -> AppResult<AuthenticatedUser> {
-            self.calls
-                .lock()
-                .unwrap()
-                .push("get_authenticated_user");
+            self.calls.lock().unwrap().push("get_authenticated_user");
             Err(AppError::Theme(
                 "StrictGateway: get_authenticated_user should not be called".into(),
             ))
@@ -490,7 +536,13 @@ mod tests {
                 "StrictGateway: sync_fork_with_upstream should not be called".into(),
             ))
         }
-        async fn create_or_reset_branch(&self, _: &str, _: &str, _: &str, _: &str) -> AppResult<()> {
+        async fn create_or_reset_branch(
+            &self,
+            _: &str,
+            _: &str,
+            _: &str,
+            _: &str,
+        ) -> AppResult<()> {
             self.calls.lock().unwrap().push("create_or_reset_branch");
             Err(AppError::Theme(
                 "StrictGateway: create_or_reset_branch should not be called".into(),
@@ -542,10 +594,7 @@ mod tests {
 
     impl GithubGateway for SyncFailGateway {
         async fn get_authenticated_user(&self) -> AppResult<AuthenticatedUser> {
-            self.calls
-                .lock()
-                .unwrap()
-                .push("get_authenticated_user");
+            self.calls.lock().unwrap().push("get_authenticated_user");
             Ok(AuthenticatedUser {
                 login: "octocat".into(),
             })
@@ -562,17 +611,17 @@ mod tests {
             })
         }
         async fn sync_fork_with_upstream(&self, _: &str, _: &str, _: &str) -> AppResult<()> {
-            self.calls
-                .lock()
-                .unwrap()
-                .push("sync_fork_with_upstream");
+            self.calls.lock().unwrap().push("sync_fork_with_upstream");
             Err(AppError::Theme("synthetic sync failure".into()))
         }
-        async fn create_or_reset_branch(&self, _: &str, _: &str, _: &str, _: &str) -> AppResult<()> {
-            self.calls
-                .lock()
-                .unwrap()
-                .push("create_or_reset_branch");
+        async fn create_or_reset_branch(
+            &self,
+            _: &str,
+            _: &str,
+            _: &str,
+            _: &str,
+        ) -> AppResult<()> {
+            self.calls.lock().unwrap().push("create_or_reset_branch");
             Ok(())
         }
         async fn put_contents(
@@ -726,7 +775,14 @@ mod tests {
 
         // 進捗イベントも同順で発火している。
         let expected_events: &[&str] = &[
-            "auth", "fork", "sync_fork", "branch", "upload_pack", "upload_previews", "upload_entry", "open_pr",
+            "auth",
+            "fork",
+            "sync_fork",
+            "branch",
+            "upload_pack",
+            "upload_previews",
+            "upload_entry",
+            "open_pr",
         ];
         let expected_events_owned: Vec<String> =
             expected_events.iter().map(|s| s.to_string()).collect();
@@ -785,12 +841,7 @@ mod tests {
 
     #[tokio::test]
     async fn tag_allow_list_dedupes_and_trims() {
-        let tags = vec![
-            " pixel ".into(),
-            "pixel".into(),
-            "  ".into(),
-            "dark".into(),
-        ];
+        let tags = vec![" pixel ".into(), "pixel".into(), "  ".into(), "dark".into()];
         let out = validate_tags(tags).unwrap();
         assert_eq!(out, vec!["pixel", "dark"]);
     }
@@ -803,5 +854,113 @@ mod tests {
             "pixel", "minimal", "animated", "dark", "light", "anime", "retro", "neon",
         ];
         assert_eq!(ALLOWED_MARKETPLACE_TAGS, expected);
+    }
+
+    /// Task 9 review finding #4: `preflight.tags` が空 (= ユーザー入力なし)
+    /// のとき `meta.tags` (= theme.json の tags) が未検証のまま entry JSON に
+    /// 入り、network write まで到達してはいけない。`upload_entry` 段階で
+    /// `validate_tags` が再適用され、不正タグ混入時に `run_submit_pipeline` が
+    /// `Err(AppError::Theme(_))` を返すことを固定する。
+    #[tokio::test]
+    async fn meta_tags_with_unknown_tag_rejected_before_network_write() {
+        let gw = RecordingGateway::new();
+        let theme_id = Uuid::parse_str("00000000-0000-0000-0000-000000000abc").unwrap();
+        let mut preflight = make_preflight(theme_id);
+        // ユーザー入力は空 (= IPC 側 allow-list を通っていない)。
+        preflight.tags = vec![];
+        // theme.json 側に不正タグ (allow-list 外) が混入しているケース。
+        preflight.meta.tags = vec!["unknown_tag".into()];
+        // preview pack 内の PNG はクリア (= upload_previews を素通りさせる)。
+        preflight.pack_bytes = empty_pack_bytes();
+
+        let sink = NoopSink;
+        let result = run_submit_pipeline(&sink, &gw, preflight).await;
+        match result {
+            Err(AppError::Theme(msg)) => {
+                assert!(
+                    msg.contains("unknown_tag"),
+                    "error should mention the bad tag, got: {msg}"
+                );
+            }
+            other => panic!("expected Theme error, got {other:?}"),
+        }
+        // 不正タグ検出時点で gate: open_pr / upload_entry の put_contents は
+        // 呼ばれていないこと (= network write に到達していない)。
+        let order = gw.order();
+        assert!(
+            !order.contains(&"open_or_update_pr"),
+            "open_pr should not have been called, but got order {order:?}"
+        );
+        assert!(
+            !order
+                .iter()
+                .any(|c| *c == "put_contents" && order.iter().take_while(|x| *x != c).count() == 6),
+            "upload_entry (3rd put_contents) should not have been called, got order {order:?}"
+        );
+    }
+
+    /// Task 9 review finding #4: `meta.tags` が全て allow-list 内のとき
+    /// (= 既存テーマで正常) は再検証を通過して PR 作成まで進む。
+    #[tokio::test]
+    async fn meta_tags_with_valid_tags_passes_through() {
+        let gw = RecordingGateway::new();
+        let theme_id = Uuid::parse_str("00000000-0000-0000-0000-000000000abc").unwrap();
+        let mut preflight = make_preflight(theme_id);
+        preflight.tags = vec![];
+        preflight.meta.tags = vec!["pixel".into(), "dark".into()];
+        preflight.pack_bytes = empty_pack_bytes();
+
+        let sink = NoopSink;
+        let result = run_submit_pipeline(&sink, &gw, preflight).await.unwrap();
+        assert_eq!(result.pr_number, 42);
+    }
+
+    /// `previews/<role>.png` を含まない空 pack を返すヘルパー。
+    fn empty_pack_bytes() -> Vec<u8> {
+        use std::io::Write;
+        let cursor = std::io::Cursor::new(Vec::<u8>::new());
+        let mut zip = zip::ZipWriter::new(cursor);
+        let opts = zip::write::SimpleFileOptions::default();
+        // 役割名だけ (中身は空) のディレクトリ相当エントリ。
+        zip.start_file("manifest.json", opts).unwrap();
+        zip.write_all(b"{}").unwrap();
+        zip.finish().expect("zip finish").into_inner()
+    }
+
+    /// Task 9 review finding #6: 10 MB を超える preview は defense-in-depth
+    /// としてスキップ (= 提出全体は止めない) され、サイズ上限内のものは抽出される。
+    #[test]
+    fn extract_preview_pngs_skips_oversize_entries() {
+        use crate::config::DEFAULT_MAX_IMAGE_FILE_SIZE;
+        use std::io::Write;
+        let cursor = std::io::Cursor::new(Vec::<u8>::new());
+        let mut zip = zip::ZipWriter::new(cursor);
+        let opts = zip::write::SimpleFileOptions::default();
+        // 正常サイズ。
+        zip.start_file("previews/Arrow.png", opts).unwrap();
+        zip.write_all(b"OK").unwrap();
+        // 上限 + 1 バイト (= スキップされるべき)。
+        zip.start_file("previews/Big.png", opts).unwrap();
+        let big = vec![0u8; (DEFAULT_MAX_IMAGE_FILE_SIZE + 1) as usize];
+        zip.write_all(&big).unwrap();
+        let pack_bytes = zip.finish().expect("zip finish").into_inner();
+
+        let out = extract_preview_pngs_from_pack(&pack_bytes).unwrap();
+        let roles: Vec<&str> = out.iter().map(|(r, _)| r.as_str()).collect();
+        assert!(
+            roles.contains(&"Arrow"),
+            "正常サイズの preview は残るべき; got {roles:?}"
+        );
+        assert!(
+            !roles.contains(&"Big"),
+            "10MB 超の preview はスキップされるべき; got {roles:?}"
+        );
+        // 返した sizes 自体が上限内に収まっていることを確認。
+        for (role, bytes) in &out {
+            assert!(
+                (bytes.len() as u64) <= DEFAULT_MAX_IMAGE_FILE_SIZE,
+                "{role} のサイズが上限を超えている"
+            );
+        }
     }
 }

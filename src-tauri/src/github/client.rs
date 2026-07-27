@@ -731,8 +731,8 @@ mod tests {
 
     #[tokio::test]
     async fn task9_put_contents_contract() {
-        // 契約: PUT /repos/{o}/{r}/contents/{path} が呼ばれ、content フィールドが
-        // Base64 エンコードされている。
+        // 契約: PUT /repos/{o}/{r}/contents/{path} が呼ばれ、`content` フィールドが
+        // Base64 エンコードされ、`message` / `branch` が反映される。
         let mut server = Server::new_async().await;
         // GET 既存 → 404 (先行コンテンツなし = 新規作成)
         let _m_get = server
@@ -746,7 +746,11 @@ mod tests {
             .with_status(404)
             .create_async()
             .await;
-        // PUT 新規作成
+        // PUT 新規作成。
+        // Task 9 review finding #5: 入力 bytes (="hello") が Base64 "aGVsbG8=" に
+        // エンコードされ、branch / message がリクエストボディに乗ることを
+        // mockito 側でアサート (= ヘッダ不一致時と同じ失敗パスを通す)。
+        // mockito::Matcher::Json は exact match。既存ファイル無しなので sha を含まない。
         let _m_put = server
             .mock(
                 "PUT",
@@ -756,13 +760,17 @@ mod tests {
                 ),
             )
             .match_header("authorization", "Bearer synthetic-test-token")
+            .match_body(mockito::Matcher::Json(serde_json::json!({
+                "message": "feat: add cursorpack",
+                "content": "aGVsbG8=",
+                "branch": "submit/abc",
+            })))
             .with_status(201)
             .with_body(r#"{"content":{"sha":"NEWSHA"},"commit":{"sha":"COMMITSHA"}}"#)
             .create_async()
             .await;
 
         let c = task9_client_for(&server.url());
-        // 入力バイト列 "hello" → Base64 "aGVsbG8="
         c.put_contents(
             "octocat",
             "easy-cursor-swap-index",
@@ -773,14 +781,12 @@ mod tests {
         )
         .await
         .unwrap();
-        // mockito のマッチャに合致したのでそのまま成功。
-        // 不一致なら panic するため、テスト本体としてはこれで契約固定完了。
     }
 
     #[tokio::test]
     async fn task9_open_or_update_pr_contract() {
         // 契約: 既存 PR 無しの場合、POST /repos/{o}/{r}/pulls で新規作成し、
-        // head / base / title / body が反映される。
+        // head / base / title / body がそのまま反映される。
         let mut server = Server::new_async().await;
         let _m_list = server
             .mock(
@@ -794,12 +800,20 @@ mod tests {
             .with_body("[]")
             .create_async()
             .await;
+        // Task 9 review finding #5: PR 作成時の head / base / title / body が
+        // そのままリクエスト JSON に入ることを mockito::Matcher::Json で固定。
         let _m_post = server
             .mock(
                 "POST",
                 "/repos/upstream-owner/easy-cursor-swap-index/pulls",
             )
             .match_header("authorization", "Bearer synthetic-test-token")
+            .match_body(mockito::Matcher::Json(serde_json::json!({
+                "title": "submit: abc v1.0.0",
+                "body": "## Auto-submitted via EasyCursorSwap",
+                "head": "octocat:submit/abc",
+                "base": "main",
+            })))
             .with_status(201)
             .with_body(
                 r#"{"number":99,"html_url":"https://github.com/upstream-owner/easy-cursor-swap-index/pull/99","head":{"ref":"submit/abc"}}"#,
