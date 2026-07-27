@@ -12,6 +12,16 @@
 //!
 //! 走らせ方:
 //!   cargo bench --bench list_themes --manifest-path src-tauri/Cargo.toml
+//!
+//! 設計ノート:
+//!  - `CUSTOM_CURSORS_DIR_OVERRIDE` env var は `EnvVarGuard` (RAII Drop) で
+//!    スコープ管理し、bench iter 中の panic でも必ず解除する (= プロセスレベルで
+//!    残った env var が他テスト/プロセスに漏れない)。
+//!  - bench の `b.iter(...)` 内では assertion (= `count == n`) を行わない:
+//!    Criterion は同関数を何百回も回すため、毎 iter の count 比較は計測ノイズになる。
+//!    代わりにセットアップ直後 (= warm-up 前) に 1 度だけ list_themes を呼んで
+//!    件数整合性を out-of-band に assert し、bench 計測対象 (= iter 内) は
+//!    純粋な走査時間のみに絞り込む。
 
 use app_lib::theme::types::{
     CursorDefinition, Hotspot, LocalizedString, Ratio01, ThemeMetadata, ThemeSource,
@@ -34,10 +44,30 @@ fn tiny_png() -> Vec<u8> {
     buf
 }
 
-/// `n` 件のテーマディレクトリを temp 配下に作成し、そのパスを返す。
+/// env var の RAII ガード。Drop で `set_var` でセットした値を必ず `remove_var` する。
+/// bench iter 中の panic でも Drop が走り、process 全体への env var 漏れを防ぐ
+/// (= 後続テストや cargo test --lib とのレース回避)。
+struct EnvVarGuard {
+    key: &'static str,
+}
+
+impl EnvVarGuard {
+    fn set(key: &'static str, value: &std::path::Path) -> Self {
+        std::env::set_var(key, value);
+        Self { key }
+    }
+}
+
+impl Drop for EnvVarGuard {
+    fn drop(&mut self) {
+        std::env::remove_var(self.key);
+    }
+}
+
+/// `n` 件のテーマディレクトリを temp 配下に作成し、そのパスを EnvVarGuard と共に返す。
 /// 既存 `ThemeManager::list_themes` の挙動と完全に一致させるため、theme.json
 /// + cursors/<role>.png (1 個以上の PNG) を同梱する。
-fn setup_themes(n: usize, png: &[u8]) -> std::path::PathBuf {
+fn setup_themes(n: usize, png: &[u8]) -> (std::path::PathBuf, EnvVarGuard) {
     let pid = std::process::id();
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -91,8 +121,8 @@ fn setup_themes(n: usize, png: &[u8]) -> std::path::PathBuf {
             .expect("write cursors/Arrow.png");
     }
 
-    std::env::set_var("CUSTOM_CURSORS_DIR_OVERRIDE", &dir);
-    dir
+    let guard = EnvVarGuard::set("CUSTOM_CURSORS_DIR_OVERRIDE", &dir);
+    (dir, guard)
 }
 
 fn bench_list_themes_parametric(c: &mut Criterion) {
@@ -100,7 +130,22 @@ fn bench_list_themes_parametric(c: &mut Criterion) {
     let mut group = c.benchmark_group("list_themes");
 
     for &n in THEMES_PER_BENCH {
-        let setup_dir = setup_themes(n, &png);
+        let (setup_dir, _env_guard) = setup_themes(n, &png);
+
+        // Out-of-band assertion (item h, n): bench 計測 (= b.iter) の外で 1 度だけ
+        // `list_themes` を呼んで、N 件のテーマが返ることを verify する。
+        // Criterion は b.iter を何百回も回すため、毎 iter 内で assert すると計測
+        // ノイズになり timing が歪む (=「assertion softened to timing-only」回帰の再発)。
+        // dark-assert out-of-band パターンを採用し、計測対象は純粋な走査のみに絞る。
+        let themes = ThemeManager::list_themes(None, &[], &HashMap::new())
+            .expect("list_themes should succeed for fresh tempdir");
+        assert_eq!(
+            themes.len(),
+            n,
+            "list_themes returned {} themes, expected {} (synthesized N mismatch)",
+            themes.len(),
+            n
+        );
 
         group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
             b.iter(|| {
@@ -108,9 +153,9 @@ fn bench_list_themes_parametric(c: &mut Criterion) {
             });
         });
 
-        // 次の N 計測前にクリーンアップ (env + tempdir)
+        // 次の N 計測前にクリーンアップ: tempdir 削除 + env var 解除 (RAII guard Drop)
         let _ = std::fs::remove_dir_all(&setup_dir);
-        std::env::remove_var("CUSTOM_CURSORS_DIR_OVERRIDE");
+        // _env_guard は for ループの次 iter で drop される (= remove_var 自動実行)
     }
 
     group.finish();
