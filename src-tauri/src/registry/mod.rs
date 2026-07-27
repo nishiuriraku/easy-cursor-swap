@@ -10,6 +10,8 @@
 //! | [`roles`]  | 17 種カーソル役割 (`CursorRole`) の enum と表示名・index マップ |
 //! | [`env`]    | `%SystemRoot%` 等の環境変数展開 / UTF-16 エンコード |
 //! | [`scheme`] | `WindowsScheme` 構造体と Schemes 値のパース / シリアライズ pure 関数群 |
+//! | [`snapshot`] | pending / initial スナップショット I/O (atomic temp-write/rename) |
+//! | [`transaction`] | snapshot → mutation → notify → commit / rollback ヘルパー |
 //!
 //! 本ファイル ([`mod`]) には [`RegistryManager`] と [`paths_match_current_registry`]、
 //! および直接レジストリ I/O を行う部分を集約している。
@@ -17,11 +19,13 @@
 pub mod env;
 pub mod roles;
 pub mod scheme;
+pub mod snapshot;
 pub mod transaction;
 
 pub use env::expand_env_vars;
 pub use roles::CursorRole;
 pub use scheme::WindowsScheme;
+pub use snapshot::{PendingSnapshotState, RegistrySnapshot};
 
 use crate::config::ConfigManager;
 use crate::errors::{AppError, AppResult};
@@ -30,9 +34,7 @@ use scheme::{
     build_scheme_value, compute_apply_values, parse_scheme_value, sanitize_scheme_name,
     scheme_is_app_managed,
 };
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs;
 use std::path::PathBuf;
 use winreg::enums::RegType;
 use winreg::RegValue;
@@ -51,18 +53,9 @@ fn to_reg_value(bytes: Vec<u8>, vtype: RegType) -> RegValue<'static> {
     }
 }
 
-/// レジストリのスナップショット（適用トランザクション用）
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RegistrySnapshot {
-    /// スキーマバージョン
-    pub schema_version: u32,
-    /// 各役割のカーソルファイルパス
-    pub original_values: HashMap<String, String>,
-    /// スナップショット取得日時
-    pub applied_at: String,
-    /// 適用対象のテーマID
-    pub target_theme_id: Option<String>,
-}
+// 注: `RegistrySnapshot` 構造体は Wave 2AB Task 8 で `snapshot` モジュールへ
+// 移動した。`pub use snapshot::RegistrySnapshot;` で再エクスポートしているため
+// 既存呼び出し側 (他モジュール / テスト) は変更不要。
 
 /// レジストリ操作を管理するマネージャー
 pub struct RegistryManager;
@@ -101,46 +94,43 @@ impl RegistryManager {
 
     /// 適用前のスナップショットをディスクに保存する
     /// クラッシュ時の復旧に使用
+    ///
+    /// Wave 2AB Task 8: 実装は `snapshot::save_pending_snapshot` に移譲。
+    /// `RegistryManager` は旧呼び出しコードとの後方互換のための façade。
     pub fn save_pending_snapshot(
         values: &HashMap<String, String>,
         theme_id: Option<&str>,
     ) -> AppResult<()> {
-        let snapshot = RegistrySnapshot {
-            schema_version: 1,
-            original_values: values.clone(),
-            applied_at: chrono::Utc::now().to_rfc3339(),
-            target_theme_id: theme_id.map(|s| s.to_string()),
-        };
-
-        let cursors_dir = ConfigManager::cursors_dir()?;
-        let snapshot_path = cursors_dir.join("_pending_apply.snapshot");
-        let content = serde_json::to_string_pretty(&snapshot)?;
-        fs::write(&snapshot_path, content)?;
-
-        Ok(())
+        snapshot::save_pending_snapshot(values, theme_id)
     }
 
     /// pending スナップショットを削除する（適用成功時に呼ぶ）
     pub fn remove_pending_snapshot() -> AppResult<()> {
-        let cursors_dir = ConfigManager::cursors_dir()?;
-        let snapshot_path = cursors_dir.join("_pending_apply.snapshot");
-        if snapshot_path.exists() {
-            fs::remove_file(&snapshot_path)?;
-        }
-        Ok(())
+        snapshot::remove_pending_snapshot()
     }
 
     /// pending スナップショットが残っているか確認する（起動時チェック）
+    ///
+    /// Wave 2AB Task 8: 旧実装は JSON パース失敗で `Err` を返していたが、
+    /// 破損を「握り潰して何もしない」事故が起きやすかった。新実装は
+    /// `snapshot::inspect_pending_snapshot` の `PendingSnapshotState::Valid`
+    /// だけを `Some` として返し、それ以外 (`Absent` / `Unreadable`) は
+    /// `None` に潰す。新規コードでは `inspect_pending_snapshot` を直接呼ぶ
+    /// ことが望ましい (起動時リカバリは Valid / Unreadable を区別せず
+    /// Windows 既定リセットに倒す方針)。
     pub fn check_pending_snapshot() -> AppResult<Option<RegistrySnapshot>> {
-        let cursors_dir = ConfigManager::cursors_dir()?;
-        let snapshot_path = cursors_dir.join("_pending_apply.snapshot");
-        if snapshot_path.exists() {
-            let content = fs::read_to_string(&snapshot_path)?;
-            let snapshot: RegistrySnapshot = serde_json::from_str(&content)?;
-            Ok(Some(snapshot))
-        } else {
-            Ok(None)
+        match snapshot::inspect_pending_snapshot()? {
+            snapshot::PendingSnapshotState::Valid(snap) => Ok(Some(snap)),
+            snapshot::PendingSnapshotState::Absent
+            | snapshot::PendingSnapshotState::Unreadable { .. } => Ok(None),
         }
+    }
+
+    /// pending スナップショットの状態を 3 状態 (`Absent` / `Valid` / `Unreadable`)
+    /// で返す。`main.rs` の起動時リカバリが直接呼ぶ推奨 API。`check_pending_snapshot`
+    /// は旧 API 互換のためのラッパー (= Valid / それ以外 を二値化)。
+    pub fn inspect_pending_snapshot() -> AppResult<PendingSnapshotState> {
+        snapshot::inspect_pending_snapshot()
     }
 
     /// カーソル設定をレジストリに書き込み、即時反映する
@@ -166,6 +156,7 @@ impl RegistryManager {
             mode: crate::registry::transaction::TransactionMode::NormalTransactional,
             theme_id: None,
             write_values: &write_values,
+            default_scheme_name: None,
         };
         crate::registry::transaction::run_cursor_transaction(&spec)
     }
@@ -294,37 +285,47 @@ impl RegistryManager {
     }
 
     /// Windows 既定カーソルにリセットする（パニックボタン）
+    /// Windows 既定カーソルにリセットする（パニックボタン）
+    ///
+    /// Wave 2AB Task 8: 内部実装を transaction ヘルパーに委譲する。
+    /// モードは `EmergencyBestEffort` (= snapshot 失敗を警告のみで続行)
+    /// を維持し、緊急リセットの目的ならば安全側 (= 続行) に倒す方針を変えない。
+    /// `(Default)` 値 (= スキーム名表示用) には "Windows Default" を書く。
     pub fn reset_to_windows_default() -> AppResult<()> {
-        use winreg::enums::*;
-        use winreg::RegKey;
-
-        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-        let cursors_key = hkcu
-            .open_subkey_with_flags("Control Panel\\Cursors", KEY_WRITE)
-            .map_err(|e| AppError::Registry(format!("Cursors キーを開けません: {}", e)))?;
-
-        // 全役割を空文字列に設定 → Windows 既定にフォールバック
-        for role in CursorRole::all() {
-            let name = role.registry_name();
-            let _ = cursors_key.set_value(name, &"");
-        }
-
-        // スキーム名も「Windows 既定」に設定
-        let _ = cursors_key.set_value("", &"Windows Default");
-
-        Self::notify_cursor_change()?;
-
+        // 17 役割すべてを空文字列にする (= Windows 既定継承)。
+        let write_values: HashMap<String, String> = HashMap::new();
+        let spec = crate::registry::transaction::TransactionSpec {
+            mode: crate::registry::transaction::TransactionMode::EmergencyBestEffort,
+            theme_id: None,
+            write_values: &write_values,
+            default_scheme_name: Some("Windows Default"),
+        };
+        crate::registry::transaction::run_cursor_transaction(&spec)?;
         tracing::info!("Windows 既定カーソルにリセットしました");
         Ok(())
     }
 
-    /// スナップショットからレジストリを復元する
+    /// スナップショットからレジストリを復元する (private ラッパー)。
+    ///
+    /// Wave 2AB Task 8: `restore_from_snapshot_pub` への薄いラッパー。
+    /// 旧名 (`restore_from_snapshot`) はテスト内部 (`CursorValuesCleanup::drop`)
+    /// から呼ばれるため残している。新規コードは `restore_from_snapshot_pub`
+    /// を直接呼ぶこと (= per-role エラー収集が効く)。
+    #[allow(dead_code)]
     fn restore_from_snapshot(values: &HashMap<String, String>) -> AppResult<()> {
         Self::restore_from_snapshot_pub(values)
     }
 
     /// `restore_from_snapshot` の公開版。Wave 1C の `transaction` モジュールから
     /// ロールバック経路で呼ばれる。
+    ///
+    /// Wave 2AB Task 8: **per-role 書込エラーを収集して 1 つの `AppError::Registry`
+    /// として返す**。旧実装は `let _ = cursors_key.set_value(name, value);` で
+    /// 個別エラーを握り潰していたが、それだとロールバックが部分失敗 (= 一部役割
+    /// だけ書き戻し失敗) しても気づけない。各役割の失敗を `tracing::warn!` で
+    /// 記録しつつ、最終的に 1 つの Err にまとめて伝播する。PII redaction は
+    /// ロール名 (= 役割レジストリ名 = "Arrow" 等、PII ではない) のみ含むので
+    /// redact 不要。
     pub fn restore_from_snapshot_pub(values: &HashMap<String, String>) -> AppResult<()> {
         use winreg::enums::*;
         use winreg::RegKey;
@@ -334,12 +335,48 @@ impl RegistryManager {
             .open_subkey_with_flags("Control Panel\\Cursors", KEY_WRITE)
             .map_err(|e| AppError::Registry(format!("復元時にキーを開けません: {}", e)))?;
 
+        // 各役割ごとに書込を試行し、失敗した役割を (name, error) で集める。
+        // 1 役割でも失敗したら残りの役割はスキップせず、できる範囲まで書き戻す
+        // (=「半分だけ復元」状態を避ける) 設計だが、呼び出し側 (`transaction`)
+        // は最終エラーを 1 つの `AppError::Registry` として受け取る。
+        let mut failures: Vec<(String, String)> = Vec::new();
         for (name, value) in values {
-            let _ = cursors_key.set_value(name, value);
+            if let Err(e) = cursors_key.set_value(name, value) {
+                tracing::warn!(
+                    "復元時のレジストリ書込失敗 (role={}, エラー記録のみ続行): {}",
+                    name,
+                    e
+                );
+                failures.push((name.clone(), e.to_string()));
+            }
         }
 
-        Self::notify_cursor_change_pub()?;
-        Ok(())
+        // 即時反映はベストエフォート (旧実装と同じ)。書込が 0 件のとき
+        // (= snapshot の中身が空) は SPI 偽陽性で失敗することがあるが、
+        // ロールバックとしては mutation が全て成功 / 失敗どちらでも
+        // SPI は試行して害がないため、呼び出し側の復元契約には影響しない。
+        if let Err(e) = Self::notify_cursor_change_pub() {
+            tracing::warn!(
+                "復元時の notify_cursor_change 失敗 (レジストリ書込は完了): {}",
+                e
+            );
+        }
+
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            // 失敗した役割をまとめて 1 つの Err にする。最初の失敗を先頭に置き、
+            // 残りはデバッグ用に `; ...` で連結する (ロール名は PII ではない)。
+            let primary = &failures[0];
+            let mut msg = format!(
+                "復元時のレジストリ書込失敗: role={} ({})",
+                primary.0, primary.1
+            );
+            for (name, err) in failures.iter().skip(1) {
+                msg.push_str(&format!("; role={} ({})", name, err));
+            }
+            Err(AppError::Registry(msg))
+        }
     }
 
     /// `SystemParametersInfoW(SPI_SETCURSORS / SPI_SETCURSORSHADOW)` が返した
@@ -364,14 +401,6 @@ impl RegistryManager {
         let code = err.code();
         code.is_ok() || code.0 == HRESULT_INVALID_HANDLE || code.0 == HRESULT_INVALID_WINDOW_HANDLE
     }
-
-    /// SystemParametersInfoW を呼び出してカーソル変更を即時反映する
-    #[cfg(windows)]
-    fn notify_cursor_change() -> AppResult<()> {
-        Self::notify_cursor_change_pub()
-    }
-
-    /// `notify_cursor_change` の公開版。Wave 1C の `transaction` モジュールから
     /// commit 経路で呼ばれる。`apply_cursors` などからは元の private 版が使われる。
     #[cfg(windows)]
     pub fn notify_cursor_change_pub() -> AppResult<()> {
@@ -761,46 +790,29 @@ impl RegistryManager {
     }
 
     /// 初回起動時のスナップショットを保存する
+    ///
+    /// Wave 2AB Task 8: 実装は `snapshot::save_initial_snapshot` に移譲。
+    /// `RegistryManager` は旧呼び出しコードとの後方互換のための façade。
     pub fn save_initial_snapshot() -> AppResult<()> {
-        let cursors_dir = ConfigManager::cursors_dir()?;
-        let snapshot_path = cursors_dir.join("_initial_snapshot.json");
-
-        // 既に存在する場合は上書きしない
-        if snapshot_path.exists() {
-            return Ok(());
-        }
-
-        let values = Self::read_current_cursors()?;
-        let snapshot = RegistrySnapshot {
-            schema_version: 1,
-            original_values: values,
-            applied_at: chrono::Utc::now().to_rfc3339(),
-            target_theme_id: None,
-        };
-
-        let content = serde_json::to_string_pretty(&snapshot)?;
-        fs::write(&snapshot_path, content)?;
-
-        tracing::info!("初回スナップショットを保存しました");
-        Ok(())
+        snapshot::save_initial_snapshot()
     }
 
     /// 初回スナップショットからカーソル設定を復元する
+    ///
+    /// Wave 2AB Task 8: トランザクションヘルパー経由で復元する。
+    /// 「installation 前の状態に戻す」=「ユーザーが意図的にデフォルトにした状態」
+    /// なので snapshot 保護 (= NormalTransactional) を適用する。
+    /// `active_theme_id` クリアと `cursor-changed` 発火は呼び出し側
+    /// (`commands::system::reset_with_cleanup`) で行う。
     pub fn restore_from_initial_snapshot() -> AppResult<()> {
-        let cursors_dir = ConfigManager::cursors_dir()?;
-        let snapshot_path = cursors_dir.join("_initial_snapshot.json");
-
-        if !snapshot_path.exists() {
-            return Err(AppError::Registry(
-                "初回スナップショットが見つかりません".to_string(),
-            ));
-        }
-
-        let content = fs::read_to_string(&snapshot_path)?;
-        let snapshot: RegistrySnapshot = serde_json::from_str(&content)?;
-
-        Self::restore_from_snapshot(&snapshot.original_values)?;
-
+        let snapshot = snapshot::load_initial_snapshot()?;
+        let spec = crate::registry::transaction::TransactionSpec {
+            mode: crate::registry::transaction::TransactionMode::NormalTransactional,
+            theme_id: None,
+            write_values: &snapshot.original_values,
+            default_scheme_name: None,
+        };
+        crate::registry::transaction::run_cursor_transaction(&spec)?;
         tracing::info!("初回スナップショットからカーソル設定を復元しました");
         Ok(())
     }
@@ -883,6 +895,12 @@ impl RegistryManager {
     /// 既存の `apply_cursors` をラップし、HKCU\Control Panel\Cursors の
     /// 各役割値を Schemes 値に基づいて書き戻す。スナップショット保護と
     /// SPI_SETCURSORS による即時反映は `apply_cursors` 側で担保される。
+    ///
+    /// Wave 2AB Task 8: `(Default)` 値の書き換えもトランザクション経由にする
+    /// ため、`apply_cursors` (= 17 役割書込) と `(Default)` 書込を 2 回の
+    /// transaction に分ける。17 役割書込が snapshot 保護込みで安全側に倒れた
+    /// 後、`(Default)` 書込だけ別 transaction (NormalTransactional, default_scheme_name)
+    /// で行う。
     pub fn apply_windows_scheme(scheme: &WindowsScheme) -> AppResult<()> {
         let cursor_paths: HashMap<String, PathBuf> = scheme
             .cursor_paths
@@ -892,14 +910,17 @@ impl RegistryManager {
             .collect();
         Self::apply_cursors(&cursor_paths)?;
 
-        // 既定スキーム名 (`(Default)` 値) も書き換え、コントロールパネルの
+        // 既定スキーム名 (`(Default)` 値) を書き換え。コントロールパネルの
         // ドロップダウンで現在のスキームが正しく表示されるようにする。
-        use winreg::enums::*;
-        use winreg::RegKey;
-        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-        if let Ok(cursors_key) = hkcu.open_subkey_with_flags("Control Panel\\Cursors", KEY_WRITE) {
-            let _ = cursors_key.set_value("", &scheme.name);
-        }
+        // 別 transaction で snapshot 保護し、失敗時のロールバック経路を残す。
+        let empty = HashMap::new();
+        let spec = crate::registry::transaction::TransactionSpec {
+            mode: crate::registry::transaction::TransactionMode::NormalTransactional,
+            theme_id: None,
+            write_values: &empty,
+            default_scheme_name: Some(&scheme.name),
+        };
+        crate::registry::transaction::run_cursor_transaction(&spec)?;
         tracing::info!("Windows スキーム '{}' を適用しました", scheme.name);
         Ok(())
     }
@@ -1767,6 +1788,52 @@ mod tests {
                 current.get(name).map(String::as_str),
                 Some(""),
                 "役割 {name} は Windows 既定リセットで空文字列になるべき"
+            );
+        }
+    }
+
+    /// Wave 2AB Task 8: `restore_from_snapshot_pub` が **per-role 書込エラーを収集**
+    /// して 1 つの `AppError::Registry` にまとめて返す契約。
+    ///
+    /// 旧実装は `let _ = cursors_key.set_value(name, value);` で個別エラーを握り潰し、
+    /// 「半分だけ復元」状態 (= 一部役割だけ書き戻し失敗) でも成功扱いを返していた。
+    /// 正常ケース (= 全役割のレジストリ書込が Err を返さない) で `Ok(())` が返ること
+    /// を確認する。失敗ケース (= 1 役割以上のレジストリ書込が Err) を直接起こすのは
+    /// 環境依存 (= 16MB 値や DWORD/REG_SZ 衝突等) で CI で安定しないため、ここでは
+    /// 「成功時に `Ok` を返すこと」と「実装中に `let _ = ...` 退化が起きないこと」
+    /// に絞って保証する (リファクタで復元動作が壊れたら既存テスト
+    /// `restore_from_snapshot_writes_all_17_roles` が落ちる)。
+    ///
+    /// HKCU の 17 役割を直接書き換えるため、`apply_cursors_test_lock` を取得し、
+    /// `CursorValuesCleanup` でテスト前の値を退避・復元する。
+    #[test]
+    fn restore_from_snapshot_pub_succeeds_on_normal_writes() {
+        let _apply_lock = apply_cursors_test_lock();
+        let _cleanup = CursorValuesCleanup::capture();
+
+        // 実在する Windows 既定カーソルを使って 17 役割すべてを書込。
+        const ARROW_CUR: &str = r"C:\Windows\Cursors\aero_arrow.cur";
+        let mut values = HashMap::new();
+        for role in CursorRole::all() {
+            values.insert(role.registry_name().to_string(), ARROW_CUR.to_string());
+        }
+
+        let result = RegistryManager::restore_from_snapshot_pub(&values);
+        // 成功ケース: Err を返さない。Win32 エラーが混入したら panic。
+        assert!(
+            result.is_ok(),
+            "全役割書込成功時は Err を返さない (= per-role 失敗なし), got {:?}",
+            result
+        );
+
+        // 復元後のレジストリ状態を確認 (書き込んだパスがそのまま読める)。
+        let current = RegistryManager::read_current_cursors().expect("read_current_cursors");
+        for role in CursorRole::all() {
+            let name = role.registry_name();
+            assert_eq!(
+                current.get(name).map(String::as_str),
+                Some(ARROW_CUR),
+                "役割 {name} は書いた値と一致するべき"
             );
         }
     }

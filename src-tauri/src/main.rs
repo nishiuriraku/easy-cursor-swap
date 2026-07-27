@@ -18,7 +18,7 @@ use app_lib::cursor_watcher;
 use app_lib::health::{RollbackTarget, StartupCheck};
 use app_lib::hotkey;
 use app_lib::logging;
-use app_lib::registry::RegistryManager;
+use app_lib::registry::{PendingSnapshotState, RegistryManager};
 use app_lib::tray;
 
 /// 連続起動失敗 3 回検出時のロールバック案内ダイアログ。
@@ -255,7 +255,7 @@ fn main() {
         Err(e) => tracing::warn!("孤児カーソルチェックに失敗: {}", e),
     }
 
-    // クラッシュリカバリ: pending スナップショットの確認
+    // クラッシュリカバリ: pending スナップショットの確認 (Wave 2AB Task 8 マーカーベース)
     //
     // 中断時の復旧には 2 経路ある:
     //  (a) プロセス生存中の apply 失敗 → `apply_cursors` 内で `restore_from_snapshot`
@@ -263,23 +263,41 @@ fn main() {
     //  (b) ここ = クラッシュ後の再起動 → どの役割まで書けたか不明でレジストリが
     //      混在状態になり得る。適用前値の部分復元は不整合を残すため、Windows 既定へ
     //      リセットして安全側に倒す (意図的な設計。バグ修正ではない)。
-    match RegistryManager::check_pending_snapshot() {
-        Ok(Some(_snapshot)) => {
-            // _snapshot は意図的に読み捨てる。既定化方針では original_values を使わず、
-            // スナップショットファイルの存在 = 前回 apply が中断された、という検出のみに使う。
+    //
+    // `PendingSnapshotState` 3 状態のうち、`Valid` と `Unreadable` (= ファイルは
+    // 存在するが破損 / 中途書込) はどちらも「Windows 既定へリセット」する。
+    // metadata の parse 試行は診断用 (logging) のみで、リカバリ判定には
+    // **ファイル存在のみ** を反映する。これにより「unreadable だから何もしない」
+    // 事故を防ぐ。
+    match RegistryManager::inspect_pending_snapshot() {
+        Ok(PendingSnapshotState::Valid(_snapshot)) => {
             tracing::warn!(
                 "前回の適用処理が中断されていました。Windows 既定へリセットします (適用前への復元ではない)"
             );
-            // 適用前値ではなく Windows 既定へリセットする (混在状態回避の安全策)。
             if let Err(e) = RegistryManager::reset_to_windows_default() {
                 tracing::error!("クラッシュリカバリに失敗: {}", e);
             } else {
                 tracing::info!("クラッシュリカバリ完了 (Windows 既定へリセット)");
             }
-            // スナップショットを削除
             let _ = RegistryManager::remove_pending_snapshot();
         }
-        Ok(None) => {
+        Ok(PendingSnapshotState::Unreadable { reason }) => {
+            // 破損 / 中途書込 → ファイルの中身は無視し、安全側 (= Windows 既定
+            // リセット) に倒す。
+            tracing::warn!(
+                "pending スナップショットが破損しています ({}). Windows 既定へリセットします",
+                reason
+            );
+            if let Err(e) = RegistryManager::reset_to_windows_default() {
+                tracing::error!("クラッシュリカバリ (unreadable snapshot) に失敗: {}", e);
+            } else {
+                tracing::info!(
+                    "クラッシュリカバリ完了 (Windows 既定へリセット; unreadable snapshot)"
+                );
+            }
+            let _ = RegistryManager::remove_pending_snapshot();
+        }
+        Ok(PendingSnapshotState::Absent) => {
             tracing::debug!("pending スナップショットなし（正常）");
         }
         Err(e) => {
