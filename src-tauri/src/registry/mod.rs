@@ -293,7 +293,13 @@ impl RegistryManager {
     /// `(Default)` 値 (= スキーム名表示用) には "Windows Default" を書く。
     pub fn reset_to_windows_default() -> AppResult<()> {
         // 17 役割すべてを空文字列にする (= Windows 既定継承)。
-        let write_values: HashMap<String, String> = HashMap::new();
+        // Wave 2AB Task 8 レビュー反映: 空 HashMap を渡すと transaction::write_all_roles
+        // が何もしない (= パニックボタンが機能不全) だったため、CursorRole::all() を
+        // 明示的に populate して全役割のレジストリ値を空文字列に揃える。
+        let mut write_values: HashMap<String, String> = HashMap::new();
+        for role in CursorRole::all() {
+            write_values.insert(role.registry_name().to_string(), String::new());
+        }
         let spec = crate::registry::transaction::TransactionSpec {
             mode: crate::registry::transaction::TransactionMode::EmergencyBestEffort,
             theme_id: None,
