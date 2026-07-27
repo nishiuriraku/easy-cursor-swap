@@ -194,6 +194,11 @@ describe('useUpdaterBootstrap', () => {
     // check は呼ばれているが失敗 → notify は出ない (bootstrap が startup をブロックしない contract)
     expect(checkMock).toHaveBeenCalled()
     expect(notifyMock).not.toHaveBeenCalled()
+    // 失敗パスでも 24h cooldown を有効化するため、last_check_at を必ず進める
+    // (= Tauri invoke 失敗が連続しても毎起動 retry しない)。
+    const tsAfterThrow = Number(localStorage.getItem(LAST_CHECK_KEY))
+    expect(Number.isFinite(tsAfterThrow) && tsAfterThrow > 0).toBe(true)
+    expect(tsAfterThrow).toBeGreaterThan(Date.now() - 1000)
   })
 
   it('クールダウン境界: ちょうど 24h 経過した直後は skip せず check する', async () => {

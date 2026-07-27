@@ -60,11 +60,17 @@ async function run(): Promise<void> {
   }
 
   const { check } = useUpdater()
-  const info = await check()
 
-  // 成功・失敗にかかわらずタイムスタンプは進める
-  // (失敗時に毎回再試行すると Toast permission ダイアログが頻発する)
-  writeLastCheckedAt(now)
+  // 成功・失敗にかかわらずタイムスタンプは進める (失敗時に毎回再試行すると
+  // Toast permission ダイアログが頻発する)。finally ブロックに置くことで
+  // `check()` が throw した場合 (= Tauri invoke 失敗 / dev モード未接続) でも
+  // 24h cooldown が機能し、次回起動で短時間 retry を避ける。
+  let info: { version: string; currentVersion: string } | null = null
+  try {
+    info = await check()
+  } finally {
+    writeLastCheckedAt(now)
+  }
 
   if (!info) return
 
