@@ -31,7 +31,10 @@ pub(crate) fn reset_with_cleanup<F>(
 where
     F: FnOnce() -> Result<(), AppError>,
 {
-    registry_action()?;
+    // registry_action の失敗を早期リターンするため、closure 実行を専用ヘルパーに
+    // 切り出しておく (テストから AppHandle / State なしで同じ早期リターン契約を
+    // 検証できるようにする)。
+    run_registry_action(registry_action)?;
     if let Err(err) = config.update(|c| c.general.active_theme_id = None) {
         tracing::warn!("{}: active_theme_id クリア失敗: {}", action_label, err);
     }
@@ -39,6 +42,17 @@ where
         tracing::warn!("{}: cursor-changed emit 失敗: {}", action_label, err);
     }
     Ok(())
+}
+
+/// `reset_with_cleanup` から呼ばれる closure 実行ヘルパー。
+/// 失敗時は `Err` をそのまま呼び出し側に返す (= `reset_with_cleanup` の早期リターン
+/// を担う)。AppHandle / State を要求しないので、テストモジュールから直接呼んで
+/// closure 実行とエラー伝播の契約を検証できる。
+fn run_registry_action<F>(registry_action: F) -> Result<(), AppError>
+where
+    F: FnOnce() -> Result<(), AppError>,
+{
+    registry_action()
 }
 
 /// Windows 既定カーソルにリセットする（パニックボタン）。
@@ -298,16 +312,87 @@ mod tests {
     /// 走らず closure の Err がそのまま伝播することを確認する。
     /// これにより、registry アクションが失敗したときに config を勝手に書き換えて
     /// しまう (= UI 側が見て混乱する) ことを防ぐ。
+    ///
+    /// AppHandle / State は作れないので、`reset_with_cleanup` 内部で closure 実行
+    /// と早期リターンを担う `run_registry_action` を直接呼んで契約を検証する。
+    /// 副作用として closure の呼び出し回数をカウントし、closure が実際に 1 回
+    /// 呼ばれて Err がそのまま返る (= 二度走ったり握り潰されたりしない) ことを確認する。
     #[test]
     fn reset_with_cleanup_propagates_registry_failure() {
-        // AppHandle / State は作れないので closure の結果だけ確認。
-        // closure が Err を返す → そのまま Err が伝播するのが contract。
-        let action_result: Result<(), AppError> = Err(AppError::Registry("boom".to_string()));
-        assert!(action_result.is_err());
-        match action_result {
+        use std::cell::Cell;
+
+        let invocations = Cell::new(0u32);
+        let result = run_registry_action(|| {
+            invocations.set(invocations.get() + 1);
+            Err(AppError::Registry("boom".to_string()))
+        });
+
+        // closure が 1 度だけ呼ばれ、Err がそのまま伝播することを確認
+        assert_eq!(
+            invocations.get(),
+            1,
+            "registry_action should run exactly once"
+        );
+        match result {
             Err(AppError::Registry(msg)) => assert_eq!(msg, "boom"),
             other => panic!("expected Registry error, got {other:?}"),
         }
+    }
+
+    /// `reset_with_cleanup` の closure が `Ok(())` を返すと、`run_registry_action`
+    /// 側でも `Ok(())` がそのまま返る (= 早期リターン条件に引っかからない) ことを確認する。
+    /// これにより、`reset_with_cleanup` 側で `config.update` / `app.emit` まで到達する
+    /// 正常系の入口条件が固定される。
+    #[test]
+    fn reset_with_cleanup_returns_ok_when_registry_action_succeeds() {
+        let result = run_registry_action(|| Ok(()));
+        assert!(
+            result.is_ok(),
+            "success closure should pass through unchanged"
+        );
+    }
+
+    /// `check_update_is_major_jump` IPC は `is_major_bump` に委譲するだけの薄いラッパー。
+    /// バージョンパース失敗・正常跨ぎ・ダウングレード・サフィックス付きビルドの
+    /// 各境界で UI 側 (= Toast 抑制判定) が誤動作しないことを保証する。
+    #[test]
+    fn check_update_is_major_jump_delegates_to_is_major_bump() {
+        // メジャー跨ぎ → true
+        assert!(check_update_is_major_jump(
+            "0.1.0".to_string(),
+            "1.0.0".to_string()
+        ));
+        assert!(check_update_is_major_jump(
+            "0.9.9".to_string(),
+            "1.0.0-rc.1".to_string()
+        ));
+
+        // 同一 / minor / patch のみ → false
+        assert!(!check_update_is_major_jump(
+            "1.0.0".to_string(),
+            "1.0.0".to_string()
+        ));
+        assert!(!check_update_is_major_jump(
+            "1.0.0".to_string(),
+            "1.5.0".to_string()
+        ));
+        assert!(!check_update_is_major_jump(
+            "1.0.0".to_string(),
+            "1.0.1".to_string()
+        ));
+
+        // ダウングレード → false (誤警告防止)
+        assert!(!check_update_is_major_jump(
+            "2.0.0".to_string(),
+            "1.9.9".to_string()
+        ));
+
+        // パース不能入力 → false (安全側に倒れる)
+        assert!(!check_update_is_major_jump(
+            "not-a-version".to_string(),
+            "still-not".to_string()
+        ));
+        assert!(!check_update_is_major_jump("".to_string(), "".to_string()));
     }
 
     /// `ALLOWED_URL_SCHEME_PREFIXES` は固定の 3 種のみであることを保証する。

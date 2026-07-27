@@ -248,9 +248,14 @@ mod tests {
     /// SizedOverridePayload.hotspot (比率) が build_cur_from_png の出力 .cur バイナリに
     /// 正しいホットスポット px として記録されることを検証する。
     ///
-    /// primary hotspot = (0.0, 0.0) → px=(0,0) で、
-    /// 64px オーバーライドの hotspot = (0.5, 0.5) → px=(32,32) を指定した場合、
-    /// 出力 .cur の 64px エントリは hotspot=(32,32) になるはず。
+    /// primary hotspot = (0.25, 0.25) → 256x256 で px=(64,64)、32px へスケールすると (8, 8)
+    /// 64px オーバーライドの hotspot = (0.5, 0.5) → to_px(64) = (32,32) を指定した場合、
+    /// 出力 .cur の 64px エントリは hotspot=(32,32) になり、32px エントリ (オーバーライドなし)
+    /// は primary のスケール結果 (8, 8) になるはず。
+    ///
+    /// NOTE: primary を 0 以外にすることで、ホットスポット計算が「スケールしているか /
+    /// 単に 0 を返していないか」を実値レベルで区別できる (= 旧来の "primary=0 → (0,0)" は
+    /// 計算ロジックが壊れていても通ってしまうので regression を検知できない)。
     #[test]
     fn sized_override_hotspot_reaches_cur_build_output() {
         use crate::cursor::ico_cur::parse_ico_cur;
@@ -270,7 +275,7 @@ mod tests {
         )
         .unwrap();
 
-        // primary は 256x256 の青、hotspot = (0, 0)
+        // primary は 256x256 の青、hotspot = (0.25, 0.25) → px=(64,64)
         let img256: image::RgbaImage =
             image::ImageBuffer::from_pixel(256, 256, image::Rgba([0, 0, 255, 255]));
         let mut png256 = Vec::new();
@@ -297,11 +302,11 @@ mod tests {
         let mut sized_hotspot_map = std::collections::HashMap::new();
         sized_hotspot_map.insert(64u32, (ov_hx, ov_hy));
 
-        // primary hotspot = (0, 0) で build_cur_from_png に per_size_hotspot_px を渡す
+        // primary hotspot = (64, 64) で build_cur_from_png に per_size_hotspot_px を渡す
         let cur_bytes = build_cur_from_png(
             &png256,
-            0,
-            0,
+            64,
+            64,
             ResizeMethod::Lanczos,
             Some(&sized_png_map),
             Some(&sized_hotspot_map),
@@ -322,7 +327,10 @@ mod tests {
             "64px エントリのホットスポットはオーバーライドの (32,32) であるべき"
         );
 
-        // 32px エントリ (オーバーライドなし) のホットスポットは primary (0,0) からスケールされた (0,0)
+        // 32px エントリ (オーバーライドなし) のホットスポットは primary (64,64) を
+        // 32px へスケールした結果 (= scale_hotspot(64, 64, 256, 32) = (8, 8)) になる。
+        // primary=0 の旧テストでは (0,0) が常に成立してロジック回帰を見逃していたため、
+        // ここで非ゼロの primary を使って scale_hotspot の挙動を実値検証する。
         let entry_32 = parsed
             .entries
             .iter()
@@ -330,8 +338,20 @@ mod tests {
             .expect("32px エントリがあるはず");
         assert_eq!(
             (entry_32.hotspot_x, entry_32.hotspot_y),
-            (0, 0),
-            "32px エントリのホットスポットは primary (0,0) のスケール値 (0,0) であるべき"
+            (8, 8),
+            "32px エントリのホットスポットは primary (64,64) のスケール値 (8,8) であるべき"
+        );
+
+        // 256px エントリはオーバーライドなし・primary と同寸なので scale せず (64, 64)
+        let entry_256 = parsed
+            .entries
+            .iter()
+            .find(|e| e.width == 256)
+            .expect("256px エントリがあるはず");
+        assert_eq!(
+            (entry_256.hotspot_x, entry_256.hotspot_y),
+            (64, 64),
+            "256px エントリのホットスポットは primary と等寸なので (64,64) のまま"
         );
     }
 
@@ -419,8 +439,12 @@ mod tests {
     }
 
     /// `generate_cur_binary` は空入力に対し `AppError::ImageProcessing` を返す contract。
-    /// 「画像なし」を 0 エントリの .cur として通してしまうと、ICONDIR.num_images=0
-    /// の壊れたファイルが出来上がる。
+    /// 「画像なし」を 0 エントリの .cur として通してしまうと、ICONDIR.num_images=0 の
+    /// ファイル (= ICO/CUR 仕様上はパース可能な空ヘッダ) が出力されてしまうが、
+    /// `parse_ico_cur` が「エントリ数 0」を AppError で拒否する経路 (= parser と writer の
+    /// 往復でクラッシュする) と、Windows カーソル API がこれを解釈できず正常動作しない
+    /// (= 0 画像 .cur を適用しても矢印が出ない) 二重の理由から、writer 側で早期に
+    /// 弾いて整合性を保つ。
     #[test]
     fn generate_cur_binary_rejects_empty_input() {
         use crate::cursor::generate_cur_binary;
