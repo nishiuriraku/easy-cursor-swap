@@ -17,21 +17,11 @@ fn lookup_scheme(name: &str) -> Result<WindowsScheme, AppError> {
         .ok_or_else(|| AppError::Registry(format!("スキーム '{}' が見つかりません", name)))
 }
 
-/// 指定スキーム名のロール毎 PNG プレビューを返す。
-///
-/// `list_windows_schemes` で得たスキーム名を渡すと、各 `.cur` / `.ani` /
-/// `.ico` を最大解像度 PNG に変換して `HashMap<role, PNG bytes>` で返す。
-/// ファイルが見つからないロールはスキップ (1 つの欠損で全体表示を諦めない)。
-#[tauri::command]
-pub fn get_windows_scheme_previews(
-    name: String,
-) -> Result<std::collections::HashMap<String, Vec<u8>>, AppError> {
-    let scheme = lookup_scheme(&name)?;
-    Ok(ThemeManager::render_paths_as_previews(&scheme.cursor_paths))
-}
-
-/// [`get_windows_scheme_previews`] のリッチ版。
 /// 各ロールに PNG + ネイティブ寸法 + `.cur` ヘッダ由来のホットスポット座標を返す。
+///
+/// `list_windows_schemes` で得たスキーム名を渡すと、各 `.cur` / `.ani` / `.ico` を
+/// 最大解像度 PNG に変換し、`.cur` ヘッダからホットスポット座標も併せて返す。
+/// ファイルが見つからないロールはスキップ (1 つの欠損で全体表示を諦めない)。
 #[tauri::command]
 pub fn get_windows_scheme_role_previews(
     name: String,

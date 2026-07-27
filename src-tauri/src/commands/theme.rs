@@ -66,25 +66,11 @@ pub fn set_theme_favorite(
         .collect())
 }
 
-/// 指定テーマのロール毎 PNG プレビューを返す。
+/// 各ロールに PNG + 寸法 + ホットスポット座標を返す。
 ///
-/// `roles` が空配列なら全ロールを返す。値が指定されていればそのロールのみ。
-/// レスポンスは `HashMap<role, PNG bytes>` で、IPC では `Vec<u8>` がそのまま JSON 配列化される。
-#[tauri::command]
-pub fn get_theme_previews(
-    theme_id: String,
-    roles: Vec<String>,
-) -> Result<std::collections::HashMap<String, Vec<u8>>, AppError> {
-    let id = uuid::Uuid::parse_str(&theme_id)
-        .map_err(|e| AppError::Theme(format!("無効なテーマ ID: {}", e)))?;
-    let filter: Option<&[String]> = if roles.is_empty() { None } else { Some(&roles) };
-    ThemeManager::load_role_previews(id, filter)
-}
-
-/// [`get_theme_previews`] のリッチ版。各ロールに PNG + 寸法 + ホットスポット座標を返す。
-///
-/// テーマ詳細ドロワーで「ホットスポットの位置」を視覚化する用途のみ使用。
-/// 旧 [`get_theme_previews`] はテーマカードのサムネ等で使い続ける (ペイロード軽量)。
+/// テーマ詳細ドロワーで「ホットスポットの位置」を視覚化する用途に使用。
+/// 旧軽量版 (`HashMap<role, PNG>`) は削除済 — ホットスポット付きのこのコマンドを
+/// サムネ / 詳細両方の用途で利用する。
 #[tauri::command]
 pub fn get_theme_role_previews(
     theme_id: String,

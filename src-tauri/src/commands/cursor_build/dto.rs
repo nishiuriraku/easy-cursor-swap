@@ -5,31 +5,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// `.cursorpack` をエクスポートする際のリクエスト。
-/// `cursors` は役割名 → ファイルパス (Rust 側でファイル読込) で渡す。
-/// パスは絶対パスを期待 (UI の保存ダイアログから渡される想定)。
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ExportCursorpackRequest {
-    pub name_ja: String,
-    pub name_en: Option<String>,
-    pub author: Option<String>,
-    pub version: String,
-    /// `theme.json` の `description` フィールド。`None` または空文字なら省略。
-    /// 現状 UI は単一テキスト欄しか持たないので `LocalizedString::Simple` 相当の単一文字列で渡す。
-    #[serde(default)]
-    pub description: Option<String>,
-    pub requires_os_shadow: bool,
-    /// 役割名 → 元画像ホットスポット比率 (`{ "Arrow": { x: 0.125, y: 0.125 } }`)
-    pub hotspots: HashMap<String, crate::theme::types::Hotspot>,
-    /// 役割名 → ローカル `.cur` ファイルパス
-    pub cur_paths: HashMap<String, String>,
-    pub output_path: String,
-    /// true の場合、現在の鍵ペアでパッケージ全体に署名する。
-    /// theme.json に `signature` フィールドを埋め込む。
-    pub sign: bool,
-}
-
 /// 出力先。`File` はディスクへの保存、`Library` はライブラリ展開 (+ オプションで apply)。
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]

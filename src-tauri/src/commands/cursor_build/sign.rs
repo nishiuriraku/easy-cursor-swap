@@ -1,8 +1,7 @@
 //! `.cursorpack` の Ed25519 署名フロー。
 //!
-//! `export_cursorpack` (非ストリーム) と `export_cursorpack_streamed` の
-//! 両方から呼ばれる。元は両者で digest 計算と Keystore::sign の重複が
-//! あったため、Phase 3b で本モジュールに統合した。
+//! `export_cursorpack_streamed` から呼ばれる (Phase 3b でストリーム式一本化)。
+//! 署名対象 digest の計算と Keystore::sign 呼び出しをここに集約している。
 
 use crate::errors::{AppError, AppResult};
 use crate::theme::ThemeMetadata;
@@ -14,8 +13,6 @@ use sha2::Digest;
 /// 鍵ペアが無い場合は `Err(AppError::Theme)` を返す。
 ///
 /// 署名対象は `id|version|sorted_role_names` の SHA-256 (hex 文字列)。
-/// この計算と Keystore::sign 呼び出しは元来 `export_cursorpack` と
-/// `export_cursorpack_streamed` の両者で重複していた。本関数に集約。
 pub(super) fn sign_theme_metadata(metadata: &mut ThemeMetadata) -> AppResult<Option<String>> {
     let info = crate::keystore::Keystore::info()?;
     if !info.has_keypair {

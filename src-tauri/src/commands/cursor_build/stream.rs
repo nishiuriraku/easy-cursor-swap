@@ -261,7 +261,7 @@ fn run_export_inner(
         cloned_from_marketplace_id: None,
     };
 
-    // 3) 署名。sign.rs に共通化済み (export_cursorpack と同じロジック)。
+    // 3) 署名。sign.rs のヘルパーに委譲。
     let signed_key_id: Option<String> = if req.sign {
         if is_cancelled() {
             // role 段階と同様に cancelled イベントを発火し、UI 進捗バーを解放する。

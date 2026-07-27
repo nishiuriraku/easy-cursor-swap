@@ -3,7 +3,6 @@
 //! クリエイターから渡された PNG / メタ情報を 17 役割 × 6 サイズの `.cur` バイナリへ
 //! 変換し、theme.json と一緒に zip に固める。
 //!
-//! - [`export_cursorpack`] — 役割パス → `.cursorpack` (同期)
 //! - [`export_cursorpack_streamed`] — 進捗イベント付きビルド (UI からの主流ルート)
 //! - [`cancel_build`] — `export_cursorpack_streamed` を中止
 //!
@@ -18,103 +17,12 @@ mod sign;
 pub mod stream;
 
 use crate::cancel_registry::CancelRegistry;
-use crate::errors::AppError;
-use crate::theme::{CursorDefinition, LocalizedString, ThemeManager, ThemeMetadata};
 
 /// 進行中の build を中止する。実際の中止は次のチェックポイントで行われる。
 #[tauri::command]
 pub fn cancel_build(registry: tauri::State<'_, CancelRegistry>, build_id: String) {
     registry.cancel(&build_id);
     tracing::info!("ビルド中止要求: {}", build_id);
-}
-
-#[tauri::command]
-pub fn export_cursorpack(req: ExportCursorpackRequest) -> Result<ExportResult, AppError> {
-    use std::collections::HashMap;
-
-    // 1) cursors マップ構築
-    let mut cursors_meta: HashMap<String, CursorDefinition> = HashMap::new();
-    let mut cursor_bytes: HashMap<String, Vec<u8>> = HashMap::new();
-    for (role, path) in &req.cur_paths {
-        let path = std::path::PathBuf::from(path);
-        let bin = std::fs::read(&path).map_err(|e| {
-            AppError::Theme(format!(
-                "カーソル {} が読み込めません ({}): {}",
-                role,
-                path.display(),
-                e
-            ))
-        })?;
-        let hot = req
-            .hotspots
-            .get(role)
-            .cloned()
-            .unwrap_or(crate::theme::types::Hotspot::ZERO);
-        // .cur ファイル自体は既ビルド済み (cur_paths で受領)。theme.json に ratio を記録するのみ (変換不要)
-        cursors_meta.insert(
-            role.clone(),
-            CursorDefinition {
-                file: format!("cursors/{}.cur", role),
-                hotspot: hot,
-                resize_method: "lanczos".to_string(),
-                size_overrides: None,
-            },
-        );
-        cursor_bytes.insert(role.clone(), bin);
-    }
-
-    // 2) theme.json メタデータ
-    let mut name_map = HashMap::new();
-    name_map.insert("ja".to_string(), req.name_ja.clone());
-    if let Some(en) = req.name_en.clone() {
-        name_map.insert("en".to_string(), en);
-    }
-
-    let mut metadata = ThemeMetadata {
-        schema_version: 1,
-        id: uuid::Uuid::new_v4(),
-        name: LocalizedString::Localized(name_map),
-        version: req.version.clone(),
-        created_at: chrono::Utc::now().to_rfc3339(),
-        requires_os_shadow: req.requires_os_shadow,
-        cursors: cursors_meta,
-        author: req.author.clone(),
-        license: None,
-        homepage: None,
-        // Creator UI の説明欄 (`metaDescription`) 由来。空文字 / 空白のみは
-        // None と同じ扱い (= theme.json から description フィールドごと省略)。
-        description: req
-            .description
-            .as_deref()
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-            .map(|s| LocalizedString::Simple(s.to_string())),
-        min_app_version: None,
-        signature: None,
-        tags: Vec::new(),
-        source: crate::theme::types::ThemeSource::Local,
-        cloned_from_marketplace_id: None,
-    };
-
-    // 3) 署名 (sign=true の場合)。sign.rs に共通化済み。
-    let signed_key_id: Option<String> = if req.sign {
-        sign::sign_theme_metadata(&mut metadata)?
-    } else {
-        None
-    };
-
-    // 4) Zip 出力
-    let out_path = std::path::PathBuf::from(&req.output_path);
-    let size = ThemeManager::export_cursorpack(&mut metadata, &cursor_bytes, &out_path)?;
-
-    Ok(ExportResult {
-        theme_id: metadata.id.to_string(),
-        size_bytes: size,
-        signed: req.sign,
-        key_id: signed_key_id,
-        applied: false,
-        apply_error: None,
-    })
 }
 
 // ストリーム式 .cursorpack ビルドは stream.rs に分離 (Phase 3b)。
