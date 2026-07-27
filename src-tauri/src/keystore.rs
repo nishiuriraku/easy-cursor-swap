@@ -84,7 +84,7 @@ impl Keystore {
         let mut sk_bytes = [0u8; 32];
         OsRng
             .try_fill_bytes(&mut sk_bytes)
-            .map_err(|e| AppError::Theme(format!("CSPRNG 失敗: {}", e)))?;
+            .map_err(|e| AppError::Crypto(format!("CSPRNG 失敗: {}", e)))?;
         let signing = SigningKey::from_bytes(&sk_bytes);
         let verifying = signing.verifying_key();
 
@@ -139,7 +139,7 @@ impl Keystore {
         let encrypted = std::fs::read(&priv_path)?;
         let raw = dpapi_decrypt(&encrypted)?;
         if raw.len() != 32 {
-            return Err(AppError::Theme(format!(
+            return Err(AppError::Crypto(format!(
                 "秘密鍵の長さが不正: {} bytes",
                 raw.len()
             )));
@@ -151,10 +151,10 @@ impl Keystore {
         let mut nonce = [0u8; 24];
         rand::rngs::OsRng
             .try_fill_bytes(&mut salt)
-            .map_err(|e| AppError::Theme(format!("CSPRNG salt 失敗: {}", e)))?;
+            .map_err(|e| AppError::Crypto(format!("CSPRNG salt 失敗: {}", e)))?;
         rand::rngs::OsRng
             .try_fill_bytes(&mut nonce)
-            .map_err(|e| AppError::Theme(format!("CSPRNG nonce 失敗: {}", e)))?;
+            .map_err(|e| AppError::Crypto(format!("CSPRNG nonce 失敗: {}", e)))?;
 
         // KDF: Argon2id でパスフレーズから 32 byte 鍵を導出
         let key = derive_key_from_passphrase(passphrase, &salt)?;
@@ -166,7 +166,7 @@ impl Keystore {
         let xnonce = XNonce::from_slice(&nonce);
         let ciphertext = cipher
             .encrypt(xnonce, raw.as_slice())
-            .map_err(|e| AppError::Theme(format!("AEAD 暗号化失敗: {}", e)))?;
+            .map_err(|e| AppError::Crypto(format!("AEAD 暗号化失敗: {}", e)))?;
 
         // フォーマット: magic + salt + nonce + ciphertext
         let mut out = Vec::with_capacity(8 + 16 + 24 + ciphertext.len());
@@ -192,12 +192,12 @@ impl Keystore {
         }
         const MAGIC: &[u8] = b"CFKEY1\n\0";
         if blob.len() < MAGIC.len() + 16 + 24 + 16 {
-            return Err(AppError::Theme(
+            return Err(AppError::Crypto(
                 "エクスポートデータが短すぎます".to_string(),
             ));
         }
         if &blob[..MAGIC.len()] != MAGIC {
-            return Err(AppError::Theme(
+            return Err(AppError::Crypto(
                 "エクスポートデータの形式が不正です (magic 不一致)".to_string(),
             ));
         }
@@ -215,10 +215,10 @@ impl Keystore {
         let xnonce = XNonce::from_slice(nonce);
         let plaintext = cipher
             .decrypt(xnonce, ciphertext)
-            .map_err(|_| AppError::Theme("復号失敗 (パスフレーズが違います)".to_string()))?;
+            .map_err(|_| AppError::Crypto("復号失敗 (パスフレーズが違います)".to_string()))?;
 
         if plaintext.len() != 32 {
-            return Err(AppError::Theme(format!(
+            return Err(AppError::Crypto(format!(
                 "復号結果の長さが不正: {} bytes",
                 plaintext.len()
             )));
@@ -268,7 +268,7 @@ impl Keystore {
         let encrypted = std::fs::read(&priv_path)?;
         let raw = dpapi_decrypt(&encrypted)?;
         if raw.len() != 32 {
-            return Err(AppError::Theme(format!(
+            return Err(AppError::Crypto(format!(
                 "秘密鍵の長さが不正: {} bytes",
                 raw.len()
             )));
@@ -289,20 +289,20 @@ impl Keystore {
         let pub_b64 = std::fs::read_to_string(&pub_path)?.trim().to_string();
         let raw = base64::engine::general_purpose::STANDARD
             .decode(&pub_b64)
-            .map_err(|e| AppError::Theme(format!("公開鍵 Base64 デコード失敗: {}", e)))?;
+            .map_err(|e| AppError::Crypto(format!("公開鍵 Base64 デコード失敗: {}", e)))?;
         let bytes: [u8; 32] = raw
             .as_slice()
             .try_into()
-            .map_err(|_| AppError::Theme("公開鍵長が不正".to_string()))?;
+            .map_err(|_| AppError::Crypto("公開鍵長が不正".to_string()))?;
         let verifying = VerifyingKey::from_bytes(&bytes)
-            .map_err(|e| AppError::Theme(format!("公開鍵パース失敗: {}", e)))?;
+            .map_err(|e| AppError::Crypto(format!("公開鍵パース失敗: {}", e)))?;
         let sig_raw = base64::engine::general_purpose::STANDARD
             .decode(signature_b64)
-            .map_err(|e| AppError::Theme(format!("署名 Base64 デコード失敗: {}", e)))?;
+            .map_err(|e| AppError::Crypto(format!("署名 Base64 デコード失敗: {}", e)))?;
         let sig_bytes: [u8; 64] = sig_raw
             .as_slice()
             .try_into()
-            .map_err(|_| AppError::Theme("署名長が不正".to_string()))?;
+            .map_err(|_| AppError::Crypto("署名長が不正".to_string()))?;
         let signature = Signature::from_bytes(&sig_bytes);
         use ed25519_dalek::Verifier;
         Ok(verifying.verify(message, &signature).is_ok())
@@ -327,8 +327,9 @@ impl Keystore {
         }
         let encrypted = std::fs::read(&p)?;
         let raw = dpapi_decrypt(&encrypted)?;
-        let token = String::from_utf8(raw)
-            .map_err(|_| AppError::Theme("OAuth トークン UTF-8 不正 (破損ファイル)".to_string()))?;
+        let token = String::from_utf8(raw).map_err(|_| {
+            AppError::Crypto("OAuth トークン UTF-8 不正 (破損ファイル)".to_string())
+        })?;
         Ok(Some(token))
     }
 
@@ -350,12 +351,12 @@ fn derive_key_from_passphrase(passphrase: &str, salt: &[u8]) -> AppResult<[u8; 3
     use argon2::{Algorithm, Argon2, Params, Version};
 
     let params = Params::new(64 * 1024, 3, 1, Some(32))
-        .map_err(|e| AppError::Theme(format!("Argon2 params 不正: {}", e)))?;
+        .map_err(|e| AppError::Crypto(format!("Argon2 params 不正: {}", e)))?;
     let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
     let mut out = [0u8; 32];
     argon2
         .hash_password_into(passphrase.as_bytes(), salt, &mut out)
-        .map_err(|e| AppError::Theme(format!("Argon2 派生失敗: {}", e)))?;
+        .map_err(|e| AppError::Crypto(format!("Argon2 派生失敗: {}", e)))?;
     Ok(out)
 }
 
@@ -363,7 +364,7 @@ fn derive_key_from_passphrase(passphrase: &str, salt: &[u8]) -> AppResult<[u8; 3
 pub fn compute_key_id(pubkey_b64: &str) -> AppResult<String> {
     let raw = base64::engine::general_purpose::STANDARD
         .decode(pubkey_b64)
-        .map_err(|e| AppError::Theme(format!("公開鍵 Base64 デコード失敗: {}", e)))?;
+        .map_err(|e| AppError::Crypto(format!("公開鍵 Base64 デコード失敗: {}", e)))?;
     Ok(hex::encode(Sha256::digest(&raw))[..16].to_string())
 }
 
@@ -395,7 +396,7 @@ fn dpapi_encrypt(plain: &[u8]) -> AppResult<Vec<u8>> {
             CRYPTPROTECT_UI_FORBIDDEN,
             &mut output,
         )
-        .map_err(|e| AppError::Theme(format!("DPAPI Protect 失敗: {}", e)))?;
+        .map_err(|e| AppError::Crypto(format!("DPAPI Protect 失敗: {}", e)))?;
     }
 
     let slice = unsafe { std::slice::from_raw_parts(output.pbData, output.cbData as usize) };
@@ -431,7 +432,7 @@ fn dpapi_decrypt(cipher: &[u8]) -> AppResult<Vec<u8>> {
             CRYPTPROTECT_UI_FORBIDDEN,
             &mut output,
         )
-        .map_err(|e| AppError::Theme(format!("DPAPI Unprotect 失敗: {}", e)))?;
+        .map_err(|e| AppError::Crypto(format!("DPAPI Unprotect 失敗: {}", e)))?;
     }
 
     let slice = unsafe { std::slice::from_raw_parts(output.pbData, output.cbData as usize) };
@@ -445,12 +446,12 @@ fn dpapi_decrypt(cipher: &[u8]) -> AppResult<Vec<u8>> {
 
 #[cfg(not(windows))]
 fn dpapi_encrypt(_plain: &[u8]) -> AppResult<Vec<u8>> {
-    Err(AppError::Theme("DPAPI は Windows 専用です".to_string()))
+    Err(AppError::Crypto("DPAPI は Windows 専用です".to_string()))
 }
 
 #[cfg(not(windows))]
 fn dpapi_decrypt(_cipher: &[u8]) -> AppResult<Vec<u8>> {
-    Err(AppError::Theme("DPAPI は Windows 専用です".to_string()))
+    Err(AppError::Crypto("DPAPI は Windows 専用です".to_string()))
 }
 
 #[cfg(test)]

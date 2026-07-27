@@ -508,8 +508,11 @@ mod tests {
 
     #[test]
     fn compute_key_id_rejects_invalid_base64() {
+        // `marketplace::compute_key_id` は Task 5a で `keystore::compute_key_id`
+        // の re-export に統一済み。鍵ペア Base64 デコード失敗は暗号学的失敗
+        // なので `AppError::Crypto` (= `crypto: <理由>`) に分類される (Task 10)。
         let err = compute_key_id("not-valid-base64-!!!").unwrap_err();
-        assert!(matches!(err, AppError::Theme(_)));
+        assert!(matches!(err, AppError::Crypto(_)));
     }
 
     #[test]

@@ -2,6 +2,7 @@
 //!
 //! システムトレイ（タスクトレイ）への常駐と、トレイメニューの管理を行う。
 
+use crate::errors::{AppError, AppResult};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
@@ -9,7 +10,7 @@ use tauri::{
 };
 
 /// システムトレイを初期化する
-pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+pub fn setup_tray(app: &AppHandle) -> AppResult<()> {
     // メニューアイテムの作成
     let show_item = MenuItem::with_id(app, "show", "EasyCursorSwap を開く", true, None::<&str>)?;
     let separator1 = MenuItem::with_id(app, "sep1", "────────────", false, None::<&str>)?;
@@ -53,7 +54,7 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let icon = app
         .default_window_icon()
         .cloned()
-        .ok_or("default_window_icon が利用できません")?;
+        .ok_or_else(|| AppError::Other("default_window_icon が利用できません".to_string()))?;
 
     let _tray = TrayIconBuilder::new()
         .icon(icon)

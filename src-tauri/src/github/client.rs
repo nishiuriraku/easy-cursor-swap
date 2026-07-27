@@ -164,7 +164,7 @@ impl Client {
                 .error_for_status()
                 .map_err(err_ctx("POST ref status"))?;
         } else {
-            return Err(AppError::Theme(format!(
+            return Err(AppError::GitHub(format!(
                 "GET ref 予期せぬステータス: {}",
                 head_resp.status()
             )));
@@ -191,7 +191,7 @@ impl Client {
         v["object"]["sha"]
             .as_str()
             .map(|s| s.to_string())
-            .ok_or_else(|| AppError::Theme("base ref に sha なし".to_string()))
+            .ok_or_else(|| AppError::GitHub("base ref に sha なし".to_string()))
     }
 
     /// ファイルを作成または更新する (`PUT /repos/{o}/{r}/contents/{path}`)。
@@ -321,9 +321,9 @@ impl Client {
     }
 }
 
-/// reqwest エラーを `AppError::Theme` に変換するクロージャを生成する。
+/// reqwest エラーを `AppError::GitHub` に変換するクロージャを生成する。
 fn err_ctx(ctx: &'static str) -> impl Fn(reqwest::Error) -> AppError {
-    move |e| AppError::Theme(format!("GitHub API {}: {}", ctx, e))
+    move |e| AppError::GitHub(format!("GitHub API {}: {}", ctx, e))
 }
 
 /// Marketplace 自動提出フローが依存する GitHub REST API の最小 interface。

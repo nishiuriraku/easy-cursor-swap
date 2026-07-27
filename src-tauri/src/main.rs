@@ -340,7 +340,6 @@ fn main() {
             tracing::info!("第二インスタンス要求でメインウィンドウを前面化");
         }))
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
