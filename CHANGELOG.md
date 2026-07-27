@@ -11,20 +11,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 加えて、Authenticode コード署名の取得経路を **SignPath Foundation 再申請から Microsoft Store (MSIX 自動署名) へ移行** する方針変更を反映 (Wave 0A)。SignPath 一次申請 (2026-05-21 保留) への再申請は行わず、ストア提出時に Microsoft が自動署名する経路を正準とする方針に切り替えた。NSIS / MSI (GitHub Releases) は当面無署名のまま継続し、Tauri Updater 用の Ed25519 (minisign) 署名は引き続き有効 (改ざん防止は維持)。`release.yml` から SignPath 関連 step 群を撤去し、CI の責務を NSIS / MSI のビルドと minisign 署名に限定した。
 
+Wave 2AB では Rust / フロントエンド双方の型整合性・テスト基盤・キャンセル確定性・ロギング反映・コード整理・ベンチ整備・バンドル縮小を一括で進めました。`ts-rs` ベースで Rust 構造体から TypeScript DTO を生成しドリフト検出、`AppConfigPatch` で `update_config` の typed patch 化 (任意キー混入のクラッシュパスを遮断)、`bulk_resolve_assets` のキャンセル時に `stage: "cancelled"` を明示 emit (UI 進捗バーの固まりを修正)、`registry/snapshot` モジュール切り出しと per-role rollback failure 収集経路の追加、起動時 `reset_to_windows_default` の 17 役割 populate 修正、`withProgressJob` による listen → invoke → unlisten ライフサイクル共通化と per-call closure での race 排除、`useUpdaterBootstrap` の timestamp-on-failure 修正、`AppError::Crypto` / `GitHub` バリアント追加と dead IPC 3 件 (`get_theme_previews` / `export_cursorpack` / `get_windows_scheme_previews`) の撤去、`tauri-plugin-shell` 完全削除 (init / capability / Cargo dep 含む) を行いました。5 大不変条件はすべて維持。
+
 ### Changed
 
 - Authenticode コード署名の正準取得経路を **Microsoft Store (MSIX 自動署名)** に変更 (2026-07-25 方針)。`docs/authenticode_signing.md` / `docs/code_signing_policy.md` / `docs/distribution.md` / `docs/updater_signing.md` / `docs/release_procedure.md` および README (en / ja) を「再申請しない・Store 署名へ移行」方針に書き換え、SignPath 旧ポリシー文書を「経緯 (履歴)」セクションへ移動。`.github/workflows/release.yml` から SignPath step 群 (Check SignPath secrets / Collect installers / Upload unsigned / Submit to SignPath / Replace bundle / Re-sign with minisign after Authenticode / Verify updater metadata integrity / Upload signed installers to Draft Release) を撤去し、`permissions` から `actions: read` (SignPath artifact 取得用) と `id-token: write` (将来の OIDC 認証用) を削除。`scripts/release/patch-latest-json.mjs` のヘッダーコメントを更新 (SignPath 後の手動 .sig 再生成ではなく、汎用 latest.json パッチャーとして明記)。MSIX ビルド経路は別 workflow (`build-msix-artifacts.yml`) で扱う予定 (Wave 4A)。
+- 設定 IPC の入力形状を `AppConfigPatch` typed patch (`src-tauri/src/commands/system.rs::update_config`) に絞り込み、任意キー混入によるクラッシュ経路を遮断。フロント (`useAppSettings`) も差分 patch を構築して送信、テスト用に `__resetForTests` を露出。Rust ↔ TS の型整合は `ts-rs` ベース DTO 生成 + ドリフト検出 (`scripts/gen-architecture.mjs --check` と CI で gate) で担保。
+- 起動時の自動アップデータチェックを try/finally 化 (`app/composables/useUpdaterBootstrap.ts`) し、`check()` が throw した経路でも 24h cooldown 用 `last_update_check_at` を必ず進めるよう修正。
 
 ### Removed
 
 - `.github/workflows/release.yml` から SignPath 関連の 8 step を削除 (skip-guard / submit / replace / re-sign / verify / upload を含む)。`release.yml` の責務は NSIS / MSI ビルド + minisign 署名 + Draft Release アップロードのみに戻る。
 - `docs/authenticode_signing.md` から SignPath Foundation 申請手順 / Artifact Configuration / GitHub Secrets・Variables のセットアップ手順を撤去 (方針不採用)。`docs/authenticode_signing.md` の Foundation 承認後の運用切替セクション (SignPath UI / Signing Policy / API Token / 運用フロー) を削除し、SignPath 経緯は同ファイル末尾の「SignPath Foundation 一次申請の経緯 (履歴)」セクションに集約。`docs/code_signing_policy.md` の SignPath Foundation 関連記述 (MFA / Access Control / Authenticode provider) を Microsoft Partner Center 前提の記述に置換。
+- 旧来の dead IPC 3 件 `get_theme_previews` / `export_cursorpack` / `get_windows_scheme_previews` を削除 (合計 53 → 50 IPC、`generate_handler![]` と Layer1 vault `reference/ipc-catalog.md` / `reference/index.json` を再同期)。
+- `tauri-plugin-shell` プラグインを完全撤去 (init / capability / Cargo dependency / 推移 lock まで含む、`docs/distribution.md` の Win32 `ShellExecuteW` 直叩き経路と `open_url` の 3 スキーム許可リストは維持)。
 
 ### Added
 
 - 非同期処理中のローディングフィードバックをアプリ全体に整備しました。再利用可能な共通プリミティブ `UiSpinner` / `UiSkeleton` / `UiSkeletonCard` / `UiProgress` (確定 / 不確定バー) / `UiStageStepper` (名前付きステージ表示) を `components/ui/` に新設し、次の箇所へ適用: テーマライブラリ・公式インデックスのカードグリッドとプレビュー行列に読み込み中スケルトン、アップデートのダウンロードに確定進捗バー、公式インデックスのインストール・テーマ適用・インポート / 複製 / エクスポート / 削除・鍵の生成 / インポート / エクスポート (Argon2id)・プロファイル入出力・クラッシュレポート送信・設定復旧・設定保存・パニック復旧の各ボタンに実行中スピナーと自動 disabled。一括取り込み (フォルダ / ファイル) には専用の全画面進捗オーバーレイ (ステージ表示 + 確定バー + キャンセル)、Creator のエクスポートにはステージステッパー (ロール → パッケージ → 署名) + 確定バーを表示します。状態変更系ボタンを共通 `UiButton` の `loading` 表現に統一し、5 箇所に重複していた `.spinner` CSS リングを撤去しました。
+- マーケットプレイスのテーマ提出 (`submit_theme_auto`) を `mod stages` 単位で分割し、GitHub 操作を `GithubGateway` trait 境界化して `mockito` テストを充てる経路を追加。`AppError::Crypto` / `AppError::GitHub` バリアントを追加してエラーを typed に分類、`tray.rs` の `Box<dyn Error>` を `AppResult<()>` に整理。
+- ベンチ整備: `list_themes` に RAII `EnvVarGuard` (panic-safe な env 復元) と timing だけに依存しない dark assertion (`assert_eq!(themes.len(), n)`) を追加、`cursor_full_build` に 17 役割それぞれ独立の seeded PNG を流す multi-PNG cold worst-case バリエーションを追加 (`clear_resize_cache` が source 単位 hash もリセットするようになった変更を反映)。
 
 ### Fixed
+
+- 一括取り込み (フォルダ / ファイル) の解決・解析フェーズで進捗が一切表示されず無反応に見えていた不具合を修正。スタート画面からの取り込みでは進捗オーバーレイが `stage !== 'start'` の分岐内に置かれていたため描画されておらず、配置を分岐外へ移して解析中もステージ進捗とキャンセルが見えるようにしました。
+- Creator のエクスポート進捗バーが未定義の CSS トークン (`--bg-elev2` / `--bg-elev1` / `--mint` / `--border`) を参照しており、背景とバーが正しく描画されていなかった問題を、共通 `UiProgress` (設計トークン `--accent` / `--line` ベース) への移行で解消しました。ライト / ダーク両テーマで確実に視認できます。
+- primary (アクセント色塗り) ボタンのローディングスピナーが背景と同化して見えなかった不具合を修正。共通 `.spinner` の回転弧が `var(--accent)` で、primary ボタンの `bg-accent` と同色だったため不可視でした。塗り / 色付き背景のボタン (primary / danger) ではスピナーをボタンの文字色 (`currentColor`) で描き直し、確実にコントラストを出すようにしました (適用 / 保存 / 書き出し等の緑ボタン)。
+- 起動時クラッシュリカバリ (apply 途中の電源断などで `_pending_apply.snapshot` が残置された状態で再起動した場合) は Windows 既定への強制リセットを意図的に採用している旨を、コメント / ログ / `docs/` 側記述で統一。pre-apply exact restore ではなく Windows 既定化である理由を「クラッシュ後は最も安全な既定に倒す」設計判断として明文化 (`c100e85` / AR-M1-1)。
+- 自動ロールバック (Health::attempt_rollback) が installer URL を `_x64-setup.exe` 固定で取得していたため、ARM64 機では 3 連続起動失敗時に x64 ビルドをサイレント上書きインストールし、回復不能ループに陥る可能性があった問題を修正。`std::env::consts::ARCH` で URL を選択するようにし、minisign 検証も arch 不一致を弾けるようになりました (`6876cc2` / AR-M1-3)。
+- `.cursorpack` 取り込み経路 (bulk_import) で、zip 展開時の per-file / 累積サイズ上限が zip ヘッダの `entry.size()` (申告値) に依存しており、申告偽装 zip 爆弾への最終防衛線がなかった問題を修正。`entry.take(MAX)` で実ストリームバイト上限を課し、`io::copy` が実際に書き込んだバイト数を累積判定に使用。本流 (`theme/package.rs`) と同じ上限定数を共有して `bulk_import/cursorpack.rs` / `theme/package.rs` / `backup.rs` の 3 経路で対称化しました (`7824174` / AR-M1-5)。
+- マーケットプレイス詳細モーダルでテーマ作者の `homepage` URL が Rust / フロントどちらの検証も通らず `<a :href>` に直接バインドされていた問題を修正。`fetch_index` 返却前に `is_allowed_url_scheme` でスキーム (http/https のみ) を検証し、不正な値は `None` に正規化。`preview_base_url` だけでなく `download_url` の https 強制と GitHub username 文字種検証も同コミットで対応 (`23984fb` / AR-M1-6)。
+- `HOTKEY_CALLBACK` / `CURSOR_CHANGE_CALLBACK` の `lock().unwrap()` がポイズン時に二重パニック → setup 内クラッシュ → 3 連続失敗カウンタ経由で自動ロールバックを誤起動する可能性があった問題を修正。`unwrap_or_else(|e| e.into_inner())` でポイズン回収し、`apply_cursors` のロールバック失敗を `let _ =` で完全黙殺せず `tracing::error!` + 返却エラーへの付記に統一 (`c100e85` / AR-M1-7)。
+- `RegisterHotKey` 失敗 (キー衝突等) がトレイ内 log のみで UI / config に伝播せず、ユーザーがパニックキーを「効くと信じられているのに無反応」状態に陥る可能性があった問題を修正。登録結果を `apply_tray_state` 経由で起動時のバナー (起動前ダイアログ) とトレイ通知に伝播させ、設定変更時はインラインで再検証 (`c100e85` / AR-M1-8)。
+- 一括取り込みの解決 (`bulk_resolve_assets`) で、ユーザーがキャンセルしても進捗オーバーレイが `stage: 'parse'` で固まる不具合を修正。キャンセル時に `stage: 'cancelled'` の progress event を明示 emit してから `Err(AppError::BulkImportCancelled)` を返すよう `src-tauri/src/bulk_import/assets.rs` を修正。
+- `useBulkImport` の `pendingCommand` / `pendingArgs` shared-mutable closure state が `runner.handle()` 内部の `await listenProgress(jobId)` で yield する間に sibling call に上書きされ、誤った `bulk_resolve_assets` / `parse_cursorpack_for_creator` invoke が発火する race を修正。`withProgressJob.handle(buildInvoke?)` を per-call closure 受け取りに拡張し、caller 側のローカル変数を呼び出し時点で同期キャプチャする形に統一 (`src-tauri` 側 `registry/mod.rs` の per-role rollback failure 経路も併せてテスト追加)。
+- 起動時リカバリで使う `RegistryManager::reset_to_windows_default` が空 `HashMap` でレジストリ書込ループを回していたため一部役割が Windows 既定に上書きされないまま残る不具合を修正。17 役割すべてを `""` で populate して完全な Windows 既定復帰を保証 (`98a0ce3`、per-role rollback failure テストは `restore_from_snapshot_pub_returns_err_when_value_name_exceeds_win32_limit` で `Win32 MAX_VALUE_NAME` (16,383 wchars) 超過を trigger にして `AppError::Registry` への集約経路を保証)。
+- `src-tauri/src/appusermodel.rs` と `src-tauri/src/commands/windows_scheme.rs` のテストが `#[cfg(windows)] pub const` シンボル / `winreg` (Windows-only) を直接参照していたが `#[cfg(test)]` だけではターゲット OS を見ていなかったため、Linux 等で `cargo check --target x86_64-unknown-linux-gnu` を回すと test モジュールがシンボル未解決で落ちる状態だった。4 件の test に `#[cfg(windows)]` を付与し、Linux CI matrix 拡張に備えた。
+- `commands/cursor_build/mod.rs` の `sized_override_hotspot_reaches_cur_build_output` が primary hotspot=`(0, 0)` で `build_cur_from_png` を呼んでおり、scale_hotspot ロジックが壊れていても `(0, 0)` 同士で常に assert 通過して regression を検知できなかった。primary を `(64, 64)` に変更し、32px エントリは `(8, 8)` (primary の 1/4 scale)、256px エントリは `(64, 64)` (等寸なので scale なし) を実値検証。
+
+### Security
 
 - 一括取り込み (フォルダ / ファイル) の解決・解析フェーズで進捗が一切表示されず無反応に見えていた不具合を修正。スタート画面からの取り込みでは進捗オーバーレイが `stage !== 'start'` の分岐内に置かれていたため描画されておらず、配置を分岐外へ移して解析中もステージ進捗とキャンセルが見えるようにしました。
 - Creator のエクスポート進捗バーが未定義の CSS トークン (`--bg-elev2` / `--bg-elev1` / `--mint` / `--border`) を参照しており、背景とバーが正しく描画されていなかった問題を、共通 `UiProgress` (設計トークン `--accent` / `--line` ベース) への移行で解消しました。ライト / ダーク両テーマで確実に視認できます。
