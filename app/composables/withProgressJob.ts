@@ -89,13 +89,21 @@ const DEFAULT_EVENT = 'bulk-import-progress'
  * ジョブ」を一元参照できる)。`handle()` 実行中は `cancelledJobId` がクリアされ、
  * `cancel()` でジョブ中断要求が記録される。
  *
+ * `handle(buildInvoke?)` の第二引数で per-call に buildInvoke を差し替え可能。
+ * `options.buildInvoke` は listen の await を跨いで後で評価されるため、
+ * 呼び出し側の mutable な closure state を読みに行くと race が発生する (Wave 2AB
+ * Task 7 I-1 parked)。per-call closure なら caller 側のローカル変数を呼び出し時点で
+ * 固定でき、安全。`options.buildInvoke` は per-call が省略された場合のフォールバック。
+ *
  * `RunOptions` を介して Tauri 依存を差し替えられるので vitest から listen/invoke
  * を mock できる (`app/composables/__tests__/withProgressJob.test.ts`)。
  */
 export function createProgressJobRunner(
   options: WithProgressJobOptions,
   runOpts: RunOptions = {},
-): { handle: () => Promise<unknown | null> } & WithProgressJobRefs {
+): {
+  handle: (buildInvoke?: (jobId: string) => InvokeSpec) => Promise<unknown | null>
+} & WithProgressJobRefs {
   const busy = ref(false)
   const currentJobId = ref<string | null>(null)
   const progress = ref<BulkImportProgressLite | null>(null)
@@ -134,7 +142,9 @@ export function createProgressJobRunner(
     return await invokeTauri<T>(cmd, args)
   }
 
-  async function handle(): Promise<unknown | null> {
+  async function handle(
+    buildInvokeOverride?: (jobId: string) => InvokeSpec,
+  ): Promise<unknown | null> {
     busy.value = true
     progress.value = null
     const jobId = newJobId()
@@ -144,8 +154,13 @@ export function createProgressJobRunner(
     // listen を invoke より **前** に張る (race 回避: invoke 直後の最初の
     // progress を取りこぼさないため)。unlisten は必ず finally で 1 回だけ呼ぶ。
     const unlisten = await listenProgress(jobId)
+    // buildInvoke は listen の await **後** に呼ばれるため、caller が listener 経由で
+    // 同期キャプチャしたローカル変数を読みに行く場合は per-call closure を渡してもらう
+    // (options.buildInvoke は runner 作成時に固定されているため、mutable な closure state
+    // を遅延評価すると race になる)。
+    const buildInvoke = buildInvokeOverride ?? options.buildInvoke
     try {
-      const spec = options.buildInvoke(jobId)
+      const spec = buildInvoke(jobId)
       const raw = await invokeCommand<unknown>(spec.command, spec.args)
       const result = options.unwrap ? options.unwrap(raw) : raw
       if (result === null || result === undefined) {

@@ -259,4 +259,99 @@ describe('withProgressJob (createProgressJobRunner)', () => {
     expect(invokeMock).toHaveBeenCalledWith('cancel_bulk_import', { jobId: 'j-cmd' })
     await p
   })
+
+  /**
+   * Wave 2AB Task 7 I-1 (parked finding) リグレッション guard。
+   *
+   * `handle(buildInvoke?)` の per-call closure 受けが race-free であることを検証。
+   * 旧実装は `options.buildInvoke` を listenProgress の await を跨いで後で評価するため、
+   * 呼び出し側が mutable な closure state (例: `let pendingCommand` / `let pendingArgs`)
+   * を読ませると、sibling call が state を上書きする window で他方の args を読み込んで
+   * 誤 invoke が発火する race が起きる (Task 7 I-1 parked)。
+   *
+   * per-call closure なら caller 側のローカル変数を handle() 呼び出し時点でキャプチャ
+   * するため、await を跨いでも安全。この test では:
+   *  - listenImpl に 1 段 microtask yield を入れ、handle() 内の await listenProgress
+   *    で実際に制御が一度戻るように仕掛ける (mockResolvedValue 同期だと race 顕在化
+   *    しないので意味がない)
+   *  - 2 つの handle() を並行発火、それぞれ別の cmd/args を持つ per-call closure を渡す
+   *  - 最終的に invoke が各 closure の cmd/args で 1 回ずつ呼ばれていることを assert
+   *
+   * 旧 options.buildInvoke のみに依存する design だとここで両 invoke が 2 段目の
+   * cmd/args に上書きされて fail。per-call closure なら pass。
+   *
+   * `runOpts.listenFn` / `invokeFn` を直接渡すことで vitest 4.x の dynamic-import
+   * キャッシュによるリアル useTauri 到達 (`transformCallback` undefined) を回避。
+   */
+  it('handle(buildInvoke?) per-call closure で race-free になる', async () => {
+    const listenImpl = vi.fn().mockImplementation(async () => {
+      await Promise.resolve()
+      return () => {}
+    })
+    const invokeImpl = vi
+      .fn()
+      .mockImplementation(async (cmd: string, _args?: Record<string, unknown>) => {
+        return { ok: cmd } as { ok: string } | null
+      })
+    const runner = createProgressJobRunner(
+      {
+        jobIdPrefix: 'race',
+        // per-call form のみで扱う想定。options.buildInvoke に到達したら fail-fast
+        // にして、誤ったクロージャ state 読みを regression で検出する。
+        buildInvoke: () => {
+          throw new Error('per-call form expected — caller must pass buildInvoke to handle()')
+        },
+      },
+      {
+        listenFn: listenImpl as <T>(
+          event: string,
+          cb: (e: { payload: T }) => void,
+        ) => Promise<() => void>,
+        invokeFn: invokeImpl as <T>(
+          cmd: string,
+          args?: Record<string, unknown>,
+        ) => Promise<T | null>,
+        newJobId: (() => {
+          let n = 0
+          return () => `j-${++n}`
+        })(),
+      },
+    )
+
+    // 1 段目: cmdA / argsA を同期キャプチャした per-call closure
+    const cmdA = 'cmd_a'
+    const argsA: Record<string, unknown> = { req: 'A' }
+    const buildInvokeA = (jobId: string) => ({
+      command: cmdA,
+      args: { ...argsA, jobId },
+    })
+    const p1 = runner.handle(buildInvokeA)
+
+    // microtask flush: handle 1 が listenProgress の await に到達した状態にする。
+    // ここで yield がないと 2 段目も同期に進行して race window が生まれない。
+    await Promise.resolve()
+
+    // 2 段目: cmdB / argsB を同期キャプチャした別の per-call closure
+    const cmdB = 'cmd_b'
+    const argsB: Record<string, unknown> = { req: 'B' }
+    const buildInvokeB = (jobId: string) => ({
+      command: cmdB,
+      args: { ...argsB, jobId },
+    })
+    const p2 = runner.handle(buildInvokeB)
+
+    // unhandled rejection 監視を回避するため両方 catch を付ける。
+    p1.catch(() => {})
+    p2.catch(() => {})
+    await Promise.all([p1, p2])
+
+    // listen / invoke それぞれの回数を sanity check
+    expect(listenImpl).toHaveBeenCalledTimes(2)
+    expect(invokeImpl).toHaveBeenCalledTimes(2)
+
+    // 各 invoke が自分の closure の cmd/args を使っている (race が起きていれば
+    // 両方 cmdB / argsB になり cmdA / argsA の呼び出しが消える)
+    expect(invokeImpl).toHaveBeenCalledWith(cmdA, expect.objectContaining({ req: 'A' }))
+    expect(invokeImpl).toHaveBeenCalledWith(cmdB, expect.objectContaining({ req: 'B' }))
+  })
 })

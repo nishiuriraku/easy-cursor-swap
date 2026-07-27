@@ -88,36 +88,43 @@ import { createProgressJobRunner } from './withProgressJob'
  *
  * resolveAssets と parseCursorpack は同じ runner インスタンスの state (busy /
  * progress / currentJobId / cancelledJobId / cancel) を共有する。両者を同時には
- * 走らせない前提 (UI 上のアクションが排他) なので、`buildInvoke` クロージャが
- * 呼び出しごとに command と args を組み立てて単一 runner を再利用する。
+ * 走らせない前提 (UI 上のアクションが排他) だが、`runner.handle()` 内部の
+ * `await listenProgress(jobId)` で制御が一旦 yield するため、共有 mutable closure
+ * を buildInvoke に読ませると race になる (Wave 2AB Task 7 I-1 parked)。
+ * 代わりに per-call に `(jobId) => InvokeSpec` を引数で渡すことで、呼び出し時点の
+ * ローカル変数を同期キャプチャして race を排除する。
  */
 export function useBulkImport() {
-  // resolveAssets / parseCursorpack から書き換える「次に走らせるスペック」。
-  // buildInvoke クロージャがこの変数を参照して invoke スペックを返す。
-  let pendingCommand: string = 'bulk_resolve_assets'
-  let pendingArgs: Record<string, unknown> = { req: { paths: [], recursive: false, jobId: '' } }
-
+  // `options.buildInvoke` は runner 固定のフォールバック。per-call では
+  // `runner.handle((jobId) => ...)` 形式で毎回ローカル closure を渡す。
+  // ここには到達しないはずだが、型シグネチャの充足と fail-fast のために残す。
   const runner = createProgressJobRunner({
     jobIdPrefix: 'bulk',
-    buildInvoke: (jobId) => ({
-      command: pendingCommand,
-      // pendingArgs 内の jobId を最新 jobId に差し替えて返す。
-      args: mergeJobId(pendingArgs, jobId),
-    }),
+    buildInvoke: () => {
+      throw new Error(
+        'useBulkImport: per-call buildInvoke が必要です。runner.handle(buildInvoke) 形式で呼んでください',
+      )
+    },
     unwrap: (raw) => raw,
   })
 
   async function resolveAssets(paths: string[], recursive: boolean): Promise<BulkResolveResult> {
-    pendingCommand = 'bulk_resolve_assets'
-    pendingArgs = { req: { paths, recursive } }
-    const r = (await runner.handle()) as BulkResolveResult | null
+    const command = 'bulk_resolve_assets'
+    const argsBase: Record<string, unknown> = { req: { paths, recursive } }
+    const r = (await runner.handle((jobId) => ({
+      command,
+      args: mergeJobId(argsBase, jobId),
+    }))) as BulkResolveResult | null
     return r ?? { assets: [], failures: [] }
   }
 
   async function parseCursorpack(path: string): Promise<ParsedCursorpack> {
-    pendingCommand = 'parse_cursorpack_for_creator'
-    pendingArgs = { req: { path } }
-    const r = await runner.handle()
+    const command = 'parse_cursorpack_for_creator'
+    const argsBase: Record<string, unknown> = { req: { path } }
+    const r = await runner.handle((jobId) => ({
+      command,
+      args: mergeJobId(argsBase, jobId),
+    }))
     if (!r) throw new Error('cursorpack parse returned empty')
     return r as ParsedCursorpack
   }
