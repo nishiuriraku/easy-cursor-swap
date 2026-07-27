@@ -77,6 +77,9 @@ jobs:
       - name: Vue type check
         run: npx vue-tsc --noEmit
 
+      - name: ESLint
+        run: npm run lint:check
+
       - name: Prettier --check
         run: npm run format:check
 
