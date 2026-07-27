@@ -39,22 +39,7 @@ export default createConfigForNuxt(
       'vue/no-v-html': 'error',
     },
   },
-  {
-    // 内部 SVG アイコン実装 (UiIcon / CursorIcon) は innerHTML プロパティで
-    // 静的 SVG body を注入する。これは sanitizeSvg 済みの内部定数
-    // (UI_ICONS / CURSOR_ICONS) のみで運用するため、no-innerHTML / security
-    // ルールはプロジェクト判断で許可する。
-    // それ以外の .vue / .ts で innerHTML / outerHTML を新規利用するのは
-    // XSS ガードが別途検出する (vue-vhtml-xss-guard)。
-    name: 'easy-cursor-swap/security/icon-innerHTML',
-    files: [
-      'app/components/icons/UiIcon.vue',
-      'app/components/icons/CursorIcon.vue',
-    ],
-    rules: {
-      // innerHTML への代入を許可 (静的 SVG body 注入経路)
-    },
-  },
+
   {
     // `no-console` はブロックしない。console.warn / console.error は
     // ブラウザ側フォールバック診断パスとして意図的に使われている。
