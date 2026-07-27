@@ -10,7 +10,7 @@
  * 依存: useBulkImport, creatorAssets, meta refs, 各種 UI ref。
  */
 import type { Ref } from 'vue'
-import { BulkImportCancelledError } from './useBulkImport'
+import { BulkImportCancelledError } from './withProgressJob'
 import type { useBulkImport, ResolvedAsset, ParsedCursorpack } from './useBulkImport'
 import type { useCreatorAssets } from './useCreatorAssets'
 import type { ApplyPayload } from './useBulkImportPreviewState'

@@ -11,7 +11,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref } from 'vue'
 import { useCreatorBulkImportFlow } from '~/composables/useCreatorBulkImportFlow'
-import { BulkImportCancelledError } from '~/composables/useBulkImport'
+import { BulkImportCancelledError } from '~/composables/withProgressJob'
 import type { ResolvedAsset } from '~/composables/useBulkImport'
 import { useI18n } from '~/composables/useI18n'
 

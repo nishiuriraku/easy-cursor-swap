@@ -72,13 +72,10 @@ export interface ParsedCursorpack {
 }
 
 /**
- * `BulkImportCancelledError` は canonical に `withProgressJob` で定義する。
- * ここで re-export することで、`useBulkImport` 経由でも
- * `import { BulkImportCancelledError } from '~/composables/withProgressJob'`
- * 経由でも `instanceof` が同じ identity を保つ (vitest auto-import TDZ 回避)。
+ * `BulkImportCancelledError` は canonical に `withProgressJob` で定義されており、
+ * すべての呼び出し側は `~/composables/withProgressJob` から直接 import する
+ * (instanceof identity を保つため)。
  */
-export { BulkImportCancelledError } from './withProgressJob'
-
 import { createProgressJobRunner } from './withProgressJob'
 
 /**
