@@ -114,6 +114,54 @@ describe('useThemes mapSummary', () => {
     expect(themes.value[0]!.clonedFromMarketplaceId).toBeNull()
   })
 
+  it('cloned_from_marketplace_id が undefined (TS 上 field 未定義) → null に正規化', async () => {
+    // 既存テストは「キーを省略」だが、`undefined` を明示的に渡したケース (= Rust
+    // 側の serde skip_serializing_if 等でフィールドが JSON に含まれないが受け側で
+    // 型が `string | null` でなく `string | null | undefined` になり得る境界) も
+    // `?? null` 経路を通ることを明示する。
+    vi.mocked(invokeTauri).mockResolvedValueOnce([
+      { ...SUMMARY, cloned_from_marketplace_id: undefined },
+    ])
+    const { refresh, themes } = useThemes()
+    await refresh()
+    expect(themes.value[0]!.clonedFromMarketplaceId).toBeNull()
+  })
+
+  it('複数テーマで cloned_from_marketplace_id が混在しても各々を独立に正規化する', async () => {
+    const originId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    vi.mocked(invokeTauri).mockResolvedValueOnce([
+      { ...SUMMARY, id: 'theme-1', cloned_from_marketplace_id: originId },
+      { ...SUMMARY, id: 'theme-2', cloned_from_marketplace_id: null },
+      // field 欠落
+      {
+        id: 'theme-3',
+        name: SUMMARY.name,
+        author: SUMMARY.author,
+        version: SUMMARY.version,
+        created_at: SUMMARY.created_at,
+        is_active: SUMMARY.is_active,
+        is_favorite: SUMMARY.is_favorite,
+        apply_count: SUMMARY.apply_count,
+        included_roles: SUMMARY.included_roles,
+        path: SUMMARY.path,
+        tags: SUMMARY.tags,
+        size_bytes: SUMMARY.size_bytes,
+        signed: SUMMARY.signed,
+        description: SUMMARY.description,
+        schema_version: SUMMARY.schema_version,
+        license: SUMMARY.license,
+        homepage: SUMMARY.homepage,
+        last_applied_at: SUMMARY.last_applied_at,
+      },
+    ])
+    const { refresh, themes } = useThemes()
+    await refresh()
+    expect(themes.value).toHaveLength(3)
+    expect(themes.value[0]!.clonedFromMarketplaceId).toBe(originId)
+    expect(themes.value[1]!.clonedFromMarketplaceId).toBeNull()
+    expect(themes.value[2]!.clonedFromMarketplaceId).toBeNull()
+  })
+
   it('source: "marketplace" を kind: "marketplace" にマップする (lineage 表示用)', async () => {
     vi.mocked(invokeTauri).mockResolvedValueOnce([
       { ...SUMMARY, source: 'marketplace', cloned_from_marketplace_id: 'origin-uuid' },

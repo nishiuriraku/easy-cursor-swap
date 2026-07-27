@@ -168,6 +168,76 @@ describe('useKeystore', () => {
     expect(ks.lastError.value).toBe('nope')
   })
 
+  // ── importPrivate() ───────────────────────────────────────────
+  // 元は関数存在チェックのみだったが、importPrivate の本体 decode 経路 (passphrase と
+  // inputPath を IPC に正しく転送し、成功時は info を更新し、失敗時は lastError を
+  // セットする) を contract レベルで固定する。
+  it('importPrivate() success forwards passphrase + inputPath and updates info', async () => {
+    invokeMock.mockResolvedValueOnce(sampleInfo)
+    const ks = useKeystore()
+    const result = await ks.importPrivate('correct horse battery staple', 'C:/keys/export.cfkey')
+    expect(invokeMock).toHaveBeenLastCalledWith('keystore_import', {
+      passphrase: 'correct horse battery staple',
+      inputPath: 'C:/keys/export.cfkey',
+    })
+    expect(result).toEqual(sampleInfo)
+    expect(ks.info.value).toEqual(sampleInfo)
+    expect(ks.lastError.value).toBeNull()
+    expect(ks.busy.value).toBe(false)
+  })
+
+  it('importPrivate() success even when returned info is null (keystore is empty after wipe)', async () => {
+    // Rust 側で「復号成功 → 鍵が既に破棄済み」ケースで null が返ることを想定。
+    // その場合も info は empty 形にリセットされ、戻り値は null (= 例外ではない)。
+    invokeMock.mockResolvedValueOnce(null)
+    const ks = useKeystore()
+    const result = await ks.importPrivate('pp', 'in.cfkey')
+    expect(result).toBeNull()
+    expect(ks.info.value).toEqual(emptyInfo)
+    expect(ks.lastError.value).toBeNull()
+  })
+
+  it('importPrivate() failure (wrong passphrase / corrupt blob) sets lastError', async () => {
+    invokeMock.mockRejectedValueOnce(new Error('crypto: passphrase mismatch'))
+    const ks = useKeystore()
+    const result = await ks.importPrivate('wrong', 'in.cfkey')
+    expect(result).toBeNull()
+    expect(ks.lastError.value).toBe('crypto: passphrase mismatch')
+    expect(ks.busy.value).toBe(false)
+  })
+
+  it('importPrivate() failure → success sequence clears lastError on retry', async () => {
+    // 1回目: パスフレーズ間違いで失敗
+    invokeMock.mockRejectedValueOnce(new Error('crypto: passphrase mismatch'))
+    const ks = useKeystore()
+    const r1 = await ks.importPrivate('bad', 'in.cfkey')
+    expect(r1).toBeNull()
+    expect(ks.lastError.value).toBe('crypto: passphrase mismatch')
+
+    // 2回目: パスフレーズ修正で成功 → lastError クリア & info 更新
+    invokeMock.mockResolvedValueOnce(sampleInfo)
+    const r2 = await ks.importPrivate('good', 'in.cfkey')
+    expect(r2).toEqual(sampleInfo)
+    expect(ks.lastError.value).toBeNull()
+    expect(ks.info.value).toEqual(sampleInfo)
+  })
+
+  it('importPrivate() during busy=true (busy flag is set synchronously)', async () => {
+    let resolveInvoke: (v: unknown) => void = () => {}
+    invokeMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveInvoke = resolve
+      }),
+    )
+    const ks = useKeystore()
+    const promise = ks.importPrivate('pp', 'in.cfkey')
+    // 同期チェック: 呼出直後は busy = true
+    expect(ks.busy.value).toBe(true)
+    resolveInvoke(sampleInfo)
+    await promise
+    expect(ks.busy.value).toBe(false)
+  })
+
   // ── return shape ─────────────────────────────────────────────
   it('useKeystore() exposes info / busy / lastError / refresh / generate / remove / exportPrivate / importPrivate', () => {
     const ks = useKeystore()

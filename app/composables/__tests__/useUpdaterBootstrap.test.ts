@@ -177,4 +177,51 @@ describe('useUpdaterBootstrap', () => {
     const arg = notifyMock.mock.calls[0]?.[0] as { body: string } | undefined
     expect(arg?.body).toBe('New version v0.2.0 is available.')
   })
+
+  // ── Wave 2AB / Task 13: エッジケース補強 ──
+  // 既存テストは「クールダウン経過後 + 正常発見」までは網羅していたが、
+  // (a) check() 自体が throw するケース、(b) クールダウン境界 (= 24h ちょうど)、
+  // (c) config が null (= load() が resolve したが c が null) のケースを取りこぼしていた。
+
+  it('check() 自体が throw しても notify は呼ばない (= エラーは fire-and-forget)', async () => {
+    configRef.value = mkConfig(true)
+    localStorage.setItem(LAST_CHECK_KEY, '0')
+    checkMock.mockRejectedValue(new Error('network: timeout'))
+
+    bootstrapUpdaterCheck()
+    await flush()
+
+    // check は呼ばれているが失敗 → notify は出ない (bootstrap が startup をブロックしない contract)
+    expect(checkMock).toHaveBeenCalled()
+    expect(notifyMock).not.toHaveBeenCalled()
+  })
+
+  it('クールダウン境界: ちょうど 24h 経過した直後は skip せず check する', async () => {
+    // 仕様: UPDATE_CHECK_COOLDOWN_MS (= 24h) 未満なら skip、それ以外は check。
+    // 「未満」と「以上」の境界を 1ms ずらして検証する。
+    configRef.value = mkConfig(true)
+    const cooldownMs = 24 * 60 * 60 * 1000
+
+    // 24h ぴったり (= 0 ms 差): 仕様上 >= なので check する
+    localStorage.setItem(LAST_CHECK_KEY, String(Date.now() - cooldownMs))
+    bootstrapUpdaterCheck()
+    await flush()
+    expect(checkMock).toHaveBeenCalledTimes(1)
+
+    // 1ms だけ余裕 (= 23h59m59s): < cooldown なので skip される
+    localStorage.clear()
+    localStorage.setItem(LAST_CHECK_KEY, String(Date.now() - cooldownMs + 1))
+    checkMock.mockClear()
+    bootstrapUpdaterCheck()
+    await flush()
+    expect(checkMock).not.toHaveBeenCalled()
+  })
+
+  it('config が null (load() が空を返したケース) なら check も notify もしない', async () => {
+    configRef.value = null
+    bootstrapUpdaterCheck()
+    await flush()
+    expect(checkMock).not.toHaveBeenCalled()
+    expect(notifyMock).not.toHaveBeenCalled()
+  })
 })
