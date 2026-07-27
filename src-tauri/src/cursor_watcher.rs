@@ -115,3 +115,37 @@ unsafe extern "system" fn cursor_wnd_proc(
 
     DefWindowProcW(hwnd, msg, wparam, lparam)
 }
+
+#[cfg(test)]
+mod tests {
+    /// `start_cursor_watcher` は非 Windows では `Ok(())` を返しつつ何もしない contract。
+    /// CI (Linux / macOS) で `cargo test --lib` が動くためには Windows guard が必須で、
+    /// この経路を動作レベルで固定する。
+    #[cfg(not(windows))]
+    #[test]
+    fn start_cursor_watcher_is_ok_noop_on_non_windows() {
+        let called = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let called_inner = std::sync::Arc::clone(&called);
+        let result = crate::cursor_watcher::start_cursor_watcher(move || {
+            called_inner.store(true, std::sync::atomic::Ordering::SeqCst);
+        });
+        assert!(result.is_ok(), "non-Windows path must return Ok(())");
+        // コールバックは呼ばれない (Windows guard が走らないため)
+        assert!(
+            !called.load(std::sync::atomic::Ordering::SeqCst),
+            "non-Windows: callback must never fire"
+        );
+    }
+
+    /// `start_cursor_watcher` の引数 closure は `Fn() + Send + 'static` を要求する。
+    /// このシグネチャが崩れるとモジュールがコンパイルできなくなるので、
+    /// ダミー closure を渡して受理されることだけ確認する (非 Windows 経路)。
+    #[cfg(not(windows))]
+    #[test]
+    fn start_cursor_watcher_accepts_send_static_closure() {
+        let result = crate::cursor_watcher::start_cursor_watcher(|| {
+            // Fn() + Send + 'static を満たす何もしない closure
+        });
+        assert!(result.is_ok());
+    }
+}

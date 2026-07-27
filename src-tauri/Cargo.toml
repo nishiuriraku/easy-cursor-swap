@@ -125,7 +125,15 @@ name = "cursor_build"
 harness = false
 
 [[bench]]
+name = "cursor_full_build"
+harness = false
+
+[[bench]]
 name = "startup"
+harness = false
+
+[[bench]]
+name = "list_themes"
 harness = false
 
 # --- 型生成バイナリ (feature-gated) ---

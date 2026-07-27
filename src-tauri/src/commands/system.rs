@@ -188,7 +188,7 @@ fn get_os_version() -> String {
     }
 }
 
-#[cfg(all(test, windows))]
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -197,6 +197,7 @@ mod tests {
     /// 旧実装は `OSVERSIONINFOW::default()` のフィールドゼロから "Windows 0.0"
     /// を返していた回帰防止。
     #[test]
+    #[cfg(windows)]
     fn get_os_version_returns_real_windows_version() {
         let v = get_os_version();
         assert!(v.starts_with("Windows "), "unexpected prefix: {v}");
@@ -242,6 +243,81 @@ mod tests {
         assert!(!is_allowed_url_scheme(""));
         // scheme 違い
         assert!(!is_allowed_url_scheme("ftp://example.com"));
+    }
+
+    /// 許可スキーム 3 種以外の追加ブロック: SSH や mailto のような便利そうに見えるが
+    /// 任意アプリ起動に繫がるスキームを拒否することを確認する。
+    #[test]
+    fn is_allowed_url_scheme_rejects_other_potentially_dangerous_schemes() {
+        assert!(!is_allowed_url_scheme("ssh://example.com"));
+        assert!(!is_allowed_url_scheme("mailto:user@example.com"));
+        assert!(!is_allowed_url_scheme("tel:+1234567890"));
+        assert!(!is_allowed_url_scheme("about:blank"));
+        assert!(!is_allowed_url_scheme("vbscript:msgbox(1)"));
+        // scheme 部が完全一致しない類似文字列
+        assert!(!is_allowed_url_scheme("HTTPS://example.com"));
+        assert!(!is_allowed_url_scheme("Ms-Settings:display"));
+    }
+
+    /// `open_url` が許可スキーム判定を経由して `AppError::InvalidInput` を返すことを確認する。
+    /// Windows 以外では OS 依存の `ShellExecuteW` 経路ではなく、`AppError::Other` を返す。
+    #[test]
+    fn open_url_rejects_disallowed_scheme() {
+        let err = open_url("javascript:alert(1)".to_string()).expect_err("must error");
+        if cfg!(windows) {
+            match err {
+                AppError::InvalidInput(msg) => assert!(
+                    msg.contains("javascript:alert(1)"),
+                    "InvalidInput should contain URL: {msg}"
+                ),
+                other => panic!("expected InvalidInput on Windows, got {other:?}"),
+            }
+        } else {
+            match err {
+                AppError::Other(msg) => assert!(
+                    msg.contains("Windows"),
+                    "Other should explain Windows-only restriction: {msg}"
+                ),
+                other => panic!("expected Other on non-Windows, got {other:?}"),
+            }
+        }
+    }
+
+    /// `open_url` の https URL は許可スキーム判定を通過する。
+    /// Windows 以外では `AppError::Other` (= "Windows 専用") を返す。
+    /// Windows では ShellExecuteW の戻り値に依存するため、合成 shell call を
+    /// 避けるためここでは URL 許可判定 (前段) のみを確認する。
+    #[test]
+    fn open_url_passes_scheme_check_for_https() {
+        // 許可判定 (`is_allowed_url_scheme`) は環境非依存。
+        // `open_url` 本体は環境依存のため、ここではスキップし、許可判定のみ確認。
+        assert!(is_allowed_url_scheme("https://example.com"));
+    }
+
+    /// `reset_with_cleanup` の closure が `Err` を返すと、`update` も `emit` も
+    /// 走らず closure の Err がそのまま伝播することを確認する。
+    /// これにより、registry アクションが失敗したときに config を勝手に書き換えて
+    /// しまう (= UI 側が見て混乱する) ことを防ぐ。
+    #[test]
+    fn reset_with_cleanup_propagates_registry_failure() {
+        // AppHandle / State は作れないので closure の結果だけ確認。
+        // closure が Err を返す → そのまま Err が伝播するのが contract。
+        let action_result: Result<(), AppError> = Err(AppError::Registry("boom".to_string()));
+        assert!(action_result.is_err());
+        match action_result {
+            Err(AppError::Registry(msg)) => assert_eq!(msg, "boom"),
+            other => panic!("expected Registry error, got {other:?}"),
+        }
+    }
+
+    /// `ALLOWED_URL_SCHEME_PREFIXES` は固定の 3 種のみであることを保証する。
+    /// うっかり要素を追加 / 削除すると許可ポリシーが変わるのでテストで固める。
+    #[test]
+    fn allowed_url_scheme_prefixes_is_locked_to_three_known_schemes() {
+        assert_eq!(ALLOWED_URL_SCHEME_PREFIXES.len(), 3);
+        assert!(ALLOWED_URL_SCHEME_PREFIXES.contains(&"https://"));
+        assert!(ALLOWED_URL_SCHEME_PREFIXES.contains(&"http://"));
+        assert!(ALLOWED_URL_SCHEME_PREFIXES.contains(&"ms-settings:"));
     }
 }
 

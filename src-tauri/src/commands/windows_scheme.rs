@@ -105,4 +105,25 @@ mod tests {
             ),
         }
     }
+
+    /// 空文字スキーム名や特殊文字を含む名前も not-found として同じ Err 型で返ること。
+    /// 内部で `find` が空文字も空文字なりに比較するため一致なし → Registry Err。
+    #[test]
+    fn lookup_scheme_rejects_empty_string_and_special_chars() {
+        for name in ["", " ", "\0", "../foo", "with\nnewline"] {
+            match lookup_scheme(name) {
+                Err(AppError::Registry(msg)) => {
+                    // 空文字も Registry Err の中に含まれている
+                    assert!(
+                        msg.contains("見つかりません"),
+                        "expected not-found message for {name:?}, got: {msg}"
+                    );
+                }
+                Ok(_) => panic!(
+                    "{name:?} should not match a real scheme (got Ok, this would require a real scheme with that name)"
+                ),
+                Err(other) => panic!("expected AppError::Registry for {name:?}, got {other:?}"),
+            }
+        }
+    }
 }

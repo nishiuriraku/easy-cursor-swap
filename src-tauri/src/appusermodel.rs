@@ -38,3 +38,50 @@ pub fn register_aumid() {
 pub fn register_aumid() {
     // 非 Windows ではノーオペ
 }
+
+#[cfg(test)]
+mod tests {
+    /// `APP_USER_MODEL_ID` は `tauri.conf.json` の `identifier` と整合させる
+    /// 契約がある。`Vendor.Product.Subproduct.VersionInformation` 形式の
+    /// ベンダー ID + アプリ ID + Subproduct の少なくとも 3 ドットを含む
+    /// canonical 形であることを保証する。
+    #[test]
+    fn app_user_model_id_has_canonical_dot_separated_form() {
+        let parts: Vec<&str> = super::APP_USER_MODEL_ID.split('.').collect();
+        assert!(
+            parts.len() >= 3,
+            "AUMID should have at least 3 dot-separated segments: got {:?}",
+            super::APP_USER_MODEL_ID
+        );
+        for (i, seg) in parts.iter().enumerate() {
+            assert!(
+                !seg.is_empty(),
+                "AUMID segment {i} is empty: {:?}",
+                super::APP_USER_MODEL_ID
+            );
+            assert!(
+                seg.chars().all(|c| c.is_ascii_alphanumeric()),
+                "AUMID segment {i:?} must be ASCII alphanumeric only: {:?}",
+                super::APP_USER_MODEL_ID
+            );
+        }
+    }
+
+    /// AUMID 文字列は `dev.easycursorswap.app` 形式 (= `tauri.conf.json` の
+    /// identifier と完全一致) を維持する。これを意図せず変更すると Windows
+    /// のトースト通知 / ジャンプリスト / タスクバーグルーピングが Tauri 既定
+    /// (タスクバーで別アプリ扱い) にフォールバックする。
+    #[test]
+    fn app_user_model_id_matches_tauri_identifier() {
+        assert_eq!(super::APP_USER_MODEL_ID, "dev.easycursorswap.app");
+    }
+
+    /// 非 Windows での `register_aumid` はノーオペ。
+    /// panic / error を返さず呼び出しが即座に返ることのみを保証する。
+    #[cfg(not(windows))]
+    #[test]
+    fn register_aumid_is_noop_on_non_windows() {
+        // 失敗しないことだけ確認。
+        super::register_aumid();
+    }
+}

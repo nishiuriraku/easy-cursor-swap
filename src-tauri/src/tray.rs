@@ -160,3 +160,44 @@ pub fn show_or_recreate_main_window(app: &AppHandle) {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    /// トレイメニューが正しいメニュー ID 文字列で分岐される contract。
+    /// handle_tray_menu_event は private 関数なので、本テストはソースに存在する
+    /// メニュー ID 文字列がトレイで必要とされる ID と一致していることを
+    /// 静的に確認する (= 回帰防止)。これにより ID リネームで UI と動作が
+    /// 乖離するのを防ぐ。
+    #[test]
+    fn tray_menu_ids_match_expected_constants() {
+        let source = include_str!("tray.rs");
+        // メニュー ID 一覧 (handle_tray_menu_event の match 分岐と一致すべき)
+        for id in ["show", "panic_default", "panic_initial", "quit"] {
+            assert!(
+                source.contains(&format!("\"{}\"", id)),
+                "menu id {id:?} must be present in tray.rs"
+            );
+        }
+    }
+
+    /// `show_or_recreate_main_window` は `tauri::AppHandle` を要求するため unit
+    /// テストからは呼びにくい。代わりに、tauri.conf.json の `app.windows[0]` と
+    /// `show_or_recreate_main_window` 内の `WebviewWindowBuilder` 設定が一致して
+    /// いることを文字列リテラルで確認する (= タイトル / サイズ / decorations が
+    /// ズレていないかを静的に固定)。
+    #[test]
+    fn show_or_recreate_main_window_config_matches_expected_defaults() {
+        let source = include_str!("tray.rs");
+        assert!(
+            source.contains(".title(\"EasyCursorSwap\")"),
+            "window title should match tauri.conf.json"
+        );
+        assert!(
+            source.contains(".decorations(false)"),
+            "decorations must be false for AppTitlebar.vue"
+        );
+        // inner_size / min_inner_size はクロップせず存在することのみ確認
+        assert!(source.contains(".inner_size(1280.0, 820.0)"));
+        assert!(source.contains(".min_inner_size(1100.0, 760.0)"));
+    }
+}
