@@ -26,7 +26,7 @@ export default createConfigForNuxt(
       '**/src-tauri/target/**',
       '**/app/types/generated/**',
       '**/*.vue.d.ts',
-      // 旧タスクで除去された IPC/プラグイン残骸 (再出現防止のため無視)
+      // Defensive ignore for obsolete mock dirs from removed IPC paths (see Task 11 dead-IPC removal).
       '**/mocks/**',
     ],
   },
