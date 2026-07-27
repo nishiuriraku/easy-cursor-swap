@@ -1843,4 +1843,50 @@ mod tests {
             );
         }
     }
+
+    /// Wave 2AB Task 8 parked finding: per-role rollback failure-path の単体テスト。
+    ///
+    /// `restore_from_snapshot_pub` は 17 役割を順次 set_value し、失敗した役割を
+    /// `Vec<(String, String)>` に集めて最後に 1 つの `AppError::Registry` にまとめて
+    /// 返す契約。`restore_from_snapshot_pub_succeeds_on_normal_writes` は成功経路の
+    /// みしかカバーしておらず、Err 経路 (= 失敗収集 + メッセージ構築) は未テストだった。
+    ///
+    /// Win32 の `MAX_VALUE_NAME` は **16,383 wchars** (RegSetValueExW の cchValueName
+    /// 上限)。これを超える名前で set_value を呼ぶと `ERROR_INVALID_PARAMETER` が
+    /// 返り、winreg 経由で確実に Err が伝播する性質を利用する。CI / Windows バージョン
+    /// に依存せず決定論的に失敗させられる。
+    ///
+    /// HKCU の 17 役割を直接書き換えるため、`apply_cursors_test_lock` を取得し、
+    /// `CursorValuesCleanup` でテスト前の値を退避・復元する。
+    #[test]
+    fn restore_from_snapshot_pub_returns_err_when_value_name_exceeds_win32_limit() {
+        let _apply_lock = apply_cursors_test_lock();
+        let _cleanup = CursorValuesCleanup::capture();
+
+        let mut values = HashMap::new();
+        // MAX_VALUE_NAME (16,383) を超える 16,500 chars の名前で Win32 制限を発火させる。
+        // 実在する Windows 既定カーソル (.cur) の値を入れれば set_value 自体が Err で
+        // 終わるため、`restore_from_snapshot_pub` の per-role 失敗収集経路 (Vec push) を
+        // 通過できる。
+        let oversized_name = "X".repeat(16_500);
+        values.insert(
+            oversized_name.clone(),
+            r"C:\Windows\Cursors\aero_arrow.cur".to_string(),
+        );
+
+        let result = RegistryManager::restore_from_snapshot_pub(&values);
+        let err = result
+            .expect_err("Win32 MAX_VALUE_NAME を超える名前で set_value した場合、Err が返るべき");
+        // per-role 失敗収集で構築されたメッセージに、当該役割名 (oversized_name) と
+        // 失敗インジケータ ("復元時のレジストリ書込失敗") が両方含まれる。
+        let msg = format!("{:?}", err);
+        assert!(
+            msg.contains("復元時のレジストリ書込失敗"),
+            "Err メッセージが per-role 失敗 summary を含むべき, got: {msg}"
+        );
+        assert!(
+            msg.contains(&oversized_name),
+            "Err メッセージに失敗した役割名を含むべき, got: {msg}"
+        );
+    }
 }
