@@ -6,8 +6,8 @@
 //!
 //! 17 役割は `CursorRole` 系 (`scheme_index` で並べる) 相当の固定 Vec を
 //! このファイルに持つ。`build_cur_from_png` は `RoleBuildEntry` (= ロール名 +
-//! PNG bytes + ホットスポット) を要求しないので、PNG を 64×64 の単色で 1 種類
-//! 用意して全役割で共有することで入力を最小化する。
+//! PNG bytes + ホットスポット) を要求しないので、PNG を 64×64 のグラデーションで
+//! 1 種類用意して全役割で共有することで入力を最小化する。
 //!
 //! 走らせ方:
 //!   cargo bench --bench cursor_full_build --manifest-path src-tauri/Cargo.toml
@@ -16,12 +16,14 @@ use app_lib::cursor::{build_cur_from_png, clear_resize_cache, ResizeMethod};
 use criterion::{criterion_group, criterion_main, Criterion};
 use std::hint::black_box;
 
-/// ベンチ用 PNG (64×64 単色)。`build_cur_from_png` は PNG マジックバイトを
-/// チェックするので本物の PNG が必要。
+/// ベンチ用 PNG (64×64 の多色グラデーション)。`build_cur_from_png` は PNG マジック
+/// バイトをチェックするので本物の PNG が必要。64色を超える入力にして、
+/// 自動判定で `ResizeMethod::Lanczos` が `Nearest` に変更されないようにする。
 fn make_test_png(size: u32) -> Vec<u8> {
     use image::{ImageBuffer, Rgba};
-    let img: ImageBuffer<Rgba<u8>, Vec<u8>> =
-        ImageBuffer::from_pixel(size, size, Rgba([120, 200, 240, 255]));
+    let img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::from_fn(size, size, |x, y| {
+        Rgba([(x % 256) as u8, (y % 256) as u8, ((x + y) % 256) as u8, 255])
+    });
     let mut buf = Vec::new();
     let encoder = image::codecs::png::PngEncoder::new(&mut buf);
     image::ImageEncoder::write_image(

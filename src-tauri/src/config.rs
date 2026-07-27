@@ -351,9 +351,8 @@ impl ConfigManager {
     /// カーソル保存ディレクトリのパスを返す
     /// ~/.custom_cursors/
     ///
-    /// テスト時は `CUSTOM_CURSORS_DIR_OVERRIDE` 環境変数で上書きできる。
+    /// `CUSTOM_CURSORS_DIR_OVERRIDE` が設定されている場合はそのパスで上書きする。
     pub fn cursors_dir() -> AppResult<PathBuf> {
-        #[cfg(test)]
         if let Ok(override_path) = std::env::var("CUSTOM_CURSORS_DIR_OVERRIDE") {
             return Ok(PathBuf::from(override_path));
         }
