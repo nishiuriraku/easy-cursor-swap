@@ -79,9 +79,7 @@ describe('useThemes mapSummary', () => {
   })
 
   it('cloned_from_marketplace_id が null → clonedFromMarketplaceId は null', async () => {
-    vi.mocked(invokeTauri).mockResolvedValueOnce([
-      { ...SUMMARY, cloned_from_marketplace_id: null },
-    ])
+    vi.mocked(invokeTauri).mockResolvedValueOnce([{ ...SUMMARY, cloned_from_marketplace_id: null }])
     const { refresh, themes } = useThemes()
     await refresh()
     expect(themes.value[0]!.clonedFromMarketplaceId).toBeNull()
@@ -127,9 +125,7 @@ describe('useThemes mapSummary', () => {
   })
 
   it('source フィールド欠落 / 未知の値 → kind: "local" にマップ', async () => {
-    vi.mocked(invokeTauri).mockResolvedValueOnce([
-      { ...SUMMARY, source: 'unknown-source-value' },
-    ])
+    vi.mocked(invokeTauri).mockResolvedValueOnce([{ ...SUMMARY, source: 'unknown-source-value' }])
     const { refresh, themes } = useThemes()
     await refresh()
     expect(themes.value[0]!.kind).toBe('local')

@@ -9,9 +9,10 @@
  * 拡張することで、`@ts-expect-error` を全廃し、`vue-tsc` を clean な
  * 状態に保ちつつ、ディレクティブ実装側は普通に代入 / 参照できる。
  *
- * Nuxt 4 は `app/**/*.d.ts` を `.nuxt/tsconfig.app.json` の `include`
- * (`../app/**/*`) 経由で拾うため、追加設定なしで全 SFC / composable に
+ * Nuxt 4 は app 配下の `.d.ts` を `.nuxt/tsconfig.app.json` の `include`
+ * glob (`../app` 以下すべて) 経由で拾うため、追加設定なしで全 SFC / composable に
  * この拡張が反映される。
+ * (注: glob 表記そのままだとブロックコメントが途中終端するため文章で記載)
  */
 export {}
 

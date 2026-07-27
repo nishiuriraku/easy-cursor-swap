@@ -109,6 +109,14 @@ Living docs must move with the code. Triggers and required updates:
 
 One feature = one commit. Run `bash scripts/verify-gate.sh` and confirm green before committing. (Docs-only commits skip the gate.)
 
+## Token economy(トークン節約)
+
+- 応答は結論先行・最小限。編集済みコードの再掲、ファイル内容のエコー、採用しない選択肢の列挙をしない。
+- ビルド/テスト/lint の生ログを会話に流さない。失敗時は該当行±数行のみ引用。フルゲートは verify-gate-runner subagent に隔離する。
+- ファイルの全読みより Grep / 部分 Read(offset+limit)を優先する。
+- 長いログ解析・大 diff レビューは subagent に委譲し、要約だけ本会話に戻す。
+- 自走作業では output style を default にする(explanatory の解説ブロックは出力トークンを増やす)。
+
 ## CI workflows
 
 - `.github/workflows/ci.yml` — `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test --lib`, `vue-tsc --noEmit`, i18n parity.

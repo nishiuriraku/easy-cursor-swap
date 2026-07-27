@@ -52,8 +52,15 @@ describe('withProgressJob (createProgressJobRunner)', () => {
         onCancelled: opts.onCancelled,
       },
       {
-        listenFn: opts.listenImpl ?? listenMock as <T>(event: string, cb: (e: { payload: T }) => void) => Promise<() => void>,
-        invokeFn: opts.invokeImpl ?? invokeMock as <T>(cmd: string, args?: Record<string, unknown>) => Promise<T | null>,
+        listenFn:
+          opts.listenImpl ??
+          (listenMock as <T>(
+            event: string,
+            cb: (e: { payload: T }) => void,
+          ) => Promise<() => void>),
+        invokeFn:
+          opts.invokeImpl ??
+          (invokeMock as <T>(cmd: string, args?: Record<string, unknown>) => Promise<T | null>),
         newJobId: opts.newJobId,
       },
     )

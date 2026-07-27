@@ -110,10 +110,7 @@ export function useBulkImport() {
     unwrap: (raw) => raw,
   })
 
-  async function resolveAssets(
-    paths: string[],
-    recursive: boolean,
-  ): Promise<BulkResolveResult> {
+  async function resolveAssets(paths: string[], recursive: boolean): Promise<BulkResolveResult> {
     pendingCommand = 'bulk_resolve_assets'
     pendingArgs = { req: { paths, recursive } }
     const r = (await runner.handle()) as BulkResolveResult | null

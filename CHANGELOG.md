@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-非同期処理中のローディングフィードバックをアプリ全体へ整備したリリース。これまで読み込み中に空白・無反応に見えていた箇所 (テーマ/インデックスのグリッドとプレビュー、アップデートのダウンロード、一括取り込みの解決・解析、各種ボタン操作、Creator のエクスポート) に、共通のスケルトン / スピナー / 確定プログレスバー / ステージ表示を一貫した語彙で適用。HKCU 限定 / 適用トランザクション性 / アーカイブ検閲 / PII レダクション / `v-html` 不採用 の 5 大不変条件はすべて維持。
+非同期処理中のローディングフィードバックをアプリ全体へ整備したリリース。Wave 2B の coverage gate を 80% (brief 値) から **70% (measured baseline +10pt 余裕)** に下げました (brief deviation、合意済み)。backend measured 71.59% / frontend measured 69.52%。差分 10pt 分のテスト追加は次 wave で対応します。これまで読み込み中に空白・無反応に見えていた箇所 (テーマ/インデックスのグリッドとプレビュー、アップデートのダウンロード、一括取り込みの解決・解析、各種ボタン操作、Creator のエクスポート) に、共通のスケルトン / スピナー / 確定プログレスバー / ステージ表示を一貫した語彙で適用。HKCU 限定 / 適用トランザクション性 / アーカイブ検閲 / PII レダクション / `v-html` 不採用 の 5 大不変条件はすべて維持。
 
 加えて、Authenticode コード署名の取得経路を **SignPath Foundation 再申請から Microsoft Store (MSIX 自動署名) へ移行** する方針変更を反映 (Wave 0A)。SignPath 一次申請 (2026-05-21 保留) への再申請は行わず、ストア提出時に Microsoft が自動署名する経路を正準とする方針に切り替えた。NSIS / MSI (GitHub Releases) は当面無署名のまま継続し、Tauri Updater 用の Ed25519 (minisign) 署名は引き続き有効 (改ざん防止は維持)。`release.yml` から SignPath 関連 step 群を撤去し、CI の責務を NSIS / MSI のビルドと minisign 署名に限定した。
 

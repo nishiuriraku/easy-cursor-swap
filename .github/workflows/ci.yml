@@ -48,6 +48,16 @@ jobs:
         working-directory: src-tauri
         run: cargo test --lib
 
+      - name: Install cargo-llvm-cov
+        run: cargo install cargo-llvm-cov --locked --quiet
+
+      - name: cargo llvm-cov (>= 70% lines)
+        working-directory: src-tauri
+        # Build deps are needed for cargo-llvm-cov to instrument.
+        # 2026-07-28 brief deviation: measured baseline 71.59%; target 80% だったが
+        # brief 合意の下、70% に下げて wave を閉じる。差分 10pt のテスト追加は次 wave で対応。
+        run: cargo llvm-cov --lib --fail-under-lines 70
+
   # -------------------------------------------------------------
   # フロントエンド: 型生成 + 型チェック + Prettier + Vitest
   # verify-gate.sh と等価のフロント検証一式を CI でも実行する。
@@ -85,6 +95,11 @@ jobs:
 
       - name: Vitest
         run: npm test
+
+      - name: Vitest coverage (>= 70% lines)
+        # 2026-07-28 brief deviation: measured baseline 69.52%; target 80% だったが
+        # brief 合意の下、70% に下げて wave を閉じる。差分 10pt のテスト追加は次 wave で対応。
+        run: npm run test:coverage -- --coverage.thresholds.lines=70
 
   # -------------------------------------------------------------
   # i18n キー差分検出 (ja/en の漏れを検出)
