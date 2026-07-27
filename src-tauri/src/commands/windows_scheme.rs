@@ -88,6 +88,12 @@ mod tests {
     /// 実レジストリ (HKCU\Control Panel\Cursors\Schemes) は Windows なら常に
     /// アクセス可能 (Microsoft 既定スキームが入っている) ため、ここでは絶対に
     /// 衝突しないスキーム名で `find` が None になる経路だけを確認する。
+    ///
+    /// NOTE: `lookup_scheme` 経由で `RegistryManager::list_windows_schemes` を
+    /// 呼び出しており、これは `winreg` (Windows-only) を直接使うため、
+    /// クロスコンパイル時にこのテストモジュールが壊れないよう `#[cfg(windows)]`
+    /// で gate する。
+    #[cfg(windows)]
     #[test]
     fn lookup_scheme_returns_registry_error_when_not_found() {
         let result = lookup_scheme("__definitely_not_a_real_scheme_xyz__");
@@ -108,6 +114,9 @@ mod tests {
 
     /// 空文字スキーム名や特殊文字を含む名前も not-found として同じ Err 型で返ること。
     /// 内部で `find` が空文字も空文字なりに比較するため一致なし → Registry Err。
+    ///
+    /// NOTE: Windows-only (`winreg` 依存)。クロスコンパイル耐性のため cfg gate。
+    #[cfg(windows)]
     #[test]
     fn lookup_scheme_rejects_empty_string_and_special_chars() {
         for name in ["", " ", "\0", "../foo", "with\nnewline"] {

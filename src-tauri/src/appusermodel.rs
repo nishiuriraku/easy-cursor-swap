@@ -45,6 +45,12 @@ mod tests {
     /// 契約がある。`Vendor.Product.Subproduct.VersionInformation` 形式の
     /// ベンダー ID + アプリ ID + Subproduct の少なくとも 3 ドットを含む
     /// canonical 形であることを保証する。
+    ///
+    /// NOTE: `super::APP_USER_MODEL_ID` は `#[cfg(windows)] pub const` なので、
+    /// `cargo check --target x86_64-unknown-linux-gnu` 等の非 Windows ターゲット
+    /// でもこのテストモジュールをコンパイルできるよう、本テストにも
+    /// `#[cfg(windows)]` を付与する。
+    #[cfg(windows)]
     #[test]
     fn app_user_model_id_has_canonical_dot_separated_form() {
         let parts: Vec<&str> = super::APP_USER_MODEL_ID.split('.').collect();
@@ -71,6 +77,9 @@ mod tests {
     /// identifier と完全一致) を維持する。これを意図せず変更すると Windows
     /// のトースト通知 / ジャンプリスト / タスクバーグルーピングが Tauri 既定
     /// (タスクバーで別アプリ扱い) にフォールバックする。
+    ///
+    /// NOTE: Windows-only シンボルを参照するため `#[cfg(windows)]` で gate。
+    #[cfg(windows)]
     #[test]
     fn app_user_model_id_matches_tauri_identifier() {
         assert_eq!(super::APP_USER_MODEL_ID, "dev.easycursorswap.app");
