@@ -9,7 +9,15 @@
 //!
 //! polling 間隔制御 (interval / slow_down 5s 加算) は **フロント側** で行う。
 //! Rust 側はステートレスな 1 try IPC のみを提供する。
+//!
+//! `submit_theme_auto` の 9 ステージオーケストレーションは
+//! [`stages::run_submit_pipeline`] に委譲する。本ファイルは前段 (UUID パース /
+//! lineage ガード / タグ allow-list / pack build+sign / token load /
+//! client 構築) までの **preflight adapter** に徹する。
 
+use crate::commands::marketplace_submit::stages::{
+    run_submit_pipeline, validate_tags, AppHandleSink, SubmitPreflight,
+};
 use crate::config::{ConfigManager, GithubAccount, DEFAULT_MAX_PACK_COMPRESSED_SIZE};
 use crate::errors::AppError;
 use crate::github::client::Client;
@@ -20,8 +28,7 @@ use serde::Serialize;
 use std::sync::RwLock;
 use tauri::{AppHandle, Emitter, State};
 
-const UPSTREAM_OWNER: &str = "nishiuriraku";
-const UPSTREAM_REPO: &str = "easy-cursor-swap-index";
+pub(crate) mod stages;
 
 /// Device Flow 開始時に GitHub から受け取った値のうち、ポーリングに必要な分。
 #[derive(Debug, Clone)]
@@ -174,6 +181,10 @@ pub async fn submit_theme_auto(
     theme_id: String,
     tags: Vec<String>,
 ) -> Result<SubmitResult, AppError> {
+    // ── preflight (この IPC ハンドラの責務) ─────────────────────
+    // UUID パース → lineage 拒否 → タグ allow-list 検証 → pack build+sign →
+    // token load → client 構築 → `run_submit_pipeline` に委譲。
+    // 9 ステージのオーケストレーションは `stages::run_submit_pipeline` に閉じている。
     let parsed_id = uuid::Uuid::parse_str(&theme_id)
         .map_err(|e| AppError::Theme(format!("テーマ ID パース失敗: {}", e)))?;
 
@@ -183,8 +194,8 @@ pub async fn submit_theme_auto(
     // 提出してきた場合に備え、Rust 側でも `cloned_from_marketplace_id` を確認する。
     // 複製してから何段ネストしても `duplicate_theme` が origin を引き継ぐので、
     // この 1 か所のチェックだけで再提出経路を全て塞げる。
-    let preflight = crate::theme::ThemeManager::load_metadata(parsed_id)?;
-    if let Some(origin) = preflight.cloned_from_marketplace_id {
+    let lineage_meta = crate::theme::ThemeManager::load_metadata(parsed_id)?;
+    if let Some(origin) = lineage_meta.cloned_from_marketplace_id {
         tracing::warn!(
             "marketplace 由来テーマの再提出を拒否: origin_short={}",
             crate::logging::short_hash(origin.to_string().as_bytes())
@@ -194,145 +205,57 @@ pub async fn submit_theme_auto(
         ));
     }
 
+    // ── タグ allow-list (ネットワーク呼び出し前に検証) ──────────
+    let normalized_tags = validate_tags(tags)?;
+
     emit_progress(&app, "build");
-    let pack_bytes = build_cursorpack_for_submit(parsed_id)?;
-    if (pack_bytes.len() as u64) > DEFAULT_MAX_PACK_COMPRESSED_SIZE {
-        return Err(AppError::Theme(format!(
-            ".cursorpack が {}MB 超: 提出できません",
-            DEFAULT_MAX_PACK_COMPRESSED_SIZE / 1024 / 1024
-        )));
-    }
-    let sha256 = sha256_hex(&pack_bytes);
-    // .cursorpack 全体の SHA-256 (16進文字列) を署名対象とする。
-    // 公式 marketplace のインストール側も同じ規約を使う。
-    let signature_b64 = Keystore::sign(sha256.as_bytes())?;
-    let key_info = Keystore::info()?;
-    let pubkey_id = key_info
-        .key_id
-        .ok_or_else(|| AppError::Theme("署名鍵が未生成です".to_string()))?;
+    // pack build + SHA-256 + 署名は CPU 重めなので spawn_blocking で逃がす。
+    // 実行スレッド自体は async executor を占有しないため、IPC 呼び出し中に他の
+    // Tauri コマンド (cancel など) がフリーズしない。
+    let parsed_id_for_blocking = parsed_id;
+    let lineage_for_preflight = lineage_meta.cloned_from_marketplace_id;
+    let preflight = tauri::async_runtime::spawn_blocking(move || -> Result<SubmitPreflight, AppError> {
+        let pack_bytes = build_cursorpack_for_submit(parsed_id_for_blocking)?;
+        if (pack_bytes.len() as u64) > DEFAULT_MAX_PACK_COMPRESSED_SIZE {
+            return Err(AppError::Theme(format!(
+                ".cursorpack が {}MB 超: 提出できません",
+                DEFAULT_MAX_PACK_COMPRESSED_SIZE / 1024 / 1024
+            )));
+        }
+        let sha256 = sha256_hex(&pack_bytes);
+        // .cursorpack 全体の SHA-256 (16進文字列) を署名対象とする。
+        // 公式 marketplace のインストール側も同じ規約を使う。
+        let signature_b64 = Keystore::sign(sha256.as_bytes())?;
+        let key_info = Keystore::info()?;
+        let pubkey_id = key_info
+            .key_id
+            .ok_or_else(|| AppError::Theme("署名鍵が未生成です".to_string()))?;
+        let meta = load_theme_meta_for_submit(parsed_id_for_blocking)?;
+        Ok(SubmitPreflight {
+            theme_id: parsed_id_for_blocking,
+            theme_id_str: parsed_id_for_blocking.to_string(),
+            tags: normalized_tags,
+            pack_bytes,
+            sha256,
+            signature_b64,
+            pubkey_id,
+            meta,
+            cloned_from_marketplace_id: lineage_for_preflight,
+        })
+    })
+    .await
+    .map_err(|e| AppError::Theme(format!("pack build join エラー: {}", e)))??;
 
     emit_progress(&app, "auth");
     let token = Keystore::load_github_oauth_token()?
         .ok_or_else(|| AppError::Theme("GitHub と未連携です".to_string()))?;
-    let gh = Client::new(token);
-    let me = gh.get_authenticated_user().await?;
+    let client = Client::new(token);
 
-    emit_progress(&app, "fork");
-    let fork = gh.ensure_fork(UPSTREAM_OWNER, UPSTREAM_REPO).await?;
-    // GitHub は「upstream owner 本人」が fork を作ろうとすると、新規 fork ではなく
-    // upstream 本体 (= 同じ owner / 同じ repo) を返す。この場合 `merge-upstream` も
-    // 「自分の main を自分の main に merge」になり 422 で落ちる。
-    // 自前の fork でない (= upstream owner 本人) なら sync をスキップする。
-    let is_self_owned = fork.owner.login == UPSTREAM_OWNER && fork.name == UPSTREAM_REPO;
-
-    emit_progress(&app, "sync_fork");
-    if is_self_owned {
-        tracing::info!("upstream owner 本人のため fork sync をスキップ");
-    } else if let Err(e) = gh
-        .sync_fork_with_upstream(&fork.owner.login, &fork.name, &fork.default_branch)
-        .await
-    {
-        // fork sync は失敗しても致命ではない (新規 fork なら upstream と一致しているはず)。
-        tracing::warn!("fork sync 失敗 (続行): {}", e);
-    }
-
-    let branch = format!("submit/{}", theme_id);
-    emit_progress(&app, "branch");
-    gh.create_or_reset_branch(&fork.owner.login, &fork.name, &branch, &fork.default_branch)
-        .await?;
-
-    emit_progress(&app, "upload_pack");
-    gh.put_contents(
-        &fork.owner.login,
-        &fork.name,
-        &branch,
-        &format!("themes/{}.cursorpack", theme_id),
-        &pack_bytes,
-        &format!("feat: add cursorpack for {}", theme_id),
-    )
-    .await?;
-
-    emit_progress(&app, "upload_previews");
-    // .cursorpack 内の `previews/<role>.png` を抽出し、
-    // `previews/<theme_id>/<role>.png` として upstream に置けるように fork へアップロードする。
-    // 失敗しても提出全体は止めず警告のみ (entry の preview_base_url は省略)。
-    let uploaded_previews = upload_previews_from_pack(
-        &gh,
-        &fork.owner.login,
-        &fork.name,
-        &branch,
-        &theme_id,
-        &pack_bytes,
-    )
-    .await
-    .unwrap_or_else(|e| {
-        tracing::warn!("preview アップロード失敗 (続行): {}", e);
-        false
-    });
-
-    emit_progress(&app, "upload_entry");
-    let mut meta = load_theme_meta_for_submit(parsed_id)?;
-    // 提出ダイアログで入力された tags があれば metadata より優先する。
-    // 空配列の場合は metadata の tags をそのまま使う。
-    if !tags.is_empty() {
-        meta.tags = tags
-            .into_iter()
-            .map(|t| t.trim().to_string())
-            .filter(|t| !t.is_empty())
-            .collect();
-    }
-    let download_url = format!(
-        "https://raw.githubusercontent.com/{}/{}/main/themes/{}.cursorpack",
-        UPSTREAM_OWNER, UPSTREAM_REPO, theme_id
-    );
-    let preview_base_url = if uploaded_previews {
-        Some(format!(
-            "https://raw.githubusercontent.com/{}/{}/main/previews/{}",
-            UPSTREAM_OWNER, UPSTREAM_REPO, theme_id
-        ))
-    } else {
-        None
-    };
-    let entry_json = build_entry_json(
-        &theme_id,
-        &meta,
-        &me.login,
-        &pubkey_id,
-        &sha256,
-        &signature_b64,
-        &download_url,
-        preview_base_url.as_deref(),
-    )?;
-    gh.put_contents(
-        &fork.owner.login,
-        &fork.name,
-        &branch,
-        &format!("entries/{}.json", theme_id),
-        entry_json.as_bytes(),
-        &format!("feat: add entry for {}", theme_id),
-    )
-    .await?;
-
-    emit_progress(&app, "open_pr");
-    let head = format!("{}:{}", fork.owner.login, branch);
-    let title = format!("submit: {} v{}", meta.display_name, meta.version);
-    let body = render_pr_body(
-        &theme_id,
-        &meta.display_name,
-        &meta.version,
-        &me.login,
-        &sha256,
-        &signature_b64,
-    );
-    let pr = gh
-        .open_or_update_pr(UPSTREAM_OWNER, UPSTREAM_REPO, &head, "main", &title, &body)
-        .await?;
-
-    tracing::info!("Marketplace 自動提出完了: PR #{}", pr.number);
-    Ok(SubmitResult {
-        pr_url: pr.html_url,
-        pr_number: pr.number,
-    })
+    // 9 ステージのネットワークオーケストレーションは stages.rs 側に完全に委譲する。
+    // IPC ハンドラ側は ProgressSink adapter を作って submit:progress イベントを
+    // 既存と同じ semantics で発火させる。
+    let sink = AppHandleSink::new(&app);
+    run_submit_pipeline(&sink, &client, preflight).await
 }
 
 // ── helpers ────────────────────────────────────────────────────────────
@@ -357,7 +280,14 @@ fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", h.finalize())
 }
 
-struct ThemeMetaForSubmit {
+/// `submit_theme_auto` IPC が組み立てて `stages::run_submit_pipeline` に渡す
+/// theme.json のサブセット。`build_entry_json` の入力となる。
+///
+/// `pub(crate)` で公開し、`stages` モジュールからも参照する。
+/// `Clone` を derive しているのは `stages` 側で `meta.clone()` するため
+/// (= ユーザー入力 tags 適用時に in-place 変更するため)。
+#[derive(Clone)]
+pub(crate) struct ThemeMetaForSubmit {
     /// `theme.json` の name をそのまま (LocalizedString のまま) 保持。
     /// `build_entry_json` で `index.json` に出力する際は serde untagged で
     /// plain string またはロケールマップとして書き出される。
@@ -452,8 +382,11 @@ fn build_cursorpack_for_submit(theme_id: uuid::Uuid) -> Result<Vec<u8>, AppError
     crate::theme::ThemeManager::write_cursorpack_to_buffer(&mut metadata, &cursors)
 }
 
+/// `index.json` 用のエントリ JSON 文字列を組み立てる。
+///
+/// `stages::run_submit_pipeline` から呼ばれるため `pub(crate)`。
 #[allow(clippy::too_many_arguments)]
-fn build_entry_json(
+pub(crate) fn build_entry_json(
     theme_id: &str,
     meta: &ThemeMetaForSubmit,
     author_github: &str,
@@ -495,73 +428,10 @@ fn build_entry_json(
     Ok(serde_json::to_string_pretty(&entry)?)
 }
 
-/// `.cursorpack` (ZIP) から `previews/<role>.png` を抽出し、
-/// fork branch の `previews/<theme_id>/<role>.png` として upload する。
+/// PR body の Markdown を組み立てる。
 ///
-/// 戻り値は「1 件以上 PNG を upload できたか」。すべて失敗 / 該当ファイル無しの
-/// 場合は `false` を返し、呼び出し側は entry の `preview_base_url` を省略する。
-async fn upload_previews_from_pack(
-    gh: &Client,
-    owner: &str,
-    repo: &str,
-    branch: &str,
-    theme_id: &str,
-    pack_bytes: &[u8],
-) -> Result<bool, AppError> {
-    use std::io::Read;
-    let reader = std::io::Cursor::new(pack_bytes);
-    let mut archive = zip::ZipArchive::new(reader)
-        .map_err(|e| AppError::Theme(format!(".cursorpack ZIP オープン失敗: {}", e)))?;
-
-    // ZIP 内エントリ名から (role, bytes) を抽出。`previews/<role>.png` 形式のみ採用し、
-    // 役割名は ASCII 英数字 + アンダースコアに正規化されたものに限定する。
-    let mut uploads: Vec<(String, Vec<u8>)> = Vec::new();
-    for i in 0..archive.len() {
-        let mut f = archive
-            .by_index(i)
-            .map_err(|e| AppError::Theme(format!(".cursorpack エントリ取得失敗: {}", e)))?;
-        let name = f.name().to_string();
-        let role = match name
-            .strip_prefix("previews/")
-            .and_then(|s| s.strip_suffix(".png"))
-        {
-            Some(r) => r,
-            None => continue,
-        };
-        if role.is_empty()
-            || role.len() > 32
-            || !role.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
-        {
-            continue;
-        }
-        let mut bytes = Vec::new();
-        f.read_to_end(&mut bytes)
-            .map_err(|e| AppError::Theme(format!("preview 読込失敗: {}", e)))?;
-        uploads.push((role.to_string(), bytes));
-    }
-
-    if uploads.is_empty() {
-        tracing::warn!("preview PNG が cursorpack に含まれていません");
-        return Ok(false);
-    }
-
-    let mut success = 0usize;
-    for (role, bytes) in &uploads {
-        let path = format!("previews/{}/{}.png", theme_id, role);
-        let msg = format!("feat: add preview {} for {}", role, theme_id);
-        if let Err(e) = gh
-            .put_contents(owner, repo, branch, &path, bytes, &msg)
-            .await
-        {
-            tracing::warn!("preview upload 失敗 ({}): {}", role, e);
-            continue;
-        }
-        success += 1;
-    }
-    Ok(success > 0)
-}
-
-fn render_pr_body(
+/// `stages::run_submit_pipeline` から呼ばれるため `pub(crate)`。
+pub(crate) fn render_pr_body(
     theme_id: &str,
     name: &str,
     version: &str,
@@ -806,7 +676,7 @@ mod tests {
             display_name: "No Author".to_string(),
             author: None,
             version: "1.0.0".to_string(),
-            included_roles: vec!["Arrow".to_string()],
+            included_roles: vec![],
             tags: vec![],
         };
         let json = build_entry_json(

@@ -326,6 +326,110 @@ fn err_ctx(ctx: &'static str) -> impl Fn(reqwest::Error) -> AppError {
     move |e| AppError::Theme(format!("GitHub API {}: {}", ctx, e))
 }
 
+/// Marketplace 自動提出フローが依存する GitHub REST API の最小 interface。
+///
+/// `Client` は本 trait を実装し、`commands::marketplace_submit::stages::run_submit_pipeline`
+/// のジェネリック引数として渡される。テストでは mockito ベースのモック (または
+/// 録音用 fake) を本 trait 経由で注入する。
+///
+/// Rust 1.82 の async-in-trait を使用しているため dyn dispatch は使えない。
+/// 呼び出し側は `async fn` のジェネリック境界 (`<C: GithubGateway>`) で受け取る。
+pub(crate) trait GithubGateway {
+    /// 認証済みユーザーを取得する (`GET /user`)。
+    async fn get_authenticated_user(&self) -> AppResult<AuthenticatedUser>;
+
+    /// upstream を自アカウントへ fork する (`POST /repos/{o}/{r}/forks`)。
+    async fn ensure_fork(&self, owner: &str, repo: &str) -> AppResult<Repo>;
+
+    /// fork を upstream の最新状態に同期する (`POST /merge-upstream`)。
+    async fn sync_fork_with_upstream(&self, owner: &str, repo: &str, branch: &str)
+        -> AppResult<()>;
+
+    /// ブランチを新規作成するか、既存を base の HEAD へ強制リセットする。
+    async fn create_or_reset_branch(
+        &self,
+        owner: &str,
+        repo: &str,
+        branch: &str,
+        base: &str,
+    ) -> AppResult<()>;
+
+    /// ファイルを作成 / 更新する (`PUT /repos/{o}/{r}/contents/{path}`)。
+    async fn put_contents(
+        &self,
+        owner: &str,
+        repo: &str,
+        branch: &str,
+        path: &str,
+        bytes: &[u8],
+        message: &str,
+    ) -> AppResult<()>;
+
+    /// Pull Request を作成または既存 PR を更新する。
+    async fn open_or_update_pr(
+        &self,
+        owner: &str,
+        repo: &str,
+        head: &str,
+        base: &str,
+        title: &str,
+        body: &str,
+    ) -> AppResult<PullRequest>;
+}
+
+impl GithubGateway for Client {
+    async fn get_authenticated_user(&self) -> AppResult<AuthenticatedUser> {
+        Client::get_authenticated_user(self).await
+    }
+
+    async fn ensure_fork(&self, owner: &str, repo: &str) -> AppResult<Repo> {
+        Client::ensure_fork(self, owner, repo).await
+    }
+
+    async fn sync_fork_with_upstream(
+        &self,
+        owner: &str,
+        repo: &str,
+        branch: &str,
+    ) -> AppResult<()> {
+        Client::sync_fork_with_upstream(self, owner, repo, branch).await
+    }
+
+    async fn create_or_reset_branch(
+        &self,
+        owner: &str,
+        repo: &str,
+        branch: &str,
+        base: &str,
+    ) -> AppResult<()> {
+        Client::create_or_reset_branch(self, owner, repo, branch, base).await
+    }
+
+    async fn put_contents(
+        &self,
+        owner: &str,
+        repo: &str,
+        branch: &str,
+        path: &str,
+        bytes: &[u8],
+        message: &str,
+    ) -> AppResult<()> {
+        Client::put_contents(self, owner, repo, branch, path, bytes, message).await
+    }
+
+    async fn open_or_update_pr(
+        &self,
+        owner: &str,
+        repo: &str,
+        head: &str,
+        base: &str,
+        title: &str,
+        body: &str,
+    ) -> AppResult<PullRequest> {
+        Client::open_or_update_pr(self, owner, repo, head, base, title, body).await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -582,5 +686,143 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(pr.number, 7);
+    }
+
+    // ───────────────────────────────────────────────────────────────
+    // Task 9: 3 つの HTTP 契約テスト。`synthetic-test-token` はテスト用固定文字列で
+    // ログ / 出力に絶対に登場させない。Bearer ヘッダの一致は mockito 側で
+    // 検査される (= ヘッダに付いたら test fail するので、CI 上で PII 漏れ検出可)。
+    // ───────────────────────────────────────────────────────────────
+
+    /// Task 9 用テストクライアント。`synthetic-test-token` は固定文字列。
+    ///
+    /// **絶対にログに出さないこと。** 失敗時のデバッグ出力に混入させないよう
+    /// Bearer ヘッダの一致は mockito 側に閉じている (= アサート失敗時にのみ
+    /// サーバ側で検証される)。
+    fn task9_client_for(url: &str) -> Client {
+        Client::new_at(url, "synthetic-test-token".to_string())
+    }
+
+    #[tokio::test]
+    async fn task9_ensure_fork_contract() {
+        // 契約: POST /repos/{o}/{r}/forks が呼ばれ、Bearer 認証ヘッダが付き、
+        // レスポンスの owner.login / default_branch / name がパースできる。
+        let mut server = Server::new_async().await;
+        let _m = server
+            .mock("POST", "/repos/upstream-owner/easy-cursor-swap-index/forks")
+            .match_header("authorization", "Bearer synthetic-test-token")
+            .match_header("accept", "application/vnd.github+json")
+            .match_header("x-github-api-version", "2022-11-28")
+            .with_status(202)
+            .with_body(
+                r#"{"name":"easy-cursor-swap-index","full_name":"octocat/easy-cursor-swap-index","default_branch":"main","owner":{"login":"octocat"}}"#,
+            )
+            .create_async()
+            .await;
+        let c = task9_client_for(&server.url());
+        let fork = c
+            .ensure_fork("upstream-owner", "easy-cursor-swap-index")
+            .await
+            .unwrap();
+        assert_eq!(fork.owner.login, "octocat");
+        assert_eq!(fork.default_branch, "main");
+        assert_eq!(fork.name, "easy-cursor-swap-index");
+    }
+
+    #[tokio::test]
+    async fn task9_put_contents_contract() {
+        // 契約: PUT /repos/{o}/{r}/contents/{path} が呼ばれ、content フィールドが
+        // Base64 エンコードされている。
+        let mut server = Server::new_async().await;
+        // GET 既存 → 404 (先行コンテンツなし = 新規作成)
+        let _m_get = server
+            .mock(
+                "GET",
+                mockito::Matcher::Regex(
+                    r"^/repos/octocat/easy-cursor-swap-index/contents/themes/.*\.cursorpack.*"
+                        .to_string(),
+                ),
+            )
+            .with_status(404)
+            .create_async()
+            .await;
+        // PUT 新規作成
+        let _m_put = server
+            .mock(
+                "PUT",
+                mockito::Matcher::Regex(
+                    r"^/repos/octocat/easy-cursor-swap-index/contents/themes/.*\.cursorpack.*"
+                        .to_string(),
+                ),
+            )
+            .match_header("authorization", "Bearer synthetic-test-token")
+            .with_status(201)
+            .with_body(r#"{"content":{"sha":"NEWSHA"},"commit":{"sha":"COMMITSHA"}}"#)
+            .create_async()
+            .await;
+
+        let c = task9_client_for(&server.url());
+        // 入力バイト列 "hello" → Base64 "aGVsbG8="
+        c.put_contents(
+            "octocat",
+            "easy-cursor-swap-index",
+            "submit/abc",
+            "themes/abc.cursorpack",
+            b"hello",
+            "feat: add cursorpack",
+        )
+        .await
+        .unwrap();
+        // mockito のマッチャに合致したのでそのまま成功。
+        // 不一致なら panic するため、テスト本体としてはこれで契約固定完了。
+    }
+
+    #[tokio::test]
+    async fn task9_open_or_update_pr_contract() {
+        // 契約: 既存 PR 無しの場合、POST /repos/{o}/{r}/pulls で新規作成し、
+        // head / base / title / body が反映される。
+        let mut server = Server::new_async().await;
+        let _m_list = server
+            .mock(
+                "GET",
+                mockito::Matcher::Regex(
+                    r"^/repos/upstream-owner/easy-cursor-swap-index/pulls.*".to_string(),
+                ),
+            )
+            .match_header("authorization", "Bearer synthetic-test-token")
+            .with_status(200)
+            .with_body("[]")
+            .create_async()
+            .await;
+        let _m_post = server
+            .mock(
+                "POST",
+                "/repos/upstream-owner/easy-cursor-swap-index/pulls",
+            )
+            .match_header("authorization", "Bearer synthetic-test-token")
+            .with_status(201)
+            .with_body(
+                r#"{"number":99,"html_url":"https://github.com/upstream-owner/easy-cursor-swap-index/pull/99","head":{"ref":"submit/abc"}}"#,
+            )
+            .create_async()
+            .await;
+
+        let c = task9_client_for(&server.url());
+        let pr = c
+            .open_or_update_pr(
+                "upstream-owner",
+                "easy-cursor-swap-index",
+                "octocat:submit/abc",
+                "main",
+                "submit: abc v1.0.0",
+                "## Auto-submitted via EasyCursorSwap",
+            )
+            .await
+            .unwrap();
+        assert_eq!(pr.number, 99);
+        assert_eq!(
+            pr.html_url,
+            "https://github.com/upstream-owner/easy-cursor-swap-index/pull/99"
+        );
     }
 }
