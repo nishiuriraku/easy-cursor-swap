@@ -71,102 +71,83 @@ export interface ParsedCursorpack {
   roles: Record<string, ParsedRole>
 }
 
-interface BulkImportProgress {
-  jobId: string
-  stage: 'scan' | 'parse' | 'extract' | 'done' | 'error'
-  current: number
-  total: number
-  message: string | null
-}
+/**
+ * `BulkImportCancelledError` は canonical に `withProgressJob` で定義する。
+ * ここで re-export することで、`useBulkImport` 経由でも
+ * `import { BulkImportCancelledError } from '~/composables/withProgressJob'`
+ * 経由でも `instanceof` が同じ identity を保つ (vitest auto-import TDZ 回避)。
+ */
+export { BulkImportCancelledError } from './withProgressJob'
+
+import { createProgressJobRunner } from './withProgressJob'
 
 /**
- * ユーザー操作 (cancel ボタン) による一括インポート中断を表す型。
- * 通常の失敗 (エラー表示) と区別し、UI 側で「失敗」トーストを出さないために使う。
+ * Creator の一括インポート機能を束ねる composable。
+ * `withProgressJob` のヘルパーに listen/invoke/unlisten ライフサイクルを委譲し、
+ * resolveAssets と parseCursorpack は薄いラッパになる。
+ *
+ * `bulk_resolve_assets` はユーザーがキャンセルすると AppError::BulkImportCancelled
+ * で reject するため、resolveAssets の typed 翻訳はヘルパー側に集約。
+ *
+ * resolveAssets と parseCursorpack は同じ runner インスタンスの state (busy /
+ * progress / currentJobId / cancelledJobId / cancel) を共有する。両者を同時には
+ * 走らせない前提 (UI 上のアクションが排他) なので、`buildInvoke` クロージャが
+ * 呼び出しごとに command と args を組み立てて単一 runner を再利用する。
  */
-export class BulkImportCancelledError extends Error {
-  constructor() {
-    super('bulk import cancelled')
-    this.name = 'BulkImportCancelledError'
-  }
-}
-
 export function useBulkImport() {
-  const busy = ref(false)
-  const progress = ref<BulkImportProgress | null>(null)
-  const currentJobId = ref<string | null>(null)
-  /** 直近に cancel() が要求されたジョブ ID。resolveAssets の reject を
-   *  「失敗」と「中断」に区別するために使う。 */
-  const cancelledJobId = ref<string | null>(null)
+  // resolveAssets / parseCursorpack から書き換える「次に走らせるスペック」。
+  // buildInvoke クロージャがこの変数を参照して invoke スペックを返す。
+  let pendingCommand: string = 'bulk_resolve_assets'
+  let pendingArgs: Record<string, unknown> = { req: { paths: [], recursive: false, jobId: '' } }
 
-  function newJobId(prefix: string) {
-    return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-  }
+  const runner = createProgressJobRunner({
+    jobIdPrefix: 'bulk',
+    buildInvoke: (jobId) => ({
+      command: pendingCommand,
+      // pendingArgs 内の jobId を最新 jobId に差し替えて返す。
+      args: mergeJobId(pendingArgs, jobId),
+    }),
+    unwrap: (raw) => raw,
+  })
 
-  async function subscribeProgress(jobId: string): Promise<() => void> {
-    try {
-      const { listen } = await import('@tauri-apps/api/event')
-      const un = await listen<BulkImportProgress>('bulk-import-progress', (e) => {
-        if (e.payload.jobId === jobId) progress.value = e.payload
-      })
-      return un
-    } catch {
-      return () => {}
-    }
-  }
-
-  async function resolveAssets(paths: string[], recursive: boolean): Promise<BulkResolveResult> {
-    busy.value = true
-    progress.value = null
-    const jobId = newJobId('bulk')
-    currentJobId.value = jobId
-    cancelledJobId.value = null
-    const unlisten = await subscribeProgress(jobId)
-    try {
-      const r = await invokeTauri<BulkResolveResult>('bulk_resolve_assets', {
-        req: { paths, recursive, jobId },
-      })
-      return r ?? { assets: [], failures: [] }
-    } catch (e) {
-      // このジョブに対して cancel() が呼ばれていれば「失敗」ではなく「中断」。
-      if (cancelledJobId.value === jobId) {
-        throw new BulkImportCancelledError()
-      }
-      throw e
-    } finally {
-      unlisten()
-      currentJobId.value = null
-      busy.value = false
-    }
+  async function resolveAssets(
+    paths: string[],
+    recursive: boolean,
+  ): Promise<BulkResolveResult> {
+    pendingCommand = 'bulk_resolve_assets'
+    pendingArgs = { req: { paths, recursive } }
+    const r = (await runner.handle()) as BulkResolveResult | null
+    return r ?? { assets: [], failures: [] }
   }
 
   async function parseCursorpack(path: string): Promise<ParsedCursorpack> {
-    busy.value = true
-    progress.value = null
-    const jobId = newJobId('cpack')
-    currentJobId.value = jobId
-    const unlisten = await subscribeProgress(jobId)
-    try {
-      const r = await invokeTauri<ParsedCursorpack>('parse_cursorpack_for_creator', {
-        req: { path, jobId },
-      })
-      if (!r) throw new Error('cursorpack parse returned empty')
-      return r
-    } finally {
-      unlisten()
-      currentJobId.value = null
-      busy.value = false
-    }
+    pendingCommand = 'parse_cursorpack_for_creator'
+    pendingArgs = { req: { path } }
+    const r = await runner.handle()
+    if (!r) throw new Error('cursorpack parse returned empty')
+    return r as ParsedCursorpack
   }
 
-  async function cancel() {
-    if (!currentJobId.value) return
-    cancelledJobId.value = currentJobId.value
-    try {
-      await invokeTauri('cancel_bulk_import', { jobId: currentJobId.value })
-    } catch {
-      // ignore
-    }
+  return {
+    busy: runner.busy,
+    progress: runner.progress,
+    currentJobId: runner.currentJobId,
+    cancelledJobId: runner.cancelledJobId,
+    resolveAssets,
+    parseCursorpack,
+    cancel: runner.cancel,
   }
+}
 
-  return { busy, progress, resolveAssets, parseCursorpack, cancel }
+/**
+ * args ツリーの `req.jobId` 位置にヘルパー生成の jobId を埋め込む。
+ * Rust 側 IPC は `req` フィールド内に `{ path, jobId }` / `{ paths, recursive, jobId }`
+ * を持つので、そこを上書きする。
+ */
+function mergeJobId(args: Record<string, unknown>, jobId: string): Record<string, unknown> {
+  const req = (args.req as Record<string, unknown> | undefined) ?? {}
+  return {
+    ...args,
+    req: { ...req, jobId },
+  }
 }

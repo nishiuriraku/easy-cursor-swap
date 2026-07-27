@@ -4,7 +4,9 @@
 //! Creator の「既存パックを取り込んで編集」フローではディスク書き込みせず
 //! メモリ上で PNG バイトを取り出す必要がある。本モジュールはその専用パイプライン。
 
-use super::{BulkImportProgress, ParseCursorpackRequest, ParsedCursorpack, ParsedRole};
+use super::{
+    BulkImportProgress, CancelRegistry, ParseCursorpackRequest, ParsedCursorpack, ParsedRole,
+};
 use crate::config::{
     DEFAULT_MAX_IMAGE_FILE_SIZE, DEFAULT_MAX_PACK_COMPRESSED_SIZE,
     DEFAULT_MAX_PACK_UNCOMPRESSED_SIZE,
@@ -14,7 +16,7 @@ use crate::theme::types::AniFrameData;
 use std::collections::HashMap;
 use std::io::Read;
 use std::path::Path;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager, State};
 use zip::ZipArchive;
 
 use super::CursorpackMetadata;
@@ -161,7 +163,7 @@ fn parse_ani_role(
 }
 
 pub fn parse_cursorpack_inner(bytes: &[u8]) -> Result<ParsedCursorpack, AppError> {
-    parse_cursorpack_inner_with_extract(bytes, None)
+    parse_cursorpack_inner_with_extract(bytes, None, None)
 }
 
 /// ZIP エントリを「申告サイズに依存せず」実バイト上限まで読み込むヘルパー。
@@ -193,9 +195,13 @@ fn read_entry_capped<R: std::io::Read>(entry: &mut R, label: &str) -> Result<Vec
 /// `parse_cursorpack_inner` の `.ani` 展開先指定版。
 /// `ani_extract_dir` を渡すと、`.ani` ロールのバイトをそこに書き出して
 /// 各 ParsedRole の `ani_source_path` に絶対パスを格納する。
+/// `should_cancel` を渡すと各ロールの read 直前と size_overrides ループ内で
+/// polling し、`true` を返す時点で `AppError::BulkImportCancelled` を投げて
+/// 早期終了する。`None` の場合はキャンセル判定をスキップする (旧挙動と同一)。
 pub fn parse_cursorpack_inner_with_extract(
     bytes: &[u8],
     ani_extract_dir: Option<&Path>,
+    should_cancel: Option<&dyn Fn() -> bool>,
 ) -> Result<ParsedCursorpack, AppError> {
     // 1) 圧縮サイズ上限 (zip 爆弾の入口防御)。フォーマット解析より前に置く。
     if bytes.len() as u64 > DEFAULT_MAX_PACK_COMPRESSED_SIZE {
@@ -239,6 +245,14 @@ pub fn parse_cursorpack_inner_with_extract(
     // 各ロールを抽出
     let mut roles: HashMap<String, ParsedRole> = HashMap::new();
     for (role_id, def) in &theme.cursors {
+        // ロール処理の先頭でキャンセル要求を polling する。要求があれば
+        // 以降のロールを処理せず即座に打ち切る。
+        if let Some(check) = should_cancel {
+            if check() {
+                return Err(AppError::BulkImportCancelled);
+            }
+        }
+
         // primary ファイルを読む (個別上限を実バイトで打ち切り、累積へ加算)
         let primary_bytes = {
             let mut entry =
@@ -308,6 +322,12 @@ pub fn parse_cursorpack_inner_with_extract(
         if let Some(overrides) = &def.size_overrides {
             for (size_str, ov) in overrides {
                 if let Ok(size) = size_str.parse::<u32>() {
+                    // size_overrides ループ内でも polling する (大量 override 経由の DoS 対策)。
+                    if let Some(check) = should_cancel {
+                        if check() {
+                            return Err(AppError::BulkImportCancelled);
+                        }
+                    }
                     let mut entry = match archive.by_name(&ov.file) {
                         Ok(e) => e,
                         Err(_) => continue,
@@ -360,11 +380,19 @@ pub fn parse_cursorpack_inner_with_extract(
 #[tauri::command]
 pub async fn parse_cursorpack_for_creator(
     app: AppHandle,
+    registry: State<'_, CancelRegistry>,
     req: ParseCursorpackRequest,
 ) -> Result<ParsedCursorpack, AppError> {
+    // RAII ガードで register。関数を抜けるとき (成功・エラー・join 失敗の ? 経路すべて) に
+    // 自動で drop_job されるため、完了後の遅延 cancel がエントリを再生成する経路を
+    // 確実に塞ぐ (cancel_registry.rs / Y15 と同じ保証)。
+    let _job = registry.register_guard(&req.job_id);
     let job_id = req.job_id.clone();
+    // 閉じられた spawn_blocking の中でも req が消費されるため、cancelled ステージ発火用
+    // の job_id を outer scope 用にもう 1 clone しておく。
+    let job_id_for_cancel_outer = req.job_id.clone();
     let app_clone = app.clone();
-    tauri::async_runtime::spawn_blocking(move || {
+    let result = tauri::async_runtime::spawn_blocking(move || {
         let _ = app_clone.emit(
             "bulk-import-progress",
             BulkImportProgress {
@@ -403,7 +431,17 @@ pub async fn parse_cursorpack_for_creator(
             );
             p.parent().map(|d| d.join(suffix))
         };
-        let r = parse_cursorpack_inner_with_extract(&bytes, extract_dir.as_deref())?;
+        // spawn_blocking 内で CancelRegistry を再解決する。bulk_resolve_assets と同じ
+        // パターンで、`State` を spawn_blocking 境界越しに直接持ち越せない Tauri v2 制約を
+        // app.handle() で迂回する (app は Send 境界で参照共有が安全)。
+        let registry = app_clone.state::<CancelRegistry>();
+        let job_id_for_cancel = req.job_id.clone();
+        let should_cancel = || registry.is_cancelled(&job_id_for_cancel);
+        let r = parse_cursorpack_inner_with_extract(
+            &bytes,
+            extract_dir.as_deref(),
+            Some(&should_cancel),
+        )?;
         let _ = app_clone.emit(
             "bulk-import-progress",
             BulkImportProgress {
@@ -419,18 +457,190 @@ pub async fn parse_cursorpack_for_creator(
     .await
     .map_err(|e| AppError::InvalidCursorpack {
         reason: format!("join 失敗: {}", e),
-    })?
+    });
+
+    // ユーザーが cancel したケースでも、`done` ではなく `cancelled` ステージを発火して
+    // UI 側の progress 監視が最終状態を判別できるようにする。bulk_resolve_assets 側でも
+    // 同じ `cancelled` ステージを統一的に使う (Wave 2B / Task 7)。
+    if let Err(AppError::BulkImportCancelled) = &result {
+        let _ = app.emit(
+            "bulk-import-progress",
+            BulkImportProgress {
+                job_id: job_id_for_cancel_outer.clone(),
+                stage: "cancelled",
+                current: 0,
+                total: 1,
+                message: None,
+            },
+        );
+    }
+
+    // drop_job は _job (RAII ガード) が return 時に確実に実行する。
+    // `result` は `Result<Result<ParsedCursorpack, AppError>, AppError>` (spawn_blocking
+    // 失敗と内部 Result の二重) なので `?` で一段剥がしてから return する。
+    result?
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::path::PathBuf;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
 
     fn fixture_dir() -> PathBuf {
         let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         p.push("../sample-icon");
         p
+    }
+
+    // ── Task 7 / cancellation 回帰テスト ─────────────────────────────
+    //
+    // `should_cancel` ポーリングが各ロールの read 直前で必ず呼ばれることを保証し、
+    // CancelRegistry と end-to-end で同期することを検証する。実 cancel 経路は
+    // ロール毎に read_entry_capped の前段で polling する設計。
+
+    /// 3 ロールを持つ最小カーソルパックを ZIP バイト列として組み立てる。
+    /// 各ロールのファイル本体は 0x00 4 byte (不正フォーマット) で parse_ico_cur 段で
+    /// エラーになるが、それは本テスト群では本質ではない (「キャンセル以外の経路で
+    /// どこまで到達できるか」を見るための対照群が別途ある)。
+    fn build_minimal_pack() -> Vec<u8> {
+        use crate::theme::types::{CursorDefinition, ThemeMetadata};
+        use crate::theme::LocalizedString;
+
+        let mut cursors: HashMap<String, CursorDefinition> = HashMap::new();
+        for role in ["Arrow", "Hand", "Help"] {
+            cursors.insert(
+                role.to_string(),
+                CursorDefinition {
+                    file: format!("cursors/{}.cur", role.to_ascii_lowercase()),
+                    hotspot: crate::theme::types::Hotspot::ZERO,
+                    resize_method: "lanczos".to_string(),
+                    size_overrides: None,
+                },
+            );
+        }
+
+        let meta = ThemeMetadata {
+            schema_version: 1,
+            id: uuid::Uuid::new_v4(),
+            name: LocalizedString::Simple("Cancel Test".into()),
+            version: "1.0.0".into(),
+            created_at: "2026-07-27T00:00:00Z".into(),
+            requires_os_shadow: false,
+            cursors,
+            author: None,
+            license: None,
+            homepage: None,
+            description: None,
+            min_app_version: None,
+            signature: None,
+            tags: Vec::new(),
+            source: crate::theme::types::ThemeSource::Local,
+            cloned_from_marketplace_id: None,
+        };
+        let metadata_json = serde_json::to_vec_pretty(&meta).unwrap();
+
+        let mut buf: Vec<u8> = Vec::new();
+        {
+            use std::io::Write;
+            let cursor = std::io::Cursor::new(&mut buf);
+            let mut zip = zip::ZipWriter::new(cursor);
+            let opts: zip::write::SimpleFileOptions = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Deflated);
+            zip.start_file("theme.json", opts).unwrap();
+            zip.write_all(&metadata_json).unwrap();
+            for role in ["arrow", "hand", "help"] {
+                zip.start_file(format!("cursors/{}.cur", role), opts)
+                    .unwrap();
+                zip.write_all(&[0u8, 0, 0, 0]).unwrap();
+            }
+            zip.finish().unwrap();
+        }
+        buf
+    }
+
+    #[test]
+    fn parse_cursorpack_inner_returns_cancelled_when_flag_set() {
+        // should_cancel が true を返すと、ループは read_entry_capped に進む前に
+        // BulkImportCancelled で打ち切らねばならない (キャンセルボタンの実機能)。
+        let bytes = build_minimal_pack();
+        let cancel = || true;
+        let result = parse_cursorpack_inner_with_extract(&bytes, None, Some(&cancel));
+        match result {
+            Err(AppError::BulkImportCancelled) => {}
+            other => panic!("expected BulkImportCancelled, got {:?}", other),
+        }
+    }
+
+    /// `should_cancel` が `None` のときは旧来どおり最後まで到達する。既存呼び出しの
+    /// 互換性確認 (`should_cancel: None` で「キャンセル扱いにしてはいけない」)。
+    #[test]
+    fn parse_cursorpack_inner_completes_when_cancel_not_set() {
+        let bytes = build_minimal_pack();
+        let result = parse_cursorpack_inner_with_extract(&bytes, None, None);
+        if let Err(AppError::BulkImportCancelled) = result {
+            panic!("should_cancel=None のときはキャンセル扱いにしてはいけない");
+        }
+    }
+
+    /// polling クロージャが実際に呼ばれることを検証する。
+    /// `should_cancel` の最初の呼び出しで `true` を返すと、1 ロール目の read 直前
+    /// (theme.json 読込直後のループ突入時) で早期終了して `BulkImportCancelled` が
+    /// 返るべき。クロージャの呼び出し回数は最低 1 回 (テーマ読込後・1 ロール目 read 前)
+    /// あることを assert する。
+    #[test]
+    fn parse_cursorpack_inner_polls_should_cancel_at_least_once() {
+        let bytes = build_minimal_pack();
+        let count = Arc::new(AtomicUsize::new(0));
+        let count_clone = Arc::clone(&count);
+        // 最初の polling で即 true を返す → 1 ロール目 read_entry_capped に進む前に抜ける。
+        let cancel = move || {
+            count_clone.fetch_add(1, Ordering::SeqCst);
+            true
+        };
+        let result = parse_cursorpack_inner_with_extract(&bytes, None, Some(&cancel));
+        match result {
+            Err(AppError::BulkImportCancelled) => {}
+            other => panic!("expected BulkImportCancelled, got {:?}", other),
+        }
+        assert!(
+            count.load(Ordering::SeqCst) >= 1,
+            "should_cancel がループ突入前に polling されるべき: got={}",
+            count.load(Ordering::SeqCst)
+        );
+    }
+
+    /// `should_cancel` のクロージャが `CancelRegistry` の状態と同期して動作することを
+    /// 保証する end-to-end の最小シナリオ。
+    /// 登録 → cancel フラグをセット → polling 関数が true を返す → 早期終了。
+    #[test]
+    fn cancel_registry_drives_parse_cursorpack_cancellation() {
+        use crate::cancel_registry::CancelRegistry;
+        let registry = CancelRegistry::default();
+        registry.register("cpack-cancel-job");
+        let bytes = build_minimal_pack();
+        let should_cancel = || registry.is_cancelled("cpack-cancel-job");
+
+        // まだキャンセル前は完走する (parse 段階でフォーマットエラーにはなり得る)。
+        let r1 = parse_cursorpack_inner_with_extract(&bytes, None, Some(&should_cancel));
+        if let Err(AppError::BulkImportCancelled) = r1 {
+            panic!(
+                "cancel 要求前の時点でキャンセル扱いにしてはいけない (結果: {:?})",
+                r1
+            );
+        }
+
+        // cancel を要求してから再実行する。即座に BulkImportCancelled が返るべき。
+        registry.cancel("cpack-cancel-job");
+        let r2 = parse_cursorpack_inner_with_extract(&bytes, None, Some(&should_cancel));
+        match r2 {
+            Err(AppError::BulkImportCancelled) => {}
+            other => panic!(
+                "cancel 要求後は BulkImportCancelled であるべき、実際: {:?}",
+                other
+            ),
+        }
     }
 
     #[test]
