@@ -1,0 +1,14 @@
+# cargo-audit advisory ignore list
+#
+# v0.0.8 リリース時点で transitive 依存のみで出現する advisory を ignore する。
+# cargo audit --json の出力で confirmed (RUSTSEC-2026-0194 / 0195, quick-xml 0.37.5 + 0.39.4)。
+# patched は >=0.41.0 だが、tauri-winrt-notification ^0.37 / plist ^0.39.2 の semver 制約で bump 不可。
+# 外部入力 (信頼境界外) を直接扱わないコンテキストで攻撃面は限定的。
+#
+# 将来 quick-xml が 0.41+ へ移行し advisory が消えればこの ignore は削除する。
+
+[advisories]
+ignore = [
+    "RUSTSEC-2026-0194",  # quick-xml: quadratic run time on duplicate attribute names (DoS)
+    "RUSTSEC-2026-0195",  # quick-xml: unbounded namespace-declaration allocation (DoS)
+]

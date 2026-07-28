@@ -75,8 +75,13 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      - name: npm ci
-        run: npm ci
+      - name: npm ci (legacy-peer-deps)
+        # 2026-07-28: @nuxt/kit@4.5.1 (transitive of @nuxt/eslint) の peer dep
+        # `oxc-parser@>=0.140.0` に対し lockfile の oxc-parser は `^0.131.0` で
+        # ズレている。npm 10 系は peer dep 厳密評価のため EUSAGE で倒れる。
+        # npm 11 系 (ローカル) は緩く通るが、CI runner の npm 10.9.8 で再現する。
+        # `--legacy-peer-deps` で lockfile を厳密採用しつつ peer dep conflict を許容。
+        run: npm ci --legacy-peer-deps
 
       - name: npm audit
         run: npm audit --audit-level=high
@@ -113,7 +118,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm ci
+      - run: npm ci --legacy-peer-deps
       - name: Compare ja/en keys
         run: node scripts/check-i18n.mjs
 
