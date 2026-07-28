@@ -20,6 +20,7 @@
 //!
 //! `bulk_import` 系 IPC は [`crate::bulk_import`] に直接定義されている (キャンセル可能なバックグラウンド処理を伴うため)。
 
+pub mod app_metadata;
 pub mod cursor_build;
 pub mod cursor_io;
 pub mod keystore;
@@ -97,5 +98,8 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         crate::bulk_import::assets::bulk_resolve_assets,
         crate::bulk_import::assets::cancel_bulk_import,
         crate::bulk_import::cursorpack::parse_cursorpack_for_creator,
+        // アプリメタ情報 (MSIX 検出 / policy label)
+        app_metadata::is_msix_packaged,
+        app_metadata::package_policy_label,
     ]
 }
