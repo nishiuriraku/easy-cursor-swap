@@ -1,17 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  MSIX マニフェストテンプレート (Phase 8-3)
+  MSIX マニフェストテンプレ (Wave 4A)
 
-  生成手順:
-   1. tauri build で `.msi` を生成
-   2. MSIX Packaging Tool もしくは `makeappx pack` で MSIX に変換
-   3. このマニフェストを ZIP のルートに配置 (Tauri の出力 manifest を上書き)
+  生成:
+    src-tauri/build-helpers/gen_msix_manifest.ps1 で
+    ${VERSION} / ${ARCH} を置換し、x64 / arm64 2 ファイル生成。
+    Publisher は manifest 既定 (CN=EasyCursorSwap, ...) を使用し、
+    MSIX_PUBLISHER env があるときだけ上書きする。
 
-  仕様書「§3 MSIX 互換ファイルセーフ設計」要件:
-   - runFullTrust capability: HKCU\Control Panel\Cursors への書込みを Package Family
-     仮想化から逃がす
-   - windows.startupTask: HKCU\...\Run の代わりに使う MSIX 流自動起動宣言
-   - PublisherDisplayName / DisplayName を i18n リソースから引かず固定 (ストア配布要件)
+  設計根拠:
+   - runFullTrust: Tauri Win32 ホスト (CryptProtectData / HKCU 直書込み) に必要
+   - rescap:unvirtualizedResources + desktop6:RegistryWriteVirtualization=disabled
+       を両方宣言して host HKCU に実書込み可能とする
+       (Microsoft Learn "Flexible virtualization" 2026-01-28 更新版に準拠)
+   - desktop:StartupTask は MSIX の自動起動宣言。autostart::set_enabled は
+     MSIX 環境では no-op となり、OS のスタートアップ設定で操作する。
+   - .cursorpack file association は NSIS/MSI の
+     src-tauri/tauri.conf.json:42-49 と並列に宣言する。
 -->
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
@@ -19,18 +24,25 @@
   xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
-  IgnorableNamespaces="uap uap5 rescap desktop">
+  xmlns:desktop6="http://schemas.microsoft.com/appx/manifest/desktop/windows10/6"
+  IgnorableNamespaces="uap uap5 rescap desktop desktop6">
 
   <Identity
     Name="dev.easycursorswap.app"
-    Publisher="CN=EasyCursorSwap, O=EasyCursorSwap, C=JP"
-    Version="1.0.0.0"
-    ProcessorArchitecture="x64" />
+    Publisher="${PUBLISHER}"
+    Version="${VERSION}"
+    ProcessorArchitecture="${ARCH}" />
 
   <Properties>
     <DisplayName>EasyCursorSwap</DisplayName>
     <PublisherDisplayName>EasyCursorSwap</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
+    <!--
+      flexible-virtualization: host HKCU への実書込みを有効化。
+      ${ARCH} 等の置換対象は <Properties> の外で残す。
+    -->
+    <desktop6:RegistryWriteVirtualization>disabled</desktop6:RegistryWriteVirtualization>
+    <desktop6:FileSystemWriteVirtualization>disabled</desktop6:FileSystemWriteVirtualization>
   </Properties>
 
   <Dependencies>
@@ -56,16 +68,14 @@
           ShortName="EasyCursorSwap"
           Square71x71Logo="Assets\Square71x71Logo.png"
           Square310x310Logo="Assets\Square310x310Logo.png"
-          Wide310x150Logo="Assets\Square310x150Logo.png" />
+          Wide310x150Logo="Assets\Wide310x150Logo.png" />
         <uap:SplashScreen Image="Assets\SplashScreen.png" />
       </uap:VisualElements>
 
       <Extensions>
         <!--
           サイレント自動起動。HKCU\Software\Microsoft\Windows\CurrentVersion\Run の
-          MSIX 版代替。
-          Enabled="false" にしておき、ユーザーが「設定 → 起動・常駐」で ON にしたら
-          PowerShell でフラグを反転させる設計を想定。
+          MSIX 版代替。OS 設定 → スタートアップ アプリで操作。
         -->
         <desktop:Extension Category="windows.startupTask">
           <desktop:StartupTask
@@ -73,17 +83,27 @@
             Enabled="false"
             DisplayName="EasyCursorSwap" />
         </desktop:Extension>
+
+        <!--
+          .cursorpack ファイル関連付け (NSIS/MSI の tauri.conf.json:42-49 と並列)
+        -->
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="cursorpack">
+            <uap:SupportedFileTypes>
+              <uap:FileType>.cursorpack</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
       </Extensions>
     </Application>
   </Applications>
 
   <Capabilities>
     <!--
-      runFullTrust:
-       Win32 API (CryptProtectData, SystemParametersInfoW, レジストリ HKCU 直書込み等)
-       を MSIX サンドボックス越えに使う。Microsoft Store 配布時は Restricted Capability
-       のため申請審査が必要。
+      runFullTrust + unvirtualizedResources を両方宣言。
+      単体指定では host HKCU まで到達せず仮想化される (2026-06-09 スパイクで再現確認)。
     -->
     <rescap:Capability Name="runFullTrust" />
+    <rescap:Capability Name="unvirtualizedResources" />
   </Capabilities>
 </Package>
