@@ -1673,6 +1673,14 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let _env_guard = EnvGuard::new("CUSTOM_CURSORS_DIR_OVERRIDE", tmp.path());
 
+        // 並列テスト実行時 (cargo test / cargo llvm-cov) の他テストが残した
+        // `_pending_apply.snapshot` 残骸を明示削除して自分の save と
+        // 混線させない。cursors_dir_override_lock 自体は Mutex で直列化
+        // されているが、`save` → `check` の瞬間にも OS 側のファイル
+        // I/O race で他テストの save を読み戻す事例があったため、ここで
+        // 明示的にクリーンスタートを切る。
+        let _ = RegistryManager::remove_pending_snapshot();
+
         let mut values: HashMap<String, String> = HashMap::new();
         values.insert("Arrow".to_string(), "C:\\snap\\arrow.cur".to_string());
         values.insert("Wait".to_string(), String::new());
