@@ -131,4 +131,51 @@ describe('useAppSettings typed-patch contract (Wave 2B / Task 3)', () => {
     const [, args] = invokeTauriMock.mock.calls[1]!
     expect(args!.updates).toEqual({ logging: { level: 'DEBUG' } })
   })
+
+  // ── Wave 3B / AR-M1-4: settings 6 フィールド永続化の回帰テスト ──
+  //
+  // 既存の `crashReporting` 1 件のテストはカバーしていたが、settings.vue の
+  // `flushLocalToConfig` が書き戻す 6 フィールド (`showApplyToast` /
+  // `applyShadowControl` / `startMinimized` / `showStorageWarning` /
+  // `requireSignedThemes` / `warnUnsignedImport`) は個別テストが無かった。
+  // 6 フィールドを同時に反転させたときに、patch に 6 フィールド全てが入るか
+  // + 余計なフィールドが混入しないかを固定する。
+
+  it('sends all 6 settings fields in the patch when flipped at once', async () => {
+    const { load, update } = useAppSettings()
+    await load(true)
+    invokeTauriMock.mockResolvedValueOnce({ ...baseConfig() })
+
+    await update((c) => {
+      // general 4 フィールド: デフォルトとは逆の値を明示代入
+      // (baseConfig は snake_case キーなので camelCase プロパティへの代入は undefined と diff)
+      c.general.showApplyToast = false
+      c.general.applyShadowControl = false
+      c.general.startMinimized = true
+      c.general.showStorageWarning = false
+      // security 2 フィールド
+      c.security.requireSignedThemes = true
+      c.security.warnUnsignedImport = false
+    })
+
+    const [, args] = invokeTauriMock.mock.calls[1]!
+    // 6 フィールド全てが patch に入っている
+    expect(args!.updates).toEqual({
+      general: {
+        showApplyToast: false,
+        applyShadowControl: false,
+        startMinimized: true,
+        showStorageWarning: false,
+      },
+      security: {
+        requireSignedThemes: true,
+        warnUnsignedImport: false,
+      },
+    })
+    // 余計なフィールドが混入していない
+    const patchJson = JSON.stringify(args!.updates)
+    expect(patchJson).not.toContain('autoStart')
+    expect(patchJson).not.toContain('language')
+    expect(patchJson).not.toContain('crashReporting')
+  })
 })

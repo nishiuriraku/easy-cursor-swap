@@ -909,6 +909,178 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 
+    // ── Wave 3B / AR-M1-4: settings 6 フィールド永続化の回帰テスト ──
+    //
+    // 既存の `apply_patch_changes_general_field` は `show_apply_toast` 1 フィールド
+    // のみカバーしていた。残 5 フィールド (`apply_shadow_control` /
+    // `start_minimized` / `show_storage_warning` / `require_signed_themes` /
+    // `warn_unsigned_import`) も個別に変更が永続化されることを固定する。
+    // これにより「`update_config` IPC 経由で設定値が反映されない」リグレッションを
+    // 検知可能にする (= AR-M1-4 が恒久的に閉じていることの証拠)。
+
+    /// `apply_patch` 経由で `general.apply_shadow_control` を変更できる。
+    #[test]
+    fn apply_patch_changes_apply_shadow_control() {
+        let dir = make_tempdir("patch-apply-shadow");
+        let path = dir.join("config.json");
+        let cm = ConfigManager::init_at(&path).unwrap();
+        assert!(cm.get().unwrap().general.apply_shadow_control);
+
+        let patch = patch::AppConfigPatch {
+            general: Some(patch::GeneralConfigPatch {
+                apply_shadow_control: Some(false),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let updated = cm.apply_patch(patch).unwrap();
+        assert!(!updated.general.apply_shadow_control);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// `apply_patch` 経由で `general.start_minimized` を変更できる。
+    /// デフォルト false → true の変更を検証 (true → false の片方向だけでは
+    /// 型 bool のトグルが機能している確証にならないため)。
+    #[test]
+    fn apply_patch_changes_start_minimized() {
+        let dir = make_tempdir("patch-start-minimized");
+        let path = dir.join("config.json");
+        let cm = ConfigManager::init_at(&path).unwrap();
+        assert!(!cm.get().unwrap().general.start_minimized);
+
+        let patch = patch::AppConfigPatch {
+            general: Some(patch::GeneralConfigPatch {
+                start_minimized: Some(true),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let updated = cm.apply_patch(patch).unwrap();
+        assert!(updated.general.start_minimized);
+
+        // 別 ConfigManager で再ロードしても同じ (= ディスク永続化)
+        let reloaded = ConfigManager::init_at(&path).unwrap();
+        assert!(reloaded.get().unwrap().general.start_minimized);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// `apply_patch` 経由で `general.show_storage_warning` を変更できる。
+    #[test]
+    fn apply_patch_changes_show_storage_warning() {
+        let dir = make_tempdir("patch-storage-warn");
+        let path = dir.join("config.json");
+        let cm = ConfigManager::init_at(&path).unwrap();
+        assert!(cm.get().unwrap().general.show_storage_warning);
+
+        let patch = patch::AppConfigPatch {
+            general: Some(patch::GeneralConfigPatch {
+                show_storage_warning: Some(false),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let updated = cm.apply_patch(patch).unwrap();
+        assert!(!updated.general.show_storage_warning);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// `apply_patch` 経由で `security.require_signed_themes` を変更できる。
+    /// デフォルト false → true の変更を検証。
+    #[test]
+    fn apply_patch_changes_require_signed_themes() {
+        let dir = make_tempdir("patch-require-signed");
+        let path = dir.join("config.json");
+        let cm = ConfigManager::init_at(&path).unwrap();
+        assert!(!cm.get().unwrap().security.require_signed_themes);
+
+        let patch = patch::AppConfigPatch {
+            security: Some(patch::SecurityConfigPatch {
+                require_signed_themes: Some(true),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let updated = cm.apply_patch(patch).unwrap();
+        assert!(updated.security.require_signed_themes);
+
+        // 別 ConfigManager で再ロードしても同じ (= ディスク永続化)
+        let reloaded = ConfigManager::init_at(&path).unwrap();
+        assert!(reloaded.get().unwrap().security.require_signed_themes);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// `apply_patch` 経由で `security.warn_unsigned_import` を変更できる。
+    #[test]
+    fn apply_patch_changes_warn_unsigned_import() {
+        let dir = make_tempdir("patch-warn-unsigned");
+        let path = dir.join("config.json");
+        let cm = ConfigManager::init_at(&path).unwrap();
+        assert!(cm.get().unwrap().security.warn_unsigned_import);
+
+        let patch = patch::AppConfigPatch {
+            security: Some(patch::SecurityConfigPatch {
+                warn_unsigned_import: Some(false),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let updated = cm.apply_patch(patch).unwrap();
+        assert!(!updated.security.warn_unsigned_import);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// 6 フィールドを同時に変更できることの確認 (= 一括 patch 適用の原子性)。
+    #[test]
+    fn apply_patch_changes_all_six_settings_at_once() {
+        let dir = make_tempdir("patch-all-six");
+        let path = dir.join("config.json");
+        let cm = ConfigManager::init_at(&path).unwrap();
+        let baseline = cm.get().unwrap();
+        // baseline と逆方向の値を patch に設定 (false→true / true→false)
+        let patch = patch::AppConfigPatch {
+            general: Some(patch::GeneralConfigPatch {
+                show_apply_toast: Some(!baseline.general.show_apply_toast),
+                apply_shadow_control: Some(!baseline.general.apply_shadow_control),
+                start_minimized: Some(!baseline.general.start_minimized),
+                show_storage_warning: Some(!baseline.general.show_storage_warning),
+                ..Default::default()
+            }),
+            // SecurityConfigPatch は 2 フィールドしか持たないため、両方を
+            // 明示代入したら `..Default::default()` は冗長 (clippy::needless_update)。
+            security: Some(patch::SecurityConfigPatch {
+                require_signed_themes: Some(!baseline.security.require_signed_themes),
+                warn_unsigned_import: Some(!baseline.security.warn_unsigned_import),
+            }),
+            ..Default::default()
+        };
+        let updated = cm.apply_patch(patch).unwrap();
+        assert_eq!(
+            updated.general.show_apply_toast,
+            !baseline.general.show_apply_toast
+        );
+        assert_eq!(
+            updated.general.apply_shadow_control,
+            !baseline.general.apply_shadow_control
+        );
+        assert_eq!(
+            updated.general.start_minimized,
+            !baseline.general.start_minimized
+        );
+        assert_eq!(
+            updated.general.show_storage_warning,
+            !baseline.general.show_storage_warning
+        );
+        assert_eq!(
+            updated.security.require_signed_themes,
+            !baseline.security.require_signed_themes
+        );
+        assert_eq!(
+            updated.security.warn_unsigned_import,
+            !baseline.security.warn_unsigned_import
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
     /// `apply_patch` は patch に含まれないフィールドを一切変更しない
     /// (e.g. `github_account` を patch 経由で送ろうとしても無視される)。
     ///
