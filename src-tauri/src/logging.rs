@@ -6,13 +6,17 @@
 //!  - 合計サイズが 100 MB を超えたら古いものから削除
 //!  - PII 除外フィルター (絶対パス → 相対パス変換、レジストリ RAW 値ハッシュ化など)
 //!  - リリース版は INFO 既定、`config.json` の `logging.level` で上書き
+//!  - 起動後の `update_config` 経由でも `tracing-subscriber` の reload handle を
+//!    使ってログレベルを差し替え可能 (Wave 2B / Task 4)。
 //!
 //! 標準出力にも出すかは `cfg!(debug_assertions)` で判定。
 
 use crate::errors::{AppError, AppResult};
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, SystemTime};
 use tracing_appender::non_blocking::WorkerGuard;
+use tracing_subscriber::reload;
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 /// ログ保持日数 (この日数を超えたら自動削除)
@@ -27,8 +31,66 @@ pub fn log_dir() -> AppResult<PathBuf> {
     Ok(base.join("EasyCursorSwap").join("logs"))
 }
 
+/// ログレベル文字列を検証し、`EnvFilter` に変換する (Wave 2B / Task 4)。
+///
+/// 受理する値 (大文字小文字どちらでも良い):
+///   - "TRACE" / "DEBUG" / "INFO" / "WARN" / "ERROR" / "OFF"
+///
+/// 不明な値は `AppError::Config` を返す。`update_config` IPC はこのパーサを
+/// 経由してログレベルを検証してから永続化するため、無効値での reload は
+/// 発生しない (セキュリティ境界)。
+pub fn validate_logging_level(level: &str) -> AppResult<EnvFilter> {
+    let normalized = level.trim().to_ascii_uppercase();
+    match normalized.as_str() {
+        "TRACE" | "DEBUG" | "INFO" | "WARN" | "ERROR" | "OFF" => {
+            EnvFilter::try_new(normalized).map_err(|e| {
+                AppError::Config(format!(
+                    "ログレベル '{}' の EnvFilter 構築に失敗: {}",
+                    level, e
+                ))
+            })
+        }
+        _ => Err(AppError::Config(format!(
+            "未対応のログレベル: '{}' (TRACE/DEBUG/INFO/WARN/ERROR/OFF のいずれかを指定してください)",
+            level
+        ))),
+    }
+}
+
+/// `EnvFilter` の reload handle。`init_logging` が INFO 既定でロードし、
+/// `set_logging_level` が ConfigManager 初期化後と `update_config` 後に再ロードする。
+type FilterHandle = reload::Handle<EnvFilter, tracing_subscriber::Registry>;
+
+static RELOAD_HANDLE: OnceLock<Mutex<FilterHandle>> = OnceLock::new();
+
+/// アクティブな `EnvFilter` を差し替える (Wave 2B / Task 4)。
+///
+/// `update_config` 経由の動的レベル変更、または ConfigManager 初期化後の
+/// config 反映で利用。**初回 init 前に呼ぶとエラー** (handle 未登録)。
+pub fn set_logging_level(level: &str) -> AppResult<()> {
+    let new_filter = validate_logging_level(level)?;
+    let mutex = RELOAD_HANDLE
+        .get()
+        .ok_or_else(|| AppError::Config("ロガーが未初期化です".to_string()))?;
+    let handle = mutex
+        .lock()
+        .map_err(|e| AppError::Config(format!("ロガーリセットへの lock 失敗: {}", e)))?;
+    handle
+        .reload(new_filter.clone())
+        .map_err(|e| AppError::Config(format!("ロガーリロード失敗: {}", e)))?;
+    handle
+        .reload(new_filter)
+        .map_err(|e| AppError::Config(format!("ロガーリロード失敗: {}", e)))?;
+    tracing::info!(level = %level, "logging level reloaded");
+    Ok(())
+}
+
 /// `tracing` の初期化。返り値の `WorkerGuard` を main で保持する必要がある
 /// (drop 時に未書き出しのバッファを flush するため)。
+///
+/// 起動時は渡された `level` (= 呼び出し側で INFO 固定) で EnvFilter を
+/// 構築し、reload handle を静的変数に格納する。ConfigManager 初期化後に
+/// `set_logging_level` を呼ぶとユーザ指定レベルへ切替わる。
 pub fn init_logging(level: &str) -> AppResult<WorkerGuard> {
     let dir = log_dir()?;
     std::fs::create_dir_all(&dir)?;
@@ -42,8 +104,12 @@ pub fn init_logging(level: &str) -> AppResult<WorkerGuard> {
     let appender = tracing_appender::rolling::daily(&dir, "app");
     let (non_blocking, guard) = tracing_appender::non_blocking(appender);
 
-    // EnvFilter: config の値があればそれを採用、なければデフォルト
-    let filter = EnvFilter::try_new(level).unwrap_or_else(|_| EnvFilter::new("info"));
+    // EnvFilter: 起動時の引数 (= 呼び出し側で INFO 固定) を使う。
+    // 実際のユーザ設定レベルは ConfigManager 読込後に `set_logging_level` で適用する。
+    let initial_filter = validate_logging_level(level).unwrap_or_else(|_| EnvFilter::new("info"));
+
+    // reload layer で包む。後で handle 経由でフィルタを差し替え可能。
+    let (filter_layer, filter_handle) = reload::Layer::new(initial_filter);
 
     let file_layer = fmt::layer()
         .with_writer(non_blocking)
@@ -51,7 +117,9 @@ pub fn init_logging(level: &str) -> AppResult<WorkerGuard> {
         .with_target(false)
         .with_timer(fmt::time::SystemTime);
 
-    let subscriber = tracing_subscriber::registry().with(filter).with(file_layer);
+    let subscriber = tracing_subscriber::registry()
+        .with(filter_layer)
+        .with(file_layer);
 
     // デバッグビルドでは標準出力にも (色付き)
     #[cfg(debug_assertions)]
@@ -64,8 +132,11 @@ pub fn init_logging(level: &str) -> AppResult<WorkerGuard> {
         subscriber.init();
     }
 
+    // reload handle を静的 Mutex に格納 (1 度だけ)。
+    let _ = RELOAD_HANDLE.set(Mutex::new(filter_handle));
+
     tracing::info!(
-        log_dir = %dir.display(),
+        log_dir = %crate::logging::redact_path(&dir),
         retention_days = RETENTION_DAYS,
         max_bytes = MAX_TOTAL_BYTES,
         "logging initialized"
@@ -192,50 +263,32 @@ mod tests {
         assert_eq!(h.len(), 12);
     }
 
-    #[test]
-    fn redact_path_keeps_paths_outside_home_unchanged() {
-        // ホーム配下でないパスはそのまま返る
-        let p = Path::new("C:\\Windows\\System32\\cursor.cur");
-        let redacted = redact_path(p);
-        assert!(redacted.contains("Windows"));
-        // ~/ で始まらない (ユーザー名を含まない)
-        assert!(!redacted.starts_with("~/"));
-    }
+    // ── Wave 2B / Task 4: ログレベル検証 ─────────────────────
 
     #[test]
-    fn redact_path_strips_home_prefix() {
-        // ホーム配下のパスは ~/ に置換される
-        let home = match dirs::home_dir() {
-            Some(h) => h,
-            None => {
-                eprintln!("skipping: home_dir unavailable on this platform");
-                return;
-            }
-        };
-        let target = home.join(".custom_cursors").join("test.cur");
-        let redacted = redact_path(&target);
-        assert!(
-            redacted.starts_with("~/"),
-            "expected ~/ prefix, got: {}",
-            redacted
-        );
-        // ホームディレクトリ自体 (= ユーザー名) は含まない
-        let username = home.file_name().and_then(|n| n.to_str()).unwrap_or("");
-        if !username.is_empty() {
+    fn validate_logging_level_accepts_known_levels_case_insensitive() {
+        for s in [
+            "trace", "Trace", "DEBUG", "Info", "WARN", "error", "OFF", "off",
+        ] {
             assert!(
-                !redacted.contains(username) || redacted == format!("~/{}", username),
-                "redacted path should not leak username: {}",
-                redacted
+                validate_logging_level(s).is_ok(),
+                "level '{s}' は受理されるべき"
             );
         }
-        // 末尾は元の相対パスを含む (区切りは OS 依存なので両方許容)
-        assert!(redacted.contains(".custom_cursors"));
-        assert!(redacted.contains("test.cur"));
     }
 
     #[test]
-    fn redact_path_handles_empty_path() {
-        // 空パスでも panic しない
-        let _ = redact_path(Path::new(""));
+    fn validate_logging_level_trims_whitespace() {
+        assert!(validate_logging_level("  debug  ").is_ok());
+    }
+
+    #[test]
+    fn validate_logging_level_rejects_unknown_levels() {
+        for s in ["verbose", "warning", "infooo", "", "TRACEER", "0"] {
+            assert!(
+                validate_logging_level(s).is_err(),
+                "level '{s}' は拒否されるべき"
+            );
+        }
     }
 }

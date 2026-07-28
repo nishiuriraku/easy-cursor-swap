@@ -22,11 +22,18 @@ export interface ThemeCardEmit {
 
 export function useThemeCardState(theme: Ref<ThemeCardData>, emit: ThemeCardEmit) {
   const previewMap = ref<Record<string, string> | null>(null)
+  /** PNG プレビュー取得中フラグ。CursorMatrix の per-cell skeleton 表示に使う (LD6)。 */
+  const previewLoading = ref(false)
   const { getMap } = useThemePreviews()
 
   async function fetchPreview() {
     if (!theme.value.id) return
-    previewMap.value = await getMap(theme.value.id)
+    previewLoading.value = true
+    try {
+      previewMap.value = await getMap(theme.value.id)
+    } finally {
+      previewLoading.value = false
+    }
   }
 
   onMounted(fetchPreview)
@@ -72,6 +79,7 @@ export function useThemeCardState(theme: Ref<ThemeCardData>, emit: ThemeCardEmit
 
   return {
     previewMap,
+    previewLoading,
     isSystem,
     isMarketplace,
     displayDate,

@@ -55,3 +55,6 @@ docs/superpowers/
 
 # Wiki staging (pushed to the separate easy-cursor-swap.wiki.git repo, not the main repo)
 /wiki-staging/
+
+# Coverage reports
+coverage/

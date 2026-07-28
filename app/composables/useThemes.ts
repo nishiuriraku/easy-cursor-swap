@@ -14,50 +14,9 @@
  * 複数画面で同じインスタンスを参照したいので Pinia 不使用のシンプル composable で実装。
  */
 import type { ThemeCardData, ThemeKind } from '~/types/theme'
-import type { MarketplaceName } from '~/types/marketplace'
+import type { IpcThemeSummary } from '~/types/theme-ipc'
 
-/**
- * Rust 側 theme::types::ThemeSummary に対応する IPC ペイロード。
- * フィールド名は serde 既定 (snake_case) のままで、フロント型 ThemeCardData
- * には mapSummary で camelCase に揃えてコピーする。
- *
- * `name` / `description` は Rust 側 `LocalizedString` の生形 (`string | { [locale]: string }`)
- * で受け取り、`mapSummary` 内で `pickLocalizedName` を介して現在の locale に解決する。
- * Rust 側で固定ロケールに解決していた頃は英語 UI ユーザーが日本語名のテーマを
- * "矢印" のように見ることになっていた (audit D1/D2)。
- *
- * 過去にここで description / signed / tags / size_bytes / last_applied_at /
- * schema_version / license / homepage を **取りこぼしていた** ため、
- * テーマ詳細モーダルの DESCRIPTION 段落が出ず、ThemeRow の signed 判定が
- * 全テーマ "署名済" 扱いになるバグの原因になっていた。Rust を真とする。
- */
-interface IpcThemeSummary {
-  id: string
-  name: MarketplaceName
-  author: string | null
-  version: string
-  created_at: string
-  is_active: boolean
-  is_favorite: boolean
-  apply_count: number
-  last_applied_at: string | null
-  included_roles: string[]
-  path: string
-  tags: string[]
-  size_bytes: number
-  signed: boolean
-  description?: MarketplaceName | null
-  schema_version: number
-  license?: string | null
-  homepage?: string | null
-  source?: string
-  /**
-   * 公式インデックス由来テーマを duplicate_theme で複製した場合に複製元 (Marketplace 原本) の UUID。
-   * SubmitThemeDialog はこのフィールドが truthy なテーマを提出可能一覧から除外する。
-   * Rust 側でも submit_theme_auto が同じ条件で拒否するので、これは UX 上の選択肢除外。
-   */
-  cloned_from_marketplace_id?: string | null
-}
+export type { IpcThemeSummary } from '~/types/theme-ipc'
 
 /**
  * `inspect_cursorpack` IPC の戻り型。インポート前に既存テーマと衝突するかを

@@ -22,6 +22,18 @@ vi.mock('../useTauri', () => ({
   invokeTauri: (cmd: string, args?: Record<string, unknown>) => invokeTauriMock(cmd, args),
 }))
 
+// i18n: 実 useI18n を差し替え、翻訳経路 (t) が使われたことを検証できるようにする (G18)。
+// version を補間して返すので、既存の「body に version が含まれる」検証も通る。
+const tMock = vi.fn((key: string, params?: Record<string, string | number>) => {
+  if (key === 'updater.toastUpdateAvailable') {
+    return `New version v${params?.version} is available.`
+  }
+  return key
+})
+vi.mock('../useI18n', () => ({
+  useI18n: () => ({ t: tMock }),
+}))
+
 import { bootstrapUpdaterCheck } from '../useUpdaterBootstrap'
 
 const LAST_CHECK_KEY = 'ecs.updater.last_check_at'
@@ -65,6 +77,7 @@ describe('useUpdaterBootstrap', () => {
     checkMock.mockReset()
     notifyMock.mockClear()
     invokeTauriMock.mockReset()
+    tMock.mockClear()
     // デフォルトでは major bump check は false (= 通常更新) を返す。
     // 個別 it で必要なら invokeTauriMock.mockResolvedValue(true) で上書きする。
     invokeTauriMock.mockResolvedValue(false)
@@ -149,5 +162,71 @@ describe('useUpdaterBootstrap', () => {
     await flush()
 
     expect(notifyMock).toHaveBeenCalledOnce()
+  })
+
+  it('通知本文は t(updater.toastUpdateAvailable, {version}) 経由で生成する (G18)', async () => {
+    configRef.value = mkConfig(true)
+    localStorage.setItem(LAST_CHECK_KEY, String(Date.now() - 25 * 60 * 60 * 1000))
+    checkMock.mockResolvedValue({ version: '0.2.0', currentVersion: '0.1.0' })
+
+    bootstrapUpdaterCheck()
+    await flush()
+
+    // ハードコード日本語ではなく i18n キー経由であること
+    expect(tMock).toHaveBeenCalledWith('updater.toastUpdateAvailable', { version: '0.2.0' })
+    const arg = notifyMock.mock.calls[0]?.[0] as { body: string } | undefined
+    expect(arg?.body).toBe('New version v0.2.0 is available.')
+  })
+
+  // ── Wave 2AB / Task 13: エッジケース補強 ──
+  // 既存テストは「クールダウン経過後 + 正常発見」までは網羅していたが、
+  // (a) check() 自体が throw するケース、(b) クールダウン境界 (= 24h ちょうど)、
+  // (c) config が null (= load() が resolve したが c が null) のケースを取りこぼしていた。
+
+  it('check() 自体が throw しても notify は呼ばない (= エラーは fire-and-forget)', async () => {
+    configRef.value = mkConfig(true)
+    localStorage.setItem(LAST_CHECK_KEY, '0')
+    checkMock.mockRejectedValue(new Error('network: timeout'))
+
+    bootstrapUpdaterCheck()
+    await flush()
+
+    // check は呼ばれているが失敗 → notify は出ない (bootstrap が startup をブロックしない contract)
+    expect(checkMock).toHaveBeenCalled()
+    expect(notifyMock).not.toHaveBeenCalled()
+    // 失敗パスでも 24h cooldown を有効化するため、last_check_at を必ず進める
+    // (= Tauri invoke 失敗が連続しても毎起動 retry しない)。
+    const tsAfterThrow = Number(localStorage.getItem(LAST_CHECK_KEY))
+    expect(Number.isFinite(tsAfterThrow) && tsAfterThrow > 0).toBe(true)
+    expect(tsAfterThrow).toBeGreaterThan(Date.now() - 1000)
+  })
+
+  it('クールダウン境界: ちょうど 24h 経過した直後は skip せず check する', async () => {
+    // 仕様: UPDATE_CHECK_COOLDOWN_MS (= 24h) 未満なら skip、それ以外は check。
+    // 「未満」と「以上」の境界を 1ms ずらして検証する。
+    configRef.value = mkConfig(true)
+    const cooldownMs = 24 * 60 * 60 * 1000
+
+    // 24h ぴったり (= 0 ms 差): 仕様上 >= なので check する
+    localStorage.setItem(LAST_CHECK_KEY, String(Date.now() - cooldownMs))
+    bootstrapUpdaterCheck()
+    await flush()
+    expect(checkMock).toHaveBeenCalledTimes(1)
+
+    // 1ms だけ余裕 (= 23h59m59s): < cooldown なので skip される
+    localStorage.clear()
+    localStorage.setItem(LAST_CHECK_KEY, String(Date.now() - cooldownMs + 1))
+    checkMock.mockClear()
+    bootstrapUpdaterCheck()
+    await flush()
+    expect(checkMock).not.toHaveBeenCalled()
+  })
+
+  it('config が null (load() が空を返したケース) なら check も notify もしない', async () => {
+    configRef.value = null
+    bootstrapUpdaterCheck()
+    await flush()
+    expect(checkMock).not.toHaveBeenCalled()
+    expect(notifyMock).not.toHaveBeenCalled()
   })
 })

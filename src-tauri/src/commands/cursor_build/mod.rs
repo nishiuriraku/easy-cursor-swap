@@ -3,7 +3,6 @@
 //! クリエイターから渡された PNG / メタ情報を 17 役割 × 6 サイズの `.cur` バイナリへ
 //! 変換し、theme.json と一緒に zip に固める。
 //!
-//! - [`export_cursorpack`] — 役割パス → `.cursorpack` (同期)
 //! - [`export_cursorpack_streamed`] — 進捗イベント付きビルド (UI からの主流ルート)
 //! - [`cancel_build`] — `export_cursorpack_streamed` を中止
 //!
@@ -18,103 +17,12 @@ mod sign;
 pub mod stream;
 
 use crate::cancel_registry::CancelRegistry;
-use crate::errors::AppError;
-use crate::theme::{CursorDefinition, LocalizedString, ThemeManager, ThemeMetadata};
 
 /// 進行中の build を中止する。実際の中止は次のチェックポイントで行われる。
 #[tauri::command]
 pub fn cancel_build(registry: tauri::State<'_, CancelRegistry>, build_id: String) {
     registry.cancel(&build_id);
     tracing::info!("ビルド中止要求: {}", build_id);
-}
-
-#[tauri::command]
-pub fn export_cursorpack(req: ExportCursorpackRequest) -> Result<ExportResult, AppError> {
-    use std::collections::HashMap;
-
-    // 1) cursors マップ構築
-    let mut cursors_meta: HashMap<String, CursorDefinition> = HashMap::new();
-    let mut cursor_bytes: HashMap<String, Vec<u8>> = HashMap::new();
-    for (role, path) in &req.cur_paths {
-        let path = std::path::PathBuf::from(path);
-        let bin = std::fs::read(&path).map_err(|e| {
-            AppError::Theme(format!(
-                "カーソル {} が読み込めません ({}): {}",
-                role,
-                path.display(),
-                e
-            ))
-        })?;
-        let hot = req
-            .hotspots
-            .get(role)
-            .cloned()
-            .unwrap_or(crate::theme::types::Hotspot::ZERO);
-        // .cur ファイル自体は既ビルド済み (cur_paths で受領)。theme.json に ratio を記録するのみ (変換不要)
-        cursors_meta.insert(
-            role.clone(),
-            CursorDefinition {
-                file: format!("cursors/{}.cur", role),
-                hotspot: hot,
-                resize_method: "lanczos".to_string(),
-                size_overrides: None,
-            },
-        );
-        cursor_bytes.insert(role.clone(), bin);
-    }
-
-    // 2) theme.json メタデータ
-    let mut name_map = HashMap::new();
-    name_map.insert("ja".to_string(), req.name_ja.clone());
-    if let Some(en) = req.name_en.clone() {
-        name_map.insert("en".to_string(), en);
-    }
-
-    let mut metadata = ThemeMetadata {
-        schema_version: 1,
-        id: uuid::Uuid::new_v4(),
-        name: LocalizedString::Localized(name_map),
-        version: req.version.clone(),
-        created_at: chrono::Utc::now().to_rfc3339(),
-        requires_os_shadow: req.requires_os_shadow,
-        cursors: cursors_meta,
-        author: req.author.clone(),
-        license: None,
-        homepage: None,
-        // Creator UI の説明欄 (`metaDescription`) 由来。空文字 / 空白のみは
-        // None と同じ扱い (= theme.json から description フィールドごと省略)。
-        description: req
-            .description
-            .as_deref()
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-            .map(|s| LocalizedString::Simple(s.to_string())),
-        min_app_version: None,
-        signature: None,
-        tags: Vec::new(),
-        source: crate::theme::types::ThemeSource::Local,
-        cloned_from_marketplace_id: None,
-    };
-
-    // 3) 署名 (sign=true の場合)。sign.rs に共通化済み。
-    let signed_key_id: Option<String> = if req.sign {
-        sign::sign_theme_metadata(&mut metadata)?
-    } else {
-        None
-    };
-
-    // 4) Zip 出力
-    let out_path = std::path::PathBuf::from(&req.output_path);
-    let size = ThemeManager::export_cursorpack(&mut metadata, &cursor_bytes, &out_path)?;
-
-    Ok(ExportResult {
-        theme_id: metadata.id.to_string(),
-        size_bytes: size,
-        signed: req.sign,
-        key_id: signed_key_id,
-        applied: false,
-        apply_error: None,
-    })
 }
 
 // ストリーム式 .cursorpack ビルドは stream.rs に分離 (Phase 3b)。
@@ -340,9 +248,14 @@ mod tests {
     /// SizedOverridePayload.hotspot (比率) が build_cur_from_png の出力 .cur バイナリに
     /// 正しいホットスポット px として記録されることを検証する。
     ///
-    /// primary hotspot = (0.0, 0.0) → px=(0,0) で、
-    /// 64px オーバーライドの hotspot = (0.5, 0.5) → px=(32,32) を指定した場合、
-    /// 出力 .cur の 64px エントリは hotspot=(32,32) になるはず。
+    /// primary hotspot = (0.25, 0.25) → 256x256 で px=(64,64)、32px へスケールすると (8, 8)
+    /// 64px オーバーライドの hotspot = (0.5, 0.5) → to_px(64) = (32,32) を指定した場合、
+    /// 出力 .cur の 64px エントリは hotspot=(32,32) になり、32px エントリ (オーバーライドなし)
+    /// は primary のスケール結果 (8, 8) になるはず。
+    ///
+    /// NOTE: primary を 0 以外にすることで、ホットスポット計算が「スケールしているか /
+    /// 単に 0 を返していないか」を実値レベルで区別できる (= 旧来の "primary=0 → (0,0)" は
+    /// 計算ロジックが壊れていても通ってしまうので regression を検知できない)。
     #[test]
     fn sized_override_hotspot_reaches_cur_build_output() {
         use crate::cursor::ico_cur::parse_ico_cur;
@@ -362,7 +275,7 @@ mod tests {
         )
         .unwrap();
 
-        // primary は 256x256 の青、hotspot = (0, 0)
+        // primary は 256x256 の青、hotspot = (0.25, 0.25) → px=(64,64)
         let img256: image::RgbaImage =
             image::ImageBuffer::from_pixel(256, 256, image::Rgba([0, 0, 255, 255]));
         let mut png256 = Vec::new();
@@ -389,11 +302,11 @@ mod tests {
         let mut sized_hotspot_map = std::collections::HashMap::new();
         sized_hotspot_map.insert(64u32, (ov_hx, ov_hy));
 
-        // primary hotspot = (0, 0) で build_cur_from_png に per_size_hotspot_px を渡す
+        // primary hotspot = (64, 64) で build_cur_from_png に per_size_hotspot_px を渡す
         let cur_bytes = build_cur_from_png(
             &png256,
-            0,
-            0,
+            64,
+            64,
             ResizeMethod::Lanczos,
             Some(&sized_png_map),
             Some(&sized_hotspot_map),
@@ -414,7 +327,10 @@ mod tests {
             "64px エントリのホットスポットはオーバーライドの (32,32) であるべき"
         );
 
-        // 32px エントリ (オーバーライドなし) のホットスポットは primary (0,0) からスケールされた (0,0)
+        // 32px エントリ (オーバーライドなし) のホットスポットは primary (64,64) を
+        // 32px へスケールした結果 (= scale_hotspot(64, 64, 256, 32) = (8, 8)) になる。
+        // primary=0 の旧テストでは (0,0) が常に成立してロジック回帰を見逃していたため、
+        // ここで非ゼロの primary を使って scale_hotspot の挙動を実値検証する。
         let entry_32 = parsed
             .entries
             .iter()
@@ -422,8 +338,201 @@ mod tests {
             .expect("32px エントリがあるはず");
         assert_eq!(
             (entry_32.hotspot_x, entry_32.hotspot_y),
-            (0, 0),
-            "32px エントリのホットスポットは primary (0,0) のスケール値 (0,0) であるべき"
+            (8, 8),
+            "32px エントリのホットスポットは primary (64,64) のスケール値 (8,8) であるべき"
+        );
+
+        // 256px エントリはオーバーライドなし・primary と同寸なので scale せず (64, 64)
+        let entry_256 = parsed
+            .entries
+            .iter()
+            .find(|e| e.width == 256)
+            .expect("256px エントリがあるはず");
+        assert_eq!(
+            (entry_256.hotspot_x, entry_256.hotspot_y),
+            (64, 64),
+            "256px エントリのホットスポットは primary と等寸なので (64,64) のまま"
+        );
+    }
+
+    /// CUR 6 サイズ標準パスの contract: `build_cur_from_png` は CURSOR_SIZES にある
+    /// 6 つのサイズ (32, 48, 64, 96, 128, 256) 全てを含む `.cur` を生成する。
+    /// 旧実装で 32 固定の単一サイズしか返さない回帰が入っていないかを固定する。
+    #[test]
+    fn build_cur_from_png_emits_all_six_canonical_sizes() {
+        use crate::cursor::build_cur_from_png;
+        use crate::cursor::ico_cur::parse_ico_cur;
+        use crate::cursor::ResizeMethod;
+
+        // 256x256 の元画像 (十分なサイズなので 6 リサイズ全てが縮小方向)
+        let img: image::RgbaImage =
+            image::ImageBuffer::from_pixel(256, 256, image::Rgba([100, 200, 50, 255]));
+        let mut png = Vec::new();
+        image::ImageEncoder::write_image(
+            image::codecs::png::PngEncoder::new(&mut png),
+            img.as_raw(),
+            256,
+            256,
+            image::ExtendedColorType::Rgba8,
+        )
+        .unwrap();
+
+        let cur_bytes = build_cur_from_png(&png, 10, 20, ResizeMethod::Lanczos, None, None)
+            .expect("build_cur_from_png should succeed for valid PNG");
+        let parsed = parse_ico_cur(&cur_bytes).expect("output should be parseable .cur");
+
+        // 全 6 サイズ ([32, 48, 64, 96, 128, 256]) が含まれる
+        assert_eq!(
+            parsed.entries.len(),
+            6,
+            "expected exactly 6 .cur entries for canonical sizes, got {}",
+            parsed.entries.len()
+        );
+        let widths: Vec<u32> = parsed.entries.iter().map(|e| e.width).collect();
+        assert_eq!(widths, vec![32, 48, 64, 96, 128, 256]);
+
+        // ホットスポットが全サイズで primary の (10, 20) を
+        // `scale_hotspot(original_size, target)` でスケールした値として記録されている
+        // ことを確認する。各エントリの幅は同じでも `scale_hotspot` の返しは
+        // ターゲットサイズへのスケールなので、ホットスポット px の算出ロジックを
+        // 巻き込んでいないことを確かめる意味でも、各エントリのホットスポットが
+        // 妥当な範囲 (target_size 以内) に収まることを検証する。
+        for entry in &parsed.entries {
+            assert!(
+                entry.hotspot_x <= entry.width,
+                "hotspot_x {} must be <= width {}",
+                entry.hotspot_x,
+                entry.width
+            );
+            assert!(
+                entry.hotspot_y <= entry.height,
+                "hotspot_y {} must be <= height {}",
+                entry.hotspot_y,
+                entry.height
+            );
+        }
+    }
+
+    /// `build_cur_from_png` に渡す PNG が不正な Magic Byte だと即座に `Err` を返す
+    /// contract。空入力や非 PNG を入れたときにバッファ読み込みで panic しないことを保証する。
+    #[test]
+    fn build_cur_from_png_rejects_invalid_png_magic() {
+        use crate::cursor::build_cur_from_png;
+        use crate::cursor::ResizeMethod;
+
+        let bogus: &[u8] = b"NOT A PNG";
+        let err = build_cur_from_png(bogus, 0, 0, ResizeMethod::Lanczos, None, None)
+            .expect_err("non-PNG should fail");
+        match err {
+            crate::errors::AppError::ImageProcessing(msg) => {
+                assert!(
+                    msg.contains("PNG") || msg.contains("ヘッダー"),
+                    "error must indicate PNG issue: {msg}"
+                );
+            }
+            other => panic!("expected ImageProcessing, got {other:?}"),
+        }
+
+        // 空バイト列も同様
+        let empty: &[u8] = &[];
+        assert!(build_cur_from_png(empty, 0, 0, ResizeMethod::Lanczos, None, None).is_err());
+    }
+
+    /// `generate_cur_binary` は空入力に対し `AppError::ImageProcessing` を返す contract。
+    /// 「画像なし」を 0 エントリの .cur として通してしまうと、ICONDIR.num_images=0 の
+    /// ファイル (= ICO/CUR 仕様上はパース可能な空ヘッダ) が出力されてしまうが、
+    /// `parse_ico_cur` が「エントリ数 0」を AppError で拒否する経路 (= parser と writer の
+    /// 往復でクラッシュする) と、Windows カーソル API がこれを解釈できず正常動作しない
+    /// (= 0 画像 .cur を適用しても矢印が出ない) 二重の理由から、writer 側で早期に
+    /// 弾いて整合性を保つ。
+    #[test]
+    fn generate_cur_binary_rejects_empty_input() {
+        use crate::cursor::generate_cur_binary;
+        let entries: Vec<(image::RgbaImage, u32, u32)> = vec![];
+        let err = generate_cur_binary(&entries).expect_err("empty should fail");
+        match err {
+            crate::errors::AppError::ImageProcessing(msg) => {
+                assert!(
+                    msg.contains("1枚も") || msg.contains("指定"),
+                    "error must indicate empty input: {msg}"
+                );
+            }
+            other => panic!("expected ImageProcessing, got {other:?}"),
+        }
+    }
+
+    /// `generate_cur_binary` は複数サイズを単一 .cur にパッキングし、ICONDIR の
+    /// エントリ数と num_images が一致する contract。
+    #[test]
+    fn generate_cur_binary_packs_multiple_sizes_with_matching_header() {
+        use crate::cursor::generate_cur_binary;
+        // 3 サイズ (32, 64, 128) を生成
+        let make = |w: u32| image::ImageBuffer::from_pixel(w, w, image::Rgba([10, 20, 30, 255]));
+        let entries = vec![
+            (make(32), 1u32, 2u32),
+            (make(64), 3u32, 4u32),
+            (make(128), 5u32, 6u32),
+        ];
+        let cur_bytes = generate_cur_binary(&entries).expect("pack 3 entries");
+        let parsed = crate::cursor::parse_ico_cur(&cur_bytes).expect("parse output");
+
+        // ICONDIR.num_images が 3 で、entries も同じ 3 件
+        assert_eq!(parsed.entries.len(), 3);
+        assert_eq!(parsed.entries[0].width, 32);
+        assert_eq!(parsed.entries[1].width, 64);
+        assert_eq!(parsed.entries[2].width, 128);
+    }
+
+    /// `StreamedExportRequest` の `destination = Library { apply_after: false }` が
+    /// 受理される contract。apply 経路がデフォルト無効でもエラーにならない。
+    #[test]
+    fn streamed_request_accepts_library_destination_without_apply() {
+        let json = serde_json::json!({
+            "buildId": "id",
+            "nameJa": "T",
+            "nameEn": null,
+            "author": null,
+            "version": "1.0.0",
+            "requiresOsShadow": false,
+            "roles": [],
+            "destination": { "kind": "library", "applyAfter": false },
+            "existingThemeId": null,
+            "sign": false
+        });
+        let req: super::StreamedExportRequest = serde_json::from_value(json).unwrap();
+        match req.destination {
+            super::ExportDestination::Library { apply_after } => assert!(!apply_after),
+            _ => panic!("expected Library variant"),
+        }
+    }
+
+    /// `ExportResult` のシリアライズ形を lock する contract。
+    /// 現在の実装では `serde(rename_all = ...)` 未指定 (= snake_case) なので、
+    /// フロント側は `theme_id` / `size_bytes` をキーに読む。camelCase 化すると
+    /// フロントが壊れるので、現状を固定する (= 既存フロントとの契約)。
+    #[test]
+    fn export_result_serializes_with_snake_case_fields() {
+        let result = super::ExportResult {
+            theme_id: "abc".to_string(),
+            size_bytes: 1234,
+            signed: true,
+            key_id: Some("kid".to_string()),
+            applied: false,
+            apply_error: None,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        // 期待する snake_case キーが含まれている
+        assert!(json.contains("\"theme_id\""), "missing theme_id: {json}");
+        assert!(
+            json.contains("\"size_bytes\""),
+            "missing size_bytes: {json}"
+        );
+        assert!(json.contains("\"signed\""), "missing signed: {json}");
+        assert!(json.contains("\"key_id\""), "missing key_id: {json}");
+        assert!(json.contains("\"applied\""), "missing applied: {json}");
+        assert!(
+            json.contains("\"apply_error\""),
+            "missing apply_error: {json}"
         );
     }
 }

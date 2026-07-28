@@ -17,11 +17,19 @@ const emit = defineEmits<{
   showDetails: [id: string]
 }>()
 
-const { previewMap, isSystem, isMarketplace, displayDate, onActivate, onKeydown, onFavorite } =
-  useThemeCardState(toRef(props, 'theme'), {
-    showDetails: (id) => emit('showDetails', id),
-    toggleFavorite: (id) => emit('toggleFavorite', id),
-  })
+const {
+  previewMap,
+  previewLoading,
+  isSystem,
+  isMarketplace,
+  displayDate,
+  onActivate,
+  onKeydown,
+  onFavorite,
+} = useThemeCardState(toRef(props, 'theme'), {
+  showDetails: (id) => emit('showDetails', id),
+  toggleFavorite: (id) => emit('toggleFavorite', id),
+})
 
 /* 2026-05-14: ライブラリカードはプレビューを 3x2 (6 セル) に縮小したため、
  * .card-preview の min-height (default 132px) を抑えて全体高さを詰める。
@@ -55,6 +63,7 @@ const coveragePct = computed(() => Math.round((props.theme.includedRoles.length 
       <CursorMatrix
         :included="theme.includedRoles"
         :preview-map="previewMap"
+        :loading="previewLoading"
         :limit="6"
         :cols="3"
         :aria-label="t('library.coverage', { filled: theme.includedRoles.length })"

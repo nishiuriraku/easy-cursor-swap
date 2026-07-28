@@ -36,8 +36,19 @@ pub const PUBKEY_BASE_URL: &str =
 /// HTTP リクエストのタイムアウト。
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
+/// ダウンロード元として許可する GitHub 系ホスト (F-27)。
+/// `index.json` の `download_url` をここ以外のホストへ向けさせない。
+const ALLOWED_DOWNLOAD_HOSTS: &[&str] = &[
+    "github.com",
+    "objects.githubusercontent.com",
+    "raw.githubusercontent.com",
+    "codeload.github.com",
+];
+
 /// `index.json` のスキーマ。
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(ts_rs::TS))]
+#[cfg_attr(feature = "typegen", ts(export))]
 pub struct MarketplaceIndex {
     pub schema_version: u32,
     pub commit: Option<String>,
@@ -60,6 +71,8 @@ pub struct MarketplaceIndex {
 /// この非対称 (audit E1 / E2) は serde の directional `rename_all` で表現する。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+#[cfg_attr(feature = "typegen", derive(ts_rs::TS))]
+#[cfg_attr(feature = "typegen", ts(export, rename_all = "camelCase"))]
 pub struct MarketplaceEntry {
     pub id: uuid::Uuid,
     pub name: crate::theme::LocalizedString,
@@ -111,6 +124,8 @@ pub struct AuthorRecord {
 /// JS 側は camelCase、Rust 側は snake_case で扱う。
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "typegen", derive(ts_rs::TS))]
+#[cfg_attr(feature = "typegen", ts(export, rename_all = "camelCase"))]
 pub struct MarketplaceInstallRequest {
     pub download_url: String,
     pub sha256: String,
@@ -155,12 +170,18 @@ impl MarketplaceClient {
             .await
             .map_err(|e| AppError::Theme(format!("レスポンス読み取り失敗: {}", e)))?;
 
-        let index: MarketplaceIndex = serde_json::from_str(&body)?;
+        let mut index: MarketplaceIndex = serde_json::from_str(&body)?;
+        // F-17: 各エントリの homepage を健全化してからフロントへ返す。
+        for entry in &mut index.entries {
+            entry.homepage = Self::sanitize_homepage(entry.homepage.take());
+        }
         Ok(index)
     }
 
     /// 著者の公開鍵レコードを取得する。
     pub async fn fetch_author_record(github_username: &str) -> AppResult<AuthorRecord> {
+        // F-28: URL 連結前に username を検証 (パストラバーサル / 別パス参照防止)。
+        Self::validate_github_username(github_username)?;
         let url = format!("{}/{}.json", PUBKEY_BASE_URL, github_username);
         let client = Self::http()?;
         let body = client
@@ -193,6 +214,10 @@ impl MarketplaceClient {
     ///  5. `ThemeManager::import_cursorpack_bytes` で展開
     ///     (Path traversal / Zip 爆弾 / シンボリックリンク防御を再利用)
     pub async fn install(req: MarketplaceInstallRequest) -> AppResult<uuid::Uuid> {
+        // 0. download_url を検証 (F-27)。署名 / SHA-256 検証より前に GET するため、
+        //    許可ホスト + https のみに絞ってフィッシング / 任意 URL 取得を防ぐ。
+        Self::validate_download_url(&req.download_url)?;
+
         // 1. 著者の公開鍵レコードを取得
         let author = Self::fetch_author_record(&req.author_github).await?;
 
@@ -258,6 +283,16 @@ impl MarketplaceClient {
     /// プレビュー画像サイズの上限 (500 KB)。
     const MAX_PREVIEW_BYTES: u64 = 500 * 1024;
 
+    /// homepage URL を健全化する (F-17 第一防御線)。
+    ///
+    /// `index.json` の `homepage` はフロントの外部リンクに直結する。`https://` で
+    /// 始まらない (javascript: / http: 等) もの、`..` を含むものは `None` に落として
+    /// フロントへ渡さない。フロント側の useExternalUrl → open_url IPC でも
+    /// `is_allowed_url_scheme` が再検証するが、ここが最初の関門。
+    pub fn sanitize_homepage(url: Option<String>) -> Option<String> {
+        url.filter(|u| u.starts_with("https://") && !u.contains(".."))
+    }
+
     /// preview_base_url が https:// で始まり ".." を含まないことを検証。
     pub fn validate_preview_url(url: &str) -> AppResult<()> {
         if !url.starts_with("https://") {
@@ -281,6 +316,67 @@ impl MarketplaceClient {
         }
         if !role.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
             return Err(AppError::Theme(format!("role 名に不正な文字: {}", role)));
+        }
+        Ok(())
+    }
+
+    /// download_url が https:// かつ許可ホストであることを検証する (F-27)。
+    ///
+    /// `index.json` の `download_url` は署名 / SHA-256 検証の前に GET される。
+    /// 許可リスト外ホストや非 https を弾くことで、悪意ある index でフィッシング
+    /// サイトや任意 URL を叩かせる経路を塞ぐ。`url` crate を増やさず手書きで
+    /// host 部だけ取り出す (Cargo.lock 不変)。
+    pub fn validate_download_url(url: &str) -> AppResult<()> {
+        let rest = url.strip_prefix("https://").ok_or_else(|| {
+            AppError::Theme("download_url は https:// である必要があります".into())
+        })?;
+        // authority 部分は最初の `/`, `?`, `#` まで。さらに `:` でポートを切り落とす。
+        let host = rest
+            .split(['/', '?', '#'])
+            .next()
+            .unwrap_or("")
+            .split(':')
+            .next()
+            .unwrap_or("");
+        let ok = ALLOWED_DOWNLOAD_HOSTS
+            .iter()
+            .any(|h| host == *h || host.ends_with(&format!(".{h}")));
+        if !ok {
+            return Err(AppError::Theme(format!(
+                "許可されていないダウンロード元ホスト: {}",
+                host
+            )));
+        }
+        Ok(())
+    }
+
+    /// github_username が GitHub の命名規則に沿う安全な値かを検証する (F-28)。
+    ///
+    /// `fetch_author_record` で `PUBKEY_BASE_URL/{username}.json` に直接連結される
+    /// ため、`../` や `/` 等を含む値はパストラバーサル / 別パス参照を招く。
+    /// GitHub の規則: 1〜39 文字、英数字とハイフンのみ、先頭末尾ハイフン不可、
+    /// 連続ハイフン不可。
+    pub fn validate_github_username(name: &str) -> AppResult<()> {
+        if name.is_empty() || name.len() > 39 {
+            return Err(AppError::Theme(
+                "github_username の長さが不正です".to_string(),
+            ));
+        }
+        if name.starts_with('-') || name.ends_with('-') {
+            return Err(AppError::Theme(
+                "github_username の先頭・末尾にハイフンは使えません".to_string(),
+            ));
+        }
+        if name.contains("--") {
+            return Err(AppError::Theme(
+                "github_username に連続ハイフンは使えません".to_string(),
+            ));
+        }
+        if !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+            return Err(AppError::Theme(format!(
+                "github_username に不正な文字: {}",
+                name
+            )));
         }
         Ok(())
     }
@@ -332,12 +428,11 @@ impl MarketplaceClient {
 }
 
 /// Base64 公開鍵から `key_id` (公開鍵 SHA-256 の先頭 16 文字) を計算する。
-pub fn compute_key_id(pubkey_b64: &str) -> AppResult<String> {
-    let raw = base64::engine::general_purpose::STANDARD
-        .decode(pubkey_b64)
-        .map_err(|e| AppError::Theme(format!("公開鍵 Base64 デコード失敗: {}", e)))?;
-    Ok(hex::encode(Sha256::digest(&raw))[..16].to_string())
-}
+///
+/// Wave 2B / Task 5: 旧 `marketplace::compute_key_id` 実装は `keystore::compute_key_id`
+/// と逐語重複だったため正準を `keystore.rs` に統一し、このラッパで再エクスポート
+/// する。`marketplace` 内では `keystore::compute_key_id` を直接呼び出す。
+pub use crate::keystore::compute_key_id;
 
 fn decode_verifying_key(pubkey_b64: &str) -> AppResult<VerifyingKey> {
     let raw = base64::engine::general_purpose::STANDARD
@@ -413,8 +508,11 @@ mod tests {
 
     #[test]
     fn compute_key_id_rejects_invalid_base64() {
+        // `marketplace::compute_key_id` は Task 5a で `keystore::compute_key_id`
+        // の re-export に統一済み。鍵ペア Base64 デコード失敗は暗号学的失敗
+        // なので `AppError::Crypto` (= `crypto: <理由>`) に分類される (Task 10)。
         let err = compute_key_id("not-valid-base64-!!!").unwrap_err();
-        assert!(matches!(err, AppError::Theme(_)));
+        assert!(matches!(err, AppError::Crypto(_)));
     }
 
     #[test]
@@ -502,6 +600,89 @@ mod tests {
                 name
             );
         }
+    }
+
+    #[test]
+    fn download_url_accepts_allowed_github_hosts() {
+        // F-27: 許可された GitHub 系ホストの https URL は通る。
+        assert!(MarketplaceClient::validate_download_url(
+            "https://github.com/owner/repo/releases/download/v1/p.cursorpack"
+        )
+        .is_ok());
+        assert!(MarketplaceClient::validate_download_url(
+            "https://objects.githubusercontent.com/github-production-release-asset/abc"
+        )
+        .is_ok());
+        // サブドメインも許可 (`.github.com` で終わるもの)。
+        assert!(MarketplaceClient::validate_download_url(
+            "https://codeload.github.com/owner/repo/zip"
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn download_url_rejects_non_https_and_foreign_hosts() {
+        // F-27: http / 別ホスト / 末尾偽装 / file スキーム / 空はすべて拒否。
+        assert!(
+            MarketplaceClient::validate_download_url("http://github.com/p.cursorpack").is_err()
+        );
+        assert!(MarketplaceClient::validate_download_url("https://evil.com/p.cursorpack").is_err());
+        // "github.com.evil.com" は github.com で「終わらない」ので拒否されるべき。
+        assert!(MarketplaceClient::validate_download_url(
+            "https://github.com.evil.com/p.cursorpack"
+        )
+        .is_err());
+        // 前方一致偽装 "github.com" + ".evil" -> ends_with(".github.com") に該当しない。
+        assert!(
+            MarketplaceClient::validate_download_url("https://notgithub.com/p.cursorpack").is_err()
+        );
+        assert!(MarketplaceClient::validate_download_url("file:///etc/passwd").is_err());
+        assert!(MarketplaceClient::validate_download_url("").is_err());
+    }
+
+    #[test]
+    fn github_username_accepts_valid_names() {
+        // F-28: GitHub 規則に沿う username は通る。
+        assert!(MarketplaceClient::validate_github_username("nishiuriraku").is_ok());
+        assert!(MarketplaceClient::validate_github_username("a").is_ok());
+        assert!(MarketplaceClient::validate_github_username("foo-bar").is_ok());
+        // 39 文字ちょうどは上限内。
+        assert!(MarketplaceClient::validate_github_username(&"a".repeat(39)).is_ok());
+    }
+
+    #[test]
+    fn github_username_rejects_invalid_names() {
+        // F-28: パストラバーサル / 不正文字 / 長さ違反 / ハイフン位置違反を拒否。
+        assert!(MarketplaceClient::validate_github_username("").is_err());
+        assert!(MarketplaceClient::validate_github_username(&"a".repeat(40)).is_err());
+        assert!(MarketplaceClient::validate_github_username("../escape").is_err());
+        assert!(MarketplaceClient::validate_github_username("foo/bar").is_err());
+        assert!(MarketplaceClient::validate_github_username("foo.bar").is_err());
+        assert!(MarketplaceClient::validate_github_username("-lead").is_err());
+        assert!(MarketplaceClient::validate_github_username("trail-").is_err());
+        assert!(MarketplaceClient::validate_github_username("日本語").is_err());
+    }
+
+    #[test]
+    fn sanitize_homepage_keeps_https_and_drops_unsafe() {
+        // F-17: https のみ通し、http / javascript / .. / None は None に落とす。
+        assert_eq!(
+            MarketplaceClient::sanitize_homepage(Some("https://example.com".to_string())),
+            Some("https://example.com".to_string())
+        );
+        assert_eq!(
+            MarketplaceClient::sanitize_homepage(Some("http://x".to_string())),
+            None
+        );
+        assert_eq!(
+            MarketplaceClient::sanitize_homepage(Some("javascript:alert(1)".to_string())),
+            None
+        );
+        assert_eq!(
+            MarketplaceClient::sanitize_homepage(Some("https://x/../y".to_string())),
+            None
+        );
+        assert_eq!(MarketplaceClient::sanitize_homepage(None), None);
     }
 
     #[test]

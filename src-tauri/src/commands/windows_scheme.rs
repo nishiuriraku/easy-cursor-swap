@@ -17,21 +17,11 @@ fn lookup_scheme(name: &str) -> Result<WindowsScheme, AppError> {
         .ok_or_else(|| AppError::Registry(format!("スキーム '{}' が見つかりません", name)))
 }
 
-/// 指定スキーム名のロール毎 PNG プレビューを返す。
-///
-/// `list_windows_schemes` で得たスキーム名を渡すと、各 `.cur` / `.ani` /
-/// `.ico` を最大解像度 PNG に変換して `HashMap<role, PNG bytes>` で返す。
-/// ファイルが見つからないロールはスキップ (1 つの欠損で全体表示を諦めない)。
-#[tauri::command]
-pub fn get_windows_scheme_previews(
-    name: String,
-) -> Result<std::collections::HashMap<String, Vec<u8>>, AppError> {
-    let scheme = lookup_scheme(&name)?;
-    Ok(ThemeManager::render_paths_as_previews(&scheme.cursor_paths))
-}
-
-/// [`get_windows_scheme_previews`] のリッチ版。
 /// 各ロールに PNG + ネイティブ寸法 + `.cur` ヘッダ由来のホットスポット座標を返す。
+///
+/// `list_windows_schemes` で得たスキーム名を渡すと、各 `.cur` / `.ani` / `.ico` を
+/// 最大解像度 PNG に変換し、`.cur` ヘッダからホットスポット座標も併せて返す。
+/// ファイルが見つからないロールはスキップ (1 つの欠損で全体表示を諦めない)。
 #[tauri::command]
 pub fn get_windows_scheme_role_previews(
     name: String,
@@ -98,6 +88,12 @@ mod tests {
     /// 実レジストリ (HKCU\Control Panel\Cursors\Schemes) は Windows なら常に
     /// アクセス可能 (Microsoft 既定スキームが入っている) ため、ここでは絶対に
     /// 衝突しないスキーム名で `find` が None になる経路だけを確認する。
+    ///
+    /// NOTE: `lookup_scheme` 経由で `RegistryManager::list_windows_schemes` を
+    /// 呼び出しており、これは `winreg` (Windows-only) を直接使うため、
+    /// クロスコンパイル時にこのテストモジュールが壊れないよう `#[cfg(windows)]`
+    /// で gate する。
+    #[cfg(windows)]
     #[test]
     fn lookup_scheme_returns_registry_error_when_not_found() {
         let result = lookup_scheme("__definitely_not_a_real_scheme_xyz__");
@@ -113,6 +109,30 @@ mod tests {
                 "expected AppError::Registry for unknown scheme, got {:?}",
                 other
             ),
+        }
+    }
+
+    /// 空文字スキーム名や特殊文字を含む名前も not-found として同じ Err 型で返ること。
+    /// 内部で `find` が空文字も空文字なりに比較するため一致なし → Registry Err。
+    ///
+    /// NOTE: Windows-only (`winreg` 依存)。クロスコンパイル耐性のため cfg gate。
+    #[cfg(windows)]
+    #[test]
+    fn lookup_scheme_rejects_empty_string_and_special_chars() {
+        for name in ["", " ", "\0", "../foo", "with\nnewline"] {
+            match lookup_scheme(name) {
+                Err(AppError::Registry(msg)) => {
+                    // 空文字も Registry Err の中に含まれている
+                    assert!(
+                        msg.contains("見つかりません"),
+                        "expected not-found message for {name:?}, got: {msg}"
+                    );
+                }
+                Ok(_) => panic!(
+                    "{name:?} should not match a real scheme (got Ok, this would require a real scheme with that name)"
+                ),
+                Err(other) => panic!("expected AppError::Registry for {name:?}, got {other:?}"),
+            }
         }
     }
 }

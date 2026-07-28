@@ -40,6 +40,24 @@ const props = defineProps<{
 defineEmits<{
   (e: 'cancel-export'): void
 }>()
+
+/** ストリームエクスポートの正準ステージ (role → package → sign)。UiStageStepper に渡す (LD10)。 */
+const exportStages = computed(() => [
+  { id: 'role', label: t('creator.exportStepRole') },
+  { id: 'package', label: t('creator.exportStepPackage') },
+  { id: 'sign', label: t('creator.exportStepSign') },
+])
+
+/** UiProgress の見出しに出す stage 別ラベル (旧 export-progress-label の文言を集約)。 */
+const exportProgressLabel = computed(() => {
+  const p = props.exportProgress
+  if (!p) return ''
+  if (p.stage === 'role') return `${p.message ?? ''} (${p.current}/${p.total})`
+  if (p.stage === 'sign') return t('creatorStart.exportStageSign')
+  if (p.stage === 'package') return t('creatorStart.exportStagePackage')
+  if (p.stage === 'cancelled') return t('creatorStart.exportStageCancelled')
+  return t('creatorStart.exportStageWorking')
+})
 </script>
 
 <template>
@@ -118,43 +136,22 @@ defineEmits<{
         aria-live="polite"
       >
         <div class="export-progress-row">
-          <span class="export-progress-label">
-            <template v-if="exportProgress.stage === 'role'">
-              {{ exportProgress.message ?? '' }} ({{ exportProgress.current }}/{{
-                exportProgress.total
-              }})
-            </template>
-            <template v-else-if="exportProgress.stage === 'sign'">{{
-              t('creatorStart.exportStageSign')
-            }}</template>
-            <template v-else-if="exportProgress.stage === 'package'">{{
-              t('creatorStart.exportStagePackage')
-            }}</template>
-            <template v-else-if="exportProgress.stage === 'cancelled'">{{
-              t('creatorStart.exportStageCancelled')
-            }}</template>
-            <template v-else>{{ t('creatorStart.exportStageWorking') }}</template>
-          </span>
+          <UiStageStepper :stages="exportStages" :current-id="exportProgress.stage" />
           <button
             v-if="exportBusy && exportProgress.stage !== 'cancelled'"
-            class="btn ghost"
-            style="height: 24px; margin-left: auto"
+            class="btn ghost cancel-btn"
             @click="$emit('cancel-export')"
           >
             <UiIcon name="X" :size="11" />{{ t('creator.cancelExport') }}
           </button>
         </div>
-        <div class="export-progress-bar">
-          <div
-            class="export-progress-fill"
-            :style="{
-              width:
-                exportProgress.total > 0
-                  ? `${(exportProgress.current / exportProgress.total) * 100}%`
-                  : '0%',
-            }"
-          />
-        </div>
+        <UiProgress
+          :value="exportProgress.current"
+          :max="exportProgress.total"
+          :indeterminate="exportProgress.stage !== 'role' || exportProgress.total <= 0"
+          :label="exportProgressLabel"
+          :show-percent="exportProgress.stage === 'role' && exportProgress.total > 0"
+        />
       </div>
     </Transition>
   </div>
@@ -233,12 +230,12 @@ defineEmits<{
 /* エクスポート結果ポップアップ。Library の .apply-error と同じく画面下部に固定表示する。
  * メタデータペイン内のレイアウトに影響しないよう viewport 基準で配置。 */
 .export-progress {
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: 10px;
   padding: 10px 14px;
-  background: var(--bg-elev2);
+  background: var(--bg-2);
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .export-progress-row {
@@ -247,22 +244,9 @@ defineEmits<{
   gap: 8px;
 }
 
-.export-progress-label {
-  font-size: 12px;
-  color: var(--text-mute);
-}
-
-.export-progress-bar {
-  height: 4px;
-  border-radius: 2px;
-  background: var(--bg-elev1);
-  overflow: hidden;
-}
-
-.export-progress-fill {
-  height: 100%;
-  background: var(--mint);
-  transition: width 200ms ease;
+.cancel-btn {
+  height: 24px;
+  margin-left: auto;
 }
 
 .btn {

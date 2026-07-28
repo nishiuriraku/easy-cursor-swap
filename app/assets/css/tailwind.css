@@ -519,6 +519,31 @@
   animation: spin 0.6s linear infinite;
 }
 
+/* --- skeleton: 共有シマープレースホルダ (Phase LD / 2026-06-09) ---
+ * Library / Marketplace のグリッドカード、CursorMatrix のプレビューセル、
+ * marketplace 詳細プレビュー列など、読込中ブランクを埋める汎用シマー。
+ * `@keyframes shimmer` は global.css の共有 keyframes。
+ * UiSkeleton.vue / UiSkeletonCard.vue が薄くラップする。 */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.02) 0%,
+    rgba(255, 255, 255, 0.04) 50%,
+    rgba(255, 255, 255, 0.02) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+:where(html.light) .skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(15, 20, 35, 0.03) 0%,
+    rgba(15, 20, 35, 0.06) 50%,
+    rgba(15, 20, 35, 0.03) 100%
+  );
+  background-size: 200% 100%;
+}
+
 /* --- Library list view shared (Phase 11-E / 13-A / 2026-05-13) ---
  * .lib-table (index.vue) + .lib-row.lib-head (index.vue) +
  * .lib-row (ThemeRow.vue) で同じグリッドレイアウトを共有するため shared utility に置く。

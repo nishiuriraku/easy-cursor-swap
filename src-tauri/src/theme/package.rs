@@ -149,17 +149,17 @@ impl ThemeManager {
         use crate::errors::AppError;
         use std::io::{Cursor, Read};
 
-        // 圧縮サイズの SoT は config.rs の DEFAULT_MAX_PACK_COMPRESSED_SIZE。
-        // 残り 2 つ (uncompressed total / per-file size) は本 commit のスコープ外。
-        use crate::config::DEFAULT_MAX_PACK_COMPRESSED_SIZE;
-        const MAX_UNCOMPRESSED_TOTAL: u64 = 200 * 1024 * 1024;
-        const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024;
+        // サイズ上限 3 種はすべて config.rs の DEFAULT_* を SoT として参照する。
+        use crate::config::{
+            DEFAULT_MAX_IMAGE_FILE_SIZE, DEFAULT_MAX_PACK_COMPRESSED_SIZE,
+            DEFAULT_MAX_PACK_UNCOMPRESSED_SIZE,
+        };
 
         if bytes.len() as u64 > DEFAULT_MAX_PACK_COMPRESSED_SIZE {
             return Err(AppError::Theme(format!(
                 ".cursorpack 圧縮サイズ {} bytes が上限 {} を超えています",
                 bytes.len(),
-                DEFAULT_MAX_PACK_COMPRESSED_SIZE
+                DEFAULT_MAX_PACK_COMPRESSED_SIZE,
             )));
         }
 
@@ -230,23 +230,15 @@ impl ThemeManager {
                 continue;
             }
 
-            // 個別ファイルサイズ
-            if entry.size() > MAX_FILE_SIZE {
+            // 個別ファイルサイズ: 申告値 (entry.size()) は信用できないので高速棄却に
+            // とどめ、後段の io::copy + take で実伸長バイト数を真の上限とする。
+            if entry.size() > DEFAULT_MAX_IMAGE_FILE_SIZE {
+                let _ = std::fs::remove_dir_all(&target_dir);
                 return Err(AppError::Theme(format!(
                     "ファイル {} のサイズ {} bytes が上限 {} を超えています",
                     raw_name,
                     entry.size(),
-                    MAX_FILE_SIZE
-                )));
-            }
-
-            // 累積サイズ (Zip 爆弾の最終防衛線)
-            total_uncompressed = total_uncompressed.saturating_add(entry.size());
-            if total_uncompressed > MAX_UNCOMPRESSED_TOTAL {
-                let _ = std::fs::remove_dir_all(&target_dir);
-                return Err(AppError::Theme(format!(
-                    "展開後合計サイズが上限 {} bytes を超えました",
-                    MAX_UNCOMPRESSED_TOTAL
+                    DEFAULT_MAX_IMAGE_FILE_SIZE
                 )));
             }
 
@@ -255,7 +247,30 @@ impl ThemeManager {
                 std::fs::create_dir_all(parent)?;
             }
             let mut out = std::fs::File::create(&dest)?;
-            std::io::copy(&mut entry, &mut out)?;
+            // 申告サイズに依存せず、実ストリーム長を `take` で上限 +1 まで読んで
+            // 実書込バイト数で判定する (申告値を偽った zip 爆弾対策)。
+            let written = std::io::copy(
+                &mut entry.by_ref().take(DEFAULT_MAX_IMAGE_FILE_SIZE + 1),
+                &mut out,
+            )?;
+            if written > DEFAULT_MAX_IMAGE_FILE_SIZE {
+                let _ = std::fs::remove_file(&dest);
+                let _ = std::fs::remove_dir_all(&target_dir);
+                return Err(AppError::Theme(format!(
+                    "ファイル {} の実サイズが上限 {} bytes を超えています",
+                    raw_name, DEFAULT_MAX_IMAGE_FILE_SIZE
+                )));
+            }
+
+            // 累積サイズ (Zip 爆弾の最終防衛線): 申告値ではなく実書込バイト数を加算。
+            total_uncompressed = total_uncompressed.saturating_add(written);
+            if total_uncompressed > DEFAULT_MAX_PACK_UNCOMPRESSED_SIZE {
+                let _ = std::fs::remove_dir_all(&target_dir);
+                return Err(AppError::Theme(format!(
+                    "展開後合計サイズが上限 {} bytes を超えました",
+                    DEFAULT_MAX_PACK_UNCOMPRESSED_SIZE
+                )));
+            }
         }
 
         tracing::info!(
@@ -932,6 +947,175 @@ mod tests {
         assert!(
             e.cloned_from_marketplace_id.is_none(),
             "ピュア Local 由来の複製に origin が混入してはいけない"
+        );
+    }
+
+    // ── import_cursorpack_bytes 悪性 ZIP 拒否テスト (M0-3) ─────────────
+    //
+    // import_cursorpack_bytes の検査順序は:
+    //   圧縮 50MB 上限 → ZipArchive::new → theme.json 先読み(必須)→
+    //   ループ内で symlink 拒否 → sanitize_archive_path(path traversal)→
+    //   個別 10MB 上限(entry.size() で書込前判定)→ 累積 200MB → io::copy。
+    // theme.json が無いと先読みで弾かれてしまい、後段の検査に到達しないため、
+    // どのケースでも有効な theme.json を必ず先頭に同梱する。
+
+    /// 共通ヘルパー: 有効な theme.json を先頭に書いた ZipWriter を作り、
+    /// `add_malicious` クロージャで悪性エントリを追加して zip バイト列を返す。
+    ///
+    /// theme.json は write_seed_theme と同じ最小メタデータ (Local) を使う。
+    /// 戻り値は import_cursorpack_bytes にそのまま渡せる `Vec<u8>`。
+    fn build_pack_with_entry(
+        add_malicious: impl FnOnce(&mut zip::ZipWriter<std::io::Cursor<&mut Vec<u8>>>),
+    ) -> Vec<u8> {
+        use std::io::Write;
+
+        let metadata = ThemeMetadata {
+            schema_version: 1,
+            id: Uuid::new_v4(),
+            name: LocalizedString::Simple("Malicious Pack".into()),
+            version: "1.0.0".into(),
+            created_at: "2026-05-20T00:00:00Z".into(),
+            requires_os_shadow: false,
+            cursors: HashMap::new(),
+            author: None,
+            license: None,
+            homepage: None,
+            description: None,
+            min_app_version: None,
+            signature: None,
+            tags: Vec::new(),
+            source: types::ThemeSource::Local,
+            cloned_from_marketplace_id: None,
+        };
+        let metadata_json = serde_json::to_vec_pretty(&metadata).unwrap();
+
+        let mut buf: Vec<u8> = Vec::new();
+        {
+            let cursor = std::io::Cursor::new(&mut buf);
+            let mut zip = zip::ZipWriter::new(cursor);
+            let opts: zip::write::SimpleFileOptions = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Deflated);
+
+            // 1) 有効な theme.json を先頭に同梱 (先読みを通過させる)
+            zip.start_file("theme.json", opts).unwrap();
+            zip.write_all(&metadata_json).unwrap();
+
+            // 2) 呼び出し側が悪性エントリを追加
+            add_malicious(&mut zip);
+
+            zip.finish().unwrap();
+        }
+        buf
+    }
+
+    #[test]
+    fn import_rejects_path_traversal_entry() {
+        use std::io::Write;
+
+        let _g = crate::config::cursors_dir_override_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let temp = tempfile::TempDir::new().unwrap();
+        std::env::set_var("CUSTOM_CURSORS_DIR_OVERRIDE", temp.path());
+
+        // `../escape.txt` で展開先の外へ書き込もうとするエントリ
+        let bytes = build_pack_with_entry(|zip| {
+            let opts: zip::write::SimpleFileOptions = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Deflated);
+            // ZipWriter 側は名前検証しないので `..` を含むエントリも書ける
+            zip.start_file("../escape.txt", opts).unwrap();
+            zip.write_all(b"x").unwrap();
+        });
+
+        let result = ThemeManager::import_cursorpack_bytes(&bytes);
+
+        std::env::remove_var("CUSTOM_CURSORS_DIR_OVERRIDE");
+
+        assert!(
+            result.is_err(),
+            "path traversal を含む .cursorpack は拒否されるべき"
+        );
+        let msg = result.unwrap_err().to_string();
+        // sanitize_archive_path が ParentDir を「不正なパス成分」として弾く
+        assert!(
+            msg.contains("不正なパス成分") || msg.contains("Path traversal"),
+            "不正パス系のエラーメッセージであるべき: {msg}"
+        );
+        // 展開先の親 (TempDir の隣) に escape.txt が漏れ出していないこと
+        let escaped = temp.path().parent().unwrap().join("escape.txt");
+        assert!(
+            !escaped.exists(),
+            "TempDir の外に escape.txt が作られてはいけない: {}",
+            escaped.display()
+        );
+    }
+
+    #[test]
+    fn import_rejects_symlink_entry() {
+        let _g = crate::config::cursors_dir_override_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let temp = tempfile::TempDir::new().unwrap();
+        std::env::set_var("CUSTOM_CURSORS_DIR_OVERRIDE", temp.path());
+
+        // symlink エントリ (中身はリンク先文字列)。
+        // zip v5 の add_symlink は external_attributes に S_IFLNK (0xA000) を立てて
+        // System::Unix で書くので、import 側の unix_mode の S_IFMT & S_IFLNK 判定に乗る。
+        // (注: SimpleFileOptions::unix_permissions は `& 0o777` で上位ビットを落とすため
+        //  ファイル種別ビットを手で立てる用途には使えない。add_symlink が正規ルート。)
+        let bytes = build_pack_with_entry(|zip| {
+            let opts: zip::write::SimpleFileOptions = zip::write::SimpleFileOptions::default();
+            zip.add_symlink("evil_link", "/etc/passwd", opts).unwrap();
+        });
+
+        let result = ThemeManager::import_cursorpack_bytes(&bytes);
+
+        std::env::remove_var("CUSTOM_CURSORS_DIR_OVERRIDE");
+
+        assert!(
+            result.is_err(),
+            "シンボリックリンクを含む .cursorpack は拒否されるべき"
+        );
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("シンボリックリンク"),
+            "シンボリックリンク系のエラーメッセージであるべき: {msg}"
+        );
+    }
+
+    #[test]
+    fn import_rejects_oversized_file_entry() {
+        use std::io::Write;
+
+        let _g = crate::config::cursors_dir_override_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let temp = tempfile::TempDir::new().unwrap();
+        std::env::set_var("CUSTOM_CURSORS_DIR_OVERRIDE", temp.path());
+
+        // 個別ファイル上限は 10MB。11MB のゼロ列を 1 エントリにする。
+        // ゼロ列なので Deflated 圧縮後は極小で高速。import 側は entry.size()
+        // (= 非圧縮サイズ 11MB) を見てディスク書込前に Err にする。
+        let payload = vec![0u8; 11 * 1024 * 1024];
+        let bytes = build_pack_with_entry(|zip| {
+            let opts: zip::write::SimpleFileOptions = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Deflated);
+            zip.start_file("cursors/huge.cur", opts).unwrap();
+            zip.write_all(&payload).unwrap();
+        });
+
+        let result = ThemeManager::import_cursorpack_bytes(&bytes);
+
+        std::env::remove_var("CUSTOM_CURSORS_DIR_OVERRIDE");
+
+        assert!(
+            result.is_err(),
+            "個別ファイル上限 (10MB) を超える .cursorpack は拒否されるべき"
+        );
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("サイズ") && msg.contains("上限"),
+            "サイズ上限超過系のエラーメッセージであるべき: {msg}"
         );
     }
 }

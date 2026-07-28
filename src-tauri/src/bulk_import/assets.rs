@@ -8,7 +8,8 @@ use super::{
     ResolveFailure, ResolvedAsset, MAX_FILE_BYTES, MAX_TOTAL_BYTES,
 };
 use crate::errors::AppError;
-use std::path::Path;
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Emitter, Manager, State};
 
 const SUPPORTED_EXTS: &[&str] = &["png", "svg", "cur", "ico", "ani"];
@@ -37,8 +38,47 @@ pub fn collect_target_files(paths: &[String], recursive: bool) -> Vec<String> {
     out
 }
 
+/// ディレクトリを再帰走査して対応拡張子のファイルパスを集める。
+///
+/// symlink / junction による自己ループで無限再帰しないよう、各ディレクトリの
+/// canonical path を  HashSet に記録し、2 度目の訪問では即座に return する。
+/// canonicalize は symlink を 1 段展開して絶対パス化するため、`dir/loop` が `dir` 自身
+/// を指す symlink なら canonical が一致して重複訪問が検出される。
+/// recursive = false (既定) の挙動は変えず、トップディレクトリのみをスキャンする。
 fn walk_dir(dir: &Path, recursive: bool, out: &mut Vec<String>) {
+    let mut visited: HashSet<PathBuf> = HashSet::new();
+    walk_dir_inner(dir, recursive, out, &mut visited);
+}
+
+/// walk_dir の再帰本体。visited に訪問済み canonical path を積み、
+/// canonicalize 失敗時 (権限なし等) は黙ってスキップする。
+/// canonicalize は I/O を伴うためロックは持たず、visited は関数引数で受け渡して
+/// ヒープ再確保を避ける。
+fn walk_dir_inner(
+    dir: &Path,
+    recursive: bool,
+    out: &mut Vec<String>,
+    visited: &mut HashSet<PathBuf>,
+) {
+    // canonicalize に失敗するケース (権限なし / パスが消えた等) はそのディレクトリの
+    // 中身ごとスキップして上位呼び出し側へ戻る。warning ログは G20 で別タスク扱い。
+    let Ok(canonical) = dir.canonicalize() else {
+        return;
+    };
+    if !visited.insert(canonical) {
+        // 既に訪問済み → symlink/junction ループ。打ち切り。
+        return;
+    }
+    // read_dir に失敗するケース (パスがディレクトリではなかった / 権限剥奪 / 消失等)
+    // も当該ディレクトリの中身ごとスキップするが、silent skip は silent failure の
+    // 温床になるので G20 で WARN を 1 行発火する。PII 不変条件に従い raw path は
+    // `logging::redact_path` で `~/...` 形式に縮約してから渡す (canonicalize 側で
+    // 既に visit 済みに登録済みなので、ここで return しても visited のサイズは爆発しない)。
     let Ok(rd) = std::fs::read_dir(dir) else {
+        tracing::warn!(
+            path = %crate::logging::redact_path(dir),
+            "bulk_import walk_dir: read_dir に失敗したためこのディレクトリ配下はスキップします",
+        );
         return;
     };
     for entry in rd.flatten() {
@@ -50,7 +90,7 @@ fn walk_dir(dir: &Path, recursive: bool, out: &mut Vec<String>) {
                 }
             }
         } else if recursive && path.is_dir() {
-            walk_dir(&path, true, out);
+            walk_dir_inner(&path, true, out, visited);
         }
     }
 }
@@ -247,8 +287,20 @@ pub fn bulk_resolve_inner(
     for (idx, path) in files.iter().enumerate() {
         // 各ファイル処理の前にキャンセル要求を polling する。要求があれば
         // 以降のファイルを処理せず即座に打ち切る。
+        // UI 側 (`useCreatorBulkImportFlow` / `useBulkImport`) は `stage` の遷移を
+        // 見てスピナー / キャンセル確定表示を切り替えるので、cancelled を明示的に
+        // 発火してから返す (Wave 2AB Task 7 I-2 parked finding)。
         if let Some(check) = should_cancel {
             if check() {
+                if let Some(cb) = on_progress {
+                    cb(BulkImportProgress {
+                        job_id: job_id.to_string(),
+                        stage: "cancelled",
+                        current: idx as u32,
+                        total,
+                        message: Some("キャンセル要求を受信".into()),
+                    });
+                }
                 return Err(AppError::BulkImportCancelled);
             }
         }
@@ -563,5 +615,219 @@ mod tests {
         )
         .unwrap();
         assert_eq!(result.assets.len(), 1);
+    }
+
+    /// キャンセル要求が立ったとき、`bulk_resolve_inner` は:
+    /// 1. `Err(AppError::BulkImportCancelled)` を返す (既存テストで保証)
+    /// 2. UI 側がステージ遷移 (resolve → cancelled) で UI を戻せるよう、
+    ///    `on_progress` に対し `stage == "cancelled"` のイベントを 1 回発火する
+    ///    (Wave 2AB Task 7 I-2 parked finding)。
+    ///
+    /// 旧コードはこの emit が抜けており、UI 側でキャンセル確定表示が出ず、
+    /// 進捗バーが `parse` のまま固まる現象があった。fix で emit を 1 行追加。
+    #[test]
+    fn bulk_resolve_emits_cancelled_stage_when_cancel_set() {
+        use std::sync::{Arc, Mutex};
+
+        let tmp = tempfile::tempdir().unwrap();
+        let one_pix = include_bytes!("../../tests/fixtures/1x1.png");
+        std::fs::write(tmp.path().join("a.png"), one_pix).unwrap();
+        std::fs::write(tmp.path().join("b.png"), one_pix).unwrap();
+
+        let events: Arc<Mutex<Vec<BulkImportProgress>>> = Arc::new(Mutex::new(Vec::new()));
+        let events_for_cb = events.clone();
+        let cb = move |p: BulkImportProgress| {
+            events_for_cb.lock().unwrap().push(p);
+        };
+
+        let cancel = || true;
+        let result = bulk_resolve_inner(
+            &[tmp.path().to_string_lossy().to_string()],
+            false,
+            "cancel-emit-job",
+            Some(&cb),
+            Some(&cancel),
+        );
+
+        // (1) エラー型は変わらない。
+        match result {
+            Err(AppError::BulkImportCancelled) => {}
+            other => panic!("expected BulkImportCancelled, got {:?}", other),
+        }
+
+        // (2) cancelled ステージが 1 回以上 emit されている。
+        let captured = events.lock().unwrap();
+        assert!(
+            captured.iter().any(|p| p.stage == "cancelled"),
+            "stage == \"cancelled\" の progress event が emit されるべき、実際: {:?}",
+            *captured
+        );
+    }
+
+    /// Windows でディレクトリ symlink が作成できない環境 (Developer Mode オフ / 非管理者) では
+    /// フィクスチャ作成自体が成立しないので、その場合はテストをスキップする。
+    /// CI (GitHub Actions Windows runner) とローカル開発者の双方で再現できるよう、
+    /// symlink 生成成否を `Ok(true)` / `Ok(false)` で呼び分け側へ伝える。
+    #[cfg(windows)]
+    fn try_make_dir_symlink(link: &Path, target: &Path) -> std::io::Result<bool> {
+        use std::os::windows::fs::symlink_dir;
+        match symlink_dir(target, link) {
+            Ok(()) => Ok(true),
+            Err(e)
+                if e.kind() == std::io::ErrorKind::PermissionDenied
+                    || e.kind() == std::io::ErrorKind::Unsupported =>
+            {
+                Ok(false)
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    /// `tracing` 出力を文字列としてキャプチャする簡易 helper。
+    /// `commands/theme.rs::tests` の同名 helper とは独立。`tracing::subscriber` の
+    /// グローバル副作用を避けるため `with_default` のスコープ内で完結させる。
+    fn capture_warns<F: FnOnce()>(f: F) -> String {
+        use std::io;
+        use std::sync::{Arc, Mutex};
+
+        #[derive(Clone, Default)]
+        struct LogCapture(Arc<Mutex<Vec<u8>>>);
+
+        impl LogCapture {
+            fn into_string(self) -> String {
+                String::from_utf8(self.0.lock().unwrap().clone()).unwrap()
+            }
+        }
+
+        impl io::Write for LogCapture {
+            fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+                self.0.lock().unwrap().extend_from_slice(buf);
+                Ok(buf.len())
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+
+        impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for LogCapture {
+            type Writer = LogCapture;
+            fn make_writer(&'a self) -> Self::Writer {
+                self.clone()
+            }
+        }
+
+        let capture = LogCapture::default();
+        let subscriber = tracing_subscriber::fmt()
+            .with_writer(capture.clone())
+            .with_max_level(tracing::Level::WARN)
+            .with_target(false)
+            .without_time()
+            .finish();
+        tracing::subscriber::with_default(subscriber, f);
+        capture.into_string()
+    }
+
+    /// `walk_dir` が `read_dir` で失敗したときに silent skip せず、`tracing::warn!` を
+    /// 発火することを保証する (Wave 1D G20)。
+    ///
+    /// フィクスチャ: 実体は regular file のパスを `walk_dir` に渡す。canonicalize は
+    /// 成功するが `read_dir` はディレクトリではないため Err を返す。これにより
+    /// ファイルシステム状態 (権限剥奪 / TOCTOU) に依存せず確実に read_dir 失敗経路を
+    /// 踏める。canonicalize 失敗経路は G20 のスコープ外 (別タスク) で、本テストは触らない。
+    ///
+    /// PII 検証: 出力ログには raw absolute path の代わりに `logging::redact_path` が
+    /// 適用されるべき。tempdir はユーザーホーム配下にあるため `~/...` 形式に短縮され、
+    /// ユーザー名 (ホームの file_name) は含まれない。
+    #[test]
+    fn walk_dir_warns_and_skips_when_read_dir_fails() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        // canonicalize が成功する regular file を渡す。read_dir は Err で返る。
+        let fake_dir = tmp.path().join("not_a_directory");
+        std::fs::write(&fake_dir, b"not a directory").expect("write file");
+
+        let redacted = crate::logging::redact_path(&fake_dir);
+
+        let logs = capture_warns(|| {
+            let mut out: Vec<String> = Vec::new();
+            walk_dir(&fake_dir, false, &mut out);
+            // read_dir が失敗しても panic せず out は空のまま返ること (skip 動作保持)。
+            assert!(
+                out.is_empty(),
+                "read_dir 失敗時は out に何も積まないべき、実際: {:?}",
+                out
+            );
+        });
+
+        // G20: silent skip を WARN で明示する。silent failure 退行検知のための最低限の保証。
+        assert!(logs.contains("WARN"), "WARN レベルで出力されるべき: {logs}");
+        // canonicalize 失敗経路と区別するため、read_dir 由来の文脈語が含まれていること。
+        assert!(
+            logs.contains("read_dir") || logs.contains("ディレクトリ走査"),
+            "read_dir 由来のコンテキストが含まれるべき: {logs}"
+        );
+        // PII: redact_path 適用後のパスが含まれるべき (ユーザー名の生出力を避ける)。
+        assert!(
+            logs.contains(&redacted),
+            "redact 後のパスが含まれるべき (got redacted={redacted:?}): {logs}"
+        );
+        // PII: ホームディレクトリ由来の username が生で漏れていないこと。
+        if let Some(home) = dirs::home_dir() {
+            if let Some(username) = home.file_name().and_then(|n| n.to_str()) {
+                if !username.is_empty() {
+                    assert!(
+                        !logs.contains(username) || redacted == format!("~/{}", username),
+                        "username 生出力がログに漏れていないこと: username={username:?} logs={logs}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// `walk_dir` がディレクトリ symlink ループを検出して終了できることを保証する。
+    ///
+    /// フィクスチャ: `tmp/cycle_dir/` の中に `loop` というディレクトリ symlink を張り、
+    /// `loop` が `cycle_dir` 自身を指す形にする。`recursive: true` で走査すると、
+    /// 修正前コードは無限に再帰 → スタックオーバーフローで panic。修正後は canonicalize
+    /// + 訪問済み HashSet により同じ canonical path を 2 度訪れず有限時間で完走する。
+    ///
+    /// `recursive: false` 既定の挙動は本テストでは直接触らない (別テストで保証)。
+    #[cfg(windows)]
+    #[test]
+    fn walk_dir_does_not_loop_on_directory_symlink_cycle() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let cycle_dir = tmp.path().join("cycle_dir");
+        std::fs::create_dir(&cycle_dir).expect("create cycle_dir");
+        // 中身の実ファイル (PNG 1 個)。canonical 走査で循環しない限り 1 件見つかるはず。
+        let one_pix = include_bytes!("../../tests/fixtures/1x1.png");
+        std::fs::write(cycle_dir.join("inside.png"), one_pix).expect("write inside.png");
+        // cycle_dir/loop -> cycle_dir という symlink を作る。これが canonical 上の cycle。
+        let link_path = cycle_dir.join("loop");
+        let created = try_make_dir_symlink(&link_path, &cycle_dir).expect("symlink_dir");
+        if !created {
+            eprintln!(
+                "skipping: ディレクトリ symlink が作成できない環境 (Developer Mode / SeCreateSymbolicLinkPrivilege)。 Windows の Developer Mode を有効にしてから再実行すること。",
+            );
+            return;
+        }
+
+        // walk_dir は `collect_target_files` の private helper だが、ここでは
+        // recursive=true で呼び出してループを踏む (RED 期待)。
+        let mut out = Vec::new();
+        walk_dir(&cycle_dir, true, &mut out);
+
+        // canonicalize 後の cycle_dir と「loop」が同じ canonical path を持つので、
+        // 訪問済みセットに投入されるべき。修正後は無限再帰せず完了する。
+        // 1 件 (inside.png) のみが返る。ループ内の同名が再カウントされない。
+        assert_eq!(
+            out.len(),
+            1,
+            "symlink loop 配下の inside.png は 1 度だけ拾われるべき、実際: {:?}",
+            out
+        );
+        assert!(
+            out.iter().any(|p| p.ends_with("inside.png")),
+            "inside.png が見つからない: {:?}",
+            out
+        );
     }
 }

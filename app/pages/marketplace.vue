@@ -275,7 +275,7 @@ onMounted(async () => {
 
       <!-- ローディング -->
       <div v-else-if="isLoading" class="grid">
-        <div v-for="i in 6" :key="i" class="card skeleton-card" />
+        <UiSkeletonCard v-for="i in 6" :key="i" />
       </div>
 
       <template v-else>
@@ -368,25 +368,5 @@ onMounted(async () => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
-}
-
-.skeleton-card {
-  @apply h-[280px];
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.02) 0%,
-    rgba(255, 255, 255, 0.04) 50%,
-    rgba(255, 255, 255, 0.02) 100%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.4s ease-in-out infinite;
-}
-@keyframes shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
 }
 </style>

@@ -88,10 +88,9 @@ onMounted(load)
               t('settings.recoveryBytes', { size: bk.size_bytes.toLocaleString() })
             }}</span>
           </div>
-          <button class="btn" :disabled="busy" @click="restore(bk)">
-            <span v-if="busy" class="spinner" style="width: 12px; height: 12px" />
+          <UiButton :loading="busy" @click="restore(bk)">
             {{ busy ? t('settings.recoveryRestoring') : t('settings.recoveryRestoreLabel') }}
-          </button>
+          </UiButton>
         </div>
 
         <UiAlert v-if="message" :tone="message.ok ? 'success' : 'danger'" class="recovery-msg">

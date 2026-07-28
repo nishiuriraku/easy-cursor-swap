@@ -39,6 +39,19 @@ export async function invokeTauri<T = unknown>(
 }
 
 /**
+ * 戻り値を使わない IPC 呼び出し (Wave 2B / Task 5)。
+ *
+ * 例えば `revoke_github_link` のような「副作用だけあって戻り値が void なコマンド」
+ * で `invokeTauri<void>(...)` を使うと、呼び出し側でも戻り値を受ける必要があり
+ * 型の意図が伝わりにくい。`invokeTauriVoid` を経由することで:
+ *   - 戻り値 `void` であることが型で明示される (誤って `result.foo` アクセスしない)
+ *   - `null` フォールバックを透過 (Tauri 未接続環境でも await 可能)
+ */
+export async function invokeTauriVoid(cmd: string, args?: Record<string, unknown>): Promise<void> {
+  await invokeTauri<unknown>(cmd, args)
+}
+
+/**
  * 起動時または 2 重起動シグナル経由で `.cursorpack` パスが Rust 側に積まれていれば
  * 取り出す。なければ null。`useCursorpackOpener` から使う。
  */

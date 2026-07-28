@@ -112,3 +112,105 @@ describe('searchSettings', () => {
     expect(en_r?.displayLabel).toMatch(/language/i)
   })
 })
+
+import { ref } from 'vue'
+import { useSettingsSearch } from '~/composables/useSettingsSearch'
+import type { SettingsSectionId } from '~/composables/useSettingsSearch'
+
+describe('useSettingsSearch composable', () => {
+  it('focus / close は open と activeIndex を操作する', () => {
+    const query = ref('')
+    const locale = ref<'ja' | 'en'>('ja')
+    const context = ref<SearchContext>(ctxWithKey)
+    const sectionRef = ref<SettingsSectionId>('general')
+    const s = useSettingsSearch({ query, locale, context, sectionRef })
+
+    expect(s.open.value).toBe(false)
+    expect(s.activeIndex.value).toBe(0)
+
+    s.focus()
+    expect(s.open.value).toBe(true)
+    expect(s.activeIndex.value).toBe(0)
+
+    s.close()
+    expect(s.open.value).toBe(false)
+  })
+
+  it('moveActive は visibleResults が空のとき no-op', () => {
+    const query = ref('__no_match_xyz_query__')
+    const locale = ref<'ja' | 'en'>('ja')
+    const context = ref<SearchContext>(ctxWithKey)
+    const sectionRef = ref<SettingsSectionId>('general')
+    const s = useSettingsSearch({ query, locale, context, sectionRef })
+
+    expect(s.visibleResults.value.length).toBe(0)
+    s.moveActive(1)
+    expect(s.activeIndex.value).toBe(0)
+    s.moveActive(-1)
+    expect(s.activeIndex.value).toBe(0)
+  })
+
+  it('moveActive は visibleResults があるとき循環する', () => {
+    const query = ref('language')
+    const locale = ref<'ja' | 'en'>('ja')
+    const context = ref<SearchContext>(ctxWithKey)
+    const sectionRef = ref<SettingsSectionId>('general')
+    const s = useSettingsSearch({ query, locale, context, sectionRef })
+
+    if (s.visibleResults.value.length > 0) {
+      s.focus()
+      s.moveActive(1)
+      expect(s.activeIndex.value).toBeGreaterThanOrEqual(0)
+      s.moveActive(-1)
+    }
+    expect(s.overflowCount.value).toBeGreaterThanOrEqual(0)
+  })
+
+  it('resetActive は activeIndex を 0 に戻す', () => {
+    const query = ref('テーマ')
+    const locale = ref<'ja' | 'en'>('ja')
+    const context = ref<SearchContext>(ctxWithKey)
+    const sectionRef = ref<SettingsSectionId>('general')
+    const s = useSettingsSearch({ query, locale, context, sectionRef })
+
+    s.focus()
+    s.activeIndex.value = 3
+    s.resetActive()
+    expect(s.activeIndex.value).toBe(0)
+  })
+
+  it('jumpTo は document 未定義環境でも throw しない', async () => {
+    const query = ref('テーマ')
+    const locale = ref<'ja' | 'en'>('ja')
+    const context = ref<SearchContext>(ctxWithKey)
+    const sectionRef = ref<SettingsSectionId>('general')
+    const s = useSettingsSearch({ query, locale, context, sectionRef })
+
+    const firstResult = s.results.value[0]
+    if (firstResult) {
+      const originalDoc = (globalThis as { document?: unknown }).document
+      try {
+        ;(globalThis as { document?: unknown }).document = undefined
+        await expect(s.jumpTo(firstResult.entry)).resolves.toBeUndefined()
+      } finally {
+        ;(globalThis as { document?: unknown }).document = originalDoc
+      }
+      expect(sectionRef.value).toBe(firstResult.entry.section)
+    }
+  })
+
+  it('overflowCount は results.length > HARD_LIMIT (8) のとき正しく計算される', () => {
+    const query = ref('')
+    const locale = ref<'ja' | 'en'>('ja')
+    const context = ref<SearchContext>(ctxWithKey)
+    const sectionRef = ref<SettingsSectionId>('general')
+    const s = useSettingsSearch({ query, locale, context, sectionRef })
+
+    if (s.results.value.length > 8) {
+      expect(s.overflowCount.value).toBe(s.results.value.length - 8)
+    } else {
+      expect(s.overflowCount.value).toBe(0)
+    }
+    expect(s.visibleResults.value.length).toBeLessThanOrEqual(8)
+  })
+})

@@ -48,6 +48,16 @@ jobs:
         working-directory: src-tauri
         run: cargo test --lib
 
+      - name: Install cargo-llvm-cov
+        run: cargo install cargo-llvm-cov --locked --quiet
+
+      - name: cargo llvm-cov (>= 70% lines)
+        working-directory: src-tauri
+        # Build deps are needed for cargo-llvm-cov to instrument.
+        # 2026-07-28 brief deviation: measured baseline 71.59%; target 80% だったが
+        # brief 合意の下、70% に下げて wave を閉じる。差分 10pt のテスト追加は次 wave で対応。
+        run: cargo llvm-cov --lib --fail-under-lines 70
+
   # -------------------------------------------------------------
   # フロントエンド: 型生成 + 型チェック + Prettier + Vitest
   # verify-gate.sh と等価のフロント検証一式を CI でも実行する。
@@ -65,13 +75,23 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      - name: npm ci
-        run: npm ci
+      - name: npm ci (legacy-peer-deps)
+        # 2026-07-28: @nuxt/kit@4.5.1 (transitive of @nuxt/eslint) の peer dep
+        # `oxc-parser@>=0.140.0` に対し lockfile の oxc-parser は `^0.131.0` で
+        # ズレている。npm 10 系は peer dep 厳密評価のため EUSAGE で倒れる。
+        # npm 11 系 (ローカル) は緩く通るが、CI runner の npm 10.9.8 で再現する。
+        # `--legacy-peer-deps` で lockfile を厳密採用しつつ peer dep conflict を許容。
+        run: npm ci --legacy-peer-deps
 
       - name: Nuxt prepare (型生成)
         run: npx nuxi prepare
 
       - name: Vue type check
+        # 2026-07-28: package.json に vue-tsc ^2.2.12 / typescript ^5.9.3 を
+        # 明示追加して lockfile 経由で固定。`npx vue-tsc` は node_modules に
+        # インストール済みの固定版を起動するため typescript/lib/tsc の
+        # exports エラーは出ない (CI runner の node_modules/.bin は PATH に
+        # 含まれないため直接呼び出しは不可)。
         run: npx vue-tsc --noEmit
 
       - name: Prettier --check
@@ -79,6 +99,11 @@ jobs:
 
       - name: Vitest
         run: npm test
+
+      - name: Vitest coverage (>= 70% lines)
+        # 2026-07-28 brief deviation: measured baseline 69.52%; target 80% だったが
+        # brief 合意の下、70% に下げて wave を閉じる。差分 10pt のテスト追加は次 wave で対応。
+        run: npm run test:coverage -- --coverage.thresholds.lines=70
 
   # -------------------------------------------------------------
   # i18n キー差分検出 (ja/en の漏れを検出)
@@ -92,6 +117,24 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm ci
+      - run: npm ci --legacy-peer-deps
       - name: Compare ja/en keys
         run: node scripts/check-i18n.mjs
+
+  # -------------------------------------------------------------
+  # 依存監査: cargo audit (脆弱性のみ fail / unmaintained 警告は無視)
+  # rustsec/audit-check は informational advisory を check status に
+  # 反映しないため、unmaintained/yanked では fail しない。
+  # -------------------------------------------------------------
+  audit:
+    name: cargo audit (RustSec)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: cargo audit
+        uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          working-directory: src-tauri

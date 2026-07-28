@@ -10,6 +10,7 @@
 const { config: appConfig, load: loadAppConfig } = useAppSettings()
 const { t, syncFromConfig } = useI18n()
 const { themes, refresh: refreshThemes } = useThemes()
+const { notify } = useNotify()
 
 const route = useRoute()
 const router = useRouter()
@@ -137,6 +138,10 @@ function onKeydown(e: KeyboardEvent) {
 // keydown ハンドラ (フォーカス時のみ) と二重に購読する。
 let unlistenHotkey: (() => void) | null = null
 
+// Rust 側のホットキー登録 (RegisterHotKey) が失敗したとき (他アプリが占有 / 不正な
+// 文字列) に発火する `hotkey-register-failed` を購読し、Toast で通知する (audit F-19)。
+let unlistenHotkeyFailed: (() => void) | null = null
+
 onMounted(async () => {
   window.addEventListener('keydown', onKeydown)
   try {
@@ -144,6 +149,16 @@ onMounted(async () => {
     unlistenHotkey = await listen('panic-hotkey', () => {
       panicOpen.value = true
     })
+    unlistenHotkeyFailed = await listen<{ spec: string; reason: string }>(
+      'hotkey-register-failed',
+      (e) => {
+        void notify({
+          title: t('hotkey.registerFailedTitle'),
+          body: t('hotkey.registerFailedBody', { spec: e.payload.spec }),
+          level: 'warn',
+        })
+      },
+    )
   } catch {
     // Web 開発時はスキップ
   }
@@ -164,6 +179,7 @@ watch(
 onUnmounted(() => {
   window.removeEventListener('keydown', onKeydown)
   if (unlistenHotkey) unlistenHotkey()
+  if (unlistenHotkeyFailed) unlistenHotkeyFailed()
 })
 </script>
 

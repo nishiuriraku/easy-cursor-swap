@@ -175,9 +175,18 @@ export default {
     clearTitle: '編集中のアセットを破棄して初期画面に戻る',
     clearLabel: 'クリア',
     cancelExport: 'キャンセル',
+    exportStepRole: 'ロール',
+    exportStepPackage: 'パッケージ',
+    exportStepSign: '署名',
     exportFailPrefix: 'エクスポート失敗',
     appDescription: 'Windows 用カーソルテーマを 17 役割 × 6 解像度で作成しエクスポートする',
     bulkSourceEditing: '📦 編集中',
+    // 一括インポート進捗オーバーレイ (LD5)
+    bulkImporting: '一括インポート中…',
+    bulkStageScan: '走査',
+    bulkStageParse: '解析',
+    bulkStageExtract: '展開',
+    bulkCancel: '中断',
     errEditLoadFailed: '編集データの読込に失敗: {detail}',
     errSvgImageLoadFailed: 'SVG イメージの読み込みに失敗',
     errCanvas2dContext: 'Canvas 2D コンテキスト取得失敗',
@@ -207,6 +216,16 @@ export default {
       warning: '保存していない変更は復元できません',
       confirm: '破棄して続行',
     },
+    // 一括インポートフロー (useCreatorBulkImportFlow) のトースト/ラベル
+    bulkImportParseFailed: 'cursorpack 取り込み失敗: {detail}',
+    bulkImportOnlyOneCursorpack: '.cursorpack は 1 つだけ選択してください',
+    bulkImportCursorpackExclusive:
+      '.cursorpack は他のファイルと同時に取り込めません (.cursorpack 以外を取り込みました)',
+    bulkImportFilesLabel: '{count} 個のファイル',
+    bulkImportNoSupportedFiles: '対応ファイルが見つかりません',
+    bulkImportSkippedFiles: '{count} 件のファイルをスキップしました',
+    bulkImportFailed: '一括インポート失敗: {detail}',
+    bulkImportRolesApplied: '{count} 件のロールを適用しました',
   },
   panic: {
     title: 'リセットを実行',
@@ -234,6 +253,10 @@ export default {
     recoveryStarted: '復旧を開始しています…',
     recoveryDone: '{ms}ms で復旧しました',
     recoveryFailed: '復旧に失敗しました: {reason}',
+  },
+  hotkey: {
+    registerFailedTitle: 'ホットキー登録に失敗',
+    registerFailedBody: '『{spec}』は他のアプリが使用中の可能性があります。設定で別のキーに変更してください。',
   },
   settings: {
     sectionGeneral: '一般',
@@ -636,5 +659,9 @@ export default {
     validateArrowRequired: 'Arrow ロールは必須です',
     toastExportFailed: 'エクスポート失敗: {error}',
     toastRetryFailed: '再試行失敗: {error}',
+  },
+  updater: {
+    // 起動時の自動アップデート告知トースト (useUpdaterBootstrap)
+    toastUpdateAvailable: '新しいバージョン v{version} が利用可能です。設定 → 更新からダウンロードできます。',
   },
 } as const

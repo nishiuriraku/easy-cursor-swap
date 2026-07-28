@@ -2,6 +2,7 @@
 //!
 //! システムトレイ（タスクトレイ）への常駐と、トレイメニューの管理を行う。
 
+use crate::errors::{AppError, AppResult};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
@@ -9,7 +10,7 @@ use tauri::{
 };
 
 /// システムトレイを初期化する
-pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+pub fn setup_tray(app: &AppHandle) -> AppResult<()> {
     // メニューアイテムの作成
     let show_item = MenuItem::with_id(app, "show", "EasyCursorSwap を開く", true, None::<&str>)?;
     let separator1 = MenuItem::with_id(app, "sep1", "────────────", false, None::<&str>)?;
@@ -53,7 +54,7 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let icon = app
         .default_window_icon()
         .cloned()
-        .ok_or("default_window_icon が利用できません")?;
+        .ok_or_else(|| AppError::Other("default_window_icon が利用できません".to_string()))?;
 
     let _tray = TrayIconBuilder::new()
         .icon(icon)
@@ -83,24 +84,30 @@ fn handle_tray_menu_event(app: &AppHandle, menu_id: &str) {
         }
         "panic_default" => {
             tracing::info!("パニックボタン: Windows 既定に戻す");
-            match crate::registry::RegistryManager::reset_to_windows_default() {
-                Ok(_) => {
-                    tracing::info!("Windows 既定カーソルに復旧しました");
-                }
-                Err(e) => {
-                    tracing::error!("復旧に失敗: {}", e);
-                }
+            // IPC 版 (commands::system::reset_to_default) と同一の後処理に統一する:
+            // レジストリ操作 + active_theme_id クリア + cursor-changed 発火を一手に行い、
+            // SoT (config) と UI 通知を直叩き経路でも迂回させない。
+            let config = app.state::<crate::config::ConfigManager>();
+            if let Err(e) = crate::commands::system::reset_with_cleanup(
+                app.clone(),
+                config,
+                "tray_panic_default",
+                crate::registry::RegistryManager::reset_to_windows_default,
+            ) {
+                tracing::error!("復旧に失敗: {}", e);
             }
         }
         "panic_initial" => {
             tracing::info!("パニックボタン: インストール前の状態に戻す");
-            match crate::registry::RegistryManager::restore_from_initial_snapshot() {
-                Ok(_) => {
-                    tracing::info!("インストール前のカーソル設定に復旧しました");
-                }
-                Err(e) => {
-                    tracing::error!("復旧に失敗: {}", e);
-                }
+            // IPC 版 (commands::system::reset_to_initial) と同一の後処理に統一する。
+            let config = app.state::<crate::config::ConfigManager>();
+            if let Err(e) = crate::commands::system::reset_with_cleanup(
+                app.clone(),
+                config,
+                "tray_panic_initial",
+                crate::registry::RegistryManager::restore_from_initial_snapshot,
+            ) {
+                tracing::error!("復旧に失敗: {}", e);
             }
         }
         "quit" => {
@@ -151,5 +158,46 @@ pub fn show_or_recreate_main_window(app: &AppHandle) {
         Err(e) => {
             tracing::error!("メインウィンドウ再生成失敗: {}", e);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    /// トレイメニューが正しいメニュー ID 文字列で分岐される contract。
+    /// handle_tray_menu_event は private 関数なので、本テストはソースに存在する
+    /// メニュー ID 文字列がトレイで必要とされる ID と一致していることを
+    /// 静的に確認する (= 回帰防止)。これにより ID リネームで UI と動作が
+    /// 乖離するのを防ぐ。
+    #[test]
+    fn tray_menu_ids_match_expected_constants() {
+        let source = include_str!("tray.rs");
+        // メニュー ID 一覧 (handle_tray_menu_event の match 分岐と一致すべき)
+        for id in ["show", "panic_default", "panic_initial", "quit"] {
+            assert!(
+                source.contains(&format!("\"{}\"", id)),
+                "menu id {id:?} must be present in tray.rs"
+            );
+        }
+    }
+
+    /// `show_or_recreate_main_window` は `tauri::AppHandle` を要求するため unit
+    /// テストからは呼びにくい。代わりに、tauri.conf.json の `app.windows[0]` と
+    /// `show_or_recreate_main_window` 内の `WebviewWindowBuilder` 設定が一致して
+    /// いることを文字列リテラルで確認する (= タイトル / サイズ / decorations が
+    /// ズレていないかを静的に固定)。
+    #[test]
+    fn show_or_recreate_main_window_config_matches_expected_defaults() {
+        let source = include_str!("tray.rs");
+        assert!(
+            source.contains(".title(\"EasyCursorSwap\")"),
+            "window title should match tauri.conf.json"
+        );
+        assert!(
+            source.contains(".decorations(false)"),
+            "decorations must be false for AppTitlebar.vue"
+        );
+        // inner_size / min_inner_size はクロップせず存在することのみ確認
+        assert!(source.contains(".inner_size(1280.0, 820.0)"));
+        assert!(source.contains(".min_inner_size(1100.0, 760.0)"));
     }
 }

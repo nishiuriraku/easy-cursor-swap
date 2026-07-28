@@ -54,16 +54,19 @@ Windows の全 17 カーソル役割 / 6 DPI サイズに対応し、Ed25519 署
 どちらも minisign 鍵で署名されています（組み込みアップデーターが検証）。
 署名の手動検証方法は [docs/updater_signing.md](docs/updater_signing.md) を参照してください。
 
-> **SmartScreen について:** 現状このアプリは **Authenticode コード署名を未取得** です。
-> OSS 向け署名サービスの [SignPath Foundation](https://signpath.org/) に申請しましたが、
-> 外部認知 (GitHub stars / 紹介記事 / 言及) がまだ十分でないため一次審査が保留となり
-> (2026-05-21)、認知度が伸びた段階での再申請を予定しています。そのため Windows
-> SmartScreen が「不明な発行元」の警告を出すことがあります。
-> **「詳細情報」→「実行」** で続行可能です。
-> 配布物は GitHub の公開ワークフローでビルドされ、Tauri Updater 用の Ed25519
-> (minisign) 署名は付与されています。ソースは MIT ライセンスで全公開、署名ポリシー
-> (チーム構成・プライバシー・ビルド再現性・現在の署名状況) は
-> [docs/code_signing_policy.md](docs/code_signing_policy.md) を参照してください。
+> **SmartScreen について:** GitHub Releases で配布している NSIS / MSI
+> インストーラーは当面 **Authenticode コード署名を未取得** です。
+> [SignPath Foundation](https://signpath.org/) への再申請は行わず、
+> 正準の Authenticode 配布経路は **Microsoft Store の MSIX** に移行します
+> (Store 経由で配信されるパッケージは Microsoft が自動署名するため
+> SmartScreen 警告が即時解消されます)。Store トラックが開設されるまでの間、
+> GitHub Releases 上の NSIS / MSI は無署名のままで、Windows SmartScreen が
+> 「不明な発行元」の警告を出すことがあります。**「詳細情報」→「実行」** で
+> 続行可能です。配布物は GitHub の公開ワークフローでビルドされ、Tauri
+> Updater 用の Ed25519 (minisign) 署名は付与されています。ソースは MIT
+> ライセンスで全公開、署名ポリシー (チーム構成・プライバシー・ビルド
+> 再現性・現在の署名状況) は [docs/code_signing_policy.md](docs/code_signing_policy.md)
+> を参照してください。
 
 ### 自動アップデート
 
@@ -88,7 +91,7 @@ EasyCursorSwap は設定 → 更新 で **自動アップデートが有効** �
 
 ### 前提条件
 
-- [Rust](https://rustup.rs/)（stable、1.82 以降。`src-tauri/Cargo.toml` の `rust-version` で固定）
+- [Rust](https://rustup.rs/)（stable、**1.95.0 を `src-tauri/rust-toolchain.toml` で固定**。MSRV 1.82）
 - [Node.js](https://nodejs.org/) 20 以降
 - [WebView2](https://developer.microsoft.com/ja-jp/microsoft-edge/webview2/)（Windows 11 は標準搭載）
 
@@ -100,7 +103,7 @@ cd easy-cursor-swap
 npm install
 
 # 開発モードで起動（Tauri dev ウィンドウ + Nuxt HMR）
-npx tauri dev
+npm run tauri:dev
 
 # Rust の型チェックのみ
 cargo check --manifest-path src-tauri/Cargo.toml
@@ -143,7 +146,7 @@ easy-cursor-swap/
 │   ├── src/
 │   │   ├── main.rs             # エントリポイント: トレイ / ヘルスチェック
 │   │   ├── lib.rs              # モジュール宣言（23 モジュール）
-│   │   ├── commands/           # Tauri IPC コマンドハンドラー（9 サブモジュール / 52 エンドポイント）
+│   │   ├── commands/           # Tauri IPC コマンドハンドラー（9 サブモジュール / 53 エンドポイント）
 │   │   ├── config.rs           # 設定マネージャー（RwLock / スキーママイグレーション / バックアップ）
 │   │   ├── cursor/             # PNG → .cur / .ani パイプライン（6 サイズ / ホットスポット / ANI 入出力）
 │   │   ├── registry/           # HKCU レジストリ読み書き / Schemes / SPI_SETCURSORS

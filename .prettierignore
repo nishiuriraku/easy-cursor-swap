@@ -9,6 +9,11 @@ src-tauri/gen
 node_modules
 package-lock.json
 *.lock
+# ts-rs 生成物 (Rust 側 `cargo run --features typegen --bin gen_types` の出力)。
+# 生成器の出力は prettier の期待するスタイル (semi / trailing comma) と一致しないため、
+# コミット前に prettier へ掛ける代わりに verify-gate.sh の DTO drift step で
+# `app/types/generated/` との差分を直接検証する。
+app/types/generated/
 
 # 設計エクスポート (Claude Design からの一括上書き)
 design/

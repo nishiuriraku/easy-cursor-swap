@@ -15,7 +15,7 @@
 use crate::config::{AppConfig, ConfigManager};
 use crate::errors::{AppError, AppResult};
 use serde::{Deserialize, Serialize};
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 /// `profile.json` のスキーマ。
@@ -191,19 +191,14 @@ impl BackupManager {
                 std::fs::create_dir_all(&dest)?;
                 continue;
             }
+            // 申告サイズ (entry.size()) は信用できないので高速棄却にとどめ、
+            // 後段の io::copy + take で実伸長バイト数を真の上限とする。
             if entry.size() > MAX_PROFILE_FILE_SIZE {
                 return Err(AppError::Theme(format!(
                     "ファイル {} のサイズ {} bytes が上限 {} を超えています",
                     raw_name,
                     entry.size(),
                     MAX_PROFILE_FILE_SIZE
-                )));
-            }
-            total = total.saturating_add(entry.size());
-            if total > MAX_PROFILE_TOTAL_SIZE {
-                return Err(AppError::Theme(format!(
-                    ".cursorprofile 展開後合計が上限 {} を超えました",
-                    MAX_PROFILE_TOTAL_SIZE
                 )));
             }
 
@@ -216,7 +211,27 @@ impl BackupManager {
                 std::fs::create_dir_all(parent)?;
             }
             let mut out = std::fs::File::create(&dest)?;
-            std::io::copy(&mut entry, &mut out)?;
+            // 申告サイズに依存せず、実ストリーム長を `take` で上限 +1 まで読んで
+            // 実書込バイト数で判定する (申告値を偽った zip 爆弾対策)。
+            let written = std::io::copy(
+                &mut entry.by_ref().take(MAX_PROFILE_FILE_SIZE + 1),
+                &mut out,
+            )?;
+            if written > MAX_PROFILE_FILE_SIZE {
+                let _ = std::fs::remove_file(&dest);
+                return Err(AppError::Theme(format!(
+                    "ファイル {} の実サイズが上限 {} bytes を超えています",
+                    raw_name, MAX_PROFILE_FILE_SIZE
+                )));
+            }
+            // 累積サイズ: 申告値ではなく実書込バイト数を加算。
+            total = total.saturating_add(written);
+            if total > MAX_PROFILE_TOTAL_SIZE {
+                return Err(AppError::Theme(format!(
+                    ".cursorprofile 展開後合計が上限 {} を超えました",
+                    MAX_PROFILE_TOTAL_SIZE
+                )));
+            }
         }
 
         tracing::info!(

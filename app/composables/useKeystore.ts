@@ -93,3 +93,14 @@ async function remove(): Promise<boolean> {
 export function useKeystore() {
   return { info, busy, lastError, refresh, generate, remove, exportPrivate, importPrivate }
 }
+
+/**
+ * テスト間で composable singleton の状態 (info / busy / lastError) をリセットする。
+ * Vitest が `it` ごとにモジュールを再評価しないため、production 動作には一切影響しない
+ * 純粋にテストヘルパ。テスト以外からは呼ばない。
+ */
+export function __resetForTests() {
+  info.value = { has_keypair: false, key_id: null, public_key_b64: null }
+  busy.value = false
+  lastError.value = null
+}

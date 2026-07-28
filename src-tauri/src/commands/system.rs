@@ -22,7 +22,7 @@ use tauri::{AppHandle, Emitter, State};
 /// `cursor-changed` を明示発火する理由: cursor_watcher は `HWND_MESSAGE` で
 /// 作られた message-only window で WM_SETTINGCHANGE のブロードキャストを
 /// 受け取れない。SPI_SETCURSORS による即時反映だけでは UI に伝わらない。
-fn reset_with_cleanup<F>(
+pub(crate) fn reset_with_cleanup<F>(
     app: AppHandle,
     config: State<'_, ConfigManager>,
     action_label: &str,
@@ -31,7 +31,10 @@ fn reset_with_cleanup<F>(
 where
     F: FnOnce() -> Result<(), AppError>,
 {
-    registry_action()?;
+    // registry_action の失敗を早期リターンするため、closure 実行を専用ヘルパーに
+    // 切り出しておく (テストから AppHandle / State なしで同じ早期リターン契約を
+    // 検証できるようにする)。
+    run_registry_action(registry_action)?;
     if let Err(err) = config.update(|c| c.general.active_theme_id = None) {
         tracing::warn!("{}: active_theme_id クリア失敗: {}", action_label, err);
     }
@@ -39,6 +42,17 @@ where
         tracing::warn!("{}: cursor-changed emit 失敗: {}", action_label, err);
     }
     Ok(())
+}
+
+/// `reset_with_cleanup` から呼ばれる closure 実行ヘルパー。
+/// 失敗時は `Err` をそのまま呼び出し側に返す (= `reset_with_cleanup` の早期リターン
+/// を担う)。AppHandle / State を要求しないので、テストモジュールから直接呼んで
+/// closure 実行とエラー伝播の契約を検証できる。
+fn run_registry_action<F>(registry_action: F) -> Result<(), AppError>
+where
+    F: FnOnce() -> Result<(), AppError>,
+{
+    registry_action()
 }
 
 /// Windows 既定カーソルにリセットする（パニックボタン）。
@@ -79,19 +93,50 @@ pub fn get_config(config: State<'_, ConfigManager>) -> Result<AppConfig, AppErro
 
 /// アプリケーション設定を更新する。
 ///
-/// 副作用として `general.auto_start` をレジストリ (HKCU\...\Run) に同期する。
-/// 同期に失敗してもログを出すのみで設定保存自体はエラーとしない (UI 操作の妨げを防ぐため)。
+/// 入力は `AppConfigPatch` (Wave 2B / Task 3)。`schema_version` / `github_account` /
+/// セキュリティ閾値 / `favorites` / `usage` / `active_theme_id` は patch に
+/// 含まれないため、フロントから上書きされることは決してない。
+///
+/// 副作用として patch に `auto_start` があればレジストリ (HKCU\...\Run) に同期
+/// する。同期に失敗してもログを出すのみで設定保存自体はエラーとしない (UI 操作
+/// の妨げを防ぐため)。ただし警告ログには config 巻き戻し案を明示し、ユーザー
+/// が個別に再同期できる動線を残す。
+///
+/// さらに patch に `logging.level` があれば、persistence 成功後に reload
+/// handle で EnvFilter を差し替える (Wave 2B / Task 4)。無効値でも patch
+/// 検証 (apply_patch) 時点で `AppError::Config` が返るので reload 経路では
+/// 到達しない。reload 自体に失敗したらエラーを返す (= persistence はロールバック
+/// しない / 次の IPC 呼出で再設定すれば次回は reload 成功する設計)。
 #[tauri::command]
 pub fn update_config(
     config: State<'_, ConfigManager>,
-    updates: AppConfig,
+    updates: crate::config::patch::AppConfigPatch,
 ) -> Result<AppConfig, AppError> {
-    let auto_start = updates.general.auto_start;
-    let saved = config.update(|c| {
-        *c = updates;
-    })?;
-    if let Err(e) = autostart::set_enabled(auto_start) {
-        tracing::warn!("自動起動レジストリ同期失敗: {}", e);
+    // 同期判定は patch の値だけを見る。`None` ならレジストリに書かない
+    // (= 現在の config 値を維持)。「旧 UI が `auto_start` 変更なしでも
+    // 同期を再走させる」ような副作用を避ける。
+    let auto_start = updates.general.as_ref().and_then(|g| g.auto_start);
+    let new_logging_level = updates.logging.as_ref().and_then(|l| l.level.clone());
+    let saved = config.apply_patch(updates)?;
+    if let Some(target) = auto_start {
+        // 自動起動のレジストリ同期は antivirus / セキュリティソフト等がロックしたり
+        // HKCU ポリシーで禁じられたりして失敗し得る。設定保存自体は atomic write
+        // で成功しているため UI 操作 (設定変更) は確定させ、レジストリ側の不整合
+        // は運用で解消する方針。
+        if let Err(e) = autostart::set_enabled(target) {
+            tracing::warn!(
+                "update_config: 自動起動レジストリ同期失敗 (config.json への保存は成功, \
+                 auto_start={} は config に反映済)。OS 側 Run キー (HKCU\\...\\Run) への反映が \
+                 ブロックされた可能性があります。復旧: 設定 → 一般 → 自動起動 を再トグルするか、 \
+                 アプリ再起動後にレジストリ実体から config を再同期してください: {}",
+                target,
+                e
+            );
+        }
+    }
+    if let Some(level) = new_logging_level {
+        // persistence 後は reload するだけ。失敗時は visible error (永続化は維持)
+        crate::logging::set_logging_level(&level)?;
     }
     Ok(saved)
 }
@@ -157,7 +202,7 @@ fn get_os_version() -> String {
     }
 }
 
-#[cfg(all(test, windows))]
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -166,6 +211,7 @@ mod tests {
     /// 旧実装は `OSVERSIONINFOW::default()` のフィールドゼロから "Windows 0.0"
     /// を返していた回帰防止。
     #[test]
+    #[cfg(windows)]
     fn get_os_version_returns_real_windows_version() {
         let v = get_os_version();
         assert!(v.starts_with("Windows "), "unexpected prefix: {v}");
@@ -211,6 +257,152 @@ mod tests {
         assert!(!is_allowed_url_scheme(""));
         // scheme 違い
         assert!(!is_allowed_url_scheme("ftp://example.com"));
+    }
+
+    /// 許可スキーム 3 種以外の追加ブロック: SSH や mailto のような便利そうに見えるが
+    /// 任意アプリ起動に繫がるスキームを拒否することを確認する。
+    #[test]
+    fn is_allowed_url_scheme_rejects_other_potentially_dangerous_schemes() {
+        assert!(!is_allowed_url_scheme("ssh://example.com"));
+        assert!(!is_allowed_url_scheme("mailto:user@example.com"));
+        assert!(!is_allowed_url_scheme("tel:+1234567890"));
+        assert!(!is_allowed_url_scheme("about:blank"));
+        assert!(!is_allowed_url_scheme("vbscript:msgbox(1)"));
+        // scheme 部が完全一致しない類似文字列
+        assert!(!is_allowed_url_scheme("HTTPS://example.com"));
+        assert!(!is_allowed_url_scheme("Ms-Settings:display"));
+    }
+
+    /// `open_url` が許可スキーム判定を経由して `AppError::InvalidInput` を返すことを確認する。
+    /// Windows 以外では OS 依存の `ShellExecuteW` 経路ではなく、`AppError::Other` を返す。
+    #[test]
+    fn open_url_rejects_disallowed_scheme() {
+        let err = open_url("javascript:alert(1)".to_string()).expect_err("must error");
+        if cfg!(windows) {
+            match err {
+                AppError::InvalidInput(msg) => assert!(
+                    msg.contains("javascript:alert(1)"),
+                    "InvalidInput should contain URL: {msg}"
+                ),
+                other => panic!("expected InvalidInput on Windows, got {other:?}"),
+            }
+        } else {
+            match err {
+                AppError::Other(msg) => assert!(
+                    msg.contains("Windows"),
+                    "Other should explain Windows-only restriction: {msg}"
+                ),
+                other => panic!("expected Other on non-Windows, got {other:?}"),
+            }
+        }
+    }
+
+    /// `open_url` の https URL は許可スキーム判定を通過する。
+    /// Windows 以外では `AppError::Other` (= "Windows 専用") を返す。
+    /// Windows では ShellExecuteW の戻り値に依存するため、合成 shell call を
+    /// 避けるためここでは URL 許可判定 (前段) のみを確認する。
+    #[test]
+    fn open_url_passes_scheme_check_for_https() {
+        // 許可判定 (`is_allowed_url_scheme`) は環境非依存。
+        // `open_url` 本体は環境依存のため、ここではスキップし、許可判定のみ確認。
+        assert!(is_allowed_url_scheme("https://example.com"));
+    }
+
+    /// `reset_with_cleanup` の closure が `Err` を返すと、`update` も `emit` も
+    /// 走らず closure の Err がそのまま伝播することを確認する。
+    /// これにより、registry アクションが失敗したときに config を勝手に書き換えて
+    /// しまう (= UI 側が見て混乱する) ことを防ぐ。
+    ///
+    /// AppHandle / State は作れないので、`reset_with_cleanup` 内部で closure 実行
+    /// と早期リターンを担う `run_registry_action` を直接呼んで契約を検証する。
+    /// 副作用として closure の呼び出し回数をカウントし、closure が実際に 1 回
+    /// 呼ばれて Err がそのまま返る (= 二度走ったり握り潰されたりしない) ことを確認する。
+    #[test]
+    fn reset_with_cleanup_propagates_registry_failure() {
+        use std::cell::Cell;
+
+        let invocations = Cell::new(0u32);
+        let result = run_registry_action(|| {
+            invocations.set(invocations.get() + 1);
+            Err(AppError::Registry("boom".to_string()))
+        });
+
+        // closure が 1 度だけ呼ばれ、Err がそのまま伝播することを確認
+        assert_eq!(
+            invocations.get(),
+            1,
+            "registry_action should run exactly once"
+        );
+        match result {
+            Err(AppError::Registry(msg)) => assert_eq!(msg, "boom"),
+            other => panic!("expected Registry error, got {other:?}"),
+        }
+    }
+
+    /// `reset_with_cleanup` の closure が `Ok(())` を返すと、`run_registry_action`
+    /// 側でも `Ok(())` がそのまま返る (= 早期リターン条件に引っかからない) ことを確認する。
+    /// これにより、`reset_with_cleanup` 側で `config.update` / `app.emit` まで到達する
+    /// 正常系の入口条件が固定される。
+    #[test]
+    fn reset_with_cleanup_returns_ok_when_registry_action_succeeds() {
+        let result = run_registry_action(|| Ok(()));
+        assert!(
+            result.is_ok(),
+            "success closure should pass through unchanged"
+        );
+    }
+
+    /// `check_update_is_major_jump` IPC は `is_major_bump` に委譲するだけの薄いラッパー。
+    /// バージョンパース失敗・正常跨ぎ・ダウングレード・サフィックス付きビルドの
+    /// 各境界で UI 側 (= Toast 抑制判定) が誤動作しないことを保証する。
+    #[test]
+    fn check_update_is_major_jump_delegates_to_is_major_bump() {
+        // メジャー跨ぎ → true
+        assert!(check_update_is_major_jump(
+            "0.1.0".to_string(),
+            "1.0.0".to_string()
+        ));
+        assert!(check_update_is_major_jump(
+            "0.9.9".to_string(),
+            "1.0.0-rc.1".to_string()
+        ));
+
+        // 同一 / minor / patch のみ → false
+        assert!(!check_update_is_major_jump(
+            "1.0.0".to_string(),
+            "1.0.0".to_string()
+        ));
+        assert!(!check_update_is_major_jump(
+            "1.0.0".to_string(),
+            "1.5.0".to_string()
+        ));
+        assert!(!check_update_is_major_jump(
+            "1.0.0".to_string(),
+            "1.0.1".to_string()
+        ));
+
+        // ダウングレード → false (誤警告防止)
+        assert!(!check_update_is_major_jump(
+            "2.0.0".to_string(),
+            "1.9.9".to_string()
+        ));
+
+        // パース不能入力 → false (安全側に倒れる)
+        assert!(!check_update_is_major_jump(
+            "not-a-version".to_string(),
+            "still-not".to_string()
+        ));
+        assert!(!check_update_is_major_jump("".to_string(), "".to_string()));
+    }
+
+    /// `ALLOWED_URL_SCHEME_PREFIXES` は固定の 3 種のみであることを保証する。
+    /// うっかり要素を追加 / 削除すると許可ポリシーが変わるのでテストで固める。
+    #[test]
+    fn allowed_url_scheme_prefixes_is_locked_to_three_known_schemes() {
+        assert_eq!(ALLOWED_URL_SCHEME_PREFIXES.len(), 3);
+        assert!(ALLOWED_URL_SCHEME_PREFIXES.contains(&"https://"));
+        assert!(ALLOWED_URL_SCHEME_PREFIXES.contains(&"http://"));
+        assert!(ALLOWED_URL_SCHEME_PREFIXES.contains(&"ms-settings:"));
     }
 }
 

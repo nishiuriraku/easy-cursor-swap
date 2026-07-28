@@ -1,63 +1,47 @@
 /**
  * 公式インデックス (Marketplace) 関連の型定義。
  * `nishiuriraku/easy-cursor-swap-index` リポジトリの `index.json` スキーマに準拠。
+ *
+ * 構造体型は `ts-rs` で `app/types/generated/` に自動生成される
+ * (`cargo run --manifest-path src-tauri/Cargo.toml --features typegen --bin gen_types`)。
+ * このファイルは **stable な再エクスポート面 (shim)** として機能し、
+ * 生成物のファイル名が変わっても既存 import
+ * (`import type { MarketplaceEntry } from '~/types/marketplace'`) を壊さない。
+ *
+ * ここで手書きするのは UI 専用のフィルタ型 (MarketplaceTag / ALLOWED_MARKETPLACE_TAGS /
+ * AllowedMarketplaceTag) と、generated に無い旧名 (MarketplaceName) の後方互換 alias のみ。
  */
+
+export type {
+  BackupInfo,
+  MarketplaceEntry,
+  MarketplaceIndex,
+  MarketplaceInstallRequest,
+} from './generated'
+
+import type { LocalizedString } from './generated'
 
 /**
  * Marketplace エントリの name 表現。
  *
- * Rust 側の `crate::theme::LocalizedString` (`#[serde(untagged)]`) と対称。
- * 後方互換のため 2 形式を許容する:
- *  - **plain string**: 既存の curated index と同じ。全ロケールで同じ値。
- *  - **localized map**: `{ ja: '...', en: '...', default: '...' }` のキー → 値マップ。
- *    UI 側で `useI18n().locale` に応じて表示を切り替える。
+ * Rust 側 `crate::theme::LocalizedString` (`#[serde(untagged)]`) と対称で、
+ * 生成出力は `LocalizedString` 名。`MarketplaceName` は旧 hand-written 名の
+ * 後方互換 alias として残している。
  *
  * 表示するときは `composables/pickLocalizedName.ts` の `pickLocalizedName()` を通すこと。
  * 生で `entry.name` を描画すると plain string ケースしか動かず、localized エントリで
  * `[object Object]` が表示されるので注意。
+ *
+ * @deprecated generated 側の `LocalizedString` を直接 import してください。
+ *             この alias は既存呼び出しを壊さないための一時的なシムです。
  */
-export type MarketplaceName = string | Record<string, string>
+export type MarketplaceName = LocalizedString
 
-export interface MarketplaceEntry {
-  /** UUID */
-  id: string
-  name: MarketplaceName
-  author: string
-  /** GitHub username (公開鍵照合に使用) */
-  authorGithub: string
-  homepage?: string
-  /** ZIP の SHA-256 (16進文字列) */
-  sha256: string
-  /** Ed25519 署名 (Base64) */
-  signature: string
-  /** 公開鍵 ID (公開鍵 SHA-256 の先頭 16 文字) */
-  authorPubkeyId: string
-  /** 直接ダウンロード URL */
-  downloadUrl: string
-  version: string
-  /**
-   * ダウンロード回数。
-   * 現状 raw.githubusercontent.com 直 DL のためカウント供給源が無く、index.json では常に 0。
-   * UI からは非表示 (FeaturedCard / MarketplaceDetailModal とも DL 数表示を撤去)。
-   * Rust 側 (`MarketplaceEntry.download_count`) と index スキーマには互換のため残してある。
-   */
-  downloadCount: number
-  /** プレビュー用の役割 ID 一覧 */
-  includedRoles: string[]
-  /** タグ (Pixel / Minimal / Animated / Dark など) */
-  tags: string[]
-  /** "新着" "人気" などの強調ラベル */
-  highlight?: 'new' | 'popular' | null
-  /** 検証ステータス: signature 検証 + マルウェアハッシュチェック完了 */
-  verified: boolean
-  /**
-   * 公式インデックス側 previews/<uuid>/ のベース URL。
-   * 詳細モーダルで <role>.png を組み立てて取得するために使う。
-   * 未定義の場合はサムネ表示を SVG にフォールバック。
-   */
-  previewBaseUrl?: string
-}
-
+/**
+ * UI フィルタ専用タグ列挙。`'all'` を含むのは UI 都合のためで、公式インデックス
+ * のスキーマ (`easy-cursor-swap-index/schemas/index-entry.json#tags.items.enum`)
+ * とは別概念。`ALLOWED_MARKETPLACE_TAGS` 側だけが index repo と同期する。
+ */
 export type MarketplaceTag = 'all' | 'pixel' | 'minimal' | 'animated' | 'dark'
 
 /**

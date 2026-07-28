@@ -196,6 +196,9 @@ onBeforeRouteLeave((_to, _from, next) => {
 
 // --- 一括インポート ---
 const bulkImport = useBulkImport()
+// LD5: resolve/parse 中 (プレビューモーダルが開く前) のオーバーレイ表示用に
+// busy / progress を取り出す。これが無いと解析中 UI が無反応に見える。
+const { busy: bulkBusy, progress: bulkProgress } = bulkImport
 const pickers = useCreatorPickers()
 
 // 既存テーマ複製ピッカー
@@ -945,6 +948,16 @@ async function onFileChange(e: Event) {
         @cancel="cancelBulkImport"
       />
     </template>
+
+    <!-- LD5: 一括インポート (resolve/parse) 中の進捗オーバーレイ。start / editing どちらの
+         stage でも表示する必要がある — 新規作成フローは resolve 完了後に editing へ遷移するため、
+         editing ブロック (v-else) 内に置くと resolve 中はマウントされず無反応に見える。
+         .bulk-overlay は position:fixed なので v-if/v-else チェーンの外・任意位置に置いてよい。 -->
+    <BulkImportProgressOverlay
+      v-if="bulkBusy"
+      :progress="bulkProgress"
+      @cancel="bulkImport.cancel"
+    />
 
     <!--
       新規作成モーダルは v-if/v-else チェーンの外に置く。

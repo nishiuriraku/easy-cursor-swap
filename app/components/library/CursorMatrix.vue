@@ -20,6 +20,9 @@ const props = defineProps<{
   limit?: number
   /** グリッドの列数。既定 6 (従来の 6x3 表示)。3 を指定するとライブラリカード向けの 3x2 表示になる。 */
   cols?: 3 | 6
+  /** PNG プレビュー取得中フラグ。true の間は included セルをスケルトンで埋め、
+   *  SVG→PNG のちらつき / await 中ブランクを防ぐ (LD6)。 */
+  loading?: boolean
 }>()
 
 /** 描画対象セル。limit 指定時のみ included ベース、未指定時は従来の 17 セル表示。 */
@@ -48,8 +51,9 @@ const displayCells = computed<Array<{ role: CursorRoleDef; included: boolean }>>
       :title="cell.role.jp"
     >
       <template v-if="cell.included">
+        <UiSkeleton v-if="loading" width="68%" height="68%" radius="3px" />
         <img
-          v-if="previewMap && previewMap[cell.role.id]"
+          v-else-if="previewMap && previewMap[cell.role.id]"
           :src="previewMap[cell.role.id]"
           :alt="cell.role.jp"
           class="cell-img"

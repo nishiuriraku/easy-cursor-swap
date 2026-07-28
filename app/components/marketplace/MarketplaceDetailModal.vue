@@ -30,8 +30,11 @@ const emit = defineEmits<{
 
 const isOpen = computed(() => props.entry !== null)
 const previewMap = ref<Record<string, string> | null>(null)
+/** プレビュー PNG 取得中フラグ。CursorMatrix の per-cell skeleton 表示に使う (LD6)。 */
+const previewLoading = ref(false)
 const { getMap } = useMarketplacePreviews()
 const { themes } = useThemes()
+const { openExternalUrl } = useExternalUrl()
 
 const alreadyInstalled = computed(() => {
   const id = props.entry?.id
@@ -55,15 +58,29 @@ const ariaLabel = computed(() =>
 
 async function fetchPreviews(entry: MarketplaceEntry | null) {
   previewMap.value = null
-  if (!entry || !entry.previewBaseUrl) return
-  const map = await getMap(entry.id, entry.previewBaseUrl)
-  previewMap.value = map
+  if (!entry || !entry.previewBaseUrl) {
+    previewLoading.value = false
+    return
+  }
+  previewLoading.value = true
+  try {
+    const map = await getMap(entry.id, entry.previewBaseUrl)
+    previewMap.value = map
+  } finally {
+    previewLoading.value = false
+  }
 }
 
 watch(() => props.entry, fetchPreviews, { immediate: true })
 
 function close() {
   emit('close')
+}
+
+// F-17: homepage を <a :href> 直結ではなく useExternalUrl 経由で開く (第二防御線)。
+// open_url IPC 側で is_allowed_url_scheme が再検証する。
+function openHomepage() {
+  if (props.entry?.homepage) openExternalUrl(props.entry.homepage)
 }
 
 function onInstall() {
@@ -88,6 +105,7 @@ function onInstall() {
         <CursorMatrix
           :included="entry.includedRoles"
           :preview-map="previewMap"
+          :loading="previewLoading"
           :limit="6"
           :cols="3"
         />
@@ -108,9 +126,9 @@ function onInstall() {
         </div>
         <div v-if="entry.homepage" class="md-row">
           <span class="md-k">Homepage</span>
-          <a :href="entry.homepage" target="_blank" rel="noopener noreferrer" class="md-v link">{{
-            entry.homepage
-          }}</a>
+          <button type="button" class="md-v link" @click="openHomepage">
+            {{ entry.homepage }}
+          </button>
         </div>
       </div>
     </template>
@@ -119,6 +137,7 @@ function onInstall() {
       <UiButton variant="ghost" @click="close">{{ t('common.cancel') }}</UiButton>
       <UiButton
         variant="primary"
+        :loading="installing"
         :disabled="alreadyInstalled || installing"
         :icon-left="alreadyInstalled ? 'Check' : 'Import'"
         @click="onInstall"
@@ -157,7 +176,7 @@ function onInstall() {
   @apply text-fg-dim;
 }
 .md-v.link {
-  @apply text-accent underline;
+  @apply cursor-pointer border-0 bg-transparent p-0 text-left text-accent underline;
 }
 .chips-row {
   @apply inline-flex flex-wrap gap-1;

@@ -18,7 +18,7 @@ use app_lib::cursor_watcher;
 use app_lib::health::{RollbackTarget, StartupCheck};
 use app_lib::hotkey;
 use app_lib::logging;
-use app_lib::registry::RegistryManager;
+use app_lib::registry::{PendingSnapshotState, RegistryManager};
 use app_lib::tray;
 
 /// 連続起動失敗 3 回検出時のロールバック案内ダイアログ。
@@ -218,6 +218,18 @@ fn main() {
         }
     };
 
+    // 設定読込後、config.json の logging.level を反映 (Wave 2B / Task 4)。
+    // 無効値 (改ざん等) でも起動は止めない: warn を出して INFO のまま。
+    if let Ok(cfg) = config_manager.get() {
+        if let Err(e) = logging::set_logging_level(&cfg.logging.level) {
+            tracing::warn!(
+                "config.json の logging.level='{}' は無効: {} (INFO のまま起動します)",
+                cfg.logging.level,
+                e
+            );
+        }
+    }
+
     // 自動起動レジストリ (HKCU\...\Run) を config に追従させる
     // ユーザーが手動で削除していても起動のたびに復元される (config が Source of Truth)
     {
@@ -243,20 +255,49 @@ fn main() {
         Err(e) => tracing::warn!("孤児カーソルチェックに失敗: {}", e),
     }
 
-    // クラッシュリカバリ: pending スナップショットの確認
-    match RegistryManager::check_pending_snapshot() {
-        Ok(Some(_snapshot)) => {
-            tracing::warn!("前回の適用処理が中断されていました。復元を開始します...");
-            // スナップショットから復元
+    // クラッシュリカバリ: pending スナップショットの確認 (Wave 2AB Task 8 マーカーベース)
+    //
+    // 中断時の復旧には 2 経路ある:
+    //  (a) プロセス生存中の apply 失敗 → `apply_cursors` 内で `restore_from_snapshot`
+    //      により「適用前の値」へ正確に巻き戻す (in-process ロールバック)。
+    //  (b) ここ = クラッシュ後の再起動 → どの役割まで書けたか不明でレジストリが
+    //      混在状態になり得る。適用前値の部分復元は不整合を残すため、Windows 既定へ
+    //      リセットして安全側に倒す (意図的な設計。バグ修正ではない)。
+    //
+    // `PendingSnapshotState` 3 状態のうち、`Valid` と `Unreadable` (= ファイルは
+    // 存在するが破損 / 中途書込) はどちらも「Windows 既定へリセット」する。
+    // metadata の parse 試行は診断用 (logging) のみで、リカバリ判定には
+    // **ファイル存在のみ** を反映する。これにより「unreadable だから何もしない」
+    // 事故を防ぐ。
+    match RegistryManager::inspect_pending_snapshot() {
+        Ok(PendingSnapshotState::Valid(_snapshot)) => {
+            tracing::warn!(
+                "前回の適用処理が中断されていました。Windows 既定へリセットします (適用前への復元ではない)"
+            );
             if let Err(e) = RegistryManager::reset_to_windows_default() {
                 tracing::error!("クラッシュリカバリに失敗: {}", e);
             } else {
-                tracing::info!("クラッシュリカバリ完了");
+                tracing::info!("クラッシュリカバリ完了 (Windows 既定へリセット)");
             }
-            // スナップショットを削除
             let _ = RegistryManager::remove_pending_snapshot();
         }
-        Ok(None) => {
+        Ok(PendingSnapshotState::Unreadable { reason }) => {
+            // 破損 / 中途書込 → ファイルの中身は無視し、安全側 (= Windows 既定
+            // リセット) に倒す。
+            tracing::warn!(
+                "pending スナップショットが破損しています ({}). Windows 既定へリセットします",
+                reason
+            );
+            if let Err(e) = RegistryManager::reset_to_windows_default() {
+                tracing::error!("クラッシュリカバリ (unreadable snapshot) に失敗: {}", e);
+            } else {
+                tracing::info!(
+                    "クラッシュリカバリ完了 (Windows 既定へリセット; unreadable snapshot)"
+                );
+            }
+            let _ = RegistryManager::remove_pending_snapshot();
+        }
+        Ok(PendingSnapshotState::Absent) => {
             tracing::debug!("pending スナップショットなし（正常）");
         }
         Err(e) => {
@@ -299,7 +340,6 @@ fn main() {
             tracing::info!("第二インスタンス要求でメインウィンドウを前面化");
         }))
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
@@ -352,16 +392,41 @@ fn main() {
             // 押下時はフロントへ `panic-hotkey` イベントを発火し、PanicFlow を起動させる
             let hotkey_handle = handle.clone();
             let spec = hotkey_spec.clone();
-            if let Err(e) = hotkey::register_panic_hotkey(&spec, move || {
+            // 登録失敗時 (他アプリがホットキーを占有 等) に UI へ伝えるための結果通知ハンドラ。
+            // バックグラウンドスレッドの登録成否は戻り値では分からないため on_result で受ける (F-19)。
+            let result_handle = handle.clone();
+            let result_spec = hotkey_spec.clone();
+            if let Err(e) = hotkey::register_panic_hotkey(
+                &spec,
+                move || {
+                    use tauri::Emitter;
+                    tracing::info!("panic-hotkey イベントを発火");
+                    // 破棄されていれば再生成してから前面化
+                    tray::show_or_recreate_main_window(&hotkey_handle);
+                    if let Err(err) = hotkey_handle.emit("panic-hotkey", ()) {
+                        tracing::warn!("panic-hotkey emit 失敗: {}", err);
+                    }
+                },
+                move |res| {
+                    use tauri::Emitter;
+                    if let Err(reason) = res {
+                        tracing::warn!("パニックホットキー登録に失敗: {}", reason);
+                        let payload = serde_json::json!({ "spec": result_spec, "reason": reason });
+                        if let Err(err) = result_handle.emit("hotkey-register-failed", payload) {
+                            tracing::warn!("hotkey-register-failed emit 失敗: {}", err);
+                        }
+                    }
+                },
+            ) {
+                // ここに来るのは parse 失敗 (spawn 前の早期 Err)。on_result は呼ばれないので
+                // ここでも同じイベントを emit して UI に伝える。
                 use tauri::Emitter;
-                tracing::info!("panic-hotkey イベントを発火");
-                // 破棄されていれば再生成してから前面化
-                tray::show_or_recreate_main_window(&hotkey_handle);
-                if let Err(err) = hotkey_handle.emit("panic-hotkey", ()) {
-                    tracing::warn!("panic-hotkey emit 失敗: {}", err);
-                }
-            }) {
                 tracing::warn!("パニックホットキー登録に失敗: {}", e);
+                let payload =
+                    serde_json::json!({ "spec": hotkey_spec.clone(), "reason": e.to_string() });
+                if let Err(err) = handle.emit("hotkey-register-failed", payload) {
+                    tracing::warn!("hotkey-register-failed emit 失敗: {}", err);
+                }
             }
 
             // 外部カーソル変更監視 — コントロールパネル等で書き換えられたら UI を再読込

@@ -39,7 +39,6 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
     tauri::generate_handler![
         // テーマ
         theme::get_themes,
-        theme::get_theme_previews,
         theme::get_theme_role_previews,
         theme::apply_theme,
         theme::set_theme_favorite,
@@ -49,7 +48,6 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         theme::duplicate_theme,
         theme::repackage_theme,
         // .cur / .cursorpack ビルド
-        cursor_build::export_cursorpack,
         cursor_build::stream::export_cursorpack_streamed,
         cursor_build::cancel_build,
         // .cursorpack ファイル関連付けハンドオフ
@@ -76,7 +74,6 @@ pub fn get_command_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         // Windows カーソルスキーム
         windows_scheme::list_windows_schemes,
         windows_scheme::apply_windows_scheme,
-        windows_scheme::get_windows_scheme_previews,
         windows_scheme::get_windows_scheme_role_previews,
         windows_scheme::export_windows_scheme_as_cursorpack,
         // システム / 設定 / 診断

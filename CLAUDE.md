@@ -12,7 +12,7 @@ Domain-specific guidance lives in nested files (auto-loaded when working under t
 EasyCursorSwap (`package.json` name: `easy-cursor-swap`) — a Windows-only desktop app for managing custom mouse cursor themes. Tauri v2 + Nuxt 4 + Rust hybrid. The project lives at the repo root (no `easy-cursor-swap/` subdirectory).
 
 - **Target:** Windows 10 22H2+ / Windows 11, x64 (ARM64 planned)
-- **Distribution:** NSIS / MSI installers (Authenticode signing pending — SignPath Foundation OSS application was deferred 2026-05-21 for insufficient external visibility; `release.yml` SignPath step is wired and skip-guarded so it activates automatically when SIGNPATH\_\* secrets are configured after reapproval); Tauri Updater with Ed25519-signed releases (active)
+- **Distribution:** NSIS / MSI installers (Authenticode signing pending — GitHub Releases path is unsigned for the foreseeable future; Microsoft Store MSIX is the canonical Authenticode path going forward per 2026-07-25 policy change, with SignPath reapplication explicitly declined. See [docs/authenticode_signing.md](docs/authenticode_signing.md)); Tauri Updater with Ed25519-signed releases (active)
 
 ## Documentation map
 
@@ -35,7 +35,7 @@ When documents disagree, the **Layer1 markdown** is canonical; `reference/index.
 These apply regardless of which side you're working on. Full list (including module-specific ones) is in the Obsidian vault `develop/easy-cursor-swap/shared/invariants.md` (Layer1 canonical home; `invariants:` frontmatter lists all ids).
 
 - **HKCU only.** Never touch HKLM or anything that triggers UAC.
-- **Apply is transactional.** `registry/mod.rs` writes a snapshot to `~/.custom_cursors/_pending_apply.snapshot` before mutating, deletes it on success. On startup, a leftover snapshot triggers auto-rollback. `_initial_snapshot.json` (first-run) is restored by the panic button (`Ctrl+Alt+Shift+R`).
+- **Apply is transactional (2 recovery paths).** `registry/mod.rs` writes a snapshot to `~/.custom_cursors/_pending_apply.snapshot` before mutating, deletes it on success. (a) **In-process write failure** → `restore_from_snapshot` rolls the registry back to the **pre-apply values** (exact restore). (b) **Leftover snapshot on startup** → means a previous apply was interrupted (likely a crash); since the registry may be in a mixed/partial state, `reset_to_windows_default` resets to **Windows default — NOT the pre-apply values** (intentional safety choice to avoid a mixed state, not a bug). `_initial_snapshot.json` (first-run) is restored by the panic button (`Ctrl+Alt+Shift+R`).
 - **Cursor files live in `~/.custom_cursors/`** so they survive uninstall.
 - **PII redaction in logs.** Raw paths via `logging::redact_path`, hashes via `logging::short_hash` (12 chars). No raw registry values, no full SHA-256.
 - **Archive sanitisation.** Any code unzipping `.cursorpack` / `.cursorprofile` must go through `theme::sanitize_archive_path` and the size limits (50 MB compressed / 200 MB expanded / 10 MB per image / 1 GB total user storage).
@@ -108,6 +108,14 @@ Living docs must move with the code. Triggers and required updates:
 ## Workflow rule (auto-memory)
 
 One feature = one commit. Run `bash scripts/verify-gate.sh` and confirm green before committing. (Docs-only commits skip the gate.)
+
+## Token economy(トークン節約)
+
+- 応答は結論先行・最小限。編集済みコードの再掲、ファイル内容のエコー、採用しない選択肢の列挙をしない。
+- ビルド/テスト/lint の生ログを会話に流さない。失敗時は該当行±数行のみ引用。フルゲートは verify-gate-runner subagent に隔離する。
+- ファイルの全読みより Grep / 部分 Read(offset+limit)を優先する。
+- 長いログ解析・大 diff レビューは subagent に委譲し、要約だけ本会話に戻す。
+- 自走作業では output style を default にする(explanatory の解説ブロックは出力トークンを増やす)。
 
 ## CI workflows
 

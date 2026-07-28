@@ -1,0 +1,6 @@
+[env]
+# ts-rs の出力先ディレクトリ (リポジトリルートからの相対パス)。
+# `cargo run --features typegen --bin gen_types` でこのディレクトリに
+# `AppConfig.ts` / `MarketplaceEntry.ts` などが書き出される。
+# value だけ指定だと cwd 依存になるため、relative=true でリポジトリルート固定。
+TS_RS_EXPORT_DIR = { value = "app/types/generated", relative = true }

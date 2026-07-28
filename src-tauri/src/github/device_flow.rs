@@ -3,7 +3,7 @@
 //! [GitHub 公式仕様](https://docs.github.com/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#device-flow)
 //!
 //! 単一の HTTP 呼び出しのみを行う。
-//! ポーリング間隔・期限切れ判定は呼び出し側 (`commands/marketplace_submit.rs`) に任せ、
+//! ポーリング間隔・期限切れ判定は呼び出し側 (`commands/marketplace_submit/mod.rs`) に任せ、
 //! ここはステートレスに `start` と `poll` を 1 回ずつ提供する。
 
 use crate::errors::{AppError, AppResult};

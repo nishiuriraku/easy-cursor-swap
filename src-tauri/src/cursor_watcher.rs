@@ -62,9 +62,10 @@ where
             };
 
             // 不可視ウィンドウなのでフォーカスは奪わない
+            // ポイズン (前回 lock 保持中の panic) でも回収して書き込む。
             CURSOR_CHANGE_CALLBACK
                 .lock()
-                .unwrap()
+                .unwrap_or_else(|e| e.into_inner())
                 .replace(Box::new(on_change));
             tracing::info!("カーソル設定変更監視を開始しました");
 
@@ -102,13 +103,49 @@ unsafe extern "system" fn cursor_wnd_proc(
         const SPI_SETCURSORS: usize = 0x0057;
         if wparam.0 == SPI_SETCURSORS {
             tracing::debug!("SPI_SETCURSORS 変更を検知");
-            if let Ok(cb) = CURSOR_CHANGE_CALLBACK.lock() {
-                if let Some(ref callback) = *cb {
-                    callback();
-                }
+            // ポイズンしていてもコールバックは実行する (UI 再読込の取りこぼしを防ぐ)。
+            let cb = CURSOR_CHANGE_CALLBACK
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            if let Some(ref callback) = *cb {
+                callback();
             }
         }
     }
 
     DefWindowProcW(hwnd, msg, wparam, lparam)
+}
+
+#[cfg(test)]
+mod tests {
+    /// `start_cursor_watcher` は非 Windows では `Ok(())` を返しつつ何もしない contract。
+    /// CI (Linux / macOS) で `cargo test --lib` が動くためには Windows guard が必須で、
+    /// この経路を動作レベルで固定する。
+    #[cfg(not(windows))]
+    #[test]
+    fn start_cursor_watcher_is_ok_noop_on_non_windows() {
+        let called = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let called_inner = std::sync::Arc::clone(&called);
+        let result = crate::cursor_watcher::start_cursor_watcher(move || {
+            called_inner.store(true, std::sync::atomic::Ordering::SeqCst);
+        });
+        assert!(result.is_ok(), "non-Windows path must return Ok(())");
+        // コールバックは呼ばれない (Windows guard が走らないため)
+        assert!(
+            !called.load(std::sync::atomic::Ordering::SeqCst),
+            "non-Windows: callback must never fire"
+        );
+    }
+
+    /// `start_cursor_watcher` の引数 closure は `Fn() + Send + 'static` を要求する。
+    /// このシグネチャが崩れるとモジュールがコンパイルできなくなるので、
+    /// ダミー closure を渡して受理されることだけ確認する (非 Windows 経路)。
+    #[cfg(not(windows))]
+    #[test]
+    fn start_cursor_watcher_accepts_send_static_closure() {
+        let result = crate::cursor_watcher::start_cursor_watcher(|| {
+            // Fn() + Send + 'static を満たす何もしない closure
+        });
+        assert!(result.is_ok());
+    }
 }

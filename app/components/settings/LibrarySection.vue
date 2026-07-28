@@ -69,20 +69,18 @@ defineEmits<{
           :label="t('settings.profileExportLabel')"
           :desc="t('settings.profileExportDesc')"
         >
-          <button class="btn" :disabled="profileBusy" @click="$emit('export-profile')">
-            <span v-if="profileBusy" class="spinner" style="width: 13px; height: 13px" />
-            <UiIcon v-else name="Export" :size="13" />{{ t('common.export') }}
-          </button>
+          <UiButton :loading="profileBusy" icon-left="Export" @click="$emit('export-profile')">
+            {{ t('common.export') }}
+          </UiButton>
         </SettingsRow>
         <SettingsRow
           anchor="profileImport"
           :label="t('settings.profileImportLabel')"
           :desc="t('settings.profileImportDesc')"
         >
-          <button class="btn" :disabled="profileBusy" @click="$emit('import-profile')">
-            <span v-if="profileBusy" class="spinner" style="width: 13px; height: 13px" />
-            <UiIcon v-else name="Import" :size="13" />{{ t('common.import') }}
-          </button>
+          <UiButton :loading="profileBusy" icon-left="Import" @click="$emit('import-profile')">
+            {{ t('common.import') }}
+          </UiButton>
         </SettingsRow>
         <div v-if="profileMessage" class="profile-msg">
           {{ profileMessage }}
@@ -135,16 +133,5 @@ defineEmits<{
   @apply mt-2 rounded-[8px] border px-3 py-2 text-[12px];
   background: rgba(106, 213, 184, 0.06);
   border-color: rgba(106, 213, 184, 0.4);
-}
-.spinner {
-  @apply inline-block size-[13px] rounded-full;
-  border: 2px solid var(--fg-mute);
-  border-top-color: transparent;
-  animation: spin 800ms linear infinite;
-}
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 </style>

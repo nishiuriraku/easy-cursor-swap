@@ -56,15 +56,17 @@ Download the latest installer from the
 Both are signed with a minisign key (verified by the built-in updater).
 See [docs/updater_signing.md](docs/updater_signing.md) for signature verification instructions.
 
-> **SmartScreen notice:** Authenticode (Windows code signing) is **not yet
-> provisioned** — the [SignPath Foundation](https://signpath.org/) OSS
-> application was deferred on 2026-05-21 pending broader project visibility,
-> and reapplication is planned once external recognition (stars, mentions,
-> coverage) grows. Until then, Windows SmartScreen may show an "Unknown
-> publisher" warning; click **More info → Run anyway** to proceed.
-> Releases remain verifiable via the Tauri Updater's Ed25519 (minisign)
-> signature; the source is MIT-licensed and built reproducibly in public
-> GitHub Actions. See [docs/code_signing_policy.md](docs/code_signing_policy.md)
+> **SmartScreen notice:** Authenticode (Windows code signing) for the
+> NSIS / MSI installers distributed via GitHub Releases is **not yet
+> provisioned**. We will not re-apply to [SignPath Foundation](https://signpath.org/);
+> instead the canonical Authenticode path is via the **Microsoft Store MSIX**
+> distribution, where Microsoft automatically signs the package (SmartScreen
+> warning disappears). Until the Store track is live, the NSIS / MSI
+> installers on GitHub Releases remain unsigned; Windows SmartScreen may
+> show an "Unknown publisher" warning — click **More info → Run anyway**
+> to proceed. Releases remain verifiable via the Tauri Updater's Ed25519
+> (minisign) signature; the source is MIT-licensed and built reproducibly
+> in public GitHub Actions. See [docs/code_signing_policy.md](docs/code_signing_policy.md)
 > for the full signing policy and current status.
 
 ### Auto Updates
@@ -90,7 +92,7 @@ silently.
 
 ### Prerequisites
 
-- [Rust](https://rustup.rs/) (stable, 1.82+; pinned via `src-tauri/Cargo.toml` `rust-version`)
+- [Rust](https://rustup.rs/) (stable, **1.95.0 pinned via `src-tauri/rust-toolchain.toml`**; MSRV 1.82)
 - [Node.js](https://nodejs.org/) 20+
 - [WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) (Windows 11 includes this)
 
@@ -102,7 +104,7 @@ cd easy-cursor-swap
 npm install
 
 # Run in development mode (Tauri dev window + Nuxt HMR)
-npx tauri dev
+npm run tauri:dev
 
 # Type-check Rust only
 cargo check --manifest-path src-tauri/Cargo.toml
@@ -145,7 +147,7 @@ easy-cursor-swap/
 │   ├── src/
 │   │   ├── main.rs             # Entry point: tray, health check
 │   │   ├── lib.rs              # Module declarations (23 modules)
-│   │   ├── commands/           # Tauri IPC command handlers (52 endpoints across 9 sub-modules)
+│   │   ├── commands/           # Tauri IPC command handlers (53 endpoints across 9 sub-modules)
 │   │   ├── config.rs           # Config manager (RwLock, schema migration, backups)
 │   │   ├── cursor/             # PNG → .cur / .ani pipeline (6 sizes, hotspot, ANI read/write)
 │   │   ├── registry/           # HKCU registry read/write, Schemes, SPI_SETCURSORS

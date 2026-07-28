@@ -38,7 +38,13 @@ const showDrop = ref(false)
 // 適用確認モーダル制御
 const pendingTheme = ref<ThemeCardData | null>(null)
 const applyBusy = ref(false)
+// .cursorpack インポート (検査 + 取込) 実行中フラグ (LD8)。ファイルダイアログ自体は
+// ネイティブのため busy にせず、選択後の inspect/actuallyImport の間だけ true にする。
+const importBusy = ref(false)
 const applyError = ref<string | null>(null)
+// 詳細モーダルの二次アクション (edit/export/duplicate/delete) 実行中フラグ (LD8)。
+// 該当ボタンにスピナーを出し、実行中はグループを無効化する。
+const detailBusyAction = ref<'edit' | 'export' | 'duplicate' | 'delete' | null>(null)
 
 // 詳細モーダル制御。モーダルは画面に同時に 1 つしか出さない。
 const detailTheme = ref<ThemeCardData | null>(null)
@@ -248,6 +254,7 @@ function applyFromDetail(id: string) {
  * OS の TEMP に書き出し、Nuxt から `parse_cursorpack_for_creator` で読み込む。
  */
 async function editInCreator(id: string) {
+  detailBusyAction.value = 'edit'
   try {
     const { tempDir, sep } = await import('@tauri-apps/api/path')
     const dir = await tempDir()
@@ -261,11 +268,14 @@ async function editInCreator(id: string) {
     applyError.value = t('library.errEditModeTransition', {
       detail: err instanceof Error ? err.message : String(err),
     })
+  } finally {
+    detailBusyAction.value = null
   }
 }
 
 /** 詳細モーダルからの「複製」。`duplicate_theme` IPC で新 UUID を作りリロードする。 */
 async function duplicateTheme(id: string) {
+  detailBusyAction.value = 'duplicate'
   try {
     await duplicateThemeIpc(id)
     closeDetails()
@@ -281,6 +291,8 @@ async function duplicateTheme(id: string) {
     applyError.value = t('library.errDuplicate', {
       detail: err instanceof Error ? err.message : String(err),
     })
+  } finally {
+    detailBusyAction.value = null
   }
 }
 
@@ -296,6 +308,7 @@ async function exportTheme(id: string) {
       filters: [{ name: 'Cursor Pack', extensions: ['cursorpack'] }],
     })
     if (!outputPath) return
+    detailBusyAction.value = 'export'
     let bytes: number | null = null
     if (target.kind === 'system') {
       // Windows レジストリスキームはローカルテーマディレクトリを持たないので
@@ -317,6 +330,8 @@ async function exportTheme(id: string) {
     applyError.value = t('library.errExport', {
       detail: err instanceof Error ? err.message : String(err),
     })
+  } finally {
+    detailBusyAction.value = null
   }
 }
 
@@ -334,6 +349,7 @@ async function deleteTheme(id: string) {
   // 将来的には専用の確認モーダルに置き換える。
   const ok = window.confirm(t('library.confirmDeleteMsg', { name: target.name }))
   if (!ok) return
+  detailBusyAction.value = 'delete'
   try {
     await deleteThemeIpc(id)
     closeDetails()
@@ -347,6 +363,8 @@ async function deleteTheme(id: string) {
     applyError.value = t('library.errDelete', {
       detail: err instanceof Error ? err.message : String(err),
     })
+  } finally {
+    detailBusyAction.value = null
   }
 }
 
@@ -356,6 +374,7 @@ async function deleteTheme(id: string) {
 let unlistenDrop: (() => void) | null = null
 
 async function importByPath(path: string) {
+  importBusy.value = true
   try {
     // まず軽量検査して既存テーマと衝突するか確認
     const inspection = await inspectCursorpackIpc(path)
@@ -383,6 +402,8 @@ async function importByPath(path: string) {
     const msg = err instanceof Error ? err.message : String(err)
     applyError.value = t('library.errImport', { detail: msg })
     console.error('[Library] import failed:', err)
+  } finally {
+    importBusy.value = false
   }
 }
 
@@ -406,11 +427,14 @@ async function confirmConflictOverwrite() {
   const pending = conflictDialog.value
   if (!pending) return
   conflictDialog.value = null
+  importBusy.value = true
   try {
     await actuallyImport(pending.path)
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     applyError.value = t('library.errImport', { detail: msg })
+  } finally {
+    importBusy.value = false
   }
 }
 
@@ -667,7 +691,11 @@ onUnmounted(() => {
 
 <template>
   <div class="library-host">
-    <LibraryToolbar v-model:search-query="searchQuery" @open-import="openImportDialog" />
+    <LibraryToolbar
+      v-model:search-query="searchQuery"
+      :import-busy="importBusy"
+      @open-import="openImportDialog"
+    />
 
     <!-- メインコンテンツ -->
     <div class="content">
@@ -705,7 +733,7 @@ onUnmounted(() => {
 
       <!-- ローディング (スケルトン) -->
       <div v-if="isLoading" class="grid">
-        <div v-for="i in 6" :key="i" class="card skeleton-card" />
+        <UiSkeletonCard v-for="i in 6" :key="i" />
       </div>
 
       <LibraryEmptyState
@@ -810,6 +838,7 @@ onUnmounted(() => {
       :theme="detailTheme"
       :preview-map="detailPreviewMap"
       :preview-details="detailPreviewDetails"
+      :busy-action="detailBusyAction"
       @close="closeDetails"
       @apply="applyFromDetail"
       @edit="editInCreator"
@@ -877,26 +906,6 @@ onUnmounted(() => {
 }
 .empty-state code {
   @apply font-mono text-accent;
-}
-
-.skeleton-card {
-  @apply h-[280px];
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.02) 0%,
-    rgba(255, 255, 255, 0.04) 50%,
-    rgba(255, 255, 255, 0.02) 100%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.4s ease-in-out infinite;
-}
-@keyframes shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
 }
 
 .fade-enter-active,

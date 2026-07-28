@@ -12,6 +12,13 @@ const { t } = useI18n()
 
 const searchQuery = defineModel<string>('searchQuery', { required: true })
 
+withDefaults(
+  defineProps<{
+    importBusy?: boolean
+  }>(),
+  { importBusy: false },
+)
+
 defineEmits<{
   (e: 'open-import'): void
 }>()
@@ -33,9 +40,9 @@ defineEmits<{
       />
     </div>
     <div class="tb-actions">
-      <button class="btn ghost" @click="$emit('open-import')">
-        <UiIcon name="Import" :size="14" />{{ t('common.import') }}
-      </button>
+      <UiButton variant="ghost" :loading="importBusy" @click="$emit('open-import')">
+        <UiIcon v-if="!importBusy" name="Import" :size="14" />{{ t('common.import') }}
+      </UiButton>
       <NuxtLink to="/creator" custom>
         <template #default="{ navigate }">
           <button class="btn primary" @click="navigate">

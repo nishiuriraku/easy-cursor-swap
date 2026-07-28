@@ -176,9 +176,18 @@ export default {
     clearTitle: 'Discard current assets and return to start screen',
     clearLabel: 'Clear',
     cancelExport: 'Cancel',
+    exportStepRole: 'Roles',
+    exportStepPackage: 'Package',
+    exportStepSign: 'Sign',
     exportFailPrefix: 'Export failed',
     appDescription: 'Author Windows cursor themes with 17 roles × 6 resolutions and export them',
     bulkSourceEditing: '📦 Editing',
+    // Bulk import progress overlay (LD5)
+    bulkImporting: 'Importing…',
+    bulkStageScan: 'Scanning',
+    bulkStageParse: 'Parsing',
+    bulkStageExtract: 'Extracting',
+    bulkCancel: 'Cancel',
     errEditLoadFailed: 'Failed to load edit data: {detail}',
     errSvgImageLoadFailed: 'Failed to load SVG image',
     errCanvas2dContext: 'Failed to acquire Canvas 2D context',
@@ -208,6 +217,16 @@ export default {
       warning: 'Unsaved changes cannot be recovered',
       confirm: 'Discard and continue',
     },
+    // Bulk import flow (useCreatorBulkImportFlow) toasts / labels
+    bulkImportParseFailed: 'Failed to import .cursorpack: {detail}',
+    bulkImportOnlyOneCursorpack: 'Select only one .cursorpack at a time',
+    bulkImportCursorpackExclusive:
+      '.cursorpack cannot be imported together with other files (non-.cursorpack files were imported)',
+    bulkImportFilesLabel: '{count} files',
+    bulkImportNoSupportedFiles: 'No supported files found',
+    bulkImportSkippedFiles: '{count} file(s) skipped',
+    bulkImportFailed: 'Bulk import failed: {detail}',
+    bulkImportRolesApplied: 'Applied {count} role(s)',
   },
   panic: {
     title: 'Run Reset',
@@ -235,6 +254,10 @@ export default {
     recoveryStarted: 'Starting recovery…',
     recoveryDone: 'Recovered in {ms}ms',
     recoveryFailed: 'Recovery failed: {reason}',
+  },
+  hotkey: {
+    registerFailedTitle: 'Hotkey registration failed',
+    registerFailedBody: '"{spec}" may be in use by another app. Change it in Settings.',
   },
   settings: {
     sectionGeneral: 'General',
@@ -637,5 +660,9 @@ export default {
     validateArrowRequired: 'The Arrow role is required',
     toastExportFailed: 'Export failed: {error}',
     toastRetryFailed: 'Retry failed: {error}',
+  },
+  updater: {
+    // Startup auto-update notification toast (useUpdaterBootstrap)
+    toastUpdateAvailable: 'New version v{version} is available. Download it from Settings → Updates.',
   },
 } as const

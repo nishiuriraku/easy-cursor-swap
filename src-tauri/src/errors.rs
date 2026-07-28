@@ -58,6 +58,16 @@ pub enum AppError {
     /// .cursorpack ZIP / metadata が壊れているとき。
     #[error(".cursorpack の解析に失敗: {reason}")]
     InvalidCursorpack { reason: String },
+
+    /// 暗号化 / 鍵操作 (Ed25519 / DPAPI / Argon2id / XChaCha20-Poly1305 など) の失敗。
+    /// フロントには `crypto: <理由>` 形式でシリアライズされる。
+    #[error("crypto: {0}")]
+    Crypto(String),
+
+    /// GitHub REST API / Device Flow / PR 作成などの失敗。
+    /// フロントには `github: <理由>` 形式でシリアライズされる。
+    #[error("github: {0}")]
+    GitHub(String),
 }
 
 /// Tauri IPC 向けのシリアライズ可能エラー
@@ -71,5 +81,69 @@ impl serde::Serialize for AppError {
     }
 }
 
+/// `tauri::Error` を汎用 `AppError::Other` に変換する。
+///
+/// トレイ初期化など `Box<dyn Error>` だった経路で `?` をそのまま使えるようにするための
+/// フォールバック。マッピングが確定しているエラー (`Crypto` / `GitHub` 等) は
+/// 呼び出し側で明示的に `.map_err()` すること。
+impl From<tauri::Error> for AppError {
+    fn from(e: tauri::Error) -> Self {
+        AppError::Other(format!("tauri エラー: {}", e))
+    }
+}
+
 /// 結果型のエイリアス
 pub type AppResult<T> = Result<T, AppError>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `AppError::Crypto` / `AppError::GitHub` の表示・シリアライズ契約。
+    ///
+    /// 表示プレフィクスは lowercase の `crypto: ` / `github: ` で固定する。
+    /// フロント側は文字列マッチでハンドリングしているため、プレフィクスを
+    /// 変更すると既存ハンドラが壊れる (i18n キーを増やさない方針なので
+    /// ここを揺らさない)。
+    #[test]
+    fn crypto_display_prefix_is_lowercase() {
+        let e = AppError::Crypto("Ed25519 生成失敗".to_string());
+        assert_eq!(e.to_string(), "crypto: Ed25519 生成失敗");
+    }
+
+    #[test]
+    fn github_display_prefix_is_lowercase() {
+        let e = AppError::GitHub("POST forks 401".to_string());
+        assert_eq!(e.to_string(), "github: POST forks 401");
+    }
+
+    /// シリアライズ結果が `to_string()` と完全一致することを保証する。
+    /// フロントはエラー文字列で分岐するため、JSON 形を変えてはいけない。
+    #[test]
+    fn crypto_serialization_matches_display() {
+        let e = AppError::Crypto("DPAPI 失敗".to_string());
+        let s = serde_json::to_string(&e).unwrap();
+        assert_eq!(s, "\"crypto: DPAPI 失敗\"");
+    }
+
+    #[test]
+    fn github_serialization_matches_display() {
+        let e = AppError::GitHub("GET /user タイムアウト".to_string());
+        let s = serde_json::to_string(&e).unwrap();
+        assert_eq!(s, "\"github: GET /user タイムアウト\"");
+    }
+
+    /// 既存バリアント (`Theme` / `InvalidInput` 等) の表示形をリグレッション検出用に固定する。
+    /// 新バリアント追加時に既存の文字列を壊していないか確認する。
+    #[test]
+    fn existing_variants_remain_unchanged() {
+        assert_eq!(
+            AppError::Theme("壊れた JSON".to_string()).to_string(),
+            "テーマエラー: 壊れた JSON"
+        );
+        assert_eq!(
+            AppError::InvalidInput("javascript:foo".to_string()).to_string(),
+            "入力エラー: javascript:foo"
+        );
+    }
+}

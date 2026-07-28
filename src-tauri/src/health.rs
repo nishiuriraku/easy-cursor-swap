@@ -78,10 +78,36 @@ pub fn is_major_bump(current: &str, next: &str) -> bool {
     }
 }
 
+/// 現在のビルドのアーキテクチャを release.yml の命名 (x64 / arm64) に解決する。
+///
+/// release.yml は x86_64 → "x64"、aarch64 → "arm64" でインストーラを命名する。
+/// それ以外の (将来追加されうる) アーキテクチャでは命名規約が未確定なので、
+/// 誤った URL を生成せず `None` を返す (呼出側で自動ロールバックをスキップさせる)。
+fn arch_label() -> Option<&'static str> {
+    match std::env::consts::ARCH {
+        "x86_64" => Some("x64"),
+        "aarch64" => Some("arm64"),
+        other => {
+            tracing::warn!(
+                "未知のアーキテクチャ {} のため自動ロールバック URL を生成できません",
+                other
+            );
+            None
+        }
+    }
+}
+
+/// 指定バージョン・指定アーキテクチャの NSIS インストーラの
+/// GitHub Releases ダウンロード URL を組み立てる。
+fn installer_url_for_arch(version: &str, arch: &str) -> String {
+    format!("{GITHUB_RELEASES_BASE}/download/v{version}/EasyCursorSwap_{version}_{arch}-setup.exe")
+}
+
 /// 指定バージョンの NSIS インストーラの GitHub Releases ダウンロード URL を返す。
-/// アーキテクチャは x64 固定。
-pub fn installer_url_for(version: &str) -> String {
-    format!("{GITHUB_RELEASES_BASE}/download/v{version}/EasyCursorSwap_{version}_x64-setup.exe")
+/// アーキテクチャは実行中ビルドから解決する (x86_64 → x64 / aarch64 → arm64)。
+/// 未知のアーキテクチャでは `None` を返す。
+pub fn installer_url_for(version: &str) -> Option<String> {
+    arch_label().map(|arch| installer_url_for_arch(version, arch))
 }
 
 /// ロールバック先情報
@@ -167,11 +193,14 @@ impl StartupCheck {
     }
 
     /// ロールバック先情報を返す。
-    /// `previous_version` が記録されている場合のみ `Some` を返す。
+    /// `previous_version` が記録されており、かつ現在のアーキテクチャの
+    /// インストーラ URL を生成できる場合のみ `Some` を返す。
+    /// 未知のアーキテクチャでは URL を組み立てられないため `None` (自動ロールバックをスキップ)。
     pub fn rollback_target(&self) -> Option<RollbackTarget> {
         let version = self.state.previous_version.clone()?;
+        let installer_url = installer_url_for(&version)?;
         Some(RollbackTarget {
-            installer_url: installer_url_for(&version),
+            installer_url,
             releases_page_url: format!("{GITHUB_RELEASES_BASE}/tag/v{version}"),
             version,
         })
@@ -290,7 +319,8 @@ mod tests {
 
     #[test]
     fn installer_url_has_correct_format() {
-        let url = installer_url_for("1.2.3");
+        // arch 非依存で URL 組み立てを検証 (installer_url_for は実行ビルドの arch に依存するため)
+        let url = installer_url_for_arch("1.2.3", "x64");
         assert!(url.contains("/v1.2.3/"));
         assert!(url.ends_with("_x64-setup.exe"));
     }
@@ -298,7 +328,7 @@ mod tests {
     #[test]
     fn installer_url_uses_https_github() {
         // フィッシング防止: ホスト名は github.com 系列に固定
-        let url = installer_url_for("1.0.0");
+        let url = installer_url_for_arch("1.0.0", "x64");
         assert!(
             url.starts_with("https://github.com/"),
             "unexpected base: {}",
@@ -309,8 +339,40 @@ mod tests {
     #[test]
     fn installer_url_embeds_exact_version() {
         // バージョン文字列がそのまま埋め込まれる (path traversal 等は呼出側責任)
-        let url = installer_url_for("0.1.0");
+        let url = installer_url_for_arch("0.1.0", "x64");
         assert!(url.contains("v0.1.0"));
         assert!(url.contains("EasyCursorSwap_0.1.0"));
+    }
+
+    #[test]
+    fn installer_url_for_arch_builds_x64_and_arm64() {
+        // release.yml の命名規約 (x64 / arm64) を担保
+        let x64 = installer_url_for_arch("1.2.3", "x64");
+        assert!(x64.ends_with("EasyCursorSwap_1.2.3_x64-setup.exe"));
+        assert!(x64.contains("/download/v1.2.3/"));
+
+        let arm64 = installer_url_for_arch("1.2.3", "arm64");
+        assert!(arm64.ends_with("EasyCursorSwap_1.2.3_arm64-setup.exe"));
+        assert!(arm64.contains("/download/v1.2.3/"));
+    }
+
+    #[test]
+    fn installer_url_for_matches_build_arch() {
+        // 実行中ビルドの arch に応じて Some/None と URL 末尾が決まる
+        let url = installer_url_for("1.2.3");
+        match std::env::consts::ARCH {
+            "x86_64" => {
+                let url = url.expect("x86_64 では Some を返すべき");
+                assert!(url.ends_with("EasyCursorSwap_1.2.3_x64-setup.exe"));
+            }
+            "aarch64" => {
+                let url = url.expect("aarch64 では Some を返すべき");
+                assert!(url.ends_with("EasyCursorSwap_1.2.3_arm64-setup.exe"));
+            }
+            _ => {
+                // 未知のアーキテクチャでは自動ロールバック URL を生成しない
+                assert!(url.is_none(), "未知 arch では None を返すべき");
+            }
+        }
     }
 }

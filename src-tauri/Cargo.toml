@@ -1,6 +1,6 @@
 [package]
 name = "easy-cursor-swap"
-version = "0.0.7"
+version = "0.0.8"
 description = "Windows 用マウスカーソルテーマ管理ツール"
 authors = ["nishiuriraku"]
 license = "MIT"
@@ -24,6 +24,10 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 # WebView2 DevTools 関連コードが一切リンクされない (バイナリサイズ削減 +
 # 署名済み配布物の Inspect 経路封印)。
 devtools = ["tauri/devtools"]
+# `ts-rs` で Rust 構造体から TS 型 (app/types/generated/) を生成するためのフィーチャ。
+# 通常ビルド / 通常 cargo test では有効化されないため、生成器依存 (proc-macro 重め) は
+# リリースバイナリに一切含まれない。`cargo run --features typegen --bin gen_types` で起動。
+typegen = ["dep:ts-rs"]
 
 [build-dependencies]
 tauri-build = { version = "2.6.2", features = [] }
@@ -41,7 +45,6 @@ tauri = { version = "2.11.2", features = ["tray-icon"] }
 # 未解決エラーになる)。
 tauri-plugin-mcp-bridge = "0.11"
 tauri-plugin-dialog = "2"
-tauri-plugin-shell = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
@@ -85,6 +88,11 @@ windows = { version = "0.62", features = [
 # --- ユーティリティ ---
 uuid = { version = "1", features = ["v4", "serde"] }
 zip = "5"
+
+# --- 型生成 (feature-gated; 通常ビルドには含まれない) ---
+# Rust 構造体から TS 型を生成する `gen_types` バイナリ用。
+# `uuid-impl` feature で `uuid::Uuid` の TS 表現を有効化。
+ts-rs = { version = "12.0.1", optional = true, features = ["uuid-impl"] }
 chrono = { version = "0.4", features = ["serde"] }
 dirs = "6.0"
 thiserror = "2"
@@ -117,8 +125,24 @@ name = "cursor_build"
 harness = false
 
 [[bench]]
+name = "cursor_full_build"
+harness = false
+
+[[bench]]
 name = "startup"
 harness = false
+
+[[bench]]
+name = "list_themes"
+harness = false
+
+# --- 型生成バイナリ (feature-gated) ---
+# `cargo run --features typegen --bin gen_types` で app/types/generated/ に
+# .ts ファイルを書き出す。typegen feature 必須 (通常 cargo run では起動しない)。
+[[bin]]
+name = "gen_types"
+path = "src/bin/gen_types.rs"
+required-features = ["typegen"]
 
 [profile.release]
 # リリースビルドの最適化

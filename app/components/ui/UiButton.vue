@@ -57,3 +57,17 @@ const buttonClasses = computed(() => {
     <UiIcon v-if="iconRight" :name="iconRight" :size="13" />
   </button>
 </template>
+
+<style scoped>
+@reference '~/assets/css/tailwind.css';
+
+/* 共通 .spinner は border-top-color: var(--accent) で弧を描くが、primary は
+ * bg=accent と同色になり弧が背景に同化して見えない (danger も accent 弧が色味で
+ * 浮いて不自然)。塗り/色付き背景のボタンではスピナーをボタンの文字色 currentColor
+ * で描き直し、確実にコントラストを出す (primary は黒弧 / danger は rose 弧)。 */
+.btn.primary .spinner,
+.btn.danger .spinner {
+  border-color: currentColor;
+  border-top-color: transparent;
+}
+</style>

@@ -181,17 +181,16 @@ const updaterErrorDisplay = computed(() => {
   return t(key, { message })
 })
 
-// useUpdaterBootstrap.ts と同じ localStorage キー / クールダウン定義を持つ。
-// 共有定数化はまだ 2 箇所重複だけなので YAGNI で保留する (3 箇所目が出たら集約)。
-const LAST_CHECK_KEY = 'ecs.updater.last_check_at'
-const CHECK_COOLDOWN_MS = 24 * 60 * 60 * 1000
+// Wave 2B / Task 5: localStorage キーとクールダウンは `useUpdaterBootstrap` と
+// 共有の `~/composables/updaterConstants` から取得する (3 箇所目の重複を待たない)。
+import { LAST_UPDATE_CHECK_KEY, UPDATE_CHECK_COOLDOWN_MS } from '~/composables/updaterConstants'
 
 /** 次回自動チェック (= 起動時 bootstrap が走るタイミング) までの残り時間を文字列で返す。 */
 const autoCheckHint = computed(() => {
   if (typeof localStorage === 'undefined') return t('settings.autoCheckHintReady')
-  const raw = Number(localStorage.getItem(LAST_CHECK_KEY) ?? '0')
+  const raw = Number(localStorage.getItem(LAST_UPDATE_CHECK_KEY) ?? '0')
   if (!Number.isFinite(raw) || raw === 0) return t('settings.autoCheckHintReady')
-  const remainingMs = raw + CHECK_COOLDOWN_MS - Date.now()
+  const remainingMs = raw + UPDATE_CHECK_COOLDOWN_MS - Date.now()
   if (remainingMs <= 0) return t('settings.autoCheckHintReady')
   const hours = Math.max(1, Math.ceil(remainingMs / (60 * 60 * 1000)))
   return t('settings.autoCheckHintHours', { hours })
@@ -200,7 +199,7 @@ const autoCheckHint = computed(() => {
 /** クールダウンを破って次回起動時に再チェックさせる。即時 check はしない (UX 上シンプル化)。 */
 function onForceRecheck() {
   if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(LAST_CHECK_KEY, '0')
+    localStorage.setItem(LAST_UPDATE_CHECK_KEY, '0')
   }
   updaterMessage.value = t('settings.autoCheckHintReady')
 }
@@ -351,10 +350,23 @@ function applyConfigToLocal() {
   suppressDirty = true
   general.value.language = (c.general.language as 'ja' | 'en' | 'auto') ?? 'auto'
   general.value.crashReporting = c.general.crash_reporting
+  // Wave 1B-2: 適用トースト表示フラグを UI ローカル ref に反映。
+  // undefined (V1 等の旧データ) の場合は V2 既定値 true を採用。
+  general.value.showApplyToast = c.general.show_apply_toast ?? true
+  // Wave 1B-3: カーソル影 ON/OFF 制御フラグ。V2 既定 true。
+  general.value.applyShadowControl = c.general.apply_shadow_control ?? true
   startup.value.autoStart = c.general.auto_start
+  // Wave 1B-4: --autostart 起動時のウィンドウ最小化。V2 既定 false。
+  startup.value.startMinimized = c.general.start_minimized ?? false
   updates.value.autoUpdate = c.general.auto_update
 
   library.value.totalLimitWarnGb = c.security.storage_warning_threshold / BYTES_PER_GB
+  // Wave 1B-6: ストレージ警告トースト表示フラグ。V2 既定 true。
+  library.value.storageWarnEnabled = c.general.show_storage_warning ?? true
+
+  // Wave 1B-5: 未署名インポート制御 2 フラグ。V2 既定 false / true。
+  security.value.requireSignedThemes = c.security.require_signed_themes ?? false
+  security.value.warnUnsignedImport = c.security.warn_unsigned_import ?? true
 
   logging.value.logLevel = (c.logging.level as typeof logging.value.logLevel) ?? 'INFO'
   logging.value.retentionDays = c.logging.retention_days
@@ -374,12 +386,25 @@ function flushLocalToConfig() {
   return persistConfig((draft) => {
     draft.general.language = general.value.language
     draft.general.crash_reporting = general.value.crashReporting
+    // Wave 1B-2: 適用トースト表示フラグを draft に書き戻し。
+    // (旧 V1 データで undefined の場合は V2 既定値 true を採用)
+    draft.general.show_apply_toast = general.value.showApplyToast ?? true
+    // Wave 1B-3: 影制御フラグを draft に書き戻し。V2 既定 true。
+    draft.general.apply_shadow_control = general.value.applyShadowControl ?? true
     draft.general.auto_start = startup.value.autoStart
+    // Wave 1B-4: --autostart 起動時ウィンドウ最小化。V2 既定 false。
+    draft.general.start_minimized = startup.value.startMinimized ?? false
     draft.general.auto_update = updates.value.autoUpdate
 
     draft.security.storage_warning_threshold = Math.round(
       library.value.totalLimitWarnGb * BYTES_PER_GB,
     )
+    // Wave 1B-5: 未署名インポート制御 2 フラグ。V2 既定 false / true。
+    draft.security.require_signed_themes = security.value.requireSignedThemes ?? false
+    draft.security.warn_unsigned_import = security.value.warnUnsignedImport ?? true
+
+    // Wave 1B-6: ストレージ警告トースト表示フラグ。V2 既定 true。
+    draft.general.show_storage_warning = library.value.storageWarnEnabled ?? true
 
     draft.logging.level = logging.value.logLevel
     draft.logging.retention_days = logging.value.retentionDays
@@ -744,14 +769,18 @@ function selectSection(id: SectionId) {
         />
       </div>
       <div class="tb-actions">
-        <button class="btn ghost" :disabled="!dirty || saving" @click="discardChanges">
+        <UiButton variant="ghost" :disabled="!dirty || saving" @click="discardChanges">
           {{ t('common.discard') }}
-        </button>
-        <button class="btn primary" :disabled="!dirty || saving" @click="save">
-          <span v-if="saving" class="spinner" style="width: 13px; height: 13px" />
-          <UiIcon v-else name="Check" :size="13" />
+        </UiButton>
+        <UiButton
+          variant="primary"
+          :loading="saving"
+          :disabled="!dirty"
+          icon-left="Check"
+          @click="save"
+        >
           {{ saving ? t('common.saving') : t('common.save') }}
-        </button>
+        </UiButton>
       </div>
     </div>
 
