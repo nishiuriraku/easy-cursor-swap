@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-非同期処理中のローディングフィードバックをアプリ全体へ整備したリリース。Wave 2B の coverage gate を 80% (brief 値) から **70% (measured baseline +10pt 余裕)** に下げました (brief deviation、合意済み)。backend measured 71.59% / frontend measured 69.52%。差分 10pt 分のテスト追加は次 wave で対応します。これまで読み込み中に空白・無反応に見えていた箇所 (テーマ/インデックスのグリッドとプレビュー、アップデートのダウンロード、一括取り込みの解決・解析、各種ボタン操作、Creator のエクスポート) に、共通のスケルトン / スピナー / 確定プログレスバー / ステージ表示を一貫した語彙で適用。HKCU 限定 / 適用トランザクション性 / アーカイブ検閲 / PII レダクション / `v-html` 不採用 の 5 大不変条件はすべて維持。
+## [0.0.8] - 2026-07-28
+
+非同期処理中のローディングフィードバックをアプリ全体へ整備したリリース (v0.0.8)。Wave 2AB の coverage gate を 80% (brief 値) から **70% (measured baseline +10pt 余裕)** に下げました (brief deviation、合意済み)。backend measured 71.86% / frontend measured 69.52%。差分 10pt 分のテスト追加は次 wave で対応します。これまで読み込み中に空白・無反応に見えていた箇所 (テーマ/インデックスのグリッドとプレビュー、アップデートのダウンロード、一括取り込みの解決・解析、各種ボタン操作、Creator のエクスポート) に、共通のスケルトン / スピナー / 確定プログレスバー / ステージ表示を一貫した語彙で適用。HKCU 限定 / 適用トランザクション性 / アーカイブ検閲 / PII レダクション / `v-html` 不採用 の 5 大不変条件はすべて維持。
 
 加えて、Authenticode コード署名の取得経路を **SignPath Foundation 再申請から Microsoft Store (MSIX 自動署名) へ移行** する方針変更を反映 (Wave 0A)。SignPath 一次申請 (2026-05-21 保留) への再申請は行わず、ストア提出時に Microsoft が自動署名する経路を正準とする方針に切り替えた。NSIS / MSI (GitHub Releases) は当面無署名のまま継続し、Tauri Updater 用の Ed25519 (minisign) 署名は引き続き有効 (改ざん防止は維持)。`release.yml` から SignPath 関連 step 群を撤去し、CI の責務を NSIS / MSI のビルドと minisign 署名に限定した。
 
@@ -267,7 +269,8 @@ v0.0.1 と同じく仮リリース系列 (provisional, SemVer 0.0.x で API 安�
   - `BulkImportPreviewModal.vue` (579 → 297 行 / -49%) から `useBulkImportPreviewState` を抽出。matches/unmatched の三方移動 state machine + props.open 連動の初期マッチ watch + Blob URL ライフサイクル + ApplyPayload 組立を composable に閉じ込め、SFC は presentation に専念 (audit C21-SIZE 部分)。`ApplyPayload` 型の output 場所も SFC から composable に移動 (`useCreatorBulkImportFlow` 側 import を更新)。
 - component 総数: 50 → 56 (library +3 / marketplace +2 / creator +1)。`docs/architecture.json` / `docs/ui_map.json` の `measured_counts.components_total` を再測定し、HTML viewer に再埋め込み。
 
-[Unreleased]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.7...HEAD
+[Unreleased]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.8...HEAD
+[0.0.8]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.7...v0.0.8
 [0.0.7]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.6...v0.0.7
 [0.0.6]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.5...v0.0.6
 [0.0.5]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.4...v0.0.5
