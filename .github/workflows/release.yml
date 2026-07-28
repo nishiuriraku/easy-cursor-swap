@@ -121,7 +121,7 @@ jobs:
           "__CHANGELOG_EOF__"            | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       - name: Tauri build (MSI + NSIS, Updater 署名付き)
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
