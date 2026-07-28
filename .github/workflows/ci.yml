@@ -88,11 +88,11 @@ jobs:
 
       - name: Vue type check
         # 2026-07-28: package.json に vue-tsc ^2.2.12 / typescript ^5.9.3 を
-        # 明示追加して lockfile 経由で固定。npx だとネットワークから
-        # vue-tsc 3.x (typescript 6.0 と非互換) を取得して typescript/lib/tsc
-        # の exports エラーで fail していた。node_modules/.bin 経由で
-        # lockfile 固定版を使う。
-        run: vue-tsc --noEmit
+        # 明示追加して lockfile 経由で固定。`npx vue-tsc` は node_modules に
+        # インストール済みの固定版を起動するため typescript/lib/tsc の
+        # exports エラーは出ない (CI runner の node_modules/.bin は PATH に
+        # 含まれないため直接呼び出しは不可)。
+        run: npx vue-tsc --noEmit
 
       - name: ESLint
         run: npm run lint:check
