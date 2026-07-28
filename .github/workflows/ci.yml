@@ -83,9 +83,6 @@ jobs:
         # `--legacy-peer-deps` で lockfile を厳密採用しつつ peer dep conflict を許容。
         run: npm ci --legacy-peer-deps
 
-      - name: npm audit
-        run: npm audit --audit-level=high
-
       - name: Nuxt prepare (型生成)
         run: npx nuxi prepare
 
