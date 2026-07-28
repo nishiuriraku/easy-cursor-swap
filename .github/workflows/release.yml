@@ -90,8 +90,12 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      - name: npm ci
-        run: npm ci
+      - name: npm ci (legacy-peer-deps)
+        # 2026-07-28: @nuxt/kit@4.5.1 (transitive of @nuxt/eslint) の peer dep
+        # `oxc-parser@>=0.140.0` に対し lockfile の oxc-parser は `^0.131.0` で
+        # ズレている。npm 10 系は peer dep 厳密評価のため EUSAGE で倒れる。
+        # ci.yml と同じ理由で --legacy-peer-deps を付与。
+        run: npm ci --legacy-peer-deps
 
       # -----------------------------------------------------------
       # CHANGELOG.md の該当バージョンのセクションを抜き出して
