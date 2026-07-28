@@ -98,11 +98,26 @@ export function useGithubAuth() {
     expiresAt.value = null
   }
 
+  /**
+   * 保存済み GitHub OAuth トークンとアカウントメタを削除 (Wave 3A / L1-5)。
+   *
+   * `revoke_github_link` は `void` 戻り値の IPC なので `invokeTauriVoid` を使い、
+   * 呼び出し側で誤って戻り値プロパティにアクセスしないよう型で防御する。
+   * 失敗時は caller が `loadConfig()` などの後続処理を行うか判断できるよう
+   * エラーをそのまま throw する (cancel とは挙動が異なる点に注意)。
+   */
+  async function revoke(): Promise<void> {
+    await invokeTauriVoid('revoke_github_link')
+    // revoke 成功後は内部状態 (status 等) は触らない。Device Flow 自体は別アクション
+    // (start/cancel) で操作する責務分離。caller は Settings 側で `loadConfig(true)` を
+    // 呼んで github_account ref を最新化する。
+  }
+
   // Component / effect scope の dispose 時に timer を必ず停止する。
   // 親ダイアログがモーダルを閉じ忘れた場合のクリーンアップ。
   if (getCurrentScope()) {
     onScopeDispose(() => stopTimer())
   }
 
-  return { status, userCode, verificationUri, expiresAt, login, errorMsg, start, cancel }
+  return { status, userCode, verificationUri, expiresAt, login, errorMsg, start, cancel, revoke }
 }

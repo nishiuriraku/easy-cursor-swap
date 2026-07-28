@@ -9,6 +9,9 @@
  * - 全エントリを FeaturedCard の横並びレイアウトで 1 グリッドに表示
  * - Ed25519 署名検証済みのテーマのみ掲載 (CI 自動検証)
  * - インポートは Rust 側の `import_from_marketplace` (将来実装) に委譲
+ *
+ * IPC 集約: `useMarketplace` composable に index 取得 / install を集約 (Wave 3A / L1-1)。
+ * sidebar バッジ (layouts/default.vue) と同一 singleton を共有し、HTTP 取得は 1 度だけ。
  */
 import type { MarketplaceEntry, MarketplaceTag } from '~/types/marketplace'
 import { computeFilteredGrid } from '~/pages/marketplace.helpers'
@@ -17,8 +20,6 @@ const { t, locale } = useI18n()
 
 const submitOpen = ref(false)
 
-const entries = ref<MarketplaceEntry[]>([])
-const isLoading = ref(true)
 const filter = ref<MarketplaceTag>('all')
 const searchQuery = ref('')
 const installingId = ref<string | null>(null)
@@ -49,6 +50,13 @@ watch(installStatus, (next) => {
 // テーマ一覧のシングルトンに直接アクセスし、インストール成功時に再取得する。
 // これで「Marketplace でインポート → サイドバーバッジ・Library 画面に即時反映」が実現する。
 const { refresh: refreshThemes } = useThemes()
+const {
+  entries,
+  isLoading: marketplaceIsLoading,
+  fetchError,
+  loadIndex,
+  installEntry: marketplaceInstall,
+} = useMarketplace()
 
 // 詳細モーダル管理
 const selectedEntry = ref<MarketplaceEntry | null>(null)
@@ -73,49 +81,11 @@ function closeDetails() {
 async function installFromDetail(id: string) {
   detailInstalling.value = true
   try {
-    await installEntry(id)
+    await handleInstall(id)
     // 成功してたら詳細モーダルを閉じる
     if (installStatus.value?.kind === 'ok') closeDetails()
   } finally {
     detailInstalling.value = false
-  }
-}
-
-// --- IPC 経由で受け取る Rust 側スキーマ ---
-// Rust 側 `MarketplaceEntry` は `#[serde(rename_all(serialize = "camelCase"))]` で
-// IPC へは camelCase のまま流れてくる (audit E1/E2 解消)。`MarketplaceEntry` 型
-// (camelCase) をそのまま使えるので、以前あった snake_case → camelCase の手動変換
-// `adaptEntry()` は不要になった。
-//
-// `verified: true` の付与だけ Rust 側 IPC ペイロードに含まれない (掲載 = CI 検証済み
-// の含意でフロント側で固定する) ため、薄い helper `withVerified()` で 1 行付与する。
-interface RustMarketplaceIndex {
-  schema_version: number
-  commit?: string
-  entries: Omit<MarketplaceEntry, 'verified'>[]
-}
-
-function withVerified(e: Omit<MarketplaceEntry, 'verified'>): MarketplaceEntry {
-  return { ...e, verified: true }
-}
-
-const fetchError = ref<string | null>(null)
-
-async function loadIndex() {
-  isLoading.value = true
-  fetchError.value = null
-  try {
-    const idx = await invokeTauri<RustMarketplaceIndex>('marketplace_fetch_index')
-    if (!idx) {
-      throw new Error('empty response')
-    }
-    entries.value = idx.entries.map(withVerified)
-  } catch (e) {
-    entries.value = []
-    fetchError.value = e instanceof Error ? e.message : String(e)
-    console.warn('[marketplace] fetch failed:', e)
-  } finally {
-    isLoading.value = false
   }
 }
 
@@ -124,28 +94,24 @@ const filteredGrid = computed(() =>
   computeFilteredGrid(entries.value, filter.value, searchQuery.value),
 )
 
+// `marketplaceIsLoading` は composable 側の ref。テンプレートは元の `isLoading` 名を
+// 維持するため、リアクティブな値を alias しておく。
+const isLoading = marketplaceIsLoading
+
 // --- ハンドラ ---
-async function installEntry(id: string) {
+async function handleInstall(id: string) {
   const e = entries.value.find((x) => x.id === id)
   if (!e) return
   installingId.value = id
   installStatus.value = null
+  // トースト / ログは displayName (現 locale でピックした文字列) を使う。
+  // e.name は LocalizedString の生形 (string | map) なので、{{ name }} 補間に
+  // そのまま渡すと map のとき "[object Object]" になる。
+  const displayName = pickLocalizedName(e.name, locale.value)
   try {
     // Rust 側 (marketplace::MarketplaceClient::install) は検証成功時にテーマ ID を返す。
     // 戻り値は使わないが、await することで成否判定する。
-    await invokeTauri<string>('marketplace_install', {
-      req: {
-        downloadUrl: e.downloadUrl,
-        sha256: e.sha256,
-        signature: e.signature,
-        authorGithub: e.authorGithub,
-        authorPubkeyId: e.authorPubkeyId,
-      },
-    })
-    // トースト / ログは displayName (現 locale でピックした文字列) を使う。
-    // e.name は LocalizedString の生形 (string | map) なので、{{ name }} 補間に
-    // そのまま渡すと map のとき "[object Object]" になる。
-    const displayName = pickLocalizedName(e.name, locale.value)
+    await marketplaceInstall(id)
     installStatus.value = { kind: 'ok', name: displayName }
     // インストール直後にライブラリの一覧をリフレッシュ。
     // useThemes はシングルトンなので Library / サイドバーバッジに即反映される。
@@ -153,7 +119,6 @@ async function installEntry(id: string) {
     console.info('[Marketplace] installed', displayName)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    const displayName = pickLocalizedName(e.name, locale.value)
     installStatus.value = { kind: 'err', name: displayName, message }
     console.error('[Marketplace] install failed:', err)
   } finally {

@@ -433,6 +433,9 @@ const { exportProfile: runExportProfile, importProfile: runImportProfile } = use
 const profileBusy = ref(false)
 const profileMessage = ref<string | null>(null)
 
+// GitHub 連携解除 (Wave 3A / L1-5): 直 invoke 廃止 → useGithubAuth.revoke() 経由。
+const { revoke: revokeGithubLink } = useGithubAuth()
+
 async function exportProfile() {
   profileBusy.value = true
   profileMessage.value = null
@@ -554,7 +557,10 @@ async function onKeystoreDelete() {
 }
 
 async function onGithubUnlink() {
-  await invokeTauri<void>('revoke_github_link')
+  // useGithubAuth.revoke() は `revoke_github_link` IPC の薄いラッパー。
+  // 失敗時は throw されるので caller (このハンドラ) が後処理 (loadConfig 等) を
+  // 行うか判断できる。
+  await revokeGithubLink()
   // useAppSettings の load() は force=false 既定でキャッシュを返すため、
   // revoke 後にフロント ref に古い github_account が残ってしまう。force=true で再取得する。
   await loadConfig(true)

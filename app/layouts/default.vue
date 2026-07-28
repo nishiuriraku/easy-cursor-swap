@@ -24,15 +24,16 @@ const themeCount = computed(() => themes.value.length)
  * Marketplace 件数を 1 度だけ取得しキャッシュする。
  * 失敗時は 0 のまま (バッジを出さない代わりに 0 を表示)。
  * 公式インデックスへの HTTP は app 起動時の 1 回のみ走らせる。
+ *
+ * Wave 3A / L1-1: 直接 invoke は廃止し `useMarketplace` composable に集約。
+ * 同 singleton を page (marketplace.vue) と共有するため、layout / page 両方から
+ * `loadIndex()` を呼んでも内部 `inflight` で HTTP は 1 回しか走らない。
+ *
+ * バッジ表示は singleton の entries から computed で派生。loadIndex がエラーで
+ * entries が空配列になっても 0 が反映される (旧 `ref(0)` の「失敗時 0」の挙動と同等)。
  */
-async function loadMarketplaceCount() {
-  try {
-    const idx = await invokeTauri<{ entries: unknown[] }>('marketplace_fetch_index')
-    marketplaceCount.value = idx?.entries?.length ?? 0
-  } catch {
-    marketplaceCount.value = 0
-  }
-}
+const { entries: marketplaceEntries, loadIndex: loadMarketplaceIndex } = useMarketplace()
+const marketplaceCount = computed(() => marketplaceEntries.value.length)
 
 const NAV_ROUTES: Record<string, string> = {
   library: '/',
@@ -165,9 +166,11 @@ onMounted(async () => {
   await loadAppConfig()
   syncFromConfig(appConfig.value?.general.language)
   // テーマ一覧 / Marketplace 件数の取得は app 起動の他処理と並行で OK なので await しない。
-  // useThemes はシングルトンなので、ここで refresh しておけばどのページでも最新値が読める。
+  // useThemes / useMarketplace はシングルトンなので、ここで呼べばどのページでも最新値が読める。
+  // useMarketplace の loadIndex は内部 inflight で dedupe されるため、layout と page から
+  // 呼んでも公式インデックスへの HTTP は 1 回しか走らない (Wave 3A / L1-1)。
   void refreshThemes()
-  void loadMarketplaceCount()
+  void loadMarketplaceIndex()
 })
 
 // config が後から変わった場合にも追随
