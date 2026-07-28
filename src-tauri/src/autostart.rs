@@ -26,21 +26,9 @@ const RUN_KEY_PATH: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
 const APP_VALUE_NAME: &str = "EasyCursorSwap";
 
 /// MSIX パッケージ環境で実行されているかを判定する。
-///
-/// `current_exe()` が `\WindowsApps\` 配下なら MSIX とみなす。失敗時は `false`
-/// (= 通常の Win32 起動として扱う) にフォールバックする。
-pub fn is_msix_packaged() -> bool {
-    is_msix_packaged_for_path(std::env::current_exe().ok().as_deref())
-}
-
-/// テスト容易性のため、判定対象パスを引数で受け取る純粋関数。
-fn is_msix_packaged_for_path(exe: Option<&std::path::Path>) -> bool {
-    let Some(path) = exe else { return false };
-    // 大文字小文字混在 (`WindowsApps` / `windowsapps`) を許容するため
-    // OsStr → 小文字化した String で照合する。
-    let s = path.to_string_lossy().to_ascii_lowercase();
-    s.contains(r"\windowsapps\")
-}
+/// 実装は `appusermodel::is_msix_packaged` に集約 (Wave 4B)。ここでは
+/// 後方互換のため re-export のみ残す。
+pub use crate::appusermodel::is_msix_packaged;
 
 /// `--autostart` 引数を付与した起動コマンド文字列を組み立てる。
 ///
@@ -213,47 +201,5 @@ mod tests {
             "末尾に --autostart 引数が付くべき: {}",
             cmd
         );
-    }
-
-    #[test]
-    fn detects_msix_path_case_insensitive() {
-        use std::path::PathBuf;
-        // 大文字 / 小文字 / 混在のいずれも MSIX として判定される
-        let cases = [
-            r"C:\Program Files\WindowsApps\dev.easycursorswap.app_1.0.0_x64__abc\app.exe",
-            r"C:\Program Files\windowsapps\dev.easycursorswap.app_1.0.0_x64__abc\app.exe",
-            r"C:\PROGRAM FILES\WINDOWSAPPS\dev.easycursorswap.app_1.0.0_x64__abc\app.exe",
-        ];
-        for c in cases {
-            let p = PathBuf::from(c);
-            assert!(
-                is_msix_packaged_for_path(Some(&p)),
-                "MSIX として判定されるべき: {}",
-                c
-            );
-        }
-    }
-
-    #[test]
-    fn does_not_detect_normal_install_paths_as_msix() {
-        use std::path::PathBuf;
-        let cases = [
-            r"C:\Program Files\EasyCursorSwap\easy-cursor-swap.exe",
-            r"C:\Users\me\AppData\Local\Programs\EasyCursorSwap\app.exe",
-            r"D:\dev\target\release\easy-cursor-swap.exe",
-        ];
-        for c in cases {
-            let p = PathBuf::from(c);
-            assert!(
-                !is_msix_packaged_for_path(Some(&p)),
-                "通常インストールは MSIX 扱いされるべきでない: {}",
-                c
-            );
-        }
-    }
-
-    #[test]
-    fn returns_false_when_exe_path_is_unavailable() {
-        assert!(!is_msix_packaged_for_path(None));
     }
 }
