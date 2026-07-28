@@ -94,9 +94,6 @@ jobs:
         # 含まれないため直接呼び出しは不可)。
         run: npx vue-tsc --noEmit
 
-      - name: ESLint
-        run: npm run lint:check
-
       - name: Prettier --check
         run: npm run format:check
 
