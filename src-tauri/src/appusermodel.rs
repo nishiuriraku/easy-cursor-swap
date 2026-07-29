@@ -236,6 +236,14 @@ pub fn decide_activation(start_minimized: bool, is_autostart_launch: bool) -> Ac
     }
 }
 
+/// 連続起動失敗 3 回検出時のロールバック動作を選択する pure 関数。
+/// MSIX 環境では NSIS インストーラの download + 自動適用は禁止 (Store 自動更新に
+/// 委譲) なので、ReleasePage (Web ブラウザでリリース案内) に退避する。
+/// unpackaged 環境では従来通り InstallerDownload を行う。
+pub fn decide_rollback_action() -> RollbackPolicy {
+    PackageContext::current().rollback
+}
+
 #[cfg(test)]
 mod tests {
     /// `APP_USER_MODEL_ID` は `tauri.conf.json` の `identifier` と整合させる
@@ -465,6 +473,16 @@ mod tests {
         assert_eq!(
             super::decide_activation(true, true),
             super::ActivationPolicy::Hide
+        );
+    }
+
+    /// `decide_rollback_action` は現在の PackageContext に従う。
+    /// 通常版テスト環境 (unpackaged) では `InstallerDownload` を返す。
+    #[test]
+    fn decide_rollback_action_returns_installer_download_when_unpackaged() {
+        assert_eq!(
+            super::decide_rollback_action(),
+            super::RollbackPolicy::InstallerDownload
         );
     }
 }

@@ -53,6 +53,21 @@ fn show_rollback_dialog(target: &RollbackTarget) {
         return;
     }
 
+    // Wave 4B.4: MSIX 環境では NSIS インストーラ download をスキップして
+    // release ページの Web ブラウザ案内に退避する。
+    match appusermodel::decide_rollback_action() {
+        appusermodel::RollbackPolicy::ReleasePage => {
+            tracing::warn!(
+                "MSIX 環境のため自動ロールバック installer download はスキップ。release page に退避します"
+            );
+            open_release_page_in_browser(&target.releases_page_url);
+            return;
+        }
+        appusermodel::RollbackPolicy::InstallerDownload => {
+            // unpackaged 経路は従来通り installer を DL + 検証 + 起動
+        }
+    }
+
     match auto_rollback_install(target) {
         Ok(()) => {
             tracing::info!("rollback installer 起動成功。プロセスを終了します");
