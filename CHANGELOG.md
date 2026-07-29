@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
 - **Wave 4A: MSIX manifest + artifact 妥当性** — `distribution/msix/AppxManifest.xml` を `${VERSION}` / `${ARCH}` / `${PUBLISHER}` プレースホルダ化、x64 / arm64 両アーキを `gen_msix_manifest_all.sh` で生成。`rescap:unvirtualizedResources` + `desktop6:RegistryWriteVirtualization=disabled` + `desktop6:FileSystemWriteVirtualization=disabled` を同時宣言し、host HKCU への実書込みを有効化。`.cursorpack` ファイル関連付けを NSIS / MSI と並列に追加。
 - **Wave 4B: Store runtime 分岐 + activation policy 集約** — `appusermodel::PackageContext::current()` で autostart / updater / rollback / activation の 4 軸を一元決定。`GetCurrentPackageFullName` (Win32 API) → path fallback の 2 段戦略で MSIX 検出。`commands/app_metadata.rs` で `is_msix_packaged` / `package_policy_label` の 2 IPC を公開。`useUpdaterBootstrap` / `useUpdater.check` を MSIX で short-circuit、`useMsixPackaged` composable で UI 出し分け (Updates / Startup セクション)。`start_minimized` 設定と `--autostart` 起動を `decide_activation` で集約し `Window::hide` 配線。`auto_rollback_install` を `PackageContext.rollback` で gate。
 - **Wave 4C: CI install/remove/sentinel パイプライン** — `.github/workflows/build-msix-artifacts.yml` 新設 (workflow_dispatch のみ、matrix x64 / arm64、test self-signed cert + signtool + `Add-AppxPackage` smoke、`~/.custom_cursors/cursor_store_sentinel.txt` 永続化検証)。`.env.example` に `MSIX_PUBLISHER` / `MSIX_TEST_CERT_PASSWORD` (任意) を追記。

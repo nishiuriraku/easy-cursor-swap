@@ -13,7 +13,6 @@
 const isMsixRef = ref<boolean>(false)
 let fetched = false
 
-
 export function useMsixPackaged(): { isMsixPackaged: Readonly<Ref<boolean>> } {
   if (!fetched) {
     fetched = true
