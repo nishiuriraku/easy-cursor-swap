@@ -834,6 +834,7 @@ function selectSection(id: SectionId) {
           v-else-if="section === 'startup'"
           v-model:auto-start="startup.autoStart"
           v-model:start-minimized="startup.startMinimized"
+          :is-msix-packaged="isMsixPackaged"
         />
 
         <LibrarySection
@@ -892,6 +893,7 @@ function selectSection(id: SectionId) {
           :updater-error="updaterErrorDisplay"
           :updater-progress="updaterProgress"
           :updater-total="updaterTotal"
+          :is-msix-packaged="isMsixPackaged"
           @check-update="onCheckUpdate"
           @download-update="onDownloadUpdate"
           @force-recheck="onForceRecheck"

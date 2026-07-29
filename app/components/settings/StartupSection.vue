@@ -8,6 +8,10 @@ const { t } = useI18n()
 
 const autoStart = defineModel<boolean>('autoStart', { required: true })
 const startMinimized = defineModel<boolean>('startMinimized', { required: true })
+
+defineProps<{
+  isMsixPackaged: boolean
+}>()
 </script>
 
 <template>
@@ -16,6 +20,10 @@ const startMinimized = defineModel<boolean>('startMinimized', { required: true }
       <h1>{{ t('settings.sectionStartup') }}</h1>
       <p>{{ t('settings.descStartup') }}</p>
     </header>
+    <div v-if="isMsixPackaged" class="msix-banner">
+      <p>{{ t('settings.storeManaged') }}</p>
+      <a href="ms-settings:startupapps">{{ t('settings.storeManagedLink') }}</a>
+    </div>
     <div class="prop-section">
       <div class="prop-head">
         {{ t('settings.groupAutoStart') }}
@@ -73,5 +81,16 @@ const startMinimized = defineModel<boolean>('startMinimized', { required: true }
 }
 .prop-body {
   padding: 4px 16px;
+}
+.msix-banner {
+  @apply mb-3 rounded-[10px] border px-4 py-3 text-[13px];
+  background: rgba(255, 213, 79, 0.08);
+  border-color: rgba(255, 213, 79, 0.4);
+}
+.msix-banner p {
+  @apply m-0 mb-1;
+}
+.msix-banner a {
+  color: rgb(var(--accent));
 }
 </style>

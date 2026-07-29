@@ -41,6 +41,10 @@ defineEmits<{
       <h1>{{ t('settings.sectionUpdates') }}</h1>
       <p>{{ t('settings.descUpdates') }}</p>
     </header>
+    <div v-if="isMsixPackaged" class="msix-banner">
+      <p>{{ t('settings.storeManaged') }}</p>
+      <a href="ms-settings:apps-features-app">{{ t('settings.storeManagedLink') }}</a>
+    </div>
     <div class="prop-section">
       <div class="prop-head">{{ t('settings.groupAutoUpdate') }}</div>
       <div class="prop-body">
@@ -155,5 +159,16 @@ defineEmits<{
   @apply mt-2 rounded-[8px] border px-3 py-2 text-[12px];
   background: rgba(106, 213, 184, 0.06);
   border-color: rgba(106, 213, 184, 0.4);
+}
+.msix-banner {
+  @apply mb-3 rounded-[10px] border px-4 py-3 text-[13px];
+  background: rgba(255, 213, 79, 0.08);
+  border-color: rgba(255, 213, 79, 0.4);
+}
+.msix-banner p {
+  @apply m-0 mb-1;
+}
+.msix-banner a {
+  color: rgb(var(--accent));
 }
 </style>

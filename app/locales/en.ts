@@ -395,6 +395,12 @@ export default {
     groupAutoUpdate: 'Auto-update',
     autoUpdateLabel: 'Enable background updates',
     autoUpdateDesc: 'Fetches signed delta updates',
+    // Wave 4B.6: MSIX environment note (updates)
+    storeManaged: 'This setting is unavailable in Microsoft Store builds. Updates are managed by the Store.',
+    storeManagedLink: 'Open Windows Settings → Apps & features for details',
+    // Wave 4B.6: MSIX environment note (updates)
+    storeManaged: 'This setting is unavailable in Microsoft Store builds. Updates are managed by the Store.',
+    storeManagedLink: 'Open Windows Settings → Apps & features for details',
     checkNowLabel: 'Check now',
     btnChecking: 'Checking...',
     btnCheckUpdate: 'Check for updates',

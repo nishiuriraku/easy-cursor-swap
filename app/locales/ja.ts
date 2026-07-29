@@ -394,6 +394,9 @@ export default {
     groupAutoUpdate: '自動アップデート',
     autoUpdateLabel: 'バックグラウンド更新を有効化',
     autoUpdateDesc: '署名検証付きの差分更新を取得',
+    // Wave 4B.6: MSIX 環境案内 (updates)
+    storeManaged: 'この設定は Microsoft Store 配布版では利用できません。更新は Store が自動管理します。',
+    storeManagedLink: 'Windows の設定 → アプリと機能 で詳細を確認',
     checkNowLabel: '今すぐ確認',
     btnChecking: '確認中...',
     btnCheckUpdate: '更新を確認',
