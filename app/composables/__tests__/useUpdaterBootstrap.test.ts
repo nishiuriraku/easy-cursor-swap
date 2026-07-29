@@ -139,7 +139,13 @@ describe('useUpdaterBootstrap', () => {
     configRef.value = mkConfig(true)
     localStorage.setItem(LAST_CHECK_KEY, String(Date.now() - 25 * 60 * 60 * 1000))
     checkMock.mockResolvedValue({ version: '2.0.0', currentVersion: '1.5.0' })
-    invokeTauriMock.mockResolvedValue(true) // major bump = true
+    // major bump = true (ただし Wave 4B.5 で is_msix_packaged 呼び出しが増えたため
+    // cmd 名で分岐する)
+    invokeTauriMock.mockImplementation(async (cmd: string) => {
+      if (cmd === 'is_msix_packaged') return false
+      if (cmd === 'check_update_is_major_jump') return true
+      return false
+    })
 
     bootstrapUpdaterCheck()
     await flush()
