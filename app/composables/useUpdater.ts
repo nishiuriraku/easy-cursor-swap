@@ -10,6 +10,8 @@
  * `dialog: false` で標準ダイアログを抑制し、UI 側で進捗表示する。
  */
 
+import { invokeTauri } from './useTauri'
+
 export interface UpdateInfo {
   version: string
   currentVersion: string
@@ -61,6 +63,19 @@ async function getUpdaterApi() {
 
 /** 手動で更新を確認する。 */
 async function check(): Promise<UpdateInfo | null> {
+  // Wave 4B.5: MSIX 環境では Tauri Updater を抑止して Store 経路に委譲。
+  // store 経由の自動更新は OS 側で行うため、ここでは silent に null を返す。
+  try {
+    const isMsix = await invokeTauri<boolean>('is_msix_packaged')
+    if (isMsix) {
+      console.info('[useUpdater] MSIX 環境のため Tauri Updater check をスキップ')
+      return null
+    }
+  } catch (e) {
+    // IPC 失敗時は unpackaged 想定で続行
+    console.warn('[useUpdater] is_msix_packaged IPC 失敗、通常経路で続行:', e)
+  }
+
   const api = await getUpdaterApi()
   if (!api) return null
   checking.value = true
