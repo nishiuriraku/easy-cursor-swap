@@ -224,6 +224,18 @@ fn is_msix_packaged_with_fallback() -> bool {
     is_msix_packaged()
 }
 
+/// 起動時のメインウィンドウ可視性を決定する pure 関数。
+/// - `start_minimized = false` + 通常起動 → Show
+/// - `start_minimized = true` + 通常起動 → Hide
+/// - `--autostart` 起動は `start_minimized` に関わらず Hide (autostart は常にバックグラウンド)
+pub fn decide_activation(start_minimized: bool, is_autostart_launch: bool) -> ActivationPolicy {
+    if is_autostart_launch || start_minimized {
+        ActivationPolicy::Hide
+    } else {
+        ActivationPolicy::Show
+    }
+}
+
 #[cfg(test)]
 mod tests {
     /// `APP_USER_MODEL_ID` は `tauri.conf.json` の `identifier` と整合させる
@@ -421,5 +433,38 @@ mod tests {
     #[test]
     fn returns_false_when_exe_path_is_unavailable() {
         assert!(!super::is_msix_packaged_for_path(None));
+    }
+
+    // --- Wave 4B.3: activation policy decision ---
+
+    /// `start_minimized=false` + 通常起動 → Show (ウィンドウ可視)
+    #[test]
+    fn decide_activation_show_when_not_minimized_and_not_autostart() {
+        assert_eq!(
+            super::decide_activation(false, false),
+            super::ActivationPolicy::Show
+        );
+    }
+
+    /// `start_minimized=true` + 通常起動 → Hide (バックグラウンド起動)
+    #[test]
+    fn decide_activation_hide_when_minimized_and_not_autostart() {
+        assert_eq!(
+            super::decide_activation(true, false),
+            super::ActivationPolicy::Hide
+        );
+    }
+
+    /// `start_minimized=false` + `--autostart` 起動 → Hide (autostart は常にバックグラウンド)
+    #[test]
+    fn decide_activation_hide_on_autostart_regardless_of_minimized() {
+        assert_eq!(
+            super::decide_activation(false, true),
+            super::ActivationPolicy::Hide
+        );
+        assert_eq!(
+            super::decide_activation(true, true),
+            super::ActivationPolicy::Hide
+        );
     }
 }
