@@ -87,13 +87,19 @@ signtool sign /a /v /fd SHA256 /f cert.pfx /p "<password>" EasyCursorSwap.msix
 詳細は [`authenticode_signing.md`](authenticode_signing.md) を参照。サマリ:
 
 1. Microsoft Partner Center で individual developer 登録 (Identity Validation)
-2. `build-msix-artifacts.yml` (別 workflow、Wave 4A) で `makeappx` + test 自己署名
-   (`CN=EasyCursorSwap-Dev`) で MSIX をビルドし、CI runner で `Add-AppxPackage`
-   → sentinel HKCU write → cleanup のスモーク
-3. AppxManifest は `distribution/msix/AppxManifest.xml` を参照 (`rescap:unvirtualizedResources`
-   + `rescap6:RegistryWriteVirtualization=disabled` 設定済)
-4. Partner Center 経由で本番 MSIX を提出 (Microsoft が自動署名)
-5. **2026-07-25 時点では方針確定のみ**。実装は Wave 4A〜4C の範囲
+2. `build-msix-artifacts.yml` (Wave 4C) で `makeappx` + test 自己署名
+   (`CN=EasyCursorSwap, O=EasyCursorSwap, C=JP`) で MSIX をビルドし、CI runner で
+   `Add-AppxPackage` → `~/.custom_cursors/cursor_store_sentinel.txt` 永続化検証 →
+   `Remove-AppxPackage` を try/finally で実行するスモーク。`workflow_dispatch` のみで
+   PR には必須チェックインを強制しない。
+3. AppxManifest は `distribution/msix/AppxManifest.xml` (Wave 4A でテンプレ化) を参照。
+   `${VERSION}` / `${ARCH}` / `${PUBLISHER}` を `gen_msix_manifest_all.sh` で置換して
+   x64 / arm64 両アーキの manifest を生成。`rescap:unvirtualizedResources` +
+   `desktop6:RegistryWriteVirtualization=disabled` + `desktop6:FileSystemWriteVirtualization=disabled`
+   を同時宣言し、host HKCU への実書込みを有効化。
+4. Partner Center 経由で本番 MSIX を提出 (Microsoft が自動署名)。
+5. **未着手 (別フェーズ)**: Store 提出、`.msixupload` 生成、ARM64 実機検証、Partner Center
+   Identity Validation 完了後の `MSIX_PUBLISHER` env 注入。
 
 ## SmartScreen レピュテーション獲得
 
