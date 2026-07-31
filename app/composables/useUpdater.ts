@@ -107,6 +107,18 @@ async function check(): Promise<UpdateInfo | null> {
 
 /** 利用可能な更新をダウンロード + インストール。完了後の再起動はユーザー判断に委ねる。 */
 async function downloadAndInstall(): Promise<boolean> {
+  // Wave 4B.5: MSIX 環境では Store 経路に委譲するため、Tauri Updater の
+  // check/download/install を完全にスキップする。
+  try {
+    const isMsix = await invokeTauri<boolean>('is_msix_packaged')
+    if (isMsix) {
+      console.info('[useUpdater] MSIX 環境のため Tauri Updater download をスキップ')
+      return false
+    }
+  } catch (e) {
+    console.warn('[useUpdater] is_msix_packaged IPC 失敗、通常経路で続行:', e)
+  }
+
   const api = await getUpdaterApi()
   if (!api) return false
   downloading.value = true
