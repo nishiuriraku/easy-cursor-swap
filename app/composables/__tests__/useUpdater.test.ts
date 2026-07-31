@@ -7,7 +7,8 @@ vi.mock('../useTauri', () => ({
   invokeTauri: (...args: unknown[]) => invokeTauriMock(...args),
 }))
 
-const pluginCheckMock = vi.fn<() => Promise<{ available?: boolean; version?: string; currentVersion?: string } | null>>()
+const pluginCheckMock =
+  vi.fn<() => Promise<{ available?: boolean; version?: string; currentVersion?: string } | null>>()
 const pluginDownloadAndInstallMock = vi.fn<() => Promise<boolean>>()
 vi.mock('@tauri-apps/plugin-updater', () => ({
   check: (..._args: unknown[]) => pluginCheckMock(),
