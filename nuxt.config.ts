@@ -27,7 +27,7 @@ export default defineNuxtConfig({
 
   // CSS load 順: Tailwind base + theme tokens を先に、global.css は後ろで上書きする
   // (Phase 8 で global.css を縮小するまで、preflight 競合は global.css 側で吸収)
-  css: ['~/assets/css/tailwind.css', '~/assets/css/global.css'],
+  css: ['~/assets/css/fonts.css', '~/assets/css/tailwind.css', '~/assets/css/global.css'],
 
   vite: {
     plugins: [tailwindcss()],
@@ -48,21 +48,6 @@ export default defineNuxtConfig({
         { charset: 'utf-8' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
         { name: 'description', content: 'EasyCursorSwap — mouse cursor theme manager' },
-      ],
-      link: [
-        {
-          rel: 'preconnect',
-          href: 'https://fonts.googleapis.com',
-        },
-        {
-          rel: 'preconnect',
-          href: 'https://fonts.gstatic.com',
-          crossorigin: '',
-        },
-        {
-          rel: 'stylesheet',
-          href: 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap',
-        },
       ],
     },
   },

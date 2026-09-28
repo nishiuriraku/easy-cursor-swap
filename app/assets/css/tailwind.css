@@ -59,9 +59,8 @@
   --radius-xl: 18px;
 
   /* --- フォント --- */
-  --font-display:
-    'Inter Tight', 'Inter', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-body: 'Inter', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: 'Inter', 'Yu Gothic UI', 'Meiryo', 'Noto Sans JP', system-ui, sans-serif;
+  --font-body: 'Inter', 'Yu Gothic UI', 'Meiryo', 'Noto Sans JP', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, Menlo, monospace;
 }
 
