@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.9] - 2026-09-28
+
+Microsoft Store (MSIX) 配布基盤の整備 (Wave 4A〜4C) と、設定・マーケットプレイス周辺の堅牢化が中心のリリース。更新内容モーダルの Markdown 描画化、描画エラーバウンダリ、公式インデックスのオフラインキャッシュ、Inter フォント同梱による Google Fonts 依存の廃止を含む。HKCU 限定 / 適用トランザクション性 / アーカイブ検閲 / PII レダクション / `v-html` 不採用 の 5 大不変条件はすべて維持。
+
 ### Added
 
 - **Wave 4A: MSIX manifest + artifact 妥当性** — `distribution/msix/AppxManifest.xml` を `${VERSION}` / `${ARCH}` / `${PUBLISHER}` プレースホルダ化、x64 / arm64 両アーキを `gen_msix_manifest_all.sh` で生成。`rescap:unvirtualizedResources` + `desktop6:RegistryWriteVirtualization=disabled` + `desktop6:FileSystemWriteVirtualization=disabled` を同時宣言し、host HKCU への実書込みを有効化。`.cursorpack` ファイル関連付けを NSIS / MSI と並列に追加。
@@ -16,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 初回起動時に 3 ステップのウェルカムガイド (スナップショット保存の案内 / パニックキーとトレイ / 最初の一歩) を表示。完了状態は Rust 設定 `general.onboarding_version` に保存され、設定 → 一般 から再表示できる。
 - 検証済みの公式インデックスを `~/.custom_cursors/_marketplace_index_cache.json` にディスクキャッシュし、ネットワーク取得失敗時は前回成功時の内容を `stale` 表示 (取得時刻付きバナー + 再試行) で返す。`marketplace_fetch_index` IPC の戻り型を `MarketplaceIndexResult { index, stale, fetchedAt, error }` に拡張 (IPC 名・数は不変)。インストール時の SHA-256 / Ed25519 / 許可ホスト検証はキャッシュ由来でも同じ経路で実行される。フロントは `online` / `offline` イベントで復帰時の自動再取得とオフライン補助表示を行う。
 - 描画エラーバウンダリ (`AppErrorBoundary` + `AppErrorFallback` + `errorBoundary.client` プラグイン + `app/error.vue`) を追加。ページ描画中の未捕捉例外をサイドバー/タイトルバーを生かしたままフォールバック表示 (詳細コピー / アプリ再起動 / 続行) に置き換える。
+- 設定 → アップデートの更新内容モーダルを Markdown 描画に変更。一覧は 1 行省略リンクのまま、クリックで開くモーダル内に共通 `UiMarkdown` で全文を描画する (`marked` は Lexer のみに使い自前 VNode レンダーで描画するため `v-html` 不使用の不変条件を維持。生 HTML はテキスト表示、リンクは `http(s)://` / `mailto:` のみ外部ブラウザで開く)。
 
 ### Changed
 
@@ -301,7 +306,8 @@ v0.0.1 と同じく仮リリース系列 (provisional, SemVer 0.0.x で API 安�
   - `BulkImportPreviewModal.vue` (579 → 297 行 / -49%) から `useBulkImportPreviewState` を抽出。matches/unmatched の三方移動 state machine + props.open 連動の初期マッチ watch + Blob URL ライフサイクル + ApplyPayload 組立を composable に閉じ込め、SFC は presentation に専念 (audit C21-SIZE 部分)。`ApplyPayload` 型の output 場所も SFC から composable に移動 (`useCreatorBulkImportFlow` 側 import を更新)。
 - component 総数: 50 → 56 (library +3 / marketplace +2 / creator +1)。`docs/architecture.json` / `docs/ui_map.json` の `measured_counts.components_total` を再測定し、HTML viewer に再埋め込み。
 
-[Unreleased]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.8...HEAD
+[Unreleased]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.9...HEAD
+[0.0.9]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.8...v0.0.9
 [0.0.8]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.7...v0.0.8
 [0.0.7]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.6...v0.0.7
 [0.0.6]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.5...v0.0.6
