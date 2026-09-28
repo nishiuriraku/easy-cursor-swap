@@ -21,12 +21,12 @@ const stubs = {
   UiAlert: { template: '<div class="alert-stub"><slot /></div>' },
   SettingsRow: {
     props: ['anchor', 'label', 'desc'],
-    template:
-      '<div :data-anchor="anchor" :data-label="label"><slot name="desc" /><slot /></div>',
+    template: '<div :data-anchor="anchor" :data-label="label"><slot name="desc" /><slot /></div>',
   },
   UiModal: {
     props: ['open', 'title'],
-    template: '<div v-if="open" class="modal-stub" :data-title="title"><slot /><slot name="actions" /></div>',
+    template:
+      '<div v-if="open" class="modal-stub" :data-title="title"><slot /><slot name="actions" /></div>',
   },
   SettingsToggle: {
     props: ['modelValue'],

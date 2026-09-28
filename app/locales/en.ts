@@ -394,7 +394,7 @@ export default {
     updateRelaunchTitle: 'Update complete',
     updateRelaunchAsk: 'Relaunch the app to apply the new version?',
     updateAvailableLabel: 'Update to v{version}',
-    updateNotesTitle: "What's new in v{version}",
+    updateNotesTitle: 'What is new in v{version}',
     updateMajorJumpTitle: 'Major version update',
     updateMajorJumpWarning: 'v{version} is a major version update. It may contain breaking changes. Do you want to continue?',
     updaterErrNetwork: 'Check your network connection ({message})',
