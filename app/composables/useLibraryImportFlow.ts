@@ -74,7 +74,7 @@ export function useLibraryImportFlow(deps: LibraryImportFlowDeps) {
       }
       await actuallyImport(path)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
+      const msg = appErrorMessage(err)
       setError(t('library.errImport', { detail: msg }))
       console.error('[Library] import failed:', err)
     } finally {
@@ -90,7 +90,7 @@ export function useLibraryImportFlow(deps: LibraryImportFlowDeps) {
     try {
       await actuallyImport(pending.path)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
+      const msg = appErrorMessage(err)
       setError(t('library.errImport', { detail: msg }))
     } finally {
       importBusy.value = false

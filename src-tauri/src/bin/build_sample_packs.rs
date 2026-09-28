@@ -10,6 +10,7 @@
 //!   cargo run --manifest-path src-tauri/Cargo.toml --bin build_sample_packs
 
 use app_lib::cursor::{build_cur_from_png, ResizeMethod};
+use app_lib::errors::{AppError, AppResult};
 use app_lib::theme::types::{
     CursorDefinition, Hotspot, LocalizedString, Ratio01, ThemeMetadata, ThemeSource,
 };
@@ -74,10 +75,13 @@ fn build_one(
     folder: &str,
     title: &str,
     prefix: &str,
-) -> Result<(PathBuf, u64, Uuid), String> {
+) -> AppResult<(PathBuf, u64, Uuid)> {
     let src_dir = sample_root.join(folder);
     if !src_dir.is_dir() {
-        return Err(format!("{} が存在しません", src_dir.display()));
+        return Err(AppError::Other(format!(
+            "{} が存在しません",
+            src_dir.display()
+        )));
     }
 
     let mut cursors_meta: HashMap<String, CursorDefinition> = HashMap::new();
@@ -86,7 +90,7 @@ fn build_one(
     for (role, hx, hy) in HOTSPOTS {
         let png_path = src_dir.join(format!("{}__{}.png", prefix, role));
         let png_bytes = std::fs::read(&png_path)
-            .map_err(|e| format!("{} の読込失敗: {}", png_path.display(), e))?;
+            .map_err(|e| AppError::Other(format!("{} の読込失敗: {}", png_path.display(), e)))?;
 
         let hotspot_norm = Hotspot {
             x: Ratio01::new(*hx),
@@ -96,7 +100,9 @@ fn build_one(
 
         let cur_bytes =
             build_cur_from_png(&png_bytes, hx_px, hy_px, ResizeMethod::Lanczos, None, None)
-                .map_err(|e| format!("{}::{} の .cur 生成失敗: {}", folder, role, e))?;
+                .map_err(|e| {
+                    AppError::Other(format!("{}::{} の .cur 生成失敗: {}", folder, role, e))
+                })?;
 
         cursors_meta.insert(
             role.to_string(),
@@ -132,7 +138,7 @@ fn build_one(
 
     let output_path = output_dir.join(format!("{}.cursorpack", folder));
     let size = ThemeManager::export_cursorpack(&mut metadata, &cursor_bytes, &output_path)
-        .map_err(|e| format!("{} の cursorpack 書出失敗: {}", folder, e))?;
+        .map_err(|e| AppError::Other(format!("{} の cursorpack 書出失敗: {}", folder, e)))?;
 
     Ok((output_path, size, id))
 }

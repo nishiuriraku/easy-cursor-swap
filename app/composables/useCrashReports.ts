@@ -46,7 +46,7 @@ export function useCrashReportsState(deps: CrashReportsStateDeps) {
       count.value = reports?.length ?? 0
     } catch (err) {
       message.value = t('settings.crashLoadFailed', {
-        error: err instanceof Error ? err.message : String(err),
+        error: appErrorMessage(err),
       })
     }
   }
@@ -71,7 +71,7 @@ export function useCrashReportsState(deps: CrashReportsStateDeps) {
       }
       await load()
     } catch (err) {
-      message.value = err instanceof Error ? err.message : String(err)
+      message.value = appErrorMessage(err)
     } finally {
       busy.value = false
     }
@@ -85,7 +85,7 @@ export function useCrashReportsState(deps: CrashReportsStateDeps) {
       message.value = t('settings.crashClearedCount', { count: removed })
       await load()
     } catch (err) {
-      message.value = err instanceof Error ? err.message : String(err)
+      message.value = appErrorMessage(err)
     } finally {
       busy.value = false
     }

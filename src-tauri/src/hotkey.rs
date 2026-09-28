@@ -95,7 +95,7 @@ pub fn parse_hotkey(spec: &str) -> Option<(u32, u32)> {
 pub fn register_panic_hotkey<F, R>(spec: &str, callback: F, on_result: R) -> AppResult<()>
 where
     F: Fn() + Send + 'static,
-    R: FnOnce(Result<(), String>) + Send + 'static,
+    R: FnOnce(Result<(), AppError>) + Send + 'static,
 {
     let (modifiers, vk) = parse_hotkey(spec).ok_or_else(|| {
         AppError::InvalidInput(format!("ホットキー文字列を解釈できません: {}", spec))
@@ -142,7 +142,7 @@ where
                 Ok(h) => h,
                 Err(e) => {
                     tracing::error!("hotkey ウィンドウ作成失敗: {}", e);
-                    on_result(Err(format!("CreateWindow: {}", e)));
+                    on_result(Err(AppError::Other(format!("CreateWindow: {}", e))));
                     return;
                 }
             };
@@ -159,7 +159,7 @@ where
                     e
                 );
                 let _ = DestroyWindow(hwnd);
-                on_result(Err(format!("RegisterHotKey: {}", e)));
+                on_result(Err(AppError::Other(format!("RegisterHotKey: {}", e))));
                 return;
             }
             // 登録成功を通知してからメッセージループへ。
@@ -183,7 +183,7 @@ where
 pub fn register_panic_hotkey<F, R>(_spec: &str, _callback: F, on_result: R) -> AppResult<()>
 where
     F: Fn() + Send + 'static,
-    R: FnOnce(Result<(), String>) + Send + 'static,
+    R: FnOnce(Result<(), AppError>) + Send + 'static,
 {
     tracing::warn!("グローバルホットキーは Windows 以外では利用できません");
     // シグネチャ整合のため即座に成功通知 (このプラットフォームでは登録自体が no-op)。

@@ -128,7 +128,7 @@ export function useSettingsForm() {
       await flushLocalToConfig()
       dirty.value = false
     } catch (err) {
-      saveError.value = err instanceof Error ? err.message : String(err)
+      saveError.value = appErrorMessage(err)
     } finally {
       saving.value = false
     }

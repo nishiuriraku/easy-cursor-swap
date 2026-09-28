@@ -95,7 +95,7 @@ export function useThemeDetailActions(deps: ThemeDetailActionsDeps) {
     } catch (err) {
       setError(
         t('library.errEditModeTransition', {
-          detail: err instanceof Error ? err.message : String(err),
+          detail: appErrorMessage(err),
         }),
       )
     } finally {
@@ -120,7 +120,7 @@ export function useThemeDetailActions(deps: ThemeDetailActionsDeps) {
     } catch (err) {
       setError(
         t('library.errDuplicate', {
-          detail: err instanceof Error ? err.message : String(err),
+          detail: appErrorMessage(err),
         }),
       )
     } finally {
@@ -161,7 +161,7 @@ export function useThemeDetailActions(deps: ThemeDetailActionsDeps) {
     } catch (err) {
       setError(
         t('library.errExport', {
-          detail: err instanceof Error ? err.message : String(err),
+          detail: appErrorMessage(err),
         }),
       )
     } finally {
@@ -196,7 +196,7 @@ export function useThemeDetailActions(deps: ThemeDetailActionsDeps) {
     } catch (err) {
       setError(
         t('library.errDelete', {
-          detail: err instanceof Error ? err.message : String(err),
+          detail: appErrorMessage(err),
         }),
       )
     } finally {

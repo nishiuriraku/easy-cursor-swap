@@ -121,7 +121,7 @@ export function useCreatorStartFlow(deps: CreatorStartFlowDeps) {
       }
     } catch (err) {
       importMessage.value = t('creator.errDuplicateThemeFailed', {
-        detail: err instanceof Error ? err.message : String(err),
+        detail: appErrorMessage(err),
       })
       stage.value = 'editing'
     }
@@ -151,7 +151,7 @@ export function useCreatorStartFlow(deps: CreatorStartFlowDeps) {
       saveModalDefault.value = 'libraryAndApply'
     } catch (err) {
       importMessage.value = t('creator.errEditLoadFailed', {
-        detail: err instanceof Error ? err.message : String(err),
+        detail: appErrorMessage(err),
       })
       stage.value = 'editing'
     }

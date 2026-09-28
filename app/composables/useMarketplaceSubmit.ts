@@ -29,7 +29,7 @@ export function useMarketplaceSubmit() {
       }
       return result
     } catch (e) {
-      errorMsg.value = e instanceof Error ? e.message : String(e)
+      errorMsg.value = appErrorMessage(e)
       throw e
     } finally {
       unlisten()

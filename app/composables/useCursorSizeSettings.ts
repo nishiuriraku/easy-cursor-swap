@@ -66,7 +66,7 @@ export function useCursorSizeSettings() {
       // Rust 側でクランプされた値を slider に反映 (snap)
       cursorSizeSlider.value = dwordToSlider(written ?? sliderToDword(next))
     } catch (err) {
-      cursorSizeError.value = err instanceof Error ? err.message : String(err)
+      cursorSizeError.value = appErrorMessage(err)
       // 失敗時は OS 側を再取得してロールバック表示
       await refreshCursorSizeFromOs()
     } finally {

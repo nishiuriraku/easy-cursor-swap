@@ -25,7 +25,7 @@ export interface UpdateInfo {
  * 同じ生メッセージから 2 回呼び出しても同じ key/message を返す純粋関数。
  */
 export function classifyUpdaterError(err: unknown): { key: string; message: string } {
-  const msg = err instanceof Error ? err.message : String(err)
+  const msg = appErrorMessage(err)
   // reqwest::Error は canonical に "error sending request for url (...)" を投げる
   // ため "sending request" / "tcp connect" / "dns" を network カテゴリに含める
   if (
@@ -98,7 +98,7 @@ async function check(): Promise<UpdateInfo | null> {
     available.value = null
     return null
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err)
+    error.value = appErrorMessage(err)
     return null
   } finally {
     checking.value = false
@@ -144,7 +144,7 @@ async function downloadAndInstall(): Promise<boolean> {
     })
     return true
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err)
+    error.value = appErrorMessage(err)
     return false
   } finally {
     downloading.value = false

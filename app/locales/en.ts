@@ -671,4 +671,22 @@ export default {
     // Startup auto-update notification toast (useUpdaterBootstrap)
     toastUpdateAvailable: 'New version v{version} is available. Download it from Settings → Updates.',
   },
+  errors: {
+    config: 'Failed to read or write settings ({message})',
+    registry: 'Cursor settings (registry) operation failed ({message})',
+    image_processing: 'Image processing failed ({message})',
+    theme: 'Theme operation failed ({message})',
+    io: 'File I/O failed ({message})',
+    json: 'Failed to parse data ({message})',
+    zip: 'Archive processing failed ({message})',
+    invalid_input: 'Invalid input ({message})',
+    other: '{message}',
+    bulk_import_cancelled: 'Bulk import was cancelled',
+    no_supported_files: 'No supported files found: {path}',
+    oversize_file: 'File exceeds the size limit: {path} ({size} bytes)',
+    invalid_cursorpack: 'Cannot parse .cursorpack: {reason}',
+    crypto: 'Key / signature operation failed ({message})',
+    github: 'GitHub communication failed ({message})',
+    unsupported_platform: 'This operation is not available on this platform',
+  },
 } as const

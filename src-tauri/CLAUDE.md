@@ -34,7 +34,7 @@ Vue (UI) ──invoke()──▶ Tauri command (commands/) ──▶ platform::C
 
 - **Comments and doc strings: Japanese.**
 - Use `tracing::{info,warn,error,debug,trace}!` for logs; never `println!`. Always pass paths through `logging::redact_path` and hashes through `logging::short_hash` (12 chars).
-- Errors propagate as `AppError`; IPC commands return `Result<T, AppError>`.
+- Errors propagate as `AppError`; IPC commands return `Result<T, AppError>`. IPC には `AppErrorDto { code, message, detail? }` で渡る。variant 追加時は `AppErrorCode` と `code()` の match、`app/locales/{ja,en}.ts` `errors.<code>`、`cargo run --features typegen --bin gen_types` の 4 点セット。
 - Prefer `RwLock` over `Mutex` when read-heavy (e.g. `config/store.rs`).
 - Use `tokio::task::spawn_blocking` for blocking I/O in async contexts (ZIP extraction, large file scans).
 - OS カーソル機構へは `State<'_, SharedBackend>` (`platform::CursorBackend`) 経由でのみ到達する。`RegistryManager` を commands / theme / main から直接呼ばない。

@@ -48,7 +48,7 @@ export function useProfileBackupDialog(deps: ProfileBackupDialogDeps) {
       message.value = t('settings.profileExportSuccess', { target })
     } catch (err) {
       message.value = t('settings.profileExportFail', {
-        error: err instanceof Error ? err.message : String(err),
+        error: appErrorMessage(err),
       })
     } finally {
       busy.value = false
@@ -76,7 +76,7 @@ export function useProfileBackupDialog(deps: ProfileBackupDialogDeps) {
       return true
     } catch (err) {
       message.value = t('settings.profileImportFail', {
-        error: err instanceof Error ? err.message : String(err),
+        error: appErrorMessage(err),
       })
       return false
     } finally {

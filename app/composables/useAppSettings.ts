@@ -33,7 +33,7 @@ async function load(force = false): Promise<AppConfig | null> {
       config.value = result ?? null
       return config.value
     } catch (err) {
-      error.value = err instanceof Error ? err.message : String(err)
+      error.value = appErrorMessage(err)
       console.warn('[useAppSettings] get_config failed:', err)
       return null
     } finally {
@@ -133,7 +133,7 @@ async function update(mutator: (c: AppConfig) => void): Promise<AppConfig | null
     if (updated) config.value = updated
     return updated
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err)
+    error.value = appErrorMessage(err)
     console.error('[useAppSettings] update_config failed:', err)
     return null
   }

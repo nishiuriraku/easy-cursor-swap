@@ -48,7 +48,7 @@ async function restore(backup: BackupInfo) {
   } catch (err) {
     message.value = {
       text: t('settings.recoveryFail', {
-        error: err instanceof Error ? err.message : String(err),
+        error: appErrorMessage(err),
       }),
       ok: false,
     }

@@ -144,7 +144,7 @@ export function useCreatorImport(deps: CreatorImportDeps) {
       }
     } catch (err) {
       importMessage.value = t('creator.errImportFailed', {
-        detail: err instanceof Error ? err.message : String(err),
+        detail: appErrorMessage(err),
       })
     } finally {
       importBusy.value = false

@@ -64,6 +64,19 @@ if ([string]::IsNullOrWhiteSpace($version)) {
   exit 2
 }
 
+if ($version -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
+  [Console]::Error.WriteLine('MSIX version requires a stable major.minor.patch version')
+  exit 2
+}
+foreach ($part in $version.Split('.')) {
+  $number = 0
+  if (-not [int]::TryParse($part, [ref]$number) -or $number -gt 65535) {
+    [Console]::Error.WriteLine('MSIX version components must be between 0 and 65535')
+    exit 2
+  }
+}
+$version = "$version.0"
+
 $publisher = $env:MSIX_PUBLISHER
 if ([string]::IsNullOrWhiteSpace($publisher)) {
   $publisher = 'CN=EasyCursorSwap, O=EasyCursorSwap, C=JP'

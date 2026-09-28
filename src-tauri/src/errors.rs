@@ -68,16 +68,109 @@ pub enum AppError {
     /// フロントには `github: <理由>` 形式でシリアライズされる。
     #[error("github: {0}")]
     GitHub(String),
+
+    /// 非 Windows ビルドの OS 機能スタブ (P01 / P02) が返す。実行時に Windows で出ることは無い。
+    #[error("この操作は Windows 専用です: {0}")]
+    UnsupportedPlatform(String),
 }
 
-/// Tauri IPC 向けのシリアライズ可能エラー
-/// Tauri の invoke ハンドラから返すため Serialize が必要
+use std::collections::BTreeMap;
+
+/// IPC 境界で安定したエラー種別。値は snake_case 文字列で TS 側 `AppErrorCode` と 1:1。
+/// **既存の値を改名・削除しない** (フロントの `errors.<code>` i18n キーと結合)。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "typegen", derive(ts_rs::TS))]
+#[cfg_attr(feature = "typegen", ts(export))]
+pub enum AppErrorCode {
+    Config,
+    Registry,
+    ImageProcessing,
+    Theme,
+    Io,
+    Json,
+    Zip,
+    InvalidInput,
+    Other,
+    BulkImportCancelled,
+    NoSupportedFiles,
+    OversizeFile,
+    InvalidCursorpack,
+    Crypto,
+    Github,
+    UnsupportedPlatform,
+}
+
+/// `AppError` の IPC 表現。`message` は `Display` と同一 (ログと突合可能)。
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "typegen", derive(ts_rs::TS))]
+#[cfg_attr(feature = "typegen", ts(export))]
+pub struct AppErrorDto {
+    pub code: AppErrorCode,
+    pub message: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "typegen", ts(optional))]
+    pub detail: Option<BTreeMap<String, String>>,
+}
+
+impl AppError {
+    pub fn code(&self) -> AppErrorCode {
+        match self {
+            AppError::Config(_) => AppErrorCode::Config,
+            AppError::Registry(_) => AppErrorCode::Registry,
+            AppError::ImageProcessing(_) => AppErrorCode::ImageProcessing,
+            AppError::Theme(_) => AppErrorCode::Theme,
+            AppError::Io(_) => AppErrorCode::Io,
+            AppError::Json(_) => AppErrorCode::Json,
+            AppError::Zip(_) => AppErrorCode::Zip,
+            AppError::InvalidInput(_) => AppErrorCode::InvalidInput,
+            AppError::Other(_) => AppErrorCode::Other,
+            AppError::BulkImportCancelled => AppErrorCode::BulkImportCancelled,
+            AppError::NoSupportedFiles { .. } => AppErrorCode::NoSupportedFiles,
+            AppError::OversizeFile { .. } => AppErrorCode::OversizeFile,
+            AppError::InvalidCursorpack { .. } => AppErrorCode::InvalidCursorpack,
+            AppError::Crypto(_) => AppErrorCode::Crypto,
+            AppError::GitHub(_) => AppErrorCode::Github,
+            AppError::UnsupportedPlatform(_) => AppErrorCode::UnsupportedPlatform,
+        }
+    }
+
+    pub fn detail(&self) -> Option<BTreeMap<String, String>> {
+        match self {
+            AppError::NoSupportedFiles { path } => {
+                Some(BTreeMap::from([("path".to_string(), path.clone())]))
+            }
+            AppError::OversizeFile { path, size } => Some(BTreeMap::from([
+                ("path".to_string(), path.clone()),
+                ("size".to_string(), size.to_string()),
+            ])),
+            AppError::InvalidCursorpack { reason } => {
+                Some(BTreeMap::from([("reason".to_string(), reason.clone())]))
+            }
+            _ => None,
+        }
+    }
+
+    pub fn to_dto(&self) -> AppErrorDto {
+        AppErrorDto {
+            code: self.code(),
+            message: self.to_string(),
+            detail: self.detail(),
+        }
+    }
+}
+
+/// Tauri IPC 向けのシリアライズ可能エラー。
+///
+/// Tauri の invoke ハンドラからは `AppErrorDto` (`{code, message, detail?}`) として
+/// 渡る。フロントは `app/utils/appError.ts` で受ける。`message` は `Display` と
+/// 同一なので、ログ / ダイアログ (`e.to_string()`) と突合できる。
 impl serde::Serialize for AppError {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        serializer.serialize_str(&self.to_string())
+        self.to_dto().serialize(serializer)
     }
 }
 
@@ -102,9 +195,7 @@ mod tests {
     /// `AppError::Crypto` / `AppError::GitHub` の表示・シリアライズ契約。
     ///
     /// 表示プレフィクスは lowercase の `crypto: ` / `github: ` で固定する。
-    /// フロント側は文字列マッチでハンドリングしているため、プレフィクスを
-    /// 変更すると既存ハンドラが壊れる (i18n キーを増やさない方針なので
-    /// ここを揺らさない)。
+    /// フロントは `code` で分岐し `message` は表示専用。
     #[test]
     fn crypto_display_prefix_is_lowercase() {
         let e = AppError::Crypto("Ed25519 生成失敗".to_string());
@@ -117,20 +208,28 @@ mod tests {
         assert_eq!(e.to_string(), "github: POST forks 401");
     }
 
-    /// シリアライズ結果が `to_string()` と完全一致することを保証する。
-    /// フロントはエラー文字列で分岐するため、JSON 形を変えてはいけない。
+    /// シリアライズ結果が DTO 形 (`{code, message}`) になることを保証する。
+    /// `message` は `to_string()` と同一。`detail` は構造体 variant のみ。
     #[test]
     fn crypto_serialization_matches_display() {
         let e = AppError::Crypto("DPAPI 失敗".to_string());
-        let s = serde_json::to_string(&e).unwrap();
-        assert_eq!(s, "\"crypto: DPAPI 失敗\"");
+        let v = serde_json::to_value(&e).unwrap();
+        assert_eq!(
+            v,
+            serde_json::json!({"code": "crypto", "message": "crypto: DPAPI 失敗"})
+        );
+        assert!(!v.as_object().unwrap().contains_key("detail"));
     }
 
     #[test]
     fn github_serialization_matches_display() {
         let e = AppError::GitHub("GET /user タイムアウト".to_string());
-        let s = serde_json::to_string(&e).unwrap();
-        assert_eq!(s, "\"github: GET /user タイムアウト\"");
+        let v = serde_json::to_value(&e).unwrap();
+        assert_eq!(
+            v,
+            serde_json::json!({"code": "github", "message": "github: GET /user タイムアウト"})
+        );
+        assert!(!v.as_object().unwrap().contains_key("detail"));
     }
 
     /// 既存バリアント (`Theme` / `InvalidInput` 等) の表示形をリグレッション検出用に固定する。
@@ -144,6 +243,109 @@ mod tests {
         assert_eq!(
             AppError::InvalidInput("javascript:foo".to_string()).to_string(),
             "入力エラー: javascript:foo"
+        );
+    }
+
+    /// 全 16 variant が安定した code 文字列に写像されることを固定する。
+    /// variant 追加時は match に分岐を足さないとコンパイルエラーになる (`_ =>` 禁止)。
+    #[test]
+    fn every_variant_maps_to_a_stable_code() {
+        let cases: Vec<(AppError, &str)> = vec![
+            (AppError::Config("x".into()), "\"config\""),
+            (AppError::Registry("x".into()), "\"registry\""),
+            (
+                AppError::ImageProcessing("x".into()),
+                "\"image_processing\"",
+            ),
+            (AppError::Theme("x".into()), "\"theme\""),
+            (AppError::Io(std::io::Error::other("x")), "\"io\""),
+            (
+                AppError::Json(serde_json::from_str::<serde_json::Value>("{").unwrap_err()),
+                "\"json\"",
+            ),
+            (
+                AppError::Zip(zip::result::ZipError::FileNotFound),
+                "\"zip\"",
+            ),
+            (AppError::InvalidInput("x".into()), "\"invalid_input\""),
+            (AppError::Other("x".into()), "\"other\""),
+            (AppError::BulkImportCancelled, "\"bulk_import_cancelled\""),
+            (
+                AppError::NoSupportedFiles { path: "p".into() },
+                "\"no_supported_files\"",
+            ),
+            (
+                AppError::OversizeFile {
+                    path: "p".into(),
+                    size: 1,
+                },
+                "\"oversize_file\"",
+            ),
+            (
+                AppError::InvalidCursorpack { reason: "r".into() },
+                "\"invalid_cursorpack\"",
+            ),
+            (AppError::Crypto("x".into()), "\"crypto\""),
+            (AppError::GitHub("x".into()), "\"github\""),
+            (
+                AppError::UnsupportedPlatform("x".into()),
+                "\"unsupported_platform\"",
+            ),
+        ];
+        assert_eq!(cases.len(), 16);
+        for (e, expected) in cases {
+            assert_eq!(serde_json::to_string(&e.code()).unwrap(), expected);
+        }
+    }
+
+    /// 構造体 variant は `detail` にフィールドを持つ。
+    #[test]
+    fn struct_variants_carry_detail() {
+        let e = AppError::OversizeFile {
+            path: "a".into(),
+            size: 11,
+        };
+        let dto = e.to_dto();
+        assert_eq!(dto.code, AppErrorCode::OversizeFile);
+        let detail = dto.detail.unwrap();
+        assert_eq!(detail.get("path").map(String::as_str), Some("a"));
+        assert_eq!(detail.get("size").map(String::as_str), Some("11"));
+        // プレーン variant には detail が付かない
+        assert!(AppError::Theme("x".into()).to_dto().detail.is_none());
+    }
+
+    /// `AppErrorCode` 16 値の serde round-trip。
+    #[test]
+    fn code_round_trips_through_serde() {
+        for code in [
+            AppErrorCode::Config,
+            AppErrorCode::Registry,
+            AppErrorCode::ImageProcessing,
+            AppErrorCode::Theme,
+            AppErrorCode::Io,
+            AppErrorCode::Json,
+            AppErrorCode::Zip,
+            AppErrorCode::InvalidInput,
+            AppErrorCode::Other,
+            AppErrorCode::BulkImportCancelled,
+            AppErrorCode::NoSupportedFiles,
+            AppErrorCode::OversizeFile,
+            AppErrorCode::InvalidCursorpack,
+            AppErrorCode::Crypto,
+            AppErrorCode::Github,
+            AppErrorCode::UnsupportedPlatform,
+        ] {
+            let s = serde_json::to_string(&code).unwrap();
+            let back: AppErrorCode = serde_json::from_str(&s).unwrap();
+            assert_eq!(back, code);
+        }
+    }
+
+    #[test]
+    fn unsupported_platform_display() {
+        assert_eq!(
+            AppError::UnsupportedPlatform("x".to_string()).to_string(),
+            "この操作は Windows 専用です: x"
         );
     }
 }

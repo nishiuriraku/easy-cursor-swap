@@ -26,6 +26,8 @@ use app_lib::cursor::ani::parse_ani;
 #[cfg(windows)]
 use app_lib::cursor::ani_write::rewrite_ani_to_path;
 #[cfg(windows)]
+use app_lib::errors::{AppError, AppResult};
+#[cfg(windows)]
 use app_lib::platform::{self, CursorBackend};
 
 /// Arrow の元値を保持し、Drop で必ず HKCU に書き戻すガード。
@@ -36,10 +38,8 @@ struct ArrowRestoreGuard {
 
 #[cfg(windows)]
 impl ArrowRestoreGuard {
-    fn snapshot(backend: &dyn CursorBackend) -> Result<Self, String> {
-        let map = backend
-            .read_current_cursors()
-            .map_err(|e| format!("Arrow 値の読み取り失敗: {e:?}"))?;
+    fn snapshot(backend: &dyn CursorBackend) -> AppResult<Self> {
+        let map = backend.read_current_cursors()?;
         let original = map.get("Arrow").cloned().unwrap_or_default();
         Ok(Self { original })
     }
@@ -78,15 +78,19 @@ impl Drop for ArrowRestoreGuard {
 }
 
 #[cfg(windows)]
-fn run(input: PathBuf) -> Result<serde_json::Value, String> {
+fn run(input: PathBuf) -> AppResult<serde_json::Value> {
     if !input.is_file() {
-        return Err(format!(".ani が見つかりません: {}", input.display()));
+        return Err(AppError::Other(format!(
+            ".ani が見つかりません: {}",
+            input.display()
+        )));
     }
     let backend = platform::default_backend();
 
     // 1. parse_ani でホットスポットを取得
-    let bytes = std::fs::read(&input).map_err(|e| format!("読み込み失敗: {e}"))?;
-    let parsed = parse_ani(&bytes).map_err(|e| format!("parse_ani 失敗: {e:?}"))?;
+    let bytes = std::fs::read(&input).map_err(|e| AppError::Other(format!("読み込み失敗: {e}")))?;
+    let parsed =
+        parse_ani(&bytes).map_err(|e| AppError::Other(format!("parse_ani 失敗: {e:?}")))?;
     let hotspot = (
         parsed.frames[0].hotspot_x as u16,
         parsed.frames[0].hotspot_y as u16,
@@ -101,27 +105,29 @@ fn run(input: PathBuf) -> Result<serde_json::Value, String> {
     );
 
     // 2. ~/.custom_cursors/_verify/Arrow.ani に rewrite コピー
-    let home = dirs::home_dir().ok_or("home dir 取得失敗")?;
+    let home = dirs::home_dir().ok_or_else(|| AppError::Other("home dir 取得失敗".to_string()))?;
     let dst_dir = home.join(".custom_cursors").join("_verify");
-    std::fs::create_dir_all(&dst_dir).map_err(|e| format!("dir 作成失敗: {e}"))?;
+    std::fs::create_dir_all(&dst_dir).map_err(|e| AppError::Other(format!("dir 作成失敗: {e}")))?;
     let dst = dst_dir.join("Arrow.ani");
     let stats = rewrite_ani_to_path(&input, &dst, hotspot)
-        .map_err(|e| format!("rewrite_ani_to_path 失敗: {e:?}"))?;
+        .map_err(|e| AppError::Other(format!("rewrite_ani_to_path 失敗: {e:?}")))?;
     eprintln!(
         "[rewrite] wrote={} bytes (legacy_normalized={})",
         stats.bytes_written, stats.was_legacy_normalized
     );
 
     // 書いた結果が parse 可能か確認
-    let written = std::fs::read(&dst).map_err(|e| format!("書込結果の読み込み失敗: {e}"))?;
-    let parsed2 = parse_ani(&written).map_err(|e| format!("書込結果の parse 失敗: {e:?}"))?;
+    let written =
+        std::fs::read(&dst).map_err(|e| AppError::Other(format!("書込結果の読み込み失敗: {e}")))?;
+    let parsed2 = parse_ani(&written)
+        .map_err(|e| AppError::Other(format!("書込結果の parse 失敗: {e:?}")))?;
     if parsed2.frames[0].hotspot_x as u16 != hotspot.0
         || parsed2.frames[0].hotspot_y as u16 != hotspot.1
     {
-        return Err(format!(
+        return Err(AppError::Other(format!(
             "書き込み後のホットスポット不一致: expected=({}, {}), got=({}, {})",
             hotspot.0, hotspot.1, parsed2.frames[0].hotspot_x, parsed2.frames[0].hotspot_y
-        ));
+        )));
     }
 
     // 3. 現在の Arrow を退避 (Drop で必ず復元)
@@ -134,12 +140,12 @@ fn run(input: PathBuf) -> Result<serde_json::Value, String> {
     paths.insert("Arrow".to_string(), dst.clone());
     backend
         .apply_cursors(&paths)
-        .map_err(|e| format!("apply_cursors 失敗: {e:?}"))?;
+        .map_err(|e| AppError::Other(format!("apply_cursors 失敗: {e:?}")))?;
 
     // 5. HKCU を読み戻して反映を確認
     let after = backend
         .read_current_cursors()
-        .map_err(|e| format!("適用後の Arrow 読込失敗: {e:?}"))?;
+        .map_err(|e| AppError::Other(format!("適用後の Arrow 読込失敗: {e:?}")))?;
     let after_arrow = after.get("Arrow").cloned().unwrap_or_default();
     let dst_str = dst.to_string_lossy().to_string();
     let registry_ok = after_arrow.eq_ignore_ascii_case(&dst_str);
@@ -149,10 +155,10 @@ fn run(input: PathBuf) -> Result<serde_json::Value, String> {
     );
 
     if !registry_ok {
-        return Err(format!(
+        return Err(AppError::Other(format!(
             "適用後の HKCU 値が一致しません: got='{}', expected='{}'",
             after_arrow, dst_str
-        ));
+        )));
     }
 
     drop(guard); // 明示的に復元 (Drop でも走るが、JSON を出す前に走らせる)
@@ -160,7 +166,7 @@ fn run(input: PathBuf) -> Result<serde_json::Value, String> {
     // 6. 復元後の値も確認
     let restored = backend
         .read_current_cursors()
-        .map_err(|e| format!("復元後の Arrow 読込失敗: {e:?}"))?;
+        .map_err(|e| AppError::Other(format!("復元後の Arrow 読込失敗: {e:?}")))?;
     let restored_arrow = restored.get("Arrow").cloned().unwrap_or_default();
     eprintln!("[verify] after restore Arrow = '{}'", restored_arrow);
 

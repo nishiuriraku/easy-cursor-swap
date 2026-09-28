@@ -514,7 +514,7 @@ pub fn open_url(url: String) -> Result<(), AppError> {
     #[cfg(not(windows))]
     {
         let _ = url;
-        return Err(AppError::Other("open_url は Windows 専用です".to_string()));
+        return Err(AppError::UnsupportedPlatform("open_url".to_string()));
     }
     Ok(())
 }
@@ -629,9 +629,7 @@ pub fn open_log_folder() -> Result<(), AppError> {
     #[cfg(not(windows))]
     {
         let _ = dir;
-        return Err(AppError::Other(
-            "open_log_folder は Windows 専用です".to_string(),
-        ));
+        return Err(AppError::UnsupportedPlatform("open_log_folder".to_string()));
     }
     Ok(())
 }

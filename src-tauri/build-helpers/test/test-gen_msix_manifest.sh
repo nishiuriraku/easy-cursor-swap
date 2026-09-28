@@ -67,7 +67,7 @@ test_x64_emits_one_file() {
 test_version_substituted() {
   local work; work="$(prepare_fixture t2)"
   run_helper "$work" x64 || fail "helper exited non-zero: $?"
-  grep -q 'Version="0.0.8"' "$work/out/AppxManifest.xml" || fail "Version not substituted"
+  grep -q 'Version="0.0.8.0"' "$work/out/AppxManifest.xml" || fail "Version not substituted"
   pass "Version is substituted from tauri.conf.json"
 }
 

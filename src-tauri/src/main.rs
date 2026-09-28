@@ -393,7 +393,8 @@ fn main() {
                     use tauri::Emitter;
                     if let Err(reason) = res {
                         tracing::warn!("パニックホットキー登録に失敗: {}", reason);
-                        let payload = serde_json::json!({ "spec": result_spec, "reason": reason });
+                        let payload =
+                            serde_json::json!({ "spec": result_spec, "reason": reason.to_string() });
                         if let Err(err) = result_handle.emit("hotkey-register-failed", payload) {
                             tracing::warn!("hotkey-register-failed emit 失敗: {}", err);
                         }

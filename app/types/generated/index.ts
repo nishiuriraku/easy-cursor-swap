@@ -15,6 +15,8 @@
 
 export type { AppConfig } from './AppConfig'
 export type { AppConfigPatch } from './AppConfigPatch'
+export type { AppErrorCode } from './AppErrorCode'
+export type { AppErrorDto } from './AppErrorDto'
 export type { BackupInfo } from './BackupInfo'
 export type { GeneralConfig } from './GeneralConfig'
 export type { GeneralConfigPatch } from './GeneralConfigPatch'

@@ -363,11 +363,7 @@ mod tests {
                 ("IBeam", "C:\\new2.cur"),
             ]))
             .unwrap_err();
-        assert!(
-            format!("{}", err).contains("No"),
-            "{}",
-            err
-        );
+        assert!(format!("{}", err).contains("No"), "{}", err);
         // 経路 (a) の exact restore: 適用前値に戻っている
         let roles = backend.store.roles.lock().unwrap();
         assert_eq!(roles.get("Arrow").map(String::as_str), Some("C:\\pre.cur"));

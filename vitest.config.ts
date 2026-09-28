@@ -15,9 +15,7 @@ export default defineConfig({
     Unimport.vite({
       dts: false,
       presets: ['vue'],
-      // `./app/utils/**` はディレクトリ未作成のため省略。
-      // utils を新設する際にここに追加する。
-      dirs: ['./app/composables/**'],
+      dirs: ['./app/composables/**', './app/utils/**'],
     }),
     Components({
       dts: false,

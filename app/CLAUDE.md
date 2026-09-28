@@ -17,6 +17,7 @@ This file is loaded automatically when working under `app/`. Root `../CLAUDE.md`
 - Prefer extending an existing composable over introducing duplicate code. Add a Vitest spec for any non-trivial logic.
 - **No `v-html` anywhere** — SVG icons go through render functions in `UiIcon.vue` / `CursorIcon.vue`.
 - **i18n parity is a CI gate.** Adding a key to one locale without the other fails `scripts/check-i18n.mjs`.
+- **Error display**: `invokeTauri` always throws `AppInvokeError` (`app/utils/appError.ts`). Display via `appErrorMessage(err)` (resolves `errors.<code>` i18n). Do not use `String(err)` / `.message` directly.
 
 ## CSS (Tailwind v4)
 

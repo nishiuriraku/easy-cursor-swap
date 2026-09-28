@@ -150,5 +150,12 @@ describe('useI18n', () => {
       syncFromConfig(undefined)
       expect(['ja', 'en']).toContain(locale.value)
     })
+
+    it('te returns true for existing keys and false for missing', () => {
+      const { te } = useI18n()
+      expect(te('common.close')).toBe(true)
+      expect(te('errors.registry')).toBe(true)
+      expect(te('no.such.key')).toBe(false)
+    })
   })
 })

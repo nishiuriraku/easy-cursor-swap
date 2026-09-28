@@ -78,14 +78,26 @@ test_driver_references_both_archs() {
   pass "driver references both x64 and arm64"
 }
 
+# --- Test 4: ドライバ本体をテンプレート override 無しで実行する (パス回帰) ---
+test_driver_real_paths() {
+  bash "$DRIVER" "$ROOT/src-tauri/tauri.conf.json" >/dev/null \
+    || fail "driver with real repo paths failed"
+  [[ -f "$ROOT/distribution/msix/out/x64/AppxManifest.xml" ]] || fail "real x64 manifest missing"
+  [[ -f "$ROOT/distribution/msix/out/arm64/AppxManifest.xml" ]] || fail "real arm64 manifest missing"
+  grep -q "distribution/msix/AppxManifest.xml" "$DRIVER" || fail "driver template path drifted"
+  pass "driver resolves repo root correctly against the real template"
+}
+
 case "${1:-all}" in
   t1) test_emits_both_architectures ;;
   t2) test_driver_emits_both ;;
   t3) test_driver_references_both_archs ;;
+  t4) test_driver_real_paths ;;
   all)
     test_emits_both_architectures
     test_driver_emits_both
     test_driver_references_both_archs
+    test_driver_real_paths
     ;;
   *) echo "unknown test: $1" >&2; exit 64 ;;
 esac

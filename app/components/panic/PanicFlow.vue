@@ -100,7 +100,7 @@ async function execute() {
     logs.value[0]!.status = 'pending'
     logs.value.push({
       status: 'pending',
-      text: t('panic.recoveryFailed', { reason: String(err) }),
+      text: t('panic.recoveryFailed', { reason: appErrorMessage(err) }),
       t: String(elapsed),
     })
     phase.value = 'error'

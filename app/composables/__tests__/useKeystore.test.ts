@@ -73,6 +73,14 @@ describe('useKeystore', () => {
     expect(ks.busy.value).toBe(false)
   })
 
+  it('generate() DTO failure resolves errors.<code> message', async () => {
+    invokeMock.mockRejectedValueOnce({ code: 'crypto', message: 'crypto: DPAPI 失敗' })
+    const ks = useKeystore()
+    await ks.generate(false)
+    // ja/en どちらのロケールでも Rust message 部分は含まれる
+    expect(ks.lastError.value).toContain('crypto: DPAPI 失敗')
+  })
+
   // ── remove() ─────────────────────────────────────────────────
   it('remove() success resets info to empty and clears lastError', async () => {
     // info に既存値を入れるため refresh を先にモック

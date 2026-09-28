@@ -128,7 +128,7 @@ async function confirmApply(id: string) {
       })
     }
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
+    const msg = appErrorMessage(err)
     applyError.value = msg
     console.error('[Library] apply failed:', err)
   } finally {

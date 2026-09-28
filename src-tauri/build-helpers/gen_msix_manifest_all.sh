@@ -3,7 +3,7 @@
 # Usage: bash src-tauri/build-helpers/gen_msix_manifest_all.sh [path/to/tauri.conf.json]
 set -u
 
-ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 TEMPLATE="$ROOT/distribution/msix/AppxManifest.xml"
 OUT_BASE="$ROOT/distribution/msix/out"
 TAURI_CONF="${1:-$ROOT/src-tauri/tauri.conf.json}"

@@ -52,7 +52,7 @@ async function loadIndex(): Promise<void> {
       entries.value = idx.entries.map(withVerified)
     } catch (e) {
       entries.value = []
-      fetchError.value = e instanceof Error ? e.message : String(e)
+      fetchError.value = appErrorMessage(e)
       // eslint-disable-next-line no-console
       console.warn('[useMarketplace] fetch_index failed:', e)
     } finally {

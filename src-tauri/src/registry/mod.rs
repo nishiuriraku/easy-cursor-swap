@@ -531,47 +531,40 @@ impl RegistryManager {
     }
 
     // P01 で追加した非 Windows スタブ群。レジストリ I/O が無い環境では
-    // 変更系を Err で安全側に倒す。P03 で `AppError::UnsupportedPlatform` へ置換する。
-    // TODO(P03): UnsupportedPlatform
+    // 変更系を Err で安全側に倒す (`AppError::UnsupportedPlatform`)。
     #[cfg(not(windows))]
     pub fn read_current_cursors() -> AppResult<HashMap<String, String>> {
-        Err(AppError::Registry(
-            "read_current_cursors は Windows 専用です".to_string(),
+        Err(AppError::UnsupportedPlatform(
+            "read_current_cursors".to_string(),
         ))
     }
 
-    // TODO(P03): UnsupportedPlatform
     #[cfg(not(windows))]
     pub fn register_scheme(
         _scheme_name: &str,
         _cursor_paths: &HashMap<String, PathBuf>,
     ) -> AppResult<()> {
-        Err(AppError::Registry(
-            "register_scheme は Windows 専用です".to_string(),
-        ))
+        Err(AppError::UnsupportedPlatform("register_scheme".to_string()))
     }
 
-    // TODO(P03): UnsupportedPlatform
     #[cfg(not(windows))]
     pub fn unregister_schemes_for_theme(_theme_dir: &std::path::Path) -> AppResult<usize> {
-        Err(AppError::Registry(
-            "unregister_schemes_for_theme は Windows 専用です".to_string(),
+        Err(AppError::UnsupportedPlatform(
+            "unregister_schemes_for_theme".to_string(),
         ))
     }
 
-    // TODO(P03): UnsupportedPlatform
     #[cfg(not(windows))]
     pub fn restore_from_snapshot_pub(_values: &HashMap<String, String>) -> AppResult<()> {
-        Err(AppError::Registry(
-            "restore_from_snapshot_pub は Windows 専用です".to_string(),
+        Err(AppError::UnsupportedPlatform(
+            "restore_from_snapshot_pub".to_string(),
         ))
     }
 
-    // TODO(P03): UnsupportedPlatform
     #[cfg(not(windows))]
     pub fn list_windows_schemes() -> AppResult<Vec<WindowsScheme>> {
-        Err(AppError::Registry(
-            "list_windows_schemes は Windows 専用です".to_string(),
+        Err(AppError::UnsupportedPlatform(
+            "list_windows_schemes".to_string(),
         ))
     }
 

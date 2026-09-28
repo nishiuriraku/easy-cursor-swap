@@ -118,7 +118,7 @@ async function handleInstall(id: string) {
     void refreshThemes()
     console.info('[Marketplace] installed', displayName)
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
+    const message = appErrorMessage(err)
     installStatus.value = { kind: 'err', name: displayName, message }
     console.error('[Marketplace] install failed:', err)
   } finally {

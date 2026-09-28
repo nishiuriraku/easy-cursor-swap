@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Wave 4A: MSIX manifest + artifact 妥当性** — `distribution/msix/AppxManifest.xml` を `${VERSION}` / `${ARCH}` / `${PUBLISHER}` プレースホルダ化、x64 / arm64 両アーキを `gen_msix_manifest_all.sh` で生成。`rescap:unvirtualizedResources` + `desktop6:RegistryWriteVirtualization=disabled` + `desktop6:FileSystemWriteVirtualization=disabled` を同時宣言し、host HKCU への実書込みを有効化。`.cursorpack` ファイル関連付けを NSIS / MSI と並列に追加。
 - **Wave 4B: Store runtime 分岐 + activation policy 集約** — `appusermodel::PackageContext::current()` で autostart / updater / rollback / activation の 4 軸を一元決定。`GetCurrentPackageFullName` (Win32 API) → path fallback の 2 段戦略で MSIX 検出。`commands/app_metadata.rs` で `is_msix_packaged` / `package_policy_label` の 2 IPC を公開。`useUpdaterBootstrap` / `useUpdater.check` を MSIX で short-circuit、`useMsixPackaged` composable で UI 出し分け (Updates / Startup セクション)。`start_minimized` 設定と `--autostart` 起動を `decide_activation` で集約し `Window::hide` 配線。`auto_rollback_install` を `PackageContext.rollback` で gate。
 - **Wave 4C: CI install/remove/sentinel パイプライン** — `.github/workflows/build-msix-artifacts.yml` 新設 (workflow_dispatch のみ、matrix x64 / arm64、test self-signed cert + signtool + `Add-AppxPackage` smoke、`~/.custom_cursors/cursor_store_sentinel.txt` 永続化検証)。`.env.example` に `MSIX_PUBLISHER` / `MSIX_TEST_CERT_PASSWORD` (任意) を追記。
+- `AppError::UnsupportedPlatform` を追加。非 Windows ビルドの OS 機能スタブが返すエラー種別 (フロントの `errors.unsupported_platform` に対応)。
 
 ### Changed
 
@@ -19,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `winreg` 依存を `[target.'cfg(windows)'.dependencies]` に限定し、`accessibility.rs` / `registry/{mod,transaction}.rs` / `bin/apply_ani_verify.rs` に `cfg(not(windows))` スタブを追加。非 Windows でも `cargo check` が通るようになった (アプリの Windows 動作は無変更)。CI に `rust-check-linux` ジョブ (ubuntu-latest, `cargo check` + `clippy -D warnings`, lib + bins) を追加。
 - `config.rs` を `config/{schema,store,migrate,tests}.rs` に分割 (公開 API / 挙動 / 生成 TS 不変)。
 - レジストリ操作を `platform::CursorBackend` trait 境界の背後に移し、`Arc<dyn CursorBackend>` を Tauri State で注入。Windows 実装は従来の `RegistryManager` へ委譲し挙動は無変更。トランザクション契約 (snapshot → 書込 → commit / rollback) と起動時 leftover snapshot → Windows 既定リセットの不変条件をインメモリ backend で Linux 上でも単体テスト化。
+- IPC エラーを `{code, message, detail?}` の型付き DTO に変更 (`AppErrorCode` 16 種、ts-rs 生成)。フロントは `invokeTauri` で `AppInvokeError` に正規化し、`errors.<code>` (ja/en) でカテゴリ文言を表示。Rust 側の Display / ログ文言は無変更。
 - Creator / 設定 / ライブラリ画面を責務単位の composable・コンポーネントに分割 (各ページ縮小、挙動不変)。共有 CSS を `assets/css/shared/*.css` に分割。
 
 ### Fixed

@@ -15,9 +15,9 @@ const { t } = useI18n()
 
 const emit = defineEmits<{
   /** 主アクション。creator.vue が拡張子で `.cursorpack` 単独 or bulk-resolve に分岐する。 */
-  (e: 'bulk-auto'): void
+  'bulk-auto': []
   /** フォルダ取込。chevron 経由のみ。 */
-  (e: 'bulk-folder'): void
+  'bulk-folder': []
 }>()
 
 const open = ref(false)

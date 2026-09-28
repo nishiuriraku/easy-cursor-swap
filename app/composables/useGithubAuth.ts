@@ -48,7 +48,7 @@ export function useGithubAuth() {
       timer = setInterval(() => void poll(), intervalMs)
     } catch (e) {
       status.value = 'error'
-      errorMsg.value = String(e)
+      errorMsg.value = appErrorMessage(e)
     }
   }
 
@@ -81,7 +81,7 @@ export function useGithubAuth() {
     } catch (e) {
       stopTimer()
       status.value = 'error'
-      errorMsg.value = String(e)
+      errorMsg.value = appErrorMessage(e)
     }
   }
 

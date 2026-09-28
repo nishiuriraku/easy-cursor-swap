@@ -667,4 +667,24 @@ export default {
     // 起動時の自動アップデート告知トースト (useUpdaterBootstrap)
     toastUpdateAvailable: '新しいバージョン v{version} が利用可能です。設定 → 更新からダウンロードできます。',
   },
+  errors: {
+    // Rust AppError の code → 表示文言。{message} は Rust 側 Display (当面日本語)、
+    // {path} / {size} / {reason} は detail (構造体 variant のみ)。
+    config: '設定の読み書きに失敗しました ({message})',
+    registry: 'カーソル設定 (レジストリ) の操作に失敗しました ({message})',
+    image_processing: '画像処理に失敗しました ({message})',
+    theme: 'テーマの操作に失敗しました ({message})',
+    io: 'ファイルの読み書きに失敗しました ({message})',
+    json: '設定データの解析に失敗しました ({message})',
+    zip: 'アーカイブの処理に失敗しました ({message})',
+    invalid_input: '入力が不正です ({message})',
+    other: '{message}',
+    bulk_import_cancelled: '一括インポートを中断しました',
+    no_supported_files: '対応ファイルが見つかりません: {path}',
+    oversize_file: 'ファイルサイズが上限を超えています: {path} ({size} bytes)',
+    invalid_cursorpack: '.cursorpack を解析できません: {reason}',
+    crypto: '鍵 / 署名処理に失敗しました ({message})',
+    github: 'GitHub との通信に失敗しました ({message})',
+    unsupported_platform: 'この操作はこのプラットフォームでは利用できません',
+  },
 } as const

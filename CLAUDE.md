@@ -41,7 +41,7 @@ These apply regardless of which side you're working on. Full list (including mod
 - **Archive sanitisation.** Any code unzipping `.cursorpack` / `.cursorprofile` must go through `theme::sanitize_archive_path` and the size limits (50 MB compressed / 200 MB expanded / 10 MB per image / 1 GB total user storage).
 - **No `v-html`** anywhere in Vue. SVG icons go through render functions in `UiIcon.vue` / `CursorIcon.vue`.
 - **Rust is the single source of truth.** Frontend state must be synced via IPC; never persist app state only on the Vue side.
-- **IPC payload types** in `app/types/` must mirror `serde`-derived Rust structs in `src-tauri/src/commands/`.
+- **IPC payload types** in `app/types/` must mirror `serde`-derived Rust structs in `src-tauri/src/commands/` (e.g. `AppErrorDto`).
 
 ## Commands
 
