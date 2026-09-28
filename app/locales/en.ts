@@ -274,6 +274,10 @@ export default {
     cursorSizeReadout: '{px} px',
     cursorSizeError: 'Failed to change size: {error}',
     cursorSizeRefreshFromOs: 'Sync from OS',
+    groupOnboarding: 'Getting started',
+    onboardingReplayLabel: 'Show the welcome guide again',
+    onboardingReplayDesc: 'Re-open the 3-step first-launch guide (panic key, tray, snapshot)',
+    onboardingReplayBtn: 'Show guide',
     groupNotifications: 'Notifications',
     showApplyToastLabel: 'Toast on apply result',
     applyShadowControlLabel: 'Control OS pointer shadow',
@@ -647,6 +651,37 @@ export default {
   updater: {
     // Startup auto-update notification toast (useUpdaterBootstrap)
     toastUpdateAvailable: 'New version v{version} is available. Download it from Settings → Updates.',
+  },
+  onboarding: {
+    progress: 'Step {n} of {total}',
+    skip: 'Skip for now',
+    next: 'Next',
+    finish: 'Get started',
+    welcome: {
+      title: 'Welcome to EasyCursorSwap',
+      lead: 'Import, create, and apply custom mouse cursor themes — all 17 roles at once.',
+      featureLibrary: 'Library — import .cursorpack files and apply them with one click',
+      featureIndex: 'Official index — browse Ed25519-verified community themes',
+      featureCreator: 'Creator — build your own theme from PNG / SVG',
+      snapshot: 'Your current cursor settings were saved as a snapshot: {path}',
+      snapshotFile: '_initial_snapshot.json',
+    },
+    safety: {
+      title: 'Two ways back, at any time',
+      hotkeyLead: 'Press the panic key even while another app is focused:',
+      hotkeyStage1: 'Stage 1 restores the OS default cursors.',
+      hotkeyStage2: 'Stage 2 restores the snapshot taken on first launch.',
+      trayLead: 'Closing the window keeps the app in the system tray. The tray menu offers the same two restore actions.',
+    },
+    start: {
+      title: 'Where do you want to start?',
+      importTitle: 'Import a .cursorpack',
+      importDesc: 'Pick a theme file you already have',
+      indexTitle: 'Browse the official index',
+      indexDesc: 'Install verified community themes',
+      creatorTitle: 'Open Creator',
+      creatorDesc: 'Design a theme from your own images',
+    },
   },
   errors: {
     config: 'Failed to read or write settings ({message})',

@@ -44,6 +44,8 @@ const emit = defineEmits<{
   (e: 'refresh-cursor-size-from-os'): void
   /** ユーザーが「Windows 設定を開く」を押したとき。親が ms-settings:easeofaccess-mousepointer (マウスポインターとタッチ) を起動する。 */
   (e: 'open-windows-cursor-settings'): void
+  /** ユーザーが「ガイドを表示」を押したとき。親がオンボーディングを再表示する。 */
+  (e: 'replay-onboarding'): void
 }>()
 
 // ドラッグ中の視覚フィードバック用にローカル ref を持つ。親側の値が変わったら同期する。
@@ -173,6 +175,21 @@ function onSliderChange(ev: Event) {
         <p v-if="cursorSizeError" class="cursor-size-error" role="alert">
           {{ t('settings.cursorSizeError', { error: cursorSizeError }) }}
         </p>
+      </div>
+    </div>
+
+    <div class="prop-section">
+      <div class="prop-head">{{ t('settings.groupOnboarding') }}</div>
+      <div class="prop-body">
+        <SettingsRow
+          anchor="onboardingReplay"
+          :label="t('settings.onboardingReplayLabel')"
+          :desc="t('settings.onboardingReplayDesc')"
+        >
+          <UiButton variant="ghost" icon-left="Logo" @click="$emit('replay-onboarding')">{{
+            t('settings.onboardingReplayBtn')
+          }}</UiButton>
+        </SettingsRow>
       </div>
     </div>
 

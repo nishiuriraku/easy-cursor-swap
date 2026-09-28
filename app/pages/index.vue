@@ -247,6 +247,11 @@ const cursorpackOpener = useCursorpackOpener((path) => {
 })
 
 onMounted(async () => {
+  const route = useRoute()
+  if (route.query.openImport === '1') {
+    void useRouter().replace({ path: '/' })
+    void openImportDialog()
+  }
   await loadThemes()
   await startFileDrop()
   // appSettings は本ページ起動時に常時必要 (active_theme_id 等)。初回ロードのみ取りに行く。

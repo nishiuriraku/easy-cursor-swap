@@ -273,6 +273,10 @@ export default {
     cursorSizeReadout: '{px} px',
     cursorSizeError: 'サイズ変更に失敗しました: {error}',
     cursorSizeRefreshFromOs: 'Sync from OS',
+    groupOnboarding: 'はじめに',
+    onboardingReplayLabel: 'ウェルカムガイドをもう一度見る',
+    onboardingReplayDesc: '初回起動時の 3 ステップガイド (パニックキー / トレイ / スナップショット) を再表示',
+    onboardingReplayBtn: 'ガイドを表示',
     groupNotifications: '通知',
     showApplyToastLabel: '適用結果のトースト表示',
     applyShadowControlLabel: 'OS 標準ポインター影を制御',
@@ -643,6 +647,37 @@ export default {
   updater: {
     // 起動時の自動アップデート告知トースト (useUpdaterBootstrap)
     toastUpdateAvailable: '新しいバージョン v{version} が利用可能です。設定 → 更新からダウンロードできます。',
+  },
+  onboarding: {
+    progress: 'ステップ {n} / {total}',
+    skip: 'あとで見る',
+    next: '次へ',
+    finish: 'はじめる',
+    welcome: {
+      title: 'EasyCursorSwap へようこそ',
+      lead: 'カスタムマウスカーソルのテーマを取り込み・作成し、17 種類をまとめて適用できます。',
+      featureLibrary: 'ライブラリ — .cursorpack を取り込んでワンクリック適用',
+      featureIndex: '公式インデックス — Ed25519 検証済みのコミュニティテーマを閲覧',
+      featureCreator: 'クリエイター — PNG / SVG から自分のテーマを作成',
+      snapshot: '現在のカーソル設定はスナップショットとして保存済みです: {path}',
+      snapshotFile: '_initial_snapshot.json',
+    },
+    safety: {
+      title: 'いつでも戻せる 2 つの手段',
+      hotkeyLead: '他のアプリを使っている最中でもパニックキーが効きます:',
+      hotkeyStage1: 'Stage 1 は OS 既定のカーソルに戻します。',
+      hotkeyStage2: 'Stage 2 は初回起動時のスナップショットに戻します。',
+      trayLead: 'ウィンドウを閉じてもトレイに常駐します。トレイメニューからも同じ 2 つの復元を実行できます。',
+    },
+    start: {
+      title: 'どこから始めますか?',
+      importTitle: '.cursorpack を取り込む',
+      importDesc: '手元のテーマファイルを選ぶ',
+      indexTitle: '公式インデックスを見る',
+      indexDesc: '検証済みのコミュニティテーマをインストール',
+      creatorTitle: 'クリエイターを開く',
+      creatorDesc: '自分の画像からテーマを作る',
+    },
   },
   errors: {
     // Rust AppError の code → 表示文言。{message} は Rust 側 Display (当面日本語)、

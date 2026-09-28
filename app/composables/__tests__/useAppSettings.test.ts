@@ -33,6 +33,7 @@ const baseConfig = () => ({
     apply_shadow_control: true,
     start_minimized: false,
     show_storage_warning: true,
+    onboarding_version: 0,
   },
   security: {
     max_pack_compressed_size: 50 * 1024 * 1024,
@@ -88,6 +89,21 @@ describe('useAppSettings typed-patch contract (Wave 2B / Task 3)', () => {
     const [, args] = invokeTauriMock.mock.calls[1]!
     expect(args!.updates).toEqual({
       general: { autoStart: false },
+    })
+  })
+
+  it('maps snake_case onboarding_version to camelCase onboardingVersion (P10)', async () => {
+    const { load, update } = useAppSettings()
+    await load(true)
+    invokeTauriMock.mockResolvedValueOnce({ ...baseConfig() })
+
+    await update((c) => {
+      c.general.onboarding_version = 1
+    })
+
+    const [, args] = invokeTauriMock.mock.calls[1]!
+    expect(args!.updates).toEqual({
+      general: { onboardingVersion: 1 },
     })
   })
 

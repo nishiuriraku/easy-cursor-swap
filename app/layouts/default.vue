@@ -164,6 +164,7 @@ onMounted(async () => {
   }
   await loadAppConfig()
   syncFromConfig(appConfig.value?.general.language)
+  useOnboarding().evaluate()
   // テーマ一覧 / Marketplace 件数の取得は app 起動の他処理と並行で OK なので await しない。
   // useThemes / useMarketplace はシングルトンなので、ここで呼べばどのページでも最新値が読める。
   // useMarketplace の loadIndex は内部 inflight で dedupe されるため、layout と page から
@@ -207,6 +208,9 @@ onUnmounted(() => {
 
     <!-- パニックリセットフロー (グローバル) -->
     <PanicFlow v-model:open="panicOpen" @done="onPanicDone" />
+
+    <!-- 初回起動オンボーディング (P10) -->
+    <OnboardingDialog />
   </div>
 </template>
 

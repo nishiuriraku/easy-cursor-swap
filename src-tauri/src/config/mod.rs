@@ -32,7 +32,7 @@ pub mod patch;
 pub use schema::{
     AppConfig, BackupInfo, GeneralConfig, GithubAccount, LoggingConfig, SecurityConfig, ThemeUsage,
     CURRENT_SCHEMA_VERSION, DEFAULT_MAX_IMAGE_FILE_SIZE, DEFAULT_MAX_PACK_COMPRESSED_SIZE,
-    DEFAULT_MAX_PACK_UNCOMPRESSED_SIZE,
+    DEFAULT_MAX_PACK_UNCOMPRESSED_SIZE, ONBOARDING_CURRENT_VERSION,
 };
 pub use store::ConfigManager;
 

@@ -25,6 +25,7 @@ for all 17 Windows cursor roles, 6 DPI sizes, and Ed25519-signed theme distribut
 - **Tray resident** — Runs silently in the system tray; optional silent launch on OS startup
 - **Security hardened** — Ed25519 signatures, ZIP bomb protection, magic byte validation, path traversal prevention, SVG sanitisation, PNG metadata stripping
 - **Auto-update** — Background update delivery via signed Tauri Updater; major-version jumps require manual confirmation
+- **First-launch guide** — A 3-step welcome dialog explains the pre-install snapshot, the panic key, and the tray, then offers import / index / Creator as starting points. Re-openable from Settings → General.
 
 ## System Requirements
 

@@ -392,6 +392,52 @@ fn apply_patch_changes_all_six_settings_at_once() {
     let _ = fs::remove_dir_all(&dir);
 }
 
+/// P10: 既定では未完了 (0)。
+#[test]
+fn default_onboarding_version_is_zero() {
+    let cfg = AppConfig::default();
+    assert_eq!(cfg.general.onboarding_version, 0);
+    assert!(cfg.general.onboarding_version < ONBOARDING_CURRENT_VERSION);
+}
+
+/// P10: 旧 v2 JSON (フィールド無し) は 0 で読める (schema_version 不変)。
+#[test]
+fn missing_onboarding_version_deserializes_as_zero() {
+    let mut json = serde_json::to_value(AppConfig::default()).unwrap();
+    json["general"]
+        .as_object_mut()
+        .unwrap()
+        .remove("onboarding_version");
+    let cfg: AppConfig = serde_json::from_value(json).unwrap();
+    assert_eq!(cfg.general.onboarding_version, 0);
+    assert_eq!(cfg.schema_version, CURRENT_SCHEMA_VERSION);
+}
+
+/// P10: patch 経由で完了バージョンを書き込める / 0 に戻せる。
+#[test]
+fn apply_patch_sets_onboarding_version() {
+    let dir = make_tempdir("patch-onboarding");
+    let path = dir.join("config.json");
+    let cm = ConfigManager::init_at(&path).unwrap();
+    let patch = patch::AppConfigPatch {
+        general: Some(patch::GeneralConfigPatch {
+            onboarding_version: Some(ONBOARDING_CURRENT_VERSION),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    assert_eq!(cm.apply_patch(patch).unwrap().general.onboarding_version, 1);
+    let reset = patch::AppConfigPatch {
+        general: Some(patch::GeneralConfigPatch {
+            onboarding_version: Some(0),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    assert_eq!(cm.apply_patch(reset).unwrap().general.onboarding_version, 0);
+    let _ = fs::remove_dir_all(&dir);
+}
+
 /// `apply_patch` は patch に含まれないフィールドを一切変更しない
 /// (e.g. `github_account` を patch 経由で送ろうとしても無視される)。
 ///

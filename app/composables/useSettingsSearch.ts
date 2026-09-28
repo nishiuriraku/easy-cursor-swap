@@ -77,6 +77,12 @@ export const CATALOG: SettingsSearchEntry[] = [
   // ---- general ----
   {
     section: 'general',
+    anchor: 'onboardingReplay',
+    labelKey: 'settings.onboardingReplayLabel',
+    descKey: 'settings.onboardingReplayDesc',
+  },
+  {
+    section: 'general',
     anchor: 'language',
     labelKey: 'settings.languageLabel',
     descKey: 'settings.languageDesc',

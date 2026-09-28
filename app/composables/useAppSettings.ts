@@ -77,6 +77,7 @@ function diffGeneral(
     applyShadowControl: diff(prev.apply_shadow_control, next.apply_shadow_control),
     startMinimized: diff(prev.start_minimized, next.start_minimized),
     showStorageWarning: diff(prev.show_storage_warning, next.show_storage_warning),
+    onboardingVersion: diff(prev.onboarding_version, next.onboarding_version),
   }) as GeneralConfigPatch
 }
 

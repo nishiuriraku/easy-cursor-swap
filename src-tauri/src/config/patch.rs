@@ -79,6 +79,9 @@ pub struct GeneralConfigPatch {
     pub apply_shadow_control: Option<bool>,
     pub start_minimized: Option<bool>,
     pub show_storage_warning: Option<bool>,
+
+    // P10: オンボーディング完了バージョン。Some(0) で「もう一度見る」。
+    pub onboarding_version: Option<u32>,
 }
 
 impl GeneralConfigPatch {
@@ -106,6 +109,9 @@ impl GeneralConfigPatch {
         }
         if let Some(v) = self.show_storage_warning {
             current.show_storage_warning = v;
+        }
+        if let Some(v) = self.onboarding_version {
+            current.onboarding_version = v;
         }
     }
 }

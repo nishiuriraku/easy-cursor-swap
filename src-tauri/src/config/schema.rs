@@ -39,6 +39,14 @@ pub struct BackupInfo {
 /// そのまま v2 AppConfig にも deserialize 可能(透過フォールバック)。
 pub const CURRENT_SCHEMA_VERSION: u32 = 2;
 
+/// オンボーディング (初回起動ガイド) の現行バージョン。
+/// `GeneralConfig::onboarding_version < ONBOARDING_CURRENT_VERSION` のとき UI が
+/// ガイドを表示し、完了 / スキップ時に `update_config` patch でこの値を書き込む。
+/// ステップ内容を大きく変えたら 1 上げる (既存ユーザーに再表示される)。
+/// 「設定 → 一般 → もう一度見る」は 0 に戻す。フロント側 `useOnboarding.ts` の
+/// `ONBOARDING_VERSION` と同値を保つこと (TS 側テストで固定)。
+pub const ONBOARDING_CURRENT_VERSION: u32 = 1;
+
 /// pack (.cursorpack) 圧縮サイズの既定上限 (50 MB)。
 ///
 /// `import_cursorpack_bytes` / `inspect_cursorpack_bytes` / `submit_theme_auto` の
@@ -147,6 +155,14 @@ pub struct GeneralConfig {
     /// 消費側: Library 画面のストレージ警告 UI。
     #[serde(default = "default_true")]
     pub show_storage_warning: bool,
+
+    /// 初回起動オンボーディングの完了バージョン (P10)。0 = 未表示 / 再表示要求。
+    /// `ONBOARDING_CURRENT_VERSION` 未満なら UI がガイドを表示する。
+    /// 旧 JSON には存在しないため `serde(default)` で 0 フォールバック
+    /// (schema_version は上げない — v1→v2 の 6 フィールド追加と同じ透過方式)。
+    /// 消費側: `layouts/default.vue` → `useOnboarding.evaluate()`。
+    #[serde(default)]
+    pub onboarding_version: u32,
 }
 
 /// テーマ利用統計 (1 テーマあたり)
@@ -246,6 +262,7 @@ impl Default for GeneralConfig {
             apply_shadow_control: true,
             start_minimized: false,
             show_storage_warning: true,
+            onboarding_version: 0,
         }
     }
 }

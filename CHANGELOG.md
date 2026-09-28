@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Wave 4B: Store runtime 分岐 + activation policy 集約** — `appusermodel::PackageContext::current()` で autostart / updater / rollback / activation の 4 軸を一元決定。`GetCurrentPackageFullName` (Win32 API) → path fallback の 2 段戦略で MSIX 検出。`commands/app_metadata.rs` で `is_msix_packaged` / `package_policy_label` の 2 IPC を公開。`useUpdaterBootstrap` / `useUpdater.check` を MSIX で short-circuit、`useMsixPackaged` composable で UI 出し分け (Updates / Startup セクション)。`start_minimized` 設定と `--autostart` 起動を `decide_activation` で集約し `Window::hide` 配線。`auto_rollback_install` を `PackageContext.rollback` で gate。
 - **Wave 4C: CI install/remove/sentinel パイプライン** — `.github/workflows/build-msix-artifacts.yml` 新設 (workflow_dispatch のみ、matrix x64 / arm64、test self-signed cert + signtool + `Add-AppxPackage` smoke、`~/.custom_cursors/cursor_store_sentinel.txt` 永続化検証)。`.env.example` に `MSIX_PUBLISHER` / `MSIX_TEST_CERT_PASSWORD` (任意) を追記。
 - `AppError::UnsupportedPlatform` を追加。非 Windows ビルドの OS 機能スタブが返すエラー種別 (フロントの `errors.unsupported_platform` に対応)。
+- 初回起動時に 3 ステップのウェルカムガイド (スナップショット保存の案内 / パニックキーとトレイ / 最初の一歩) を表示。完了状態は Rust 設定 `general.onboarding_version` に保存され、設定 → 一般 から再表示できる。
 
 ### Changed
 

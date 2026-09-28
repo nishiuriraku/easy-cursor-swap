@@ -167,6 +167,11 @@ async function onConfigRestored() {
   applyConfigToLocal()
 }
 
+const { replay: replayOnboarding } = useOnboarding()
+function onReplayOnboarding() {
+  void replayOnboarding()
+}
+
 // 設定検索コンテキスト (P08a V4: SettingsSearchBox に渡す)。
 const searchContext = computed(() => ({
   hasKeystore: keystoreInfo.value?.has_keypair ?? false,
@@ -251,6 +256,7 @@ function selectSection(id: SectionId) {
           @update:cursor-size-slider="onCursorSizeCommit"
           @refresh-cursor-size-from-os="onRefreshCursorSizeFromOs"
           @open-windows-cursor-settings="onOpenWindowsCursorSettings"
+          @replay-onboarding="onReplayOnboarding"
           @config-restored="onConfigRestored"
         />
 
