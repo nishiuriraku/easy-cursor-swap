@@ -249,6 +249,7 @@ gh run list --workflow=release.yml --limit 3
 | CHANGELOG の comparison link を更新し忘れる | ファイル末尾の `[Unreleased]: .../v0.0.(X-1)...HEAD` を `v0.0.X...HEAD` に書き換え、新たに `[0.0.X]: .../compare/v0.0.(X-1)...v0.0.X` を追加 |
 | docs-only commit と勘違いして gate をスキップ | `CHANGELOG.md` は規約上 docs-only に含まれるが、**release commit は安全側に gate を通す** のが慣例 |
 | `npm run tauri:build` を回さずに PR を作る | ローカル installer build は CI で代替可能だが、Authenticode 署名前の sanity check として手元で 1 回回しておくと安全 (現状 NSIS / MSI は無署名のため Authenticode 検証はスキップされる、MSIX 自動署名は `build-msix-artifacts.yml` 側で別途検証) |
+| **tauri-action v1 (2026-09-)**: `releaseDraft: true` のため、**publish 済みタグに対して `workflow_dispatch` で再実行すると action が fail** する | 再ビルドが必要なら新しいパッチタグを切る。`latest.json` の `platforms.*.url` は `https://api.github.com/repos/.../releases/assets/<id>` 形式 (tauri-plugin-updater 2.x が解釈) |
 
 ---
 
