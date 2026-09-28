@@ -94,7 +94,7 @@ const exportProgressLabel = computed(() => {
             />
           </SettingsRow>
           <SettingsRow :label="t('creator.metaShadow')" :desc="t('creator.metaShadowDesc')">
-            <SettingsToggle v-model="shadowEnabled" />
+            <SettingsToggle v-model="shadowEnabled" :label="t('creator.metaShadow')" />
           </SettingsRow>
         </div>
       </div>

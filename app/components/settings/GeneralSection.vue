@@ -184,14 +184,17 @@ function onSliderChange(ev: Event) {
           :label="t('settings.showApplyToastLabel')"
           :desc="tp('showApplyToastDesc')"
         >
-          <SettingsToggle v-model="showApplyToast" />
+          <SettingsToggle v-model="showApplyToast" :label="t('settings.showApplyToastLabel')" />
         </SettingsRow>
         <SettingsRow
           anchor="applyShadowControl"
           :label="t('settings.applyShadowControlLabel')"
           :desc="t('settings.applyShadowControlDesc')"
         >
-          <SettingsToggle v-model="applyShadowControl" />
+          <SettingsToggle
+            v-model="applyShadowControl"
+            :label="t('settings.applyShadowControlLabel')"
+          />
         </SettingsRow>
       </div>
     </div>

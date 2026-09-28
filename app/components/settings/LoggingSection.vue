@@ -118,7 +118,7 @@ async function openLogFolder() {
           :label="t('settings.crashReportingLabel')"
           :desc="t('settings.crashReportingDesc')"
         >
-          <SettingsToggle v-model="crashReporting" />
+          <SettingsToggle v-model="crashReporting" :label="t('settings.crashReportingLabel')" />
         </SettingsRow>
         <SettingsRow
           anchor="crashCount"

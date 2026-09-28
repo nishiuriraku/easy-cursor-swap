@@ -53,3 +53,7 @@ npx vitest run app/path/to/file.test.ts # single file
 npx vue-tsc --noEmit                    # type check
 node scripts/check-i18n.mjs             # i18n parity (CI gate)
 ```
+
+## Testing
+
+- a11y: `vitest-axe` (`app/test-setup/axe.ts`). happy-dom has no layout/computed styles, so visual rules (`color-contrast` etc.) and page-landmark rules are disabled; component-level checks only.

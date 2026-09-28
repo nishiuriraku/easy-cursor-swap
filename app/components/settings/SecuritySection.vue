@@ -24,14 +24,14 @@ const warnUnsignedImport = defineModel<boolean>('warnUnsignedImport', { required
           :label="t('settings.requireSignedLabel')"
           :desc="t('settings.requireSignedDesc')"
         >
-          <SettingsToggle v-model="requireSignedThemes" />
+          <SettingsToggle v-model="requireSignedThemes" :label="t('settings.requireSignedLabel')" />
         </SettingsRow>
         <SettingsRow
           anchor="warnUnsigned"
           :label="t('settings.warnUnsignedLabel')"
           :desc="t('settings.warnUnsignedDesc')"
         >
-          <SettingsToggle v-model="warnUnsignedImport" />
+          <SettingsToggle v-model="warnUnsignedImport" :label="t('settings.warnUnsignedLabel')" />
         </SettingsRow>
       </div>
     </div>

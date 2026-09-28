@@ -53,7 +53,7 @@ defineEmits<{
           :label="t('settings.autoUpdateLabel')"
           :desc="t('settings.autoUpdateDesc')"
         >
-          <SettingsToggle v-model="autoUpdate" />
+          <SettingsToggle v-model="autoUpdate" :label="t('settings.autoUpdateLabel')" />
         </SettingsRow>
         <SettingsRow
           anchor="autoCheckStatus"

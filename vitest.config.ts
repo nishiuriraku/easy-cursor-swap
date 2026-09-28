@@ -29,6 +29,7 @@ export default defineConfig({
     environment: 'happy-dom',
     include: ['app/**/__tests__/**/*.test.ts'],
     globals: true,
+    setupFiles: ['./app/test-setup/axe.ts'],
   },
   resolve: {
     alias: {

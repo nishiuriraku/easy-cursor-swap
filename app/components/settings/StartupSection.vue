@@ -36,14 +36,22 @@ defineProps<{
           :label="t('settings.autoStartLabel')"
           :desc="t('settings.autoStartDesc')"
         >
-          <SettingsToggle v-model="autoStart" />
+          <SettingsToggle
+            v-model="autoStart"
+            :label="t('settings.autoStartLabel')"
+            anchor="autoStart"
+          />
         </SettingsRow>
         <SettingsRow
           anchor="startMinimized"
           :label="t('settings.startMinimizedLabel')"
           :desc="t('settings.startMinimizedDesc')"
         >
-          <SettingsToggle v-model="startMinimized" />
+          <SettingsToggle
+            v-model="startMinimized"
+            :label="t('settings.startMinimizedLabel')"
+            anchor="startMinimized"
+          />
         </SettingsRow>
       </div>
     </div>

@@ -35,6 +35,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Internal
 
 - フロント: マーケットプレイス IPC (`marketplace_fetch_index` / `marketplace_install`) を singleton composable `useMarketplace` に集約し、`pages/marketplace.vue` と `layouts/default.vue` (サイドバーのバッジ) で index を共有、inflight dedupe で公式インデックス HTTP を 1 回に (Wave 3A / L1-1)。`useGithubAuth` に `revoke()` を追加し `pages/settings.vue` からの `revoke_github_link` 直 invoke を撤去 (L1-5)。
+- Rust 統合テスト (cursorpack/profile roundtrip, config migrate) をゲートに追加。
+- vitest-axe a11y テスト (ui コンポーネント + ページ相当セクション)。
+- Windows E2E smoke (tauri-driver + WebdriverIO、非ブロッキング)。
 
 ## [0.0.8] - 2026-07-28
 
