@@ -29,7 +29,9 @@
 //! ために値自体は引き続き `cursor_base_size` フィールドで公開する。
 
 use serde::Serialize;
+#[cfg(windows)]
 use winreg::enums::HKEY_CURRENT_USER;
+#[cfg(windows)]
 use winreg::RegKey;
 
 /// アクセシビリティ機能の競合情報 + 現在の CursorBaseSize 値。
@@ -87,6 +89,7 @@ impl AccessibilityConflicts {
 }
 
 /// `HKCU\Control Panel\Mouse\MouseSonar` を読む。失敗時は false。
+#[cfg(windows)]
 fn read_mouse_sonar() -> bool {
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     hkcu.open_subkey(r"Control Panel\Mouse")
@@ -95,8 +98,15 @@ fn read_mouse_sonar() -> bool {
         .unwrap_or(false)
 }
 
+/// 非 Windows: レジストリが無いので「競合なし」側の既定値を返す。
+#[cfg(not(windows))]
+fn read_mouse_sonar() -> bool {
+    false
+}
+
 /// `HKCU\Control Panel\Accessibility\HighContrast\Flags` の bit 0 を確認。
 /// HCF_HIGHCONTRASTON = 0x00000001
+#[cfg(windows)]
 fn read_high_contrast() -> bool {
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     hkcu.open_subkey(r"Control Panel\Accessibility\HighContrast")
@@ -105,11 +115,18 @@ fn read_high_contrast() -> bool {
         .unwrap_or(false)
 }
 
+/// 非 Windows: レジストリが無いので「競合なし」側の既定値を返す。
+#[cfg(not(windows))]
+fn read_high_contrast() -> bool {
+    false
+}
+
 /// 現在のカーソル基準サイズ (DWORD 32-256) を取得する。Windows 11 Settings が
 /// canonical に書く `Accessibility\CursorSize` (slider 1-15) を優先し、本アプリ
 /// および旧 Control Panel API が書く `CursorBaseSize` を fallback として読む。
 ///
 /// 順序は [`resolve_cursor_base_size`] で純粋関数として表現する (テスト容易化)。
+#[cfg(windows)]
 fn read_cursor_base_size() -> u32 {
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let accessibility_slider = hkcu
@@ -121,6 +138,12 @@ fn read_cursor_base_size() -> u32 {
         .and_then(|k| k.get_value::<u32, _>("CursorBaseSize"))
         .ok();
     resolve_cursor_base_size(accessibility_slider, cursor_base_size)
+}
+
+/// 非 Windows: レジストリが無いので Windows 既定値を返す。
+#[cfg(not(windows))]
+fn read_cursor_base_size() -> u32 {
+    DEFAULT_CURSOR_BASE_SIZE
 }
 
 /// 2 つのレジストリ値から canonical な CursorBaseSize (DWORD) を決定する純粋関数。
@@ -166,6 +189,7 @@ fn resolve_cursor_base_size(
 
 /// `HKCU\SOFTWARE\Microsoft\Accessibility\CursorSize` (slider 1-15) を読む。
 /// 失敗時はファクトリ状態 1。範囲外は clamp する。
+#[cfg(windows)]
 fn read_accessibility_cursor_size_slider() -> u8 {
     use crate::registry::{MAX_CURSOR_SIZE_SLIDER, MIN_CURSOR_SIZE_SLIDER};
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
@@ -179,8 +203,15 @@ fn read_accessibility_cursor_size_slider() -> u8 {
     ) as u8
 }
 
+/// 非 Windows: レジストリが無いので slider 最小値 (= 標準 pipeline 側) を返す。
+#[cfg(not(windows))]
+fn read_accessibility_cursor_size_slider() -> u8 {
+    crate::registry::MIN_CURSOR_SIZE_SLIDER
+}
+
 /// `HKCU\SOFTWARE\Microsoft\Accessibility\CursorType` を読む。
 /// 失敗時は 0 (= 白、ファクトリ)。u8 範囲外は u8::MAX に飽和。
+#[cfg(windows)]
 fn read_accessibility_cursor_type() -> u8 {
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let raw: u32 = hkcu
@@ -192,6 +223,12 @@ fn read_accessibility_cursor_type() -> u8 {
     } else {
         raw as u8
     }
+}
+
+/// 非 Windows: レジストリが無いのでファクトリ値 0 (= 白) を返す。
+#[cfg(not(windows))]
+fn read_accessibility_cursor_type() -> u8 {
+    0
 }
 
 #[cfg(test)]

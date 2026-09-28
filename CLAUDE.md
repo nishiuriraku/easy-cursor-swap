@@ -119,7 +119,7 @@ One feature = one commit. Run `bash scripts/verify-gate.sh` and confirm green be
 
 ## CI workflows
 
-- `.github/workflows/ci.yml` — `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test --lib`, `vue-tsc --noEmit`, i18n parity.
+- `.github/workflows/ci.yml` — `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test --lib`, `vue-tsc --noEmit`, i18n parity, `rust-check-linux` (ubuntu-latest: `cargo check` / clippy lib+bins, テストなし).
 - `.github/workflows/performance.yml` — Criterion benches (`benches/cursor_build.rs`, `benches/startup.rs`); regression detection on PRs.
 - `.github/workflows/release.yml` — signed installer builds.
 

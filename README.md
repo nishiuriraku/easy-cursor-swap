@@ -114,6 +114,7 @@ npm run tauri:dev
 
 # Type-check Rust only
 cargo check --manifest-path src-tauri/Cargo.toml
+# (Linux / macOS でも型検査は通る。実行・テストは Windows のみ)
 
 # Run Rust tests
 cargo test --manifest-path src-tauri/Cargo.toml

@@ -43,7 +43,7 @@ Vue (UI) ──invoke()──▶ Tauri command (commands/) ──▶ Rust module
 Operate inside `src-tauri/` (or via `--manifest-path` from repo root).
 
 ```bash
-cargo check
+cargo check # Linux でも通る (lib + bins)。テスト実行・カバレッジは Windows のみ
 cargo fmt --all -- --check
 cargo clippy --all-targets -- -D warnings
 cargo test --lib                                  # all unit tests
@@ -70,3 +70,4 @@ cargo bench                                       # criterion benches in benches
 
 - The `zip` crate v2.6.x is yanked — pin a known-good version when bumping.
 - `cargo test --lib` is the canonical test runner for the verification gate; integration tests in `tests/` are not run by `verify-gate.sh`.
+- `winreg` は `[target.'cfg(windows)'.dependencies]` 限定。非 Windows では `registry/` の I/O 関数が `#[cfg(not(windows))]` スタブ (`AppError::Registry`) になる。新しい winreg / windows 呼び出しは必ず `#[cfg(windows)]` 関数に閉じ、対になるスタブを書く。CI `rust-check-linux` (ubuntu, `cargo check --lib --bins` + clippy) が `-D warnings` で検出する。

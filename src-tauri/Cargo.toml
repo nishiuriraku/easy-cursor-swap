@@ -65,9 +65,11 @@ tracing-appender = "0.2"
 image = { version = "0.25", features = ["png", "ico"] }
 
 # --- Windows API ---
-winreg = "0.56"
-
+# winreg 0.56 は非 Windows で compile_error! を出すため、windows crate と同じく
+# target 限定にする。非 Windows では registry/ 配下の関数が cfg(not(windows)) スタブ
+# (AppError::Registry を返す) にフォールバックする。
 [target.'cfg(windows)'.dependencies]
+winreg = "0.56"
 # windows >= 0.62 では `WNDCLASSW` / `RegisterClassW` が `Win32_Graphics_Gdi` feature
 # (WNDCLASSW.hbrBackground が HBRUSH を持つため) の背後に gating されている。
 # `cursor_watcher.rs` / `hotkey.rs` がメッセージ専用 HWND_MESSAGE ウィンドウを

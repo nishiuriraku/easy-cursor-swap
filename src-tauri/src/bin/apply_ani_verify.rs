@@ -15,19 +15,26 @@
 //!
 //! stdout に JSON で結果を 1 行出す。終了コード 0 = 成功。
 
+#[cfg(windows)]
 use std::env;
+#[cfg(windows)]
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+#[cfg(windows)]
 use app_lib::cursor::ani::parse_ani;
+#[cfg(windows)]
 use app_lib::cursor::ani_write::rewrite_ani_to_path;
+#[cfg(windows)]
 use app_lib::registry::RegistryManager;
 
 /// Arrow の元値を保持し、Drop で必ず HKCU に書き戻すガード。
+#[cfg(windows)]
 struct ArrowRestoreGuard {
     original: String,
 }
 
+#[cfg(windows)]
 impl ArrowRestoreGuard {
     fn snapshot() -> Result<Self, String> {
         let map = RegistryManager::read_current_cursors()
@@ -37,6 +44,7 @@ impl ArrowRestoreGuard {
     }
 }
 
+#[cfg(windows)]
 impl Drop for ArrowRestoreGuard {
     fn drop(&mut self) {
         // 直接 HKCU\Control Panel\Cursors\Arrow を書き戻し、SPI_SETCURSORS で反映する。
@@ -68,6 +76,7 @@ impl Drop for ArrowRestoreGuard {
     }
 }
 
+#[cfg(windows)]
 fn run(input: PathBuf) -> Result<serde_json::Value, String> {
     if !input.is_file() {
         return Err(format!(".ani が見つかりません: {}", input.display()));
@@ -165,6 +174,7 @@ fn run(input: PathBuf) -> Result<serde_json::Value, String> {
     }))
 }
 
+#[cfg(windows)]
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().collect();
     if args.len() != 2 {
@@ -183,4 +193,11 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+/// 非 Windows: 実レジストリに書く検証 CLI のため実行不可。使い方だけ出して終了する。
+#[cfg(not(windows))]
+fn main() -> ExitCode {
+    eprintln!("apply_ani_verify は Windows 専用です (HKCU\\Control Panel\\Cursors に書き込みます)");
+    ExitCode::from(2)
 }

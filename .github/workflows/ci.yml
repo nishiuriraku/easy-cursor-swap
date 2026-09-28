@@ -121,6 +121,47 @@ jobs:
         run: node scripts/check-i18n.mjs
 
   # -------------------------------------------------------------
+  # Rust 側 (Linux): クロスプラットフォームのコンパイルゲート。
+  # winreg / windows crate が target 限定であること、非 Windows スタブが
+  # -D warnings 下で通ることだけを見る。テスト実行・カバレッジは windows ジョブの責務。
+  # -------------------------------------------------------------
+  rust-check-linux:
+    name: Rust check (ubuntu-latest, compile gate)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Linux system deps (Tauri v2 prerequisites)
+        # webkit2gtk-4.1 / gtk3 / ayatana-appindicator / rsvg は tauri crate の build script、
+        # libdbus-1 は libdbus-sys、libxdo / libssl は tauri の推移依存が要求する。
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
+            librsvg2-dev libxdo-dev libssl-dev libdbus-1-dev patchelf
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cargo cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: cargo check (lib + bins)
+        working-directory: src-tauri
+        run: cargo check --lib --bins
+
+      - name: cargo clippy (lib + bins, no tests)
+        working-directory: src-tauri
+        run: cargo clippy --lib --bins --no-deps -- -D warnings
+
+  # NOTE(P05): macOS の compile gate (macos-latest, cargo check --lib) は P05 spike で要否判断。
+
+  # -------------------------------------------------------------
   # 依存監査: cargo audit (脆弱性のみ fail / unmaintained 警告は無視)
   # rustsec/audit-check は informational advisory を check status に
   # 反映しないため、unmaintained/yanked では fail しない。

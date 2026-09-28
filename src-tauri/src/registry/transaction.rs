@@ -44,8 +44,6 @@ use crate::errors::{AppError, AppResult};
 use crate::logging;
 use crate::registry::RegistryManager;
 use std::collections::HashMap;
-use winreg::enums::*;
-use winreg::RegKey;
 
 /// 操作モード。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -212,7 +210,11 @@ fn run_emergency_best_effort(spec: &TransactionSpec<'_>) -> AppResult<()> {
 }
 
 /// 17 役割全部に値を書き込む。`write_values` 未登録の役割は空文字列 (= Windows 既定継承)。
+#[cfg(windows)]
 fn write_all_roles(write_values: &HashMap<String, String>) -> AppResult<()> {
+    use winreg::enums::*;
+    use winreg::RegKey;
+
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let cursors_key = hkcu
         .open_subkey_with_flags("Control Panel\\Cursors", KEY_READ | KEY_WRITE)
@@ -231,11 +233,23 @@ fn write_all_roles(write_values: &HashMap<String, String>) -> AppResult<()> {
     Ok(())
 }
 
-/// `Control Panel\Cursors\(Default)` (= スキーム名表示用) を書き込む。
+// TODO(P03): UnsupportedPlatform
+#[cfg(not(windows))]
+fn write_all_roles(_write_values: &HashMap<String, String>) -> AppResult<()> {
+    Err(AppError::Registry(
+        "write_all_roles は Windows 専用です".to_string(),
+    ))
+}
+
+/// `Control Panel\Cursors\(Default)` (= スキーム名表示用) を書き込む.
 ///
 /// reg 名は空文字 `""` で `set_value` を呼ぶと「既定値」が更新される
 /// (Windows の `RegSetValueEx` の `lpValue = NULL` 相当)。
+#[cfg(windows)]
 fn write_default_scheme_name(name: &str) -> AppResult<()> {
+    use winreg::enums::*;
+    use winreg::RegKey;
+
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let cursors_key = hkcu
         .open_subkey_with_flags("Control Panel\\Cursors", KEY_WRITE)
@@ -246,17 +260,28 @@ fn write_default_scheme_name(name: &str) -> AppResult<()> {
     Ok(())
 }
 
+// TODO(P03): UnsupportedPlatform
+#[cfg(not(windows))]
+fn write_default_scheme_name(_name: &str) -> AppResult<()> {
+    Err(AppError::Registry(
+        "write_default_scheme_name は Windows 専用です".to_string(),
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(windows)]
     use crate::config::cursors_dir_override_lock;
 
     /// `CUSTOM_CURSORS_DIR_OVERRIDE` 用の RAII ガード。Drop で env を復元。
+    #[cfg(windows)]
     struct EnvGuard {
         key: &'static str,
         prev: Option<String>,
     }
 
+    #[cfg(windows)]
     impl EnvGuard {
         fn new(key: &'static str, value: &std::path::Path) -> Self {
             let prev = std::env::var(key).ok();
@@ -265,6 +290,7 @@ mod tests {
         }
     }
 
+    #[cfg(windows)]
     impl Drop for EnvGuard {
         fn drop(&mut self) {
             match &self.prev {
@@ -275,10 +301,12 @@ mod tests {
     }
 
     /// 現在の 17 役割値を退避する RAII ガード。テスト終了時に必ず復元する。
+    #[cfg(windows)]
     struct CursorValuesCleanup {
         original: HashMap<String, String>,
     }
 
+    #[cfg(windows)]
     impl CursorValuesCleanup {
         fn capture() -> Self {
             Self {
@@ -287,6 +315,7 @@ mod tests {
         }
     }
 
+    #[cfg(windows)]
     impl Drop for CursorValuesCleanup {
         fn drop(&mut self) {
             let _ = RegistryManager::restore_from_snapshot_pub(&self.original);

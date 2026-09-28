@@ -27,16 +27,19 @@ pub use roles::CursorRole;
 pub use scheme::WindowsScheme;
 pub use snapshot::{PendingSnapshotState, RegistrySnapshot};
 
-use crate::config::ConfigManager;
+#[cfg(windows)]
+use crate::config::ConfigManager; // list_windows_schemes のみ
 use crate::errors::{AppError, AppResult};
-use env::encode_utf16_with_nul;
-use scheme::{
-    build_scheme_value, compute_apply_values, parse_scheme_value, sanitize_scheme_name,
-    scheme_is_app_managed,
-};
+#[cfg(windows)]
+use env::encode_utf16_with_nul; // register_scheme のみ
+use scheme::compute_apply_values; // apply_cursors (両 OS)
+#[cfg(windows)]
+use scheme::{build_scheme_value, parse_scheme_value, sanitize_scheme_name, scheme_is_app_managed};
 use std::collections::HashMap;
 use std::path::PathBuf;
+#[cfg(windows)]
 use winreg::enums::RegType;
+#[cfg(windows)]
 use winreg::RegValue;
 
 /// 所有 `Vec<u8>` から `winreg::RegValue` を構築する小さなヘルパー。
@@ -46,6 +49,7 @@ use winreg::RegValue;
 /// ライフタイムは `'static`。この変換ロジックを 1 箇所に閉じ込めることで、winreg
 /// 側の API 形状が将来また変わったときも修正点を限定できる。
 #[inline]
+#[cfg(windows)]
 fn to_reg_value(bytes: Vec<u8>, vtype: RegType) -> RegValue<'static> {
     RegValue {
         bytes: bytes.into(),
@@ -62,6 +66,7 @@ pub struct RegistryManager;
 
 impl RegistryManager {
     /// 現在のカーソル設定をレジストリから読み取る
+    #[cfg(windows)]
     pub fn read_current_cursors() -> AppResult<HashMap<String, String>> {
         use winreg::enums::*;
         use winreg::RegKey;
@@ -170,6 +175,7 @@ impl RegistryManager {
     /// 値は `REG_EXPAND_SZ` で書き込み、17 役割を scheme_index 順にカンマ区切りする。
     /// 失敗してもユーザー体験への影響は限定的なので、tracing::warn で記録するのみで
     /// 上位層に伝播させる呼び出し元 / 静かに無視する呼び出し元を選べるよう Result を返す。
+    #[cfg(windows)]
     pub fn register_scheme(
         scheme_name: &str,
         cursor_paths: &HashMap<String, PathBuf>,
@@ -223,6 +229,7 @@ impl RegistryManager {
     ///
     /// 戻り値: 削除に成功した Schemes 値の数。Schemes キー自体が存在しない場合は
     /// `Ok(0)` (= 成功扱い: そもそも掃除する対象がない)。
+    #[cfg(windows)]
     pub fn unregister_schemes_for_theme(theme_dir: &std::path::Path) -> AppResult<usize> {
         use winreg::enums::*;
         use winreg::RegKey;
@@ -332,6 +339,7 @@ impl RegistryManager {
     /// 記録しつつ、最終的に 1 つの Err にまとめて伝播する。PII redaction は
     /// ロール名 (= 役割レジストリ名 = "Arrow" 等、PII ではない) のみ含むので
     /// redact 不要。
+    #[cfg(windows)]
     pub fn restore_from_snapshot_pub(values: &HashMap<String, String>) -> AppResult<()> {
         use winreg::enums::*;
         use winreg::RegKey;
@@ -461,6 +469,51 @@ impl RegistryManager {
         // Windows 以外ではスキップ
         tracing::warn!("Windows 以外の環境では SystemParametersInfoW は使用できません");
         Ok(())
+    }
+
+    // P01 で追加した非 Windows スタブ群。レジストリ I/O が無い環境では
+    // 変更系を Err で安全側に倒す。P03 で `AppError::UnsupportedPlatform` へ置換する。
+    // TODO(P03): UnsupportedPlatform
+    #[cfg(not(windows))]
+    pub fn read_current_cursors() -> AppResult<HashMap<String, String>> {
+        Err(AppError::Registry(
+            "read_current_cursors は Windows 専用です".to_string(),
+        ))
+    }
+
+    // TODO(P03): UnsupportedPlatform
+    #[cfg(not(windows))]
+    pub fn register_scheme(
+        _scheme_name: &str,
+        _cursor_paths: &HashMap<String, PathBuf>,
+    ) -> AppResult<()> {
+        Err(AppError::Registry(
+            "register_scheme は Windows 専用です".to_string(),
+        ))
+    }
+
+    // TODO(P03): UnsupportedPlatform
+    #[cfg(not(windows))]
+    pub fn unregister_schemes_for_theme(_theme_dir: &std::path::Path) -> AppResult<usize> {
+        Err(AppError::Registry(
+            "unregister_schemes_for_theme は Windows 専用です".to_string(),
+        ))
+    }
+
+    // TODO(P03): UnsupportedPlatform
+    #[cfg(not(windows))]
+    pub fn restore_from_snapshot_pub(_values: &HashMap<String, String>) -> AppResult<()> {
+        Err(AppError::Registry(
+            "restore_from_snapshot_pub は Windows 専用です".to_string(),
+        ))
+    }
+
+    // TODO(P03): UnsupportedPlatform
+    #[cfg(not(windows))]
+    pub fn list_windows_schemes() -> AppResult<Vec<WindowsScheme>> {
+        Err(AppError::Registry(
+            "list_windows_schemes は Windows 専用です".to_string(),
+        ))
     }
 
     /// OS 標準ポインター影 (`SPI_SETCURSORSHADOW`) の ON/OFF を切り替える。
@@ -836,6 +889,7 @@ impl RegistryManager {
     /// 全スロット空のスキーム (= 何も上書きしない) は UI 表示する意味がないので除外する。
     /// Schemes キー自体が存在しない (一度もカスタムスキームを保存していない) 場合は
     /// 空配列を返す。
+    #[cfg(windows)]
     pub fn list_windows_schemes() -> AppResult<Vec<WindowsScheme>> {
         use winreg::enums::*;
         use winreg::RegKey;
