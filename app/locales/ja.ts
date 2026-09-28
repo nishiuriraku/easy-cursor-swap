@@ -390,6 +390,7 @@ export default {
     updateRelaunchTitle: 'アップデート完了',
     updateRelaunchAsk: 'アプリを再起動して新バージョンを適用しますか？',
     updateAvailableLabel: 'v{version} へ更新',
+    updateNotesTitle: 'v{version} の更新内容',
     updateMajorJumpTitle: 'メジャーバージョンアップ',
     updateMajorJumpWarning: 'v{version} はメジャーバージョンアップです。互換性のない変更が含まれる場合があります。続行しますか？',
     updaterErrNetwork: 'ネットワーク接続を確認してください ({message})',

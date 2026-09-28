@@ -33,6 +33,9 @@ defineEmits<{
   (e: 'download-update'): void
   (e: 'force-recheck'): void
 }>()
+
+/** 更新内容モーダルの開閉。body 全文はモーダル内で pre-wrap 表示する。 */
+const showNotes = ref(false)
 </script>
 
 <template>
@@ -83,8 +86,12 @@ defineEmits<{
               version: updaterAvailable.version,
             })
           "
-          :desc="updaterAvailable.body ?? ''"
         >
+          <template v-if="updaterAvailable.body" #desc>
+            <button type="button" class="notes-link" @click="showNotes = true">
+              {{ updaterAvailable.body }}
+            </button>
+          </template>
           <UiButton
             variant="primary"
             :loading="updaterDownloading"
@@ -118,6 +125,19 @@ defineEmits<{
         </UiAlert>
       </div>
     </div>
+    <UiModal
+      v-if="updaterAvailable"
+      :open="showNotes"
+      :title="t('settings.updateNotesTitle', { version: updaterAvailable.version })"
+      icon="Import"
+      size="md"
+      @close="showNotes = false"
+    >
+      <UiMarkdown :source="updaterAvailable.body ?? ''" />
+      <template #actions>
+        <UiButton variant="ghost" @click="showNotes = false">{{ t('common.close') }}</UiButton>
+      </template>
+    </UiModal>
   </section>
 </template>
 
@@ -159,6 +179,19 @@ defineEmits<{
   @apply mt-2 rounded-[8px] border px-3 py-2 text-[12px];
   background: rgba(106, 213, 184, 0.06);
   border-color: rgba(106, 213, 184, 0.4);
+}
+/* 更新内容の1行省略リンク。クリックで全文モーダルを開く。 */
+.notes-link {
+  @apply mt-[3px] block w-full border-0 bg-transparent p-0 text-left text-[11.5px] leading-[1.5] text-fg-mute;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.notes-link:hover {
+  color: rgb(var(--accent));
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .msix-banner {
   @apply mb-3 rounded-[10px] border px-4 py-3 text-[13px];

@@ -21,7 +21,12 @@ const stubs = {
   UiAlert: { template: '<div class="alert-stub"><slot /></div>' },
   SettingsRow: {
     props: ['anchor', 'label', 'desc'],
-    template: '<div :data-anchor="anchor" :data-label="label"><slot /></div>',
+    template:
+      '<div :data-anchor="anchor" :data-label="label"><slot name="desc" /><slot /></div>',
+  },
+  UiModal: {
+    props: ['open', 'title'],
+    template: '<div v-if="open" class="modal-stub" :data-title="title"><slot /><slot name="actions" /></div>',
   },
   SettingsToggle: {
     props: ['modelValue'],
@@ -132,5 +137,38 @@ describe('UpdatesSection', () => {
     expect(toggle.attributes('data-on')).toBe('false')
     await toggle.trigger('click')
     expect(wrapper.emitted('update:autoUpdate')).toEqual([[true]])
+  })
+
+  it('更新内容の1行リンクをクリックすると全文モーダルが開く', async () => {
+    const wrapper = mount(UpdatesSection, {
+      props: {
+        ...baseProps,
+        autoUpdate: true,
+        updaterAvailable: { version: '0.2.0', body: 'line1\nline2\nline3' },
+      },
+      global: { stubs },
+    })
+    // 初期状態ではモーダルは閉じている
+    expect(wrapper.find('.modal-stub').exists()).toBe(false)
+    const notesLink = wrapper.find('.notes-link')
+    expect(notesLink.exists()).toBe(true)
+    await notesLink.trigger('click')
+    const modal = wrapper.find('.modal-stub')
+    expect(modal.exists()).toBe(true)
+    // 全文 (改行含む) がモーダル内に描画される
+    expect(modal.text()).toContain('line1')
+    expect(modal.text()).toContain('line2')
+  })
+
+  it('body が無いときは notes-link が描画されない', () => {
+    const wrapper = mount(UpdatesSection, {
+      props: {
+        ...baseProps,
+        autoUpdate: true,
+        updaterAvailable: { version: '0.2.0', body: null },
+      },
+      global: { stubs },
+    })
+    expect(wrapper.find('.notes-link').exists()).toBe(false)
   })
 })
