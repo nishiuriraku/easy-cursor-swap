@@ -120,6 +120,7 @@ fn open_release_page_in_browser(url: &str) {
 }
 
 /// `https://.../EasyCursorSwap_0.1.0_x64-setup.exe` → `EasyCursorSwap_0.1.0_x64-setup.exe`
+#[cfg(windows)]
 fn installer_filename_from_url(url: &str) -> String {
     url.rsplit('/')
         .next()
