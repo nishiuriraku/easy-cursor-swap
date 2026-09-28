@@ -115,83 +115,22 @@ const {
 } = metaState
 
 /**
- * 編集破棄ダイアログのガード判定。
- * 編集ステージにいて、アセット割り当て または メタ入力 のどちらかがあれば true。
- * Clear ボタン / 画面遷移どちらの経路でもこの判定でダイアログ表示を分岐する。
+ * 破棄ガード (P08a C1: useCreatorDiscardGuard に集約)。
  */
-const hasUnsavedEdits = computed(() => {
-  if (stage.value !== 'editing') return false
-  if (assignedRoleCount.value > 0) return true
-  return metaState.isDirty.value
-})
-
-/**
- * 編集破棄ダイアログの開閉と「破棄後に何をするか」を保持する。
- * - mode='clear':   confirm 後に resetCreator() を実行
- * - mode='navigate': confirm 後に Vue Router の next() を実行 (cancel 時は next(false))
- *
- * `pendingNavigation` は onBeforeRouteLeave から渡された next() のサンクで、
- * confirm / cancel 経路の両方で必ず呼び切る (放置すると router がフリーズする)。
- */
-const discardDialogOpen = ref(false)
-const discardDialogMode = ref<'clear' | 'navigate'>('clear')
-let pendingNavigation: ((proceed: boolean) => void) | null = null
-
-/**
- * 保存成功直後にライブラリへ自動遷移する際、破棄ダイアログをスキップするためのフラグ。
- *  - true の間: `onBeforeRouteLeave` は `hasUnsavedEdits` を見ずに即 next() する。
- *  - 保存直後にだけ立て、遷移完了後に false に戻す (unmount でリセットされるので明示的な
- *    後始末は不要だが、保存後に同一ページ内へ遷移しない再エントリも考慮して reset する)。
- */
-const bypassUnsavedGuard = ref(false)
-
-/** 保存後遷移のためにスケジュール済みの setTimeout ハンドル。unmount で確実にクリアする。 */
-let postSaveNavTimer: ReturnType<typeof setTimeout> | null = null
-
-function requestReset() {
-  if (!hasUnsavedEdits.value) {
-    resetCreator()
-    return
-  }
-  discardDialogMode.value = 'clear'
-  pendingNavigation = null
-  discardDialogOpen.value = true
-}
-
-function onDiscardConfirm() {
-  discardDialogOpen.value = false
-  const navigation = pendingNavigation
-  pendingNavigation = null
-  if (navigation) {
-    navigation(true)
-  } else {
-    resetCreator()
-  }
-}
-
-function onDiscardCancel() {
-  discardDialogOpen.value = false
-  const navigation = pendingNavigation
-  pendingNavigation = null
-  if (navigation) navigation(false)
-}
-
-// サイドバー / ブラウザバック相当の遷移をガードする。
-// Vue Router の onBeforeRouteLeave は next(false) で離脱をキャンセルできる。
-onBeforeRouteLeave((_to, _from, next) => {
-  // 保存直後の自動遷移は破棄ダイアログをスキップする (assigned/メタが残っていても
-  // 既にバックエンドへ保存済みなので破棄リスクは無い)。
-  if (bypassUnsavedGuard.value) {
-    next()
-    return
-  }
-  if (!hasUnsavedEdits.value) {
-    next()
-    return
-  }
-  discardDialogMode.value = 'navigate'
-  pendingNavigation = (proceed) => next(proceed)
-  discardDialogOpen.value = true
+const {
+  hasUnsavedEdits,
+  discardDialogOpen,
+  discardDialogMode,
+  bypassUnsavedGuard,
+  requestReset,
+  onDiscardConfirm,
+  onDiscardCancel,
+  scheduleNavigateAfterSave,
+} = useCreatorDiscardGuard({
+  stage,
+  assignedRoleCount,
+  isMetaDirty: computed(() => metaState.isDirty.value),
+  onReset: () => resetCreator(),
 })
 
 // --- 一括インポート ---
@@ -233,192 +172,40 @@ const tabs = computed<Array<{ id: TabId; label: string; count?: string }>>(() =>
   { id: 'metadata', label: t('creator.tabMetadata') },
 ])
 
-/**
- * 現在ロールに「埋まっているサイズ」を assigned から導出。
- * primary は必ず含まれ、sized オーバーライドのキーを和集合で足す。
- */
-const filledSizes = computed<number[]>(() => {
-  const a = assigned.value[activeRoleId.value]
-  if (!a) return []
-  const set = new Set<number>([a.primarySize])
-  if (a.sized) for (const k of a.sized.keys()) set.add(k)
-  return Array.from(set).sort((x, y) => x - y)
-})
-
 function selectRole(id: string) {
   activeRoleId.value = id
 }
 
-/** ロール一覧で ↑↓ Home End キー操作 — リストボックス相当のフォーカス移動。 */
-function onRoleListKeydown(e: KeyboardEvent) {
-  const idx = CURSOR_ROLES.findIndex((r) => r.id === activeRoleId.value)
-  if (idx === -1) return
-  let next = idx
-  if (e.key === 'ArrowDown' || e.key === 'j') next = Math.min(idx + 1, CURSOR_ROLES.length - 1)
-  else if (e.key === 'ArrowUp' || e.key === 'k') next = Math.max(idx - 1, 0)
-  else if (e.key === 'Home') next = 0
-  else if (e.key === 'End') next = CURSOR_ROLES.length - 1
-  else return
-  e.preventDefault()
-  selectRole(CURSOR_ROLES[next]!.id)
-}
-
-// 各ロールの primary バイト列から Blob URL を派生し、ロール切替時に正しいプレビューを表示する。
-// ロール毎にキャッシュして、リスト中のロール切替で URL を毎回作り直さない。
-const roleBlobCache = new Map<string, { url: string; ref: Uint8Array }>()
-function ensureRoleBlobUrl(roleId: string, bytes: Uint8Array): string {
-  const cached = roleBlobCache.get(roleId)
-  if (cached && cached.ref === bytes) return cached.url
-  if (cached) URL.revokeObjectURL(cached.url)
-  // Uint8Array → BlobPart: 一旦 ArrayBuffer のスライスにコピーして TS 型互換にする
-  const buf = bytes.slice().buffer
-  const url = URL.createObjectURL(new Blob([buf], { type: 'image/png' }))
-  roleBlobCache.set(roleId, { url, ref: bytes })
-  return url
-}
-
-/** 現在の役割に紐付いた表示用 PNG URL。assigned が無いロールは null (既定アイコン表示)。 */
-const activePreviewUrl = computed<string | null>(() => {
-  const a = assigned.value[activeRoleId.value]
-  if (a?.primary) return ensureRoleBlobUrl(activeRoleId.value, a.primary)
-  return null
-})
-
 /**
- * `<CursorPreview>` に渡す現在の asset 形。
- * ANI フレームがあれば 'ani'、静止 PNG があれば 'static'、どちらもなければ 'empty'。
+ * ホットスポット編集状態 (P08a C2: useCreatorHotspotState に集約)。
+ * perSizeHotspot=ON かつ sized override があれば sized 側、それ以外は primary。
  */
-const activePreviewAsset = computed<CursorPreviewAsset>(() => {
-  const frames = activeAniFrames.value
-  if (frames) {
-    const a = assigned.value[activeRoleId.value]
-    return {
-      kind: 'ani',
-      framePngs: frames.framePngs,
-      sequence: frames.sequence,
-      durations: frames.perStepDurationsMs,
-      nativeSize: a?.primarySize ?? activeSize.value,
-    }
-  }
-  const url = activePreviewUrl.value
-  if (url) return { kind: 'static', url, alt: activeRole.value.jp }
-  return { kind: 'empty' }
-})
-
+const {
+  activeHotspot,
+  activeHotspotModel,
+  sizedOverrideActive,
+  canEditSizedOverride,
+  activeAniFrames,
+  activeAniSourcePath,
+  writeActiveHotspot,
+  enableSizedOverride,
+  centerHotspot,
 /**
- * 現在のロール + サイズで「表示・操作対象」のホットスポット (ratio)。
- * perSizeHotspot=ON かつ sized.hotspot=Some のとき sized 側を返す。
+ * プレビュー Blob URL 派生状態 (P08a C3: useCreatorPreviewUrls に集約)。
  */
-const activeHotspot = computed<Hotspot>(() => {
-  const a = assigned.value[activeRoleId.value]
-  if (!a) return { x: 0, y: 0 }
-  if (perSizeHotspot.value) {
-    const sized = a.sized?.get(activeSize.value)
-    if (sized?.hotspot) return sized.hotspot
-  }
-  return a.hotspot
-})
-
-/**
- * 現在の編集対象 (primary or sized override) に hotspot を書き込む。
- * perSizeHotspot=ON かつそのサイズに override が既に存在 (sized.hotspot=Some) なら sized 側に、
- * それ以外は primary に書く。editor 操作 (pointer / keyboard / model setter) 専用。
- * import 系 (applyImportedRaster / pickCursorFromPath) は primary 直接書込を維持する。
- */
-function writeActiveHotspot(next: Hotspot) {
-  const id = activeRoleId.value
-  const a = assigned.value[id]
-  if (!a) return
-  const sized = a.sized?.get(activeSize.value)
-  if (perSizeHotspot.value && sized?.hotspot) {
-    const nextSizedMap = new Map(a.sized ?? new Map())
-    nextSizedMap.set(activeSize.value, { ...sized, hotspot: next })
-    setAsset(id, { ...a, sized: nextSizedMap })
-  } else {
-    setAsset(id, { ...a, hotspot: next })
-  }
-}
-
-/**
- * activeHotspot の writable 版。pointer / keyboard ハンドラから setter 経由で更新する。
- * writeActiveHotspot 経由で perSizeHotspot=ON 時に sized へ書き込む。
- */
-const activeHotspotModel = computed<Hotspot>({
-  get: () => activeHotspot.value,
-  set: (next) => {
-    writeActiveHotspot(next)
-  },
-})
-
-/**
- * 現在のアクティブサイズに sized.hotspot override が存在するか。
- * enableSizedOverride を押した後に true になる。
- */
-const sizedOverrideActive = computed(() => {
-  const a = assigned.value[activeRoleId.value]
-  return !!a?.sized?.get(activeSize.value)?.hotspot
-})
-
-/**
- * sized override の有効化ボタンを押せる条件 (アセット割り当て済み + perSizeHotspot=ON)。
- */
-const canEditSizedOverride = computed(() => {
-  const a = assigned.value[activeRoleId.value]
-  return !!a && perSizeHotspot.value
-})
-
-/**
- * このサイズの sized.hotspot を primary hotspot からコピーして初期化する。
- * 以後 writeActiveHotspot が sized 側に書き込むようになる。
- */
-function enableSizedOverride() {
-  const id = activeRoleId.value
-  const a = assigned.value[id]
-  if (!a) return
-  const nextSizedMap = new Map(a.sized ?? new Map())
-  const existing = nextSizedMap.get(activeSize.value)
-  nextSizedMap.set(activeSize.value, {
-    png: existing?.png ?? a.primary,
-    // 現在の primary hotspot をコピーして編集起点にする
-    hotspot: { ...a.hotspot },
+const { filledSizes, activePreviewUrl, activePreviewAsset, sizePreviewMap } =
+  useCreatorPreviewUrls({
+    creatorAssets,
+    activeRoleId,
+    activeSize,
+    activeRole,
+    activeAniFrames,
   })
-  setAsset(id, { ...a, sized: nextSizedMap })
-}
 
-/** アクティブロールに .ani フレームデータが存在する場合にそれを返す。 */
-const activeAniFrames = computed(() => {
-  const id = activeRoleId.value
-  if (!id) return null
-  return assigned.value[id]?.aniFrames ?? null
-})
-
-/** アクティブロールの .ani 元ファイルパス (存在する場合のみ)。 */
-const activeAniSourcePath = computed(() => {
-  const id = activeRoleId.value
-  if (!id) return null
-  return assigned.value[id]?.aniSourcePath ?? null
-})
-
-onBeforeUnmount(() => {
-  for (const { url } of roleBlobCache.values()) URL.revokeObjectURL(url)
-  roleBlobCache.clear()
-})
 
 onUnmounted(() => {
   stopFileDrop()
-  // 保存後遷移用 setTimeout が残っていれば必ず解放 (連続遷移時のリーク対策)。
-  if (postSaveNavTimer) {
-    clearTimeout(postSaveNavTimer)
-    postSaveNavTimer = null
-  }
 })
-
-/**
- * 現在ロールのホットスポットを画像中央 (0.5, 0.5) に移動する。
- */
-function centerHotspot() {
-  writeActiveHotspot({ x: 0.5, y: 0.5 })
-}
 
 /**
  * 詳細設定で解像度 (`activeSize`) を切り替える。
@@ -428,41 +215,6 @@ function selectSize(s: number) {
   activeSize.value = s
 }
 
-/**
- * 現在ロールの各サイズに対する実画像 Blob URL マップ。
- * SizeStrip の各タイルに表示する。
- *  - sized[size] があればそれを (size 別オーバーライド)
- *  - 無く且つ size === primarySize なら primary を
- *
- * Blob URL は role + size でキャッシュし、ロール切替で revoke する。
- */
-const sizeBlobCache = new Map<string, { url: string; ref: Uint8Array }>()
-function ensureSizeBlobUrl(roleId: string, size: number, bytes: Uint8Array): string {
-  const key = `${roleId}:${size}`
-  const cached = sizeBlobCache.get(key)
-  if (cached && cached.ref === bytes) return cached.url
-  if (cached) URL.revokeObjectURL(cached.url)
-  const buf = bytes.slice().buffer
-  const url = URL.createObjectURL(new Blob([buf], { type: 'image/png' }))
-  sizeBlobCache.set(key, { url, ref: bytes })
-  return url
-}
-
-const sizePreviewMap = computed<Record<number, string>>(() => {
-  const out: Record<number, string> = {}
-  const a = assigned.value[activeRoleId.value]
-  if (!a) return out
-  const roleId = activeRoleId.value
-  for (const size of filledSizes.value) {
-    const sized = a.sized?.get(size)
-    if (sized?.png) {
-      out[size] = ensureSizeBlobUrl(roleId, size, sized.png)
-    } else if (size === a.primarySize && a.primary) {
-      out[size] = ensureSizeBlobUrl(roleId, size, a.primary)
-    }
-  }
-  return out
-})
 
 function isRequired(id: string): boolean {
   return id === 'Arrow'
@@ -473,71 +225,25 @@ onMounted(async () => {
   void refreshKeystore()
   void startFileDrop()
   // ライブラリの「Creator で編集」から `?editPath=...` で .cursorpack を渡された場合は
-  // 自動ロードして editing ステージを開く。一時ファイルなので読み込み後に放置しても
-  // OS が TEMP を整理してくれるので明示削除はしない。
+  // 自動ロードして editing ステージを開く。
   const route = useRoute()
   const editPath = (route.query.editPath as string | undefined) ?? null
-  if (editPath) {
-    try {
-      const parsed = await bulkImport.parseCursorpack(editPath)
-      bulkCursorpack.value = parsed
-      bulkResolved.value = null
-      bulkSourceLabel.value = t('creator.bulkSourceEditing')
-      bulkModalOpen.value = true
-      stage.value = 'editing'
-      // `?editPath` 経由のみ元テーマ ID を保持。SaveDestinationModal が
-      // 「上書き / 複製」セクションを出すトリガにも使う。
-      sourceThemeId.value = parsed.metadata.id ?? null
-      // `?editPath` 由来のテーマは「編集 → 再適用」が典型。デフォルトを Library+Apply に。
-      saveModalDefault.value = 'libraryAndApply'
-    } catch (err) {
-      importMessage.value = t('creator.errEditLoadFailed', {
-        detail: err instanceof Error ? err.message : String(err),
-      })
-      stage.value = 'editing'
-    }
-  }
+  if (editPath) await loadFromEditPath(editPath)
 })
 
 // --- 画像インポート / エクスポート / 一括インポートのフロー制御 ---
 // 詳細は composable に分離 (Phase 3c)。creator.vue は組み立てだけを担当する。
 
-/** sanitized SVG 文字列 → 指定サイズの PNG バイト列 (Canvas 経由)。Canvas API 依存なのでここに残す。 */
-async function rasterizeSvgToPng(svgString: string, size: number): Promise<Uint8Array> {
-  const blob = new Blob([svgString], { type: 'image/svg+xml' })
-  const url = URL.createObjectURL(blob)
-  try {
-    const img = new Image()
-    img.decoding = 'async'
-    img.src = url
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve()
-      img.onerror = () => reject(new Error(t('creator.errSvgImageLoadFailed')))
-    })
-    const canvas = document.createElement('canvas')
-    canvas.width = size
-    canvas.height = size
-    const ctx = canvas.getContext('2d')
-    if (!ctx) throw new Error(t('creator.errCanvas2dContext'))
-    ctx.imageSmoothingEnabled = true
-    ctx.imageSmoothingQuality = 'high'
-    ctx.drawImage(img, 0, 0, size, size)
-    const pngBlob: Blob = await new Promise((resolve, reject) => {
-      canvas.toBlob(
-        (b) => (b ? resolve(b) : reject(new Error(t('creator.errToBlobFailed')))),
-        'image/png',
-      )
-    })
-    return new Uint8Array(await pngBlob.arrayBuffer())
-  } finally {
-    URL.revokeObjectURL(url)
-  }
-}
-
-const { importBusy, importMessage, sanitizedRemovals, applyImportedRaster } = useCreatorImport({
+const {
+  importBusy,
+  importMessage,
+  sanitizedRemovals,
+  applyImportedRaster,
+  handleFileInput: onFileChange,
+} = useCreatorImport({
   creatorAssets,
   activeRoleId,
-  rasterizeSvgToPng,
+  t,
 })
 
 const {
@@ -580,12 +286,7 @@ async function handleSaveSubmit(
   const status = await executeSave(payload)
   if (status !== 'ok') return
   // 保存成功 → ライブラリへ自動遷移。トーストが見える程度の短い遅延を挟む。
-  if (postSaveNavTimer) clearTimeout(postSaveNavTimer)
-  postSaveNavTimer = setTimeout(() => {
-    postSaveNavTimer = null
-    bypassUnsavedGuard.value = true
-    void navigateTo('/')
-  }, 1000)
+  scheduleNavigateAfterSave('/', 1000)
 }
 
 const {
@@ -681,159 +382,39 @@ function resetCreator() {
 }
 
 /**
- * ヒーロー画面の「新規作成」CTA ハンドラ。
- * モーダルを開いてベース画像を選ばせる (デザイン要件) → Arrow ロールに割り当てて編集画面へ。
+ * 新規作成 / 複製フロー (P08a C5: useCreatorStartFlow に集約)。
  */
-function onStartNew() {
-  newThemeModalOpen.value = true
-}
-
-/**
- * 「ファイル/パックから取り込む」CTA — bulkAuto を起動。
- * モーダルを閉じてから dispatch する。プレビューモーダルが開いたら editing へ遷移する。
- */
-async function onNewThemePickFiles() {
-  newThemeModalOpen.value = false
-  await pickBulkAuto()
-  if (bulkModalOpen.value) {
-    stage.value = 'editing'
-  }
-}
-
-/** 「フォルダから取り込む」CTA。 */
-async function onNewThemePickFolder() {
-  newThemeModalOpen.value = false
-  await pickBulkFolder()
-  if (bulkModalOpen.value) {
-    stage.value = 'editing'
-  }
-}
-
-/** モーダルから「画像なしで開始」を選んだ場合は従来通りの空エディタに遷移。 */
-function onNewThemeStartEmpty() {
-  newThemeModalOpen.value = false
-  stage.value = 'editing'
-}
-
-function onNewThemeCancel() {
-  newThemeModalOpen.value = false
-}
-
-/**
- * 「既存テーマを複製して編集」CTA ハンドラ。
- *
- * 1. ライブラリのテーマ一覧をロードしてピッカーモーダルを開く
- * 2. 選択されたテーマを `repackage_theme` で一時 `.cursorpack` 化
- * 3. 既存の bulk preview modal 経路 (parseCursorpack) に流して editing へ遷移
- *
- * 詳細モーダルの `editInCreator` と同じ IPC を使うので、ロール衝突解決や
- * メタデータ反映の挙動はそちらと統一される。
- */
-async function onDuplicateExistingFromStart() {
-  // 既存テーマの「複製」を起点にした新規作成セッション。`?editPath` で引き継いだ
-  // ソース UUID は無効になるので、ピッカーを開く時点でクリアしておく
-  // (SaveDestinationModal が誤って元テーマへの overwrite を提案するのを防ぐ)。
-  sourceThemeId.value = null
-  await refreshPickerThemes()
-  themePickerSelected.value = null
-  themePickerOpen.value = true
-}
-
-async function onThemePickerSelect(id: string | null) {
-  themePickerOpen.value = false
-  if (!id) return
-  try {
-    const { tempDir, sep } = await import('@tauri-apps/api/path')
-    const dir = await tempDir()
-    const tempPath = `${dir}${sep()}_easycursorswap_dup_${Date.now()}.cursorpack`
-    await useThemes().repackageTheme(id, tempPath)
-    await dispatchBulkPaths([tempPath])
-    if (bulkModalOpen.value) {
-      stage.value = 'editing'
-    }
-  } catch (err) {
-    importMessage.value = t('creator.errDuplicateThemeFailed', {
-      detail: err instanceof Error ? err.message : String(err),
-    })
-    stage.value = 'editing'
-  }
-}
-
-function onThemePickerCancel() {
-  themePickerOpen.value = false
-}
-
-async function onFileChange(e: Event) {
-  const input = e.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) return
-  importBusy.value = true
-  importMessage.value = null
-  sanitizedRemovals.value = []
-  try {
-    if (file.size > 10 * 1024 * 1024) {
-      throw new Error(t('creator.errFileSizeOverMb'))
-    }
-
-    const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
-    let pngBytes: Uint8Array | null = null
-    if (ext === 'svg') {
-      const text = await file.text()
-      const { sanitized, removed } = sanitizeSvg(text)
-      if (!sanitized)
-        throw new Error(t('creator.errSvgUnparsable', { removed: removed.join(', ') }))
-      sanitizedRemovals.value = removed
-      // SVG → 256px PNG にラスタライズして Rust 側ビルダー用に保持
-      pngBytes = await rasterizeSvgToPng(sanitized, 256)
-      importMessage.value =
-        removed.length > 0
-          ? t('creator.notifySvgSanitized', { count: removed.length })
-          : t('creator.notifySvgImported')
-    } else if (ext === 'png') {
-      // PNG は magic byte の弱検証のみ (89 50 4E 47)
-      const fullBytes = new Uint8Array(await file.arrayBuffer())
-      if (
-        fullBytes.length < 8 ||
-        fullBytes[0] !== 0x89 ||
-        fullBytes[1] !== 0x50 ||
-        fullBytes[2] !== 0x4e ||
-        fullBytes[3] !== 0x47
-      ) {
-        throw new Error(t('creator.errPngBadHeader'))
-      }
-      pngBytes = fullBytes
-      importMessage.value = t('creator.notifyPngImported')
-    } else {
-      throw new Error(t('creator.errUnsupportedExt', { ext }))
-    }
-
-    // 役割マップに登録 (assigned が真のソース。setAsset 経由で filledRoleSet
-    // computed が追従するので filledRoles/filledSizesByRole の手動更新は不要。)
-    // エクスポート時にも assigned 経由で使用。
-    // PNG/SVG はホットスポット情報を持たないので、既存 hotspot を維持するか、
-    // 新規ロールならロールに応じた初期値を適用する。ratio は size 非依存。
-    if (pngBytes) {
-      const existing = assigned.value[activeRoleId.value]
-      const hotspot = existing?.hotspot ?? initialHotspotFor(activeRoleId.value, 256)
-      setAsset(activeRoleId.value, {
-        primary: pngBytes,
-        primarySize: 256,
-        hotspot,
-        source: 'manual',
-      })
-    }
-  } catch (err) {
-    importMessage.value = t('creator.errImportFailed', {
-      detail: err instanceof Error ? err.message : String(err),
-    })
-  } finally {
-    importBusy.value = false
-    // 同一ファイル再選択を許すため、change イベントの元 input をクリア。
-    // input 要素は子コンポーネント (CreatorEditorCanvas) に移ったので、
-    // e.target 経由で参照する (親の ref は持たない)。
-    input.value = ''
-  }
-}
+const {
+  onStartNew,
+  onNewThemePickFiles,
+  onNewThemePickFolder,
+  onNewThemeStartEmpty,
+  onNewThemeCancel,
+  onDuplicateExistingFromStart,
+  onThemePickerSelect,
+  onThemePickerCancel,
+  loadFromEditPath,
+} = useCreatorStartFlow({
+  stage,
+  newThemeModalOpen,
+  themePickerOpen,
+  themePickerSelected,
+  sourceThemeId,
+  saveModalDefault,
+  bulkFlow: {
+    bulkModalOpen,
+    bulkCursorpack,
+    bulkResolved,
+    bulkSourceLabel,
+    dispatchBulkPaths,
+  },
+  bulkImport,
+  pickBulkAuto,
+  pickBulkFolder,
+  refreshPickerThemes,
+  importMessage,
+  t,
+})
 </script>
 
 <template>
@@ -856,18 +437,8 @@ async function onFileChange(e: Event) {
         @bulk-folder="pickBulkFolder"
       />
 
-      <!-- タブバー -->
-      <div class="tabs">
-        <button
-          v-for="t in tabs"
-          :key="t.id"
-          :class="['tab', { active: activeTab === t.id }]"
-          @click="activeTab = t.id"
-        >
-          {{ t.label }}
-          <span v-if="t.count" class="num">{{ t.count }}</span>
-        </button>
-      </div>
+      <!-- タブバー (P08a V1) -->
+      <CreatorTabBar v-model="activeTab" :tabs="tabs" />
 
       <CreatorMetadataPane
         v-if="activeTab === 'metadata'"
@@ -891,7 +462,6 @@ async function onFileChange(e: Event) {
           :active-role-id="activeRoleId"
           :status-of="statusOf"
           @select="selectRole"
-          @keydown="onRoleListKeydown"
         />
 
         <CreatorEditorCanvas
@@ -1038,68 +608,8 @@ async function onFileChange(e: Event) {
   @apply relative flex h-full flex-col;
 }
 
-.draft-tag {
-  @apply ml-1.5 font-mono text-[10.5px] text-fg-mute;
-}
-
-.pane-head {
-  @apply mb-2.5 flex items-center justify-between;
-}
-.pane-head h6 {
-  @apply m-0 font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-fg-mute;
-}
-
-.color-chips {
-  @apply flex gap-1;
-}
-.cc {
-  @apply size-[18px] rounded border border-line;
-}
-
-.validation-body {
-  @apply gap-2 font-mono text-[11.5px] text-fg-dim;
-}
-.vrow {
-  @apply flex justify-between;
-}
-.vrow .ok {
-  @apply text-accent;
-}
-.vrow .warn {
-  @apply text-amber;
-}
-.vrow .dim {
-  @apply text-fg-dim;
-}
-
-/* (P08a: インポート結果ポップアップは UiFloatingBanner に集約し、ここから削除) */
-
-.export-progress {
-  @apply mx-[18px] mb-2 mt-0 rounded-[8px] border border-accent-line px-3 py-2 text-[12px] text-fg-dim;
-  background: rgba(124, 242, 212, 0.04);
-}
-.export-progress-row {
-  @apply mb-1.5 flex items-center gap-2;
-}
-.export-progress-label {
-  font-variant-numeric: tabular-nums;
-}
-.export-progress-bar {
-  @apply h-1 overflow-hidden rounded-sm;
-  background: rgba(255, 255, 255, 0.06);
-}
-.export-progress-fill {
-  @apply h-full bg-accent;
-  transition: width 120ms ease-out;
-}
-
-.metadata-pane {
-  @apply flex-1 overflow-y-auto px-7 pb-8 pt-6;
-  background: radial-gradient(800px 600px at 50% 0%, rgba(124, 242, 212, 0.04), transparent 60%);
-}
-.metadata-grid {
-  @apply mx-auto flex max-w-[760px] flex-col gap-[18px];
-}
+/* (P08a: 未使用 scoped CSS 9 グループ + インポート結果ポップアップを削除。
+ * `.export-progress*` / `.metadata-*` はテンプレ参照 0 件のため除去) */
 
 .creator-grid {
   @apply grid min-h-0 flex-1 border-t border-line;
