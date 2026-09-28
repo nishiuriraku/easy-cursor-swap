@@ -1919,6 +1919,13 @@ mod tests {
     #[test]
     fn reset_to_windows_default_clears_all_17_roles() {
         let _apply_lock = apply_cursors_test_lock();
+        // reset は transaction 経由で pending snapshot ファイル I/O を行う。
+        // env var はプロセス共有のため、override を使う他テスト (snapshot round_trip 等)
+        // と直列化しないと互いの TempDir 上の `_pending_apply.snapshot` を汚染する
+        // (並列実行で `original_values` が空で読み戻される実発事例あり)。
+        let _override_lock = crate::config::cursors_dir_override_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
 
         // HKCU の 17 役割を退避 (Drop で確実に復元)。
         let _cleanup = CursorValuesCleanup::capture();

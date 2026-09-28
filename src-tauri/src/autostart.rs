@@ -45,6 +45,7 @@ fn build_run_command() -> AppResult<String> {
 }
 
 #[cfg(test)]
+#[cfg(windows)]
 fn is_enabled_with_name(name: &str) -> bool {
     #[cfg(windows)]
     {
