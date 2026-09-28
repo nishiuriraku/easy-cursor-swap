@@ -60,11 +60,11 @@ describe('useAppSettings typed-patch contract (Wave 2B / Task 3)', () => {
     await load(true)
     // update_config の戻り値は mutation 反映後を想定
     const updatedConfig = { ...baseConfig() }
-    updatedConfig.general = { ...baseConfig().general, crashReporting: true }
+    updatedConfig.general = { ...baseConfig().general, crash_reporting: true }
     invokeTauriMock.mockResolvedValueOnce(updatedConfig)
 
     const result = await update((c) => {
-      c.general.crashReporting = true
+      c.general.crash_reporting = true
     })
 
     expect(result).not.toBeNull()
@@ -73,7 +73,22 @@ describe('useAppSettings typed-patch contract (Wave 2B / Task 3)', () => {
     expect(args!.updates).toEqual({
       general: { crashReporting: true },
     })
-    expect(config.value!.general.crashReporting).toBe(true)
+    expect(config.value!.general.crash_reporting).toBe(true)
+  })
+
+  it('maps snake_case auto_start to camelCase autoStart in the patch (B2 regression)', async () => {
+    const { load, update } = useAppSettings()
+    await load(true)
+    invokeTauriMock.mockResolvedValueOnce({ ...baseConfig() })
+
+    await update((c) => {
+      c.general.auto_start = false
+    })
+
+    const [, args] = invokeTauriMock.mock.calls[1]!
+    expect(args!.updates).toEqual({
+      general: { autoStart: false },
+    })
   })
 
   it('never sends schema_version, github_account, security thresholds, favorites or usage', async () => {
@@ -82,10 +97,9 @@ describe('useAppSettings typed-patch contract (Wave 2B / Task 3)', () => {
     invokeTauriMock.mockResolvedValueOnce({ ...baseConfig() })
 
     // mutator 内で forbidden fields を触ろうとしても patch に漏れない
-    // (camelCase キーを直接書き換えても diff に入るものは AppConfigPatch 経由)
     await update((c) => {
       c.general.language = 'en'
-      c.security.requireSignedThemes = true
+      c.security.require_signed_themes = true
       // forbidden attempts (type cast 経由でしか触れないので no-op):
       ;(c as { schema_version: number }).schema_version = 1
       ;(c as { github_account: unknown }).github_account = null
@@ -148,14 +162,14 @@ describe('useAppSettings typed-patch contract (Wave 2B / Task 3)', () => {
 
     await update((c) => {
       // general 4 フィールド: デフォルトとは逆の値を明示代入
-      // (baseConfig は snake_case キーなので camelCase プロパティへの代入は undefined と diff)
-      c.general.showApplyToast = false
-      c.general.applyShadowControl = false
-      c.general.startMinimized = true
-      c.general.showStorageWarning = false
+      // (baseConfig は snake_case キー = 実データ形状)
+      c.general.show_apply_toast = false
+      c.general.apply_shadow_control = false
+      c.general.start_minimized = true
+      c.general.show_storage_warning = false
       // security 2 フィールド
-      c.security.requireSignedThemes = true
-      c.security.warnUnsignedImport = false
+      c.security.require_signed_themes = true
+      c.security.warn_unsigned_import = false
     })
 
     const [, args] = invokeTauriMock.mock.calls[1]!

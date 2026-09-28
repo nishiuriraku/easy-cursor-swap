@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Wave 4B: Store runtime 分岐 + activation policy 集約** — `appusermodel::PackageContext::current()` で autostart / updater / rollback / activation の 4 軸を一元決定。`GetCurrentPackageFullName` (Win32 API) → path fallback の 2 段戦略で MSIX 検出。`commands/app_metadata.rs` で `is_msix_packaged` / `package_policy_label` の 2 IPC を公開。`useUpdaterBootstrap` / `useUpdater.check` を MSIX で short-circuit、`useMsixPackaged` composable で UI 出し分け (Updates / Startup セクション)。`start_minimized` 設定と `--autostart` 起動を `decide_activation` で集約し `Window::hide` 配線。`auto_rollback_install` を `PackageContext.rollback` で gate。
 - **Wave 4C: CI install/remove/sentinel パイプライン** — `.github/workflows/build-msix-artifacts.yml` 新設 (workflow_dispatch のみ、matrix x64 / arm64、test self-signed cert + signtool + `Add-AppxPackage` smoke、`~/.custom_cursors/cursor_store_sentinel.txt` 永続化検証)。`.env.example` に `MSIX_PUBLISHER` / `MSIX_TEST_CERT_PASSWORD` (任意) を追記。
 
+### Fixed
+
+- 設定画面の切替 (自動起動 / 自動更新 / クラッシュレポート / トースト表示など) が `language` 以外保存されない不具合を修正。差分 patch 生成が camelCase キーで実データ (snake_case) を読んでいたため常に空 patch になっていた (`app/composables/useAppSettings.ts`)。
+- `app/layouts/default.vue` の `marketplaceCount` 重複宣言を除去し、develop からのビルド (`nuxi generate` / `tauri build`) が失敗する不具合を修正。
+
 ## [0.0.8] - 2026-07-28
 
 非同期処理中のローディングフィードバックをアプリ全体へ整備したリリース (v0.0.8)。Wave 2AB の coverage gate を 80% (brief 値) から **70% (measured baseline +10pt 余裕)** に下げました (brief deviation、合意済み)。backend measured 71.86% / frontend measured 69.52%。差分 10pt 分のテスト追加は次 wave で対応します。これまで読み込み中に空白・無反応に見えていた箇所 (テーマ/インデックスのグリッドとプレビュー、アップデートのダウンロード、一括取り込みの解決・解析、各種ボタン操作、Creator のエクスポート) に、共通のスケルトン / スピナー / 確定プログレスバー / ステージ表示を一貫した語彙で適用。HKCU 限定 / 適用トランザクション性 / アーカイブ検閲 / PII レダクション / `v-html` 不採用 の 5 大不変条件はすべて維持。

@@ -14,13 +14,17 @@
  */
 
 export type { AppConfig } from './AppConfig'
+export type { AppConfigPatch } from './AppConfigPatch'
 export type { BackupInfo } from './BackupInfo'
 export type { GeneralConfig } from './GeneralConfig'
+export type { GeneralConfigPatch } from './GeneralConfigPatch'
 export type { GithubAccount } from './GithubAccount'
 export type { LocalizedString } from './LocalizedString'
 export type { LoggingConfig } from './LoggingConfig'
+export type { LoggingConfigPatch } from './LoggingConfigPatch'
 export type { MarketplaceEntry } from './MarketplaceEntry'
 export type { MarketplaceIndex } from './MarketplaceIndex'
 export type { MarketplaceInstallRequest } from './MarketplaceInstallRequest'
 export type { SecurityConfig } from './SecurityConfig'
+export type { SecurityConfigPatch } from './SecurityConfigPatch'
 export type { ThemeUsage } from './ThemeUsage'
