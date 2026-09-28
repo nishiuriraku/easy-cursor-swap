@@ -278,9 +278,7 @@ fn current_unix_secs() -> u64 {
 
 fn sha256_hex(bytes: &[u8]) -> String {
     use sha2::{Digest, Sha256};
-    let mut h = Sha256::new();
-    h.update(bytes);
-    format!("{:x}", h.finalize())
+    hex::encode(Sha256::digest(bytes))
 }
 
 /// `submit_theme_auto` IPC が組み立てて `stages::run_submit_pipeline` に渡す
