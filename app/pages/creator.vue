@@ -405,10 +405,7 @@ onBeforeUnmount(() => {
 })
 
 onUnmounted(() => {
-  if (unlistenDrop) {
-    unlistenDrop()
-    unlistenDrop = null
-  }
+  stopFileDrop()
   // 保存後遷移用 setTimeout が残っていれば必ず解放 (連続遷移時のリーク対策)。
   if (postSaveNavTimer) {
     clearTimeout(postSaveNavTimer)
@@ -474,7 +471,7 @@ function isRequired(id: string): boolean {
 // 起動時に keystore 状態を取得して「署名 & エクスポート」ボタンの表示判定に使う
 onMounted(async () => {
   void refreshKeystore()
-  void setupTauriDrop()
+  void startFileDrop()
   // ライブラリの「Creator で編集」から `?editPath=...` で .cursorpack を渡された場合は
   // 自動ロードして editing ステージを開く。一時ファイルなので読み込み後に放置しても
   // OS が TEMP を整理してくれるので明示削除はしない。
@@ -628,9 +625,7 @@ async function pickBulkFolder() {
   await runBulkResolve([picked], false, `📁 ${picked}`)
 }
 
-// ----------------------------------------------------------------------------
-// Tauri ウィンドウ Drag & Drop
-//
+// Tauri ウィンドウ Drag & Drop (P08a: useTauriFileDrop に集約)。
 // ブラウザの DragEvent は dataTransfer.files に絶対パスを含めないため、Library
 // 画面と同じく Tauri v2 の onDragDropEvent で実パスを受け取って dispatchBulkPaths
 // に流す。start ステージで受けた場合は NewThemeStartModal をスキップして editing
@@ -639,46 +634,26 @@ async function pickBulkFolder() {
 // dispatchBulkPaths は拡張子別に「.cursorpack 単独」と「bulk_resolve」に分岐する
 // ので、ここでは拡張子ごとの分岐を再実装しない。サポート外の拡張子は
 // dispatchBulkPaths 側で「マッチ 0 件」の空 preview として扱われる。
-// ----------------------------------------------------------------------------
-const showDrop = ref(false)
-let unlistenDrop: (() => void) | null = null
-
-const SUPPORTED_DROP_EXTS = ['png', 'svg', 'cur', 'ico', 'ani', 'cursorpack']
-
-async function setupTauriDrop() {
-  try {
-    const { getCurrentWindow } = await import('@tauri-apps/api/window')
-    const win = getCurrentWindow()
-    unlistenDrop = await win.onDragDropEvent((event) => {
-      const p = event.payload
-      if (p.type === 'enter' || p.type === 'over') {
-        showDrop.value = true
-      } else if (p.type === 'leave') {
-        showDrop.value = false
-      } else if (p.type === 'drop') {
-        showDrop.value = false
-        const paths = (p.paths ?? []).filter((path: string) => {
-          const ext = path.toLowerCase().split('.').pop() ?? ''
-          return SUPPORTED_DROP_EXTS.includes(ext)
-        })
-        if (paths.length === 0) {
-          importMessage.value = t('creator.errDropUnsupported')
-          return
-        }
-        // start 画面で受けたときは NewThemeStartModal を閉じて editing に遷移。
-        // dispatchBulkPaths 内で `.cursorpack` の場合は bulkModalOpen が立ち、
-        // bulk_resolve 経路でも同様に preview が開くため stage 遷移は先んじて行う。
-        if (stage.value === 'start') {
-          newThemeModalOpen.value = false
-          stage.value = 'editing'
-        }
-        void dispatchBulkPaths(paths)
-      }
-    })
-  } catch (err) {
-    console.warn('[Creator] Tauri drop API unavailable:', err)
-  }
-}
+const {
+  showDrop,
+  start: startFileDrop,
+  stop: stopFileDrop,
+} = useTauriFileDrop({
+  accept: ['png', 'svg', 'cur', 'ico', 'ani', 'cursorpack'],
+  onDrop: (paths) => {
+    // start 画面で受けたときは NewThemeStartModal を閉じて editing に遷移。
+    // dispatchBulkPaths 内で `.cursorpack` の場合は bulkModalOpen が立ち、
+    // bulk_resolve 経路でも同様に preview が開くため stage 遷移は先んじて行う。
+    if (stage.value === 'start') {
+      newThemeModalOpen.value = false
+      stage.value = 'editing'
+    }
+    void dispatchBulkPaths(paths)
+  },
+  onRejected: () => {
+    importMessage.value = t('creator.errDropUnsupported')
+  },
+})
 
 /**
  * Creator の編集状態を完全にリセットして初期画面に戻す。
@@ -1011,67 +986,47 @@ async function onFileChange(e: Event) {
     />
 
     <!--
-      Tauri ウィンドウ DnD のフィードバック。Library 画面の LibraryDropOverlay と
-      ほぼ同じだが、Creator では PNG/SVG/CUR/ICO/ANI/.cursorpack 全般を受け付ける
-      ので文言を専用化している。
+      Tauri ウィンドウ DnD のフィードバック (P08a: LibraryDropOverlay を再利用。
+      Creator では PNG/SVG/CUR/ICO/ANI/.cursorpack 全般を受け付けるので文言を専用化)。
     -->
-    <Transition name="fade">
-      <div v-if="showDrop" class="creator-drop">
-        <div class="creator-drop-inner">
-          <UiIcon name="Import" :size="56" class="creator-drop-icon" />
-          <h3>{{ t('creator.dropTitle') }}</h3>
-          <p>{{ t('creator.dropSub') }}</p>
-        </div>
-      </div>
-    </Transition>
+    <LibraryDropOverlay
+      :show="showDrop"
+      :title="t('creator.dropTitle')"
+      :sub="t('creator.dropSub')"
+      icon="Import"
+    />
 
-    <!-- インポート結果メッセージ (Library の apply-error と同じく画面下部のポップアップ) -->
+    <!-- インポート結果メッセージ (画面下部のポップアップ、UiFloatingBanner) -->
     <Transition name="fade">
-      <div v-if="importMessage" class="import-banner" role="status">
-        <UiIcon
-          :name="importMessage.startsWith(t('creator.errImportPrefix')) ? 'Alert' : 'Check'"
-          :size="13"
-        />
-        <span>{{ importMessage }}</span>
-        <button
-          class="btn ghost"
-          style="margin-left: auto; height: 24px"
-          @click="importMessage = null"
-        >
-          <UiIcon name="X" :size="11" />
-        </button>
-      </div>
+      <UiFloatingBanner
+        v-if="importMessage"
+        tone="accent"
+        :icon="importMessage.startsWith(t('creator.errImportPrefix')) ? 'Alert' : 'Check'"
+        @dismiss="importMessage = null"
+      >
+        {{ importMessage }}
+      </UiFloatingBanner>
     </Transition>
 
     <!--
       エクスポート結果トースト。元々は CreatorMetadataPane 内に居たが、
       assign タブで保存したとき (= metadata pane が v-if で unmount されている時) に
       トーストが描画されない問題があったため、タブに依存しないこの層に持ち上げた。
-      .import-banner クラスは creator.vue の scoped style で定義済 (importMessage と同 UI)。
     -->
     <Transition name="fade">
-      <div v-if="exportMessage" class="import-banner" role="status">
-        <UiIcon
-          :name="exportMessage.startsWith(t('creator.exportFailPrefix')) ? 'Alert' : 'Check'"
-          :size="13"
-        />
-        <span>{{ exportMessage }}</span>
-        <button
-          v-if="failedApplyThemeId"
-          class="btn ghost"
-          style="height: 24px; margin-left: auto"
-          @click="retryApply"
-        >
-          {{ t('saveModal.retryApply') }}
-        </button>
-        <button
-          class="btn ghost"
-          :style="failedApplyThemeId ? 'height: 24px' : 'margin-left: auto; height: 24px'"
-          @click="exportMessage = null"
-        >
-          <UiIcon name="X" :size="11" />
-        </button>
-      </div>
+      <UiFloatingBanner
+        v-if="exportMessage"
+        tone="accent"
+        :icon="exportMessage.startsWith(t('creator.exportFailPrefix')) ? 'Alert' : 'Check'"
+        @dismiss="exportMessage = null"
+      >
+        {{ exportMessage }}
+        <template v-if="failedApplyThemeId" #actions>
+          <button class="btn ghost" style="height: 24px" @click="retryApply">
+            {{ t('saveModal.retryApply') }}
+          </button>
+        </template>
+      </UiFloatingBanner>
     </Transition>
   </div>
 </template>
@@ -1117,13 +1072,7 @@ async function onFileChange(e: Event) {
   @apply text-fg-dim;
 }
 
-/* インポート結果ポップアップ。Library の .apply-error と同じ位置/挙動で、
- * 色だけ accent (緑) を維持して「成功+失敗」両用で使う。 */
-.import-banner {
-  @apply fixed bottom-12 left-1/2 z-[90] flex min-w-[320px] max-w-[80%] -translate-x-1/2 items-center gap-2.5 rounded-[8px] border border-accent-line px-3.5 py-2.5 text-[12.5px] text-fg-dim backdrop-blur-[12px];
-  background: rgba(124, 242, 212, 0.1);
-  box-shadow: var(--shadow-2);
-}
+/* (P08a: インポート結果ポップアップは UiFloatingBanner に集約し、ここから削除) */
 
 .export-progress {
   @apply mx-[18px] mb-2 mt-0 rounded-[8px] border border-accent-line px-3 py-2 text-[12px] text-fg-dim;
@@ -1163,30 +1112,8 @@ async function onFileChange(e: Event) {
   }
 }
 
-/* Tauri DnD オーバーレイ。LibraryDropOverlay と同じ表現を Creator 用に inline 化。
- * Creator 配下のすべてのステージ (start / editing) を覆うので creator-host
- * (relative) の中で z-50 に積む。 */
-.creator-drop {
-  @apply absolute inset-0 z-50 grid place-items-center;
-  background: rgba(10, 11, 15, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-.creator-drop-inner {
-  @apply w-[480px] rounded-2xl p-10 text-center;
-  border: 1.5px dashed var(--accent-line);
-  background: rgba(124, 242, 212, 0.04);
-}
-.creator-drop-inner h3 {
-  @apply m-0 font-display text-[18px] font-semibold tracking-[-0.01em];
-  margin: 12px 0 6px;
-}
-.creator-drop-inner p {
-  @apply m-0 text-[13px] text-fg-dim;
-}
-.creator-drop-icon {
-  @apply text-accent;
-}
+/* (P08a: Tauri DnD オーバーレイは LibraryDropOverlay に集約し、ここから削除) */
+
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 200ms ease;

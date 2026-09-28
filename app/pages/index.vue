@@ -368,10 +368,21 @@ async function deleteTheme(id: string) {
   }
 }
 
-// ブラウザの DragEvent は dataTransfer.files に絶対パスを含めないため、
-// Tauri v2 のウィンドウ drag-drop イベントで実ファイルパスを取得する。
-// onMounted で `onDragDropEvent` 購読 → unlisten をクリーンアップ用に保持。
-let unlistenDrop: (() => void) | null = null
+// Tauri v2 ウィンドウドラッグ&ドロップ (P08a: useTauriFileDrop に集約)。
+// `.cursorpack` のみ受理し、Explorer からの取込は既存 importByPath フローへ。
+const {
+  showDrop,
+  start: startFileDrop,
+  stop: stopFileDrop,
+} = useTauriFileDrop({
+  accept: ['cursorpack'],
+  onDrop: (paths) => {
+    for (const path of paths) void importByPath(path)
+  },
+  onRejected: () => {
+    applyError.value = t('library.importNotPack')
+  },
+})
 
 async function importByPath(path: string) {
   importBusy.value = true
@@ -618,34 +629,6 @@ watch(locale, () => {
   void loadThemes({ silent: true })
 })
 
-// --- Tauri v2 ウィンドウドラッグ&ドロップイベント購読 ---
-async function setupTauriDrop() {
-  try {
-    const { getCurrentWindow } = await import('@tauri-apps/api/window')
-    const win = getCurrentWindow()
-    unlistenDrop = await win.onDragDropEvent((event) => {
-      const p = event.payload
-      if (p.type === 'enter' || p.type === 'over') {
-        showDrop.value = true
-      } else if (p.type === 'leave') {
-        showDrop.value = false
-      } else if (p.type === 'drop') {
-        showDrop.value = false
-        const paths = (p.paths ?? []).filter((path: string) =>
-          path.toLowerCase().endsWith('.cursorpack'),
-        )
-        if (paths.length === 0) {
-          applyError.value = t('library.importNotPack')
-          return
-        }
-        for (const path of paths) void importByPath(path)
-      }
-    })
-  } catch (err) {
-    console.warn('[Library] Tauri drop API unavailable:', err)
-  }
-}
-
 // Explorer から渡された .cursorpack を受け取り、既存の importByPath フローに流す。
 const cursorpackOpener = useCursorpackOpener((path) => {
   void importByPath(path)
@@ -653,7 +636,7 @@ const cursorpackOpener = useCursorpackOpener((path) => {
 
 onMounted(async () => {
   await loadThemes()
-  await setupTauriDrop()
+  await startFileDrop()
   await setupCursorChangeListener()
   if (typeof window !== 'undefined') {
     window.addEventListener('easycs:cursors-changed', onExternalCursorsMaybeChanged)
@@ -671,10 +654,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   void cursorpackOpener.stop()
-  if (unlistenDrop) {
-    unlistenDrop()
-    unlistenDrop = null
-  }
+  stopFileDrop()
   if (unlistenCursorChange) {
     unlistenCursorChange()
     unlistenCursorChange = null
@@ -869,19 +849,12 @@ onUnmounted(() => {
       />
     </Transition>
 
-    <!-- 適用エラー (簡易バナー) -->
+    <!-- 適用エラー (簡易バナー、P08a: UiFloatingBanner に集約) -->
     <Transition name="fade">
-      <div v-if="applyError" class="apply-error" role="alert">
+      <UiFloatingBanner v-if="applyError" tone="danger" role="alert" @dismiss="applyError = null">
         <UiIcon name="Alert" :size="14" />
         {{ t('library.applyFailedBanner', { detail: applyError }) }}
-        <button
-          class="btn ghost"
-          style="height: 24px; margin-left: auto"
-          @click="applyError = null"
-        >
-          <UiIcon name="X" :size="11" />
-        </button>
-      </div>
+      </UiFloatingBanner>
     </Transition>
 
     <LibraryDropOverlay :show="showDrop" />
@@ -915,13 +888,5 @@ onUnmounted(() => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
-}
-
-.apply-error {
-  @apply fixed bottom-12 left-1/2 z-[90] flex min-w-[320px] max-w-[80%] -translate-x-1/2 items-center gap-2.5 rounded-[8px] border px-3.5 py-2.5 text-[12.5px] backdrop-blur-[12px];
-  background: rgba(255, 107, 138, 0.12);
-  border-color: rgba(255, 107, 138, 0.4);
-  color: #ffb8c5;
-  box-shadow: var(--shadow-2);
 }
 </style>
