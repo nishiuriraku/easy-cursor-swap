@@ -86,13 +86,12 @@ jobs:
       - name: Nuxt prepare (型生成)
         run: npx nuxi prepare
 
-      - name: Vue type check
-        # 2026-07-28: package.json に vue-tsc ^2.2.12 / typescript ^5.9.3 を
-        # 明示追加して lockfile 経由で固定。`npx vue-tsc` は node_modules に
-        # インストール済みの固定版を起動するため typescript/lib/tsc の
-        # exports エラーは出ない (CI runner の node_modules/.bin は PATH に
-        # 含まれないため直接呼び出しは不可)。
-        run: npx vue-tsc --noEmit
+      - name: Vue type check (app project; non-blocking until P09)
+        # P00: root tsconfig.json は files: [] + references のみで `vue-tsc --noEmit`
+        # が 0 ファイル検査の no-op になるため、実プロジェクトを直接指定して検査する。
+        # 既存エラー約 129 件のため non-blocking (件数だけログ出し)。P09 でゲート化。
+        continue-on-error: true
+        run: npx vue-tsc --noEmit -p .nuxt/tsconfig.app.json 2>&1 | tee vue-tsc.log; grep -c "error TS" vue-tsc.log || true
 
       - name: Prettier --check
         run: npm run format:check

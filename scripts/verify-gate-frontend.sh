@@ -3,8 +3,10 @@
 set -e
 echo "=== prettier --check ==="
 npm run --silent format:check
-echo "=== vue-tsc ==="
-npx vue-tsc --noEmit
+echo "=== vue-tsc (app project; non-blocking until P09) ==="
+# P00: root tsconfig.json は files: [] のため `vue-tsc --noEmit` が no-op。
+# 実プロジェクトを検査し件数だけ出す (現状 約129件)。P09 でゲート化。
+npx vue-tsc --noEmit -p .nuxt/tsconfig.app.json 2>&1 | tee vue-tsc.log; grep -c "error TS" vue-tsc.log || true
 echo "=== i18n parity ==="
 node scripts/check-i18n.mjs
 echo "=== vitest ==="
