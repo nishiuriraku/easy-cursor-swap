@@ -374,11 +374,14 @@ mod tests {
     }
 
     /// panic 時に env を必ず復元する RAII ガード (registry/mod.rs の同名パターンと同じ)。
+    /// 使用側テストが Windows 限定のため Linux では未構築になる。呼び出し元に合わせる。
+    #[cfg(windows)]
     struct EnvRestore {
         key: &'static str,
         prev: Option<String>,
     }
 
+    #[cfg(windows)]
     impl Drop for EnvRestore {
         fn drop(&mut self) {
             match &self.prev {
