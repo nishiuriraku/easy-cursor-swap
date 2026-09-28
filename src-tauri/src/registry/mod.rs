@@ -64,6 +64,65 @@ fn to_reg_value(bytes: Vec<u8>, vtype: RegType) -> RegValue<'static> {
 /// レジストリ操作を管理するマネージャー
 pub struct RegistryManager;
 
+/// transaction の Windows 実装 (`RoleStore` seam)。
+///
+/// `write_roles` は fail-fast (旧 `write_all_roles` 本体)、`restore_roles` は
+/// best-effort 収集 (旧 `restore_from_snapshot_pub` 本体)。意味論は P02 C2 で
+/// 機械的に移動したもので、1 bit も変えていない。
+#[cfg(windows)]
+pub(crate) struct WinRoleStore;
+
+#[cfg(windows)]
+impl transaction::RoleStore for WinRoleStore {
+    fn read_roles(&self) -> AppResult<HashMap<String, String>> {
+        RegistryManager::read_current_cursors()
+    }
+
+    fn write_roles(&self, values: &HashMap<String, String>) -> AppResult<()> {
+        use winreg::enums::*;
+        use winreg::RegKey;
+
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let cursors_key = hkcu
+            .open_subkey_with_flags("Control Panel\\Cursors", KEY_READ | KEY_WRITE)
+            .map_err(|e| AppError::Registry(format!("Cursors キーを開けません: {}", e)))?;
+
+        for (name, value) in values {
+            if let Err(e) = cursors_key.set_value(name, value) {
+                return Err(AppError::Registry(format!(
+                    "レジストリ書き込み失敗 ({}): {}",
+                    name, e
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    fn restore_roles(&self, values: &HashMap<String, String>) -> AppResult<()> {
+        RegistryManager::restore_from_snapshot_pub(values)
+    }
+
+    fn write_default_scheme_name(&self, name: &str) -> AppResult<()> {
+        use winreg::enums::*;
+        use winreg::RegKey;
+
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let cursors_key = hkcu
+            .open_subkey_with_flags("Control Panel\\Cursors", KEY_WRITE)
+            .map_err(|e| {
+                AppError::Registry(format!("Cursors キーを開けません (Default): {}", e))
+            })?;
+        cursors_key
+            .set_value("", &name)
+            .map_err(|e| AppError::Registry(format!("(Default) 値書込失敗: {}", e)))?;
+        Ok(())
+    }
+
+    fn notify(&self) -> AppResult<()> {
+        RegistryManager::notify_cursor_change_pub()
+    }
+}
+
 impl RegistryManager {
     /// 現在のカーソル設定をレジストリから読み取る
     #[cfg(windows)]
@@ -163,7 +222,7 @@ impl RegistryManager {
             write_values: &write_values,
             default_scheme_name: None,
         };
-        crate::registry::transaction::run_cursor_transaction(&spec)
+        crate::registry::transaction::run_cursor_transaction(&WinRoleStore, &spec)
     }
 
     /// 適用したテーマを `Control Panel\Cursors\Schemes\<scheme_name>` に登録する。
@@ -313,7 +372,7 @@ impl RegistryManager {
             write_values: &write_values,
             default_scheme_name: Some("Windows Default"),
         };
-        crate::registry::transaction::run_cursor_transaction(&spec)?;
+        crate::registry::transaction::run_cursor_transaction(&WinRoleStore, &spec)?;
         tracing::info!("Windows 既定カーソルにリセットしました");
         Ok(())
     }
@@ -871,7 +930,7 @@ impl RegistryManager {
             write_values: &snapshot.original_values,
             default_scheme_name: None,
         };
-        crate::registry::transaction::run_cursor_transaction(&spec)?;
+        crate::registry::transaction::run_cursor_transaction(&WinRoleStore, &spec)?;
         tracing::info!("初回スナップショットからカーソル設定を復元しました");
         Ok(())
     }
@@ -980,7 +1039,7 @@ impl RegistryManager {
             write_values: &empty,
             default_scheme_name: Some(&scheme.name),
         };
-        crate::registry::transaction::run_cursor_transaction(&spec)?;
+        crate::registry::transaction::run_cursor_transaction(&WinRoleStore, &spec)?;
         tracing::info!("Windows スキーム '{}' を適用しました", scheme.name);
         Ok(())
     }

@@ -81,20 +81,51 @@ pub struct TransactionSpec<'a> {
     pub default_scheme_name: Option<&'a str>,
 }
 
+/// transaction が必要とする原始操作。Windows 実装は `registry::WinRoleStore`、
+/// テストは `platform::memory::MemoryRoleStore`。
+pub(crate) trait RoleStore {
+    fn read_roles(&self) -> AppResult<HashMap<String, String>>;
+    /// 与えた値をそのまま書く。1 役割でも失敗したら即 Err (fail-fast; 旧 write_all_roles)。
+    fn write_roles(&self, values: &HashMap<String, String>) -> AppResult<()>;
+    /// 与えた値をできる限り書き、失敗を 1 つの Err に収集 (best-effort; 旧 restore_from_snapshot_pub)。
+    fn restore_roles(&self, values: &HashMap<String, String>) -> AppResult<()>;
+    fn write_default_scheme_name(&self, name: &str) -> AppResult<()>;
+    fn notify(&self) -> AppResult<()>;
+}
+
+/// 未指定役割を空文字 (= OS 既定継承) で埋めて 17 役割全部のマップにする (旧 write_all_roles の埋め処理)。
+pub(crate) fn fill_all_roles(write_values: &HashMap<String, String>) -> HashMap<String, String> {
+    let mut out = HashMap::with_capacity(17);
+    for role in crate::registry::CursorRole::all() {
+        let name = role.registry_name();
+        out.insert(
+            name.to_string(),
+            write_values.get(name).cloned().unwrap_or_default(),
+        );
+    }
+    out
+}
+
 /// 共通の transaction を実行する。
 ///
 /// 詳細はモジュール docstring の commit / rollback 契約を参照。
-pub fn run_cursor_transaction(spec: &TransactionSpec<'_>) -> AppResult<()> {
+///
+/// `pub(crate)` 止まりにする (`RoleStore` が `pub(crate)` のため。
+/// `private_interfaces` lint 対策。呼び出し側はすべて同一クレート内)。
+pub(crate) fn run_cursor_transaction(
+    store: &dyn RoleStore,
+    spec: &TransactionSpec<'_>,
+) -> AppResult<()> {
     match spec.mode {
-        TransactionMode::NormalTransactional => run_normal_transactional(spec),
-        TransactionMode::EmergencyBestEffort => run_emergency_best_effort(spec),
+        TransactionMode::NormalTransactional => run_normal_transactional(store, spec),
+        TransactionMode::EmergencyBestEffort => run_emergency_best_effort(store, spec),
     }
 }
 
 /// NormalTransactional: snapshot 保存 → mutation → notify → commit / rollback。
-fn run_normal_transactional(spec: &TransactionSpec<'_>) -> AppResult<()> {
+fn run_normal_transactional(store: &dyn RoleStore, spec: &TransactionSpec<'_>) -> AppResult<()> {
     // 1. 現在のレジストリ値を snapshot として保存。
-    let current_values = RegistryManager::read_current_cursors()?;
+    let current_values = store.read_roles()?;
     if let Err(e) = RegistryManager::save_pending_snapshot(&current_values, spec.theme_id) {
         // snapshot 失敗 → mutation 中止 (= ユーザーが元に戻れる手段が無い状態での
         // mutation は禁止)。
@@ -105,9 +136,9 @@ fn run_normal_transactional(spec: &TransactionSpec<'_>) -> AppResult<()> {
     }
 
     // 2. mutation。1 役割でも失敗したら snapshot から復元。
-    if let Err(e) = write_all_roles(spec.write_values) {
+    if let Err(e) = store.write_roles(&fill_all_roles(spec.write_values)) {
         tracing::error!("transaction mutation 失敗: {}", e);
-        match RegistryManager::restore_from_snapshot_pub(&current_values) {
+        match store.restore_roles(&current_values) {
             Ok(()) => tracing::info!("ロールバック成功: 適用前値へ復元"),
             Err(re) => {
                 tracing::error!("ロールバック失敗: {}", re);
@@ -125,9 +156,9 @@ fn run_normal_transactional(spec: &TransactionSpec<'_>) -> AppResult<()> {
     // 2b. (Default) 値 (= スキーム名) の書き換え (Some の場合のみ)。
     //     roles 書込が全て成功した後に走る。失敗時はロールバック。
     if let Some(name) = spec.default_scheme_name {
-        if let Err(e) = write_default_scheme_name(name) {
+        if let Err(e) = store.write_default_scheme_name(name) {
             tracing::error!("transaction (Default) 値書込失敗: {}", e);
-            match RegistryManager::restore_from_snapshot_pub(&current_values) {
+            match store.restore_roles(&current_values) {
                 Ok(()) => tracing::info!("ロールバック成功 (Default 値書込失敗)"),
                 Err(re) => {
                     tracing::error!("ロールバック失敗 (Default 値書込失敗): {}", re);
@@ -144,7 +175,7 @@ fn run_normal_transactional(spec: &TransactionSpec<'_>) -> AppResult<()> {
     }
 
     // 3. 即時反映 (SPI_SETCURSORS 等)。
-    if let Err(e) = RegistryManager::notify_cursor_change_pub() {
+    if let Err(e) = store.notify() {
         // SPI 失敗は mutation 自体は成功しているのでベストエフォート: snapshot は
         // 残す (= 次回起動で再試行 or Windows Default へリセット)。
         tracing::error!("transaction notify 失敗: {}", e);
@@ -173,7 +204,7 @@ fn run_normal_transactional(spec: &TransactionSpec<'_>) -> AppResult<()> {
 /// 「ユーザーが今すぐ確実に元に戻したい」が目的のため、snapshot 失敗を理由に
 /// mutation を止める = ユーザーが望む「即時リセット」を阻害する。緊急用途では
 /// 安全側 (= 続行) に倒す。
-fn run_emergency_best_effort(spec: &TransactionSpec<'_>) -> AppResult<()> {
+fn run_emergency_best_effort(store: &dyn RoleStore, spec: &TransactionSpec<'_>) -> AppResult<()> {
     let mut snapshot_committed = false;
     if let Err(e) = RegistryManager::save_pending_snapshot(&HashMap::new(), spec.theme_id) {
         tracing::warn!(
@@ -184,19 +215,19 @@ fn run_emergency_best_effort(spec: &TransactionSpec<'_>) -> AppResult<()> {
         snapshot_committed = true;
     }
 
-    let mutation_result = write_all_roles(spec.write_values);
+    let mutation_result = store.write_roles(&fill_all_roles(spec.write_values));
     if let Err(e) = &mutation_result {
         tracing::error!("emergency transaction: mutation 失敗 {}", e);
     }
 
     // (Default) 値書込 (Some の場合のみ)。
     if let Some(name) = spec.default_scheme_name {
-        if let Err(e) = write_default_scheme_name(name) {
+        if let Err(e) = store.write_default_scheme_name(name) {
             tracing::warn!("emergency transaction: (Default) 値書込失敗 {}", e);
         }
     }
 
-    if let Err(e) = RegistryManager::notify_cursor_change_pub() {
+    if let Err(e) = store.notify() {
         tracing::warn!("emergency transaction: notify 失敗 {}", e);
     }
 
@@ -207,65 +238,6 @@ fn run_emergency_best_effort(spec: &TransactionSpec<'_>) -> AppResult<()> {
     }
 
     mutation_result
-}
-
-/// 17 役割全部に値を書き込む。`write_values` 未登録の役割は空文字列 (= Windows 既定継承)。
-#[cfg(windows)]
-fn write_all_roles(write_values: &HashMap<String, String>) -> AppResult<()> {
-    use winreg::enums::*;
-    use winreg::RegKey;
-
-    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-    let cursors_key = hkcu
-        .open_subkey_with_flags("Control Panel\\Cursors", KEY_READ | KEY_WRITE)
-        .map_err(|e| AppError::Registry(format!("Cursors キーを開けません: {}", e)))?;
-
-    for role in crate::registry::CursorRole::all() {
-        let name = role.registry_name();
-        let value = write_values.get(name).cloned().unwrap_or_default();
-        if let Err(e) = cursors_key.set_value(name, &value) {
-            return Err(AppError::Registry(format!(
-                "レジストリ書き込み失敗 ({}): {}",
-                name, e
-            )));
-        }
-    }
-    Ok(())
-}
-
-// TODO(P03): UnsupportedPlatform
-#[cfg(not(windows))]
-fn write_all_roles(_write_values: &HashMap<String, String>) -> AppResult<()> {
-    Err(AppError::Registry(
-        "write_all_roles は Windows 専用です".to_string(),
-    ))
-}
-
-/// `Control Panel\Cursors\(Default)` (= スキーム名表示用) を書き込む.
-///
-/// reg 名は空文字 `""` で `set_value` を呼ぶと「既定値」が更新される
-/// (Windows の `RegSetValueEx` の `lpValue = NULL` 相当)。
-#[cfg(windows)]
-fn write_default_scheme_name(name: &str) -> AppResult<()> {
-    use winreg::enums::*;
-    use winreg::RegKey;
-
-    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-    let cursors_key = hkcu
-        .open_subkey_with_flags("Control Panel\\Cursors", KEY_WRITE)
-        .map_err(|e| AppError::Registry(format!("Cursors キーを開けません (Default): {}", e)))?;
-    cursors_key
-        .set_value("", &name)
-        .map_err(|e| AppError::Registry(format!("(Default) 値書込失敗: {}", e)))?;
-    Ok(())
-}
-
-// TODO(P03): UnsupportedPlatform
-#[cfg(not(windows))]
-fn write_default_scheme_name(_name: &str) -> AppResult<()> {
-    Err(AppError::Registry(
-        "write_default_scheme_name は Windows 専用です".to_string(),
-    ))
 }
 
 #[cfg(test)]
@@ -356,7 +328,8 @@ mod tests {
             write_values: &write_values,
             default_scheme_name: None,
         };
-        run_cursor_transaction(&spec).expect("NormalTransactional happy path");
+        run_cursor_transaction(&crate::registry::WinRoleStore, &spec)
+            .expect("NormalTransactional happy path");
 
         // 1 + 2
         let current = RegistryManager::read_current_cursors().unwrap();
@@ -424,7 +397,8 @@ mod tests {
             write_values: &write_values,
             default_scheme_name: Some("Windows Default"),
         };
-        run_cursor_transaction(&spec).expect("NormalTransactional with default_scheme_name");
+        run_cursor_transaction(&crate::registry::WinRoleStore, &spec)
+            .expect("NormalTransactional with default_scheme_name");
 
         // (Default) 値が指定値になっている (コントロールパネルでの現在スキーム表示)。
         let hkcu = winreg::RegKey::predef(winreg::enums::HKEY_CURRENT_USER);
@@ -482,7 +456,8 @@ mod tests {
         //     ゼロではない状態」と「失敗時のゼロ」の比較で異常検知する。
         // ここではまず「成功時に mutation が発生する」ことを保証 (= ゼロ不変条件が
         // 壊れていない = 失敗時のみ mutation が走らない) を確認する。
-        run_cursor_transaction(&spec).expect("空 write_values の正常終了");
+        run_cursor_transaction(&crate::registry::WinRoleStore, &spec)
+            .expect("空 write_values の正常終了");
 
         let current = RegistryManager::read_current_cursors().unwrap();
         // 全 17 役割が空文字列になっている (= transaction 経由で mutation が走った)。
