@@ -265,7 +265,10 @@ fn main() {
 
     // 孤児カーソル復旧: ~/.custom_cursors/<UUID>/ が手動削除されていた場合、
     // config の参照をクリアし、active なら Windows 既定へ戻す
-    match app_lib::theme::ThemeManager::cleanup_orphan_references(&config_manager) {
+    match app_lib::theme::ThemeManager::cleanup_orphan_references(
+        platform::default_backend().as_ref(),
+        &config_manager,
+    ) {
         Ok(true) => tracing::info!("孤児カーソル参照を復旧しました"),
         Ok(false) => tracing::debug!("孤児カーソル参照なし"),
         Err(e) => tracing::warn!("孤児カーソルチェックに失敗: {}", e),

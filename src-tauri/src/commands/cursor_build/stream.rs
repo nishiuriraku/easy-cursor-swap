@@ -114,8 +114,15 @@ pub async fn export_cursorpack_streamed(
     // 不要なので (Wave 2AB / Task 6 fix) そのまま move。drain 側は別途 1 度だけ clone
     // して所有権を分ける (= req clone / 余計な app clone を排除)。
     let app_for_drain = app.clone();
-    let worker_join =
-        tauri::async_runtime::spawn_blocking(move || run_export_blocking(app, req, sender));
+    let backend: crate::platform::SharedBackend = {
+        use tauri::Manager;
+        app.state::<crate::platform::SharedBackend>()
+            .inner()
+            .clone()
+    };
+    let worker_join = tauri::async_runtime::spawn_blocking(move || {
+        run_export_blocking(app, backend, req, sender)
+    });
 
     // 進捗ドレインタスク: receiver.recv() で channel から build-progress を取り出し、
     // Tauri emit でフロントへ配送する。sender が drop されると (worker 完了時)
@@ -148,6 +155,7 @@ pub async fn export_cursorpack_streamed(
 /// 作業は `run_export_inner` 側に集約される (testability のため)。
 fn run_export_blocking(
     app: tauri::AppHandle,
+    backend: crate::platform::SharedBackend,
     req: StreamedExportRequest,
     sender: ProgressSender,
 ) -> Result<ExportResult, AppError> {
@@ -161,7 +169,7 @@ fn run_export_blocking(
     // registry を move せず参照だけを move する `_job` の存命期間中は registry を借用中
     let registry_ref = &registry;
     let is_cancelled = move || registry_ref.is_cancelled(&build_id);
-    run_export_inner(req, &sender, is_cancelled)
+    run_export_inner(backend.as_ref(), req, &sender, is_cancelled)
 }
 
 /// 進捗チャネル + キャンセル判定 closure だけを受け取る純粋ワーカー本体。
@@ -174,6 +182,7 @@ fn run_export_blocking(
 /// カウンタや `Cell<bool>` など) を伴ったクロージャを渡せるようにしている。プロダクション
 /// 経路 (無キャプチャ || クロージャ) は Fn だが FnMut の境界に coerce 可能。
 fn run_export_inner(
+    backend: &dyn crate::platform::CursorBackend,
     req: StreamedExportRequest,
     sender: &ProgressSender,
     mut is_cancelled: impl FnMut() -> bool,
@@ -347,7 +356,7 @@ fn run_export_inner(
 
             // 2. apply_after = true なら適用も試みる。失敗しても Library 登録は成功扱い (部分成功)
             let (applied, apply_error) = if *apply_after {
-                match crate::theme::ThemeManager::apply_theme(imported_id) {
+                match crate::theme::ThemeManager::apply_theme(backend, imported_id) {
                     Ok(()) => {
                         tracing::info!("applied theme {} from creator", imported_id);
                         (true, None)
@@ -482,7 +491,12 @@ mod tests {
             sign: false,
         };
         let _ = || -> Result<ExportResult, crate::errors::AppError> {
-            run_export_inner(minimal, &tx, || false)
+            run_export_inner(
+                &crate::platform::memory::MemoryCursorBackend::default(),
+                minimal,
+                &tx,
+                || false,
+            )
         };
     }
 
@@ -612,7 +626,12 @@ mod tests {
         };
 
         // roles が空 → role ループはスキップされ package 段階のキャンセルに合流する
-        let result = run_export_inner(req, &tx, || true);
+        let result = run_export_inner(
+            &crate::platform::memory::MemoryCursorBackend::default(),
+            req,
+            &tx,
+            || true,
+        );
         assert!(
             result.is_err(),
             "expected Err when is_cancelled returns true at package stage"
@@ -664,11 +683,16 @@ mod tests {
             sign: false,
         };
         let mut first_check = true;
-        let result = run_export_inner(req, &tx, || {
-            // 最初のチェックポイントだけキャンセル要求を返す (std::mem::take で
-            // clippy::manual_take を回避しつつ意図を明示する)。
-            std::mem::take(&mut first_check)
-        });
+        let result = run_export_inner(
+            &crate::platform::memory::MemoryCursorBackend::default(),
+            req,
+            &tx,
+            || {
+                // 最初のチェックポイントだけキャンセル要求を返す (std::mem::take で
+                // clippy::manual_take を回避しつつ意図を明示する)。
+                std::mem::take(&mut first_check)
+            },
+        );
         assert!(result.is_err(), "expected cancellation error");
         drop(tx);
         let events = finish_drain(handle, collected);
@@ -716,7 +740,12 @@ mod tests {
             existing_theme_id: None,
             sign: false,
         };
-        let result = run_export_inner(req, &tx, || false);
+        let result = run_export_inner(
+            &crate::platform::memory::MemoryCursorBackend::default(),
+            req,
+            &tx,
+            || false,
+        );
         assert!(result.is_ok(), "normal path should succeed: {result:?}");
         drop(tx);
 
