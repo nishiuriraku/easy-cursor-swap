@@ -169,7 +169,41 @@ jobs:
         working-directory: src-tauri
         run: cargo test --lib platform::memory
 
-  # NOTE(P05): macOS の compile gate (macos-latest, cargo check --lib) は P05 spike で要否判断。
+  # -------------------------------------------------------------
+  # Rust 側 (macOS): Linux と同じく非 Windows スタブのコンパイルゲート。
+  # macOS ランナーに Tauri 追加の system dep は不要 (Xcode CLT 済み)。
+  # テスト実行・カバレッジは windows ジョブの責務。
+  # -------------------------------------------------------------
+  rust-check-macos:
+    name: Rust check (macos-latest, compile gate)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cargo cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: cargo check (lib + bins)
+        working-directory: src-tauri
+        run: cargo check --lib --bins
+
+      - name: cargo clippy (lib + bins, no tests)
+        working-directory: src-tauri
+        run: cargo clippy --lib --bins --no-deps -- -D warnings
+
+      - name: cargo test (platform memory backend only)
+        # transaction 契約を macOS 上で検証する。対象モジュール限定のため
+        # registry tests の Windows 限定ヘルパー問題に当たらない。
+        working-directory: src-tauri
+        run: cargo test --lib platform::memory
 
   # -------------------------------------------------------------
   # 依存監査: cargo audit (脆弱性のみ fail / unmaintained 警告は無視)
