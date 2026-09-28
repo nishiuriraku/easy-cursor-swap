@@ -510,13 +510,13 @@ pub fn open_url(url: String) -> Result<(), AppError> {
     #[cfg(windows)]
     {
         shell_execute_w(Some("open"), &url)?;
+        Ok(())
     }
     #[cfg(not(windows))]
     {
         let _ = url;
-        return Err(AppError::UnsupportedPlatform("open_url".to_string()));
+        Err(AppError::UnsupportedPlatform("open_url".to_string()))
     }
-    Ok(())
 }
 
 /// アクセシビリティ機能との競合を検出する。
@@ -625,11 +625,11 @@ pub fn open_log_folder() -> Result<(), AppError> {
     #[cfg(windows)]
     {
         shell_execute_w(None, &dir.to_string_lossy())?;
+        Ok(())
     }
     #[cfg(not(windows))]
     {
         let _ = dir;
-        return Err(AppError::UnsupportedPlatform("open_log_folder".to_string()));
+        Err(AppError::UnsupportedPlatform("open_log_folder".to_string()))
     }
-    Ok(())
 }

@@ -210,6 +210,7 @@ impl RegistryManager {
     /// Wave 1C: 内部実装を [`crate::registry::transaction::run_cursor_transaction`]
     /// に委譲する。snapshot → mutation → notify → commit / rollback の契約は
     /// transaction モジュール側で一元管理される。
+    #[cfg(windows)]
     pub fn apply_cursors(cursor_paths: &HashMap<String, PathBuf>) -> AppResult<()> {
         let entries = compute_apply_values(cursor_paths);
         let write_values: HashMap<String, String> = entries
@@ -223,6 +224,11 @@ impl RegistryManager {
             default_scheme_name: None,
         };
         crate::registry::transaction::run_cursor_transaction(&WinRoleStore, &spec)
+    }
+
+    #[cfg(not(windows))]
+    pub fn apply_cursors(_cursor_paths: &HashMap<String, PathBuf>) -> AppResult<()> {
+        Err(AppError::UnsupportedPlatform("apply_cursors".to_string()))
     }
 
     /// 適用したテーマを `Control Panel\Cursors\Schemes\<scheme_name>` に登録する。
@@ -357,6 +363,7 @@ impl RegistryManager {
     /// モードは `EmergencyBestEffort` (= snapshot 失敗を警告のみで続行)
     /// を維持し、緊急リセットの目的ならば安全側 (= 続行) に倒す方針を変えない。
     /// `(Default)` 値 (= スキーム名表示用) には "Windows Default" を書く。
+    #[cfg(windows)]
     pub fn reset_to_windows_default() -> AppResult<()> {
         // 17 役割すべてを空文字列にする (= Windows 既定継承)。
         // Wave 2AB Task 8 レビュー反映: 空 HashMap を渡すと transaction::write_all_roles
@@ -375,6 +382,13 @@ impl RegistryManager {
         crate::registry::transaction::run_cursor_transaction(&WinRoleStore, &spec)?;
         tracing::info!("Windows 既定カーソルにリセットしました");
         Ok(())
+    }
+
+    #[cfg(not(windows))]
+    pub fn reset_to_windows_default() -> AppResult<()> {
+        Err(AppError::UnsupportedPlatform(
+            "reset_to_windows_default".to_string(),
+        ))
     }
 
     /// スナップショットからレジストリを復元する (private ラッパー)。
@@ -915,6 +929,7 @@ impl RegistryManager {
     /// なので snapshot 保護 (= NormalTransactional) を適用する。
     /// `active_theme_id` クリアと `cursor-changed` 発火は呼び出し側
     /// (`commands::system::reset_with_cleanup`) で行う。
+    #[cfg(windows)]
     pub fn restore_from_initial_snapshot() -> AppResult<()> {
         let snapshot = snapshot::load_initial_snapshot()?;
         let spec = crate::registry::transaction::TransactionSpec {
@@ -926,6 +941,13 @@ impl RegistryManager {
         crate::registry::transaction::run_cursor_transaction(&WinRoleStore, &spec)?;
         tracing::info!("初回スナップショットからカーソル設定を復元しました");
         Ok(())
+    }
+
+    #[cfg(not(windows))]
+    pub fn restore_from_initial_snapshot() -> AppResult<()> {
+        Err(AppError::UnsupportedPlatform(
+            "restore_from_initial_snapshot".to_string(),
+        ))
     }
 
     /// `HKCU\Control Panel\Cursors\Schemes` に保存されたカーソルスキームを列挙する。
@@ -1013,6 +1035,7 @@ impl RegistryManager {
     /// transaction に分ける。17 役割書込が snapshot 保護込みで安全側に倒れた
     /// 後、`(Default)` 書込だけ別 transaction (NormalTransactional, default_scheme_name)
     /// で行う。
+    #[cfg(windows)]
     pub fn apply_windows_scheme(scheme: &WindowsScheme) -> AppResult<()> {
         let cursor_paths: HashMap<String, PathBuf> = scheme
             .cursor_paths
@@ -1035,6 +1058,13 @@ impl RegistryManager {
         crate::registry::transaction::run_cursor_transaction(&WinRoleStore, &spec)?;
         tracing::info!("Windows スキーム '{}' を適用しました", scheme.name);
         Ok(())
+    }
+
+    #[cfg(not(windows))]
+    pub fn apply_windows_scheme(_scheme: &WindowsScheme) -> AppResult<()> {
+        Err(AppError::UnsupportedPlatform(
+            "apply_windows_scheme".to_string(),
+        ))
     }
 }
 

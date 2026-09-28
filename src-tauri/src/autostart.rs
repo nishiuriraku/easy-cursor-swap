@@ -17,7 +17,9 @@
 //! 検出は `current_exe()` のパスに `\WindowsApps\` が含まれるかで簡易判定する
 //! (Microsoft が `GetCurrentPackageFullName` の前段スクリーニングとして例示する手法)。
 
-use crate::errors::{AppError, AppResult};
+#[cfg(windows)]
+use crate::errors::AppError;
+use crate::errors::AppResult;
 
 /// HKCU 配下の Run キー
 const RUN_KEY_PATH: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
