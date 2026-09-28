@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI: `actions/setup-node` を v4 → v7 に更新 (Node 24 ランタイム、`ci.yml` / `release.yml`) (#14)。
 - `winreg` 依存を `[target.'cfg(windows)'.dependencies]` に限定し、`accessibility.rs` / `registry/{mod,transaction}.rs` / `bin/apply_ani_verify.rs` に `cfg(not(windows))` スタブを追加。非 Windows でも `cargo check` が通るようになった (アプリの Windows 動作は無変更)。CI に `rust-check-linux` ジョブ (ubuntu-latest, `cargo check` + `clippy -D warnings`, lib + bins) を追加。
 - `config.rs` を `config/{schema,store,migrate,tests}.rs` に分割 (公開 API / 挙動 / 生成 TS 不変)。
+- レジストリ操作を `platform::CursorBackend` trait 境界の背後に移し、`Arc<dyn CursorBackend>` を Tauri State で注入。Windows 実装は従来の `RegistryManager` へ委譲し挙動は無変更。トランザクション契約 (snapshot → 書込 → commit / rollback) と起動時 leftover snapshot → Windows 既定リセットの不変条件をインメモリ backend で Linux 上でも単体テスト化。
 - Creator / 設定 / ライブラリ画面を責務単位の composable・コンポーネントに分割 (各ページ縮小、挙動不変)。共有 CSS を `assets/css/shared/*.css` に分割。
 
 ### Fixed

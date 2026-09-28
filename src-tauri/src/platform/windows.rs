@@ -53,3 +53,16 @@ impl CursorBackend for WindowsCursorBackend {
         AccessibilityConflicts::detect()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 委譲経路のカバレッジ用: 実レジストリ読み取りが 17 役割を返すこと。
+    #[test]
+    fn windows_backend_read_current_cursors_returns_17_roles() {
+        let backend = WindowsCursorBackend;
+        let map = backend.read_current_cursors().unwrap();
+        assert_eq!(map.len(), 17);
+    }
+}

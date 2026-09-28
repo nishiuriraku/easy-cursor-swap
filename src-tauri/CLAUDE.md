@@ -7,7 +7,7 @@ Crates: `windows`, `winreg`, `image`, `tracing`, `ed25519-dalek`, `tauri` v2.
 ## Architecture
 
 ```
-Vue (UI) ──invoke()──▶ Tauri command (commands/) ──▶ Rust module ──▶ Windows registry / FS
+Vue (UI) ──invoke()──▶ Tauri command (commands/) ──▶ platform::CursorBackend ──▶ registry/ ──▶ Windows registry / FS
 ```
 
 **Rust is the single source of truth.** All persistent app state lives here; the frontend reflects it via IPC.
@@ -21,7 +21,7 @@ Vue (UI) ──invoke()──▶ Tauri command (commands/) ──▶ Rust module
 | IPC surface     | `commands/` (sub-modules: `theme` / `cursor_build/` / `cursor_io` / `keystore` / `marketplace` / `marketplace_submit` / `profile` / `system` / `windows_scheme`)                                                                                                                   |
 | Config / state  | `config/` (`schema` 型 / `store` RwLock + atomic_write + `config.corrupt.*.json` quarantine / `migrate` schema_version / `v1` / `patch`, Source of Truth), `errors.rs`, `cancel_registry.rs` (shared cursorpack-build / bulk-import cancellation registry App state)                                                                          |
 | Cursor pipeline | `cursor/` (`image` / `cur_build` / `ico_cur` / `ani` / `ani_write`), `cursor_watcher.rs`                                                                                                                                                                                           |
-| Registry        | `registry/` (`mod` / `scheme` / `roles` / `env`)                                                                                                                                                                                                                                   |
+| Registry        | `registry/` (`mod` / `scheme` / `roles` / `env` / `snapshot` / `transaction`) + `platform/` (`CursorBackend` trait, `windows` / `noop` / `memory` 実装) |
 | Theme packages  | `theme/`, `bulk_import/`, `backup.rs` (`.cursorprofile`)                                                                                                                                                                                                                           |
 | Marketplace     | `marketplace.rs` (HTTP index fetch, SHA-256 + Ed25519 verify), `keystore.rs` (Ed25519 + DPAPI + `.cfkey` XChaCha20-Poly1305 + Argon2id)                                                                                                                                            |
 | Reliability     | `health.rs` (startup-failure counter + rollback), `crash.rs`                                                                                                                                                                                                                       |
@@ -37,6 +37,7 @@ Vue (UI) ──invoke()──▶ Tauri command (commands/) ──▶ Rust module
 - Errors propagate as `AppError`; IPC commands return `Result<T, AppError>`.
 - Prefer `RwLock` over `Mutex` when read-heavy (e.g. `config/store.rs`).
 - Use `tokio::task::spawn_blocking` for blocking I/O in async contexts (ZIP extraction, large file scans).
+- OS カーソル機構へは `State<'_, SharedBackend>` (`platform::CursorBackend`) 経由でのみ到達する。`RegistryManager` を commands / theme / main から直接呼ばない。
 
 ## Commands
 
@@ -62,7 +63,7 @@ cargo bench                                       # criterion benches in benches
 ## Hard rules (backend-side)
 
 - **HKCU only.** Never touch HKLM or anything that triggers UAC.
-- **Apply is transactional (2 recovery paths).** Snapshot to `~/.custom_cursors/_pending_apply.snapshot` before mutating; delete on success. In-process write failure rolls back to the pre-apply values via `restore_from_snapshot`. A leftover snapshot on startup means an interrupted apply (likely a crash) and the registry may be mixed, so recovery resets to **Windows default via `reset_to_windows_default` — not the pre-apply values** (intentional safety choice).
+- **Apply is transactional (2 recovery paths).** Snapshot to `~/.custom_cursors/_pending_apply.snapshot` before mutating; delete on success. In-process write failure rolls back to the pre-apply values via `restore_roles` (`RoleStore` seam in `registry::transaction`). A leftover snapshot on startup means an interrupted apply (likely a crash) and the registry may be mixed, so recovery resets to **Windows default via `platform::recover_pending_snapshot_on_startup` — not the pre-apply values** (intentional safety choice).
 - **PII redaction is mandatory.** Raw registry values and full SHA-256 must never appear in logs.
 - **Archive sanitisation.** Any unzip path must go through `theme::sanitize_archive_path` with the documented size limits (50 MB compressed / 200 MB expanded / 10 MB per image / 1 GB total).
 
