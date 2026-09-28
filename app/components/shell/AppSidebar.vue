@@ -77,6 +77,7 @@ function navigate(id: string) {
         :key="it.id"
         :class="['nav-item', { active: active === it.id }]"
         :aria-current="active === it.id ? 'page' : undefined"
+        :data-testid="`nav-${it.id}`"
         @click="navigate(it.id)"
       >
         <UiIcon :name="it.icon" aria-hidden="true" />
@@ -97,6 +98,7 @@ function navigate(id: string) {
         :key="it.id"
         :class="['nav-item', { active: active === it.id }]"
         :aria-current="active === it.id ? 'page' : undefined"
+        :data-testid="`nav-${it.id}`"
         @click="navigate(it.id)"
       >
         <UiIcon :name="it.icon" aria-hidden="true" />
@@ -109,6 +111,7 @@ function navigate(id: string) {
         class="panic"
         :aria-label="t('common.panic') + ' (Ctrl+Alt+Shift+R)'"
         title="Ctrl+Alt+Shift+R"
+        data-testid="panic-open"
         @click="emit('panic')"
       >
         <UiIcon name="Refresh" :size="14" aria-hidden="true" />

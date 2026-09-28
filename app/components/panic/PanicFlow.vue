@@ -158,6 +158,7 @@ function logMark(s: LogEntry['status']): string {
           <button
             type="button"
             :class="['stage-card', { selected: stage === 1 }]"
+            data-testid="panic-stage-1"
             @click="selectStage(1)"
           >
             <div class="stage-meta">
@@ -171,6 +172,7 @@ function logMark(s: LogEntry['status']): string {
           <button
             type="button"
             :class="['stage-card', { selected: stage === 2 }]"
+            data-testid="panic-stage-2"
             @click="selectStage(2)"
           >
             <div class="stage-meta">

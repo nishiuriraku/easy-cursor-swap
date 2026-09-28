@@ -1,0 +1,67 @@
+name: E2E (Windows, tauri-driver)
+
+# 初月は non-blocking (continue-on-error)。安定したら ci.yml の required に昇格する。
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'app/**'
+      - 'src-tauri/**'
+      - 'e2e/**'
+      - '.github/workflows/e2e.yml'
+  schedule:
+    - cron: '17 21 * * 1' # 毎週火曜 06:17 JST
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: WebdriverIO smoke (windows-latest)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    continue-on-error: true
+    env:
+      # ~/.custom_cursors を runner 上でも temp に隔離する (tauri-driver → app へ env が継承される)
+      CUSTOM_CURSORS_DIR_OVERRIDE: ${{ runner.temp }}\custom_cursors
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci --legacy-peer-deps
+
+      - name: Build debug app (no bundle)
+        run: npm run tauri build -- --debug --no-bundle
+
+      - name: Install tauri-driver
+        run: cargo install tauri-driver --locked
+
+      - name: Download msedgedriver matching installed Edge
+        shell: pwsh
+        run: |
+          $ver = (Get-ItemProperty 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062}').pv
+          Write-Host "Edge $ver"
+          $zip = "$env:RUNNER_TEMP\edgedriver.zip"
+          Invoke-WebRequest "https://msedgedriver.microsoft.com/$ver/edgedriver_win64.zip" -OutFile $zip
+          Expand-Archive $zip -DestinationPath "$env:RUNNER_TEMP\edgedriver" -Force
+          "MSEDGEDRIVER_PATH=$env:RUNNER_TEMP\edgedriver\msedgedriver.exe" | Out-File $env:GITHUB_ENV -Append
+
+      - name: Run E2E
+        run: npm run e2e
+
+      - name: Upload wdio logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-logs
+          path: |
+            e2e/logs/**
+            ${{ runner.temp }}\custom_cursors\**\*.log
+          if-no-files-found: ignore
