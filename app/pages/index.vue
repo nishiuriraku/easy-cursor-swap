@@ -16,14 +16,7 @@ import type { IpcWindowsScheme } from '~/composables/useWindowsSchemes'
 const { t, locale } = useI18n()
 // UiIcon / ThemeCard / ApplyModal は Nuxt の自動インポートで解決される。
 
-type FilterChip = 'all' | 'favorites' | 'recent'
-/** 並び替えキー。
- *  - `updated` / `name` / `applied`: グリッド・一覧表示の両方で使う既存キー
- *  - `coverage` / `size`: 一覧表示のヘッダクリック用に追加
- *  なお Q2 で「sortKey/sortDir はグリッドと一覧で共有」と決定したため、
- *  グリッド側のソート巡回ボタンも増えたキーを順番に巡回する。 */
-type SortKey = 'name' | 'updated' | 'applied' | 'coverage' | 'size'
-type SortDir = 'asc' | 'desc'
+import type { FilterChip, SortDir, SortKey } from './index.helpers'
 
 const themes = ref<ThemeCardData[]>([])
 const searchQuery = ref('')
@@ -46,94 +39,66 @@ const applyError = ref<string | null>(null)
 // 該当ボタンにスピナーを出し、実行中はグループを無効化する。
 const detailBusyAction = ref<'edit' | 'export' | 'duplicate' | 'delete' | null>(null)
 
-// 詳細モーダル制御。モーダルは画面に同時に 1 つしか出さない。
-const detailTheme = ref<ThemeCardData | null>(null)
-const detailPreviewMap = ref<Record<string, string> | null>(null)
-const detailPreviewDetails = ref<Record<
-  string,
-  import('~/composables/useThemePreviews').RolePreviewDetail
-> | null>(null)
-const themePreviewCache = useThemePreviews()
+// 詳細モーダル操作 (P08a L2: useThemeDetailActions に集約)。
+const {
+  detailTheme,
+  detailPreviewMap,
+  detailPreviewDetails,
+  detailBusyAction,
+  showDetails,
+  closeDetails,
+  applyFromDetail,
+  editInCreator,
+  duplicateTheme,
+  exportTheme,
+  deleteTheme,
+} = useThemeDetailActions({
+  themes,
+  reload: () => loadThemes(),
+  setError: (msg) => {
+    applyError.value = msg
+  },
+  requestApply,
+  t,
+})
 // Theme mutation IPC は useThemes に集約 (audit B8-SIZE-001)。
 // `themes` ref と `refresh` は本ページが自前管理する `loadThemes()` を使い続けるため、
 // メソッドだけ取り出す。
-const {
-  applyTheme: applyThemeIpc,
-  setFavorite: setFavoriteIpc,
-  repackageTheme: repackageThemeIpc,
-  duplicateTheme: duplicateThemeIpc,
-  deleteTheme: deleteThemeIpc,
-  inspectCursorpack: inspectCursorpackIpc,
-  importCursorpack: importCursorpackIpc,
-} = useThemes()
-const { listSchemes, applyScheme, exportSchemeAsCursorpack } = useWindowsSchemes()
+const { applyTheme: applyThemeIpc, setFavorite: setFavoriteIpc } = useThemes()
+const { listSchemes, applyScheme } = useWindowsSchemes()
 
-// インポート衝突ダイアログ用
-interface ConflictPending {
-  path: string
-  info: {
-    id: string
-    name: string
-    version: string
-    author: string | null
-    roleCount: number
-    existing: {
-      name: string
-      version: string
-      author: string | null
-      roleCount: number
-    }
-  }
-}
-const conflictDialog = ref<ConflictPending | null>(null)
-
-// --- フィルタ・ソート ---
-const filteredThemes = computed(() => {
-  let result = [...themes.value]
-
-  if (searchQuery.value.trim()) {
-    const q = searchQuery.value.toLowerCase()
-    result = result.filter(
-      (t) => t.name.toLowerCase().includes(q) || (t.author?.toLowerCase().includes(q) ?? false),
-    )
-  }
-
-  if (filter.value === 'favorites') result = result.filter((tt) => tt.isFavorite)
-  else if (filter.value === 'recent')
-    result = result.filter((tt) => Boolean(tt.lastAppliedAt) || tt.applyCount > 0)
-
-  // Q2: sortKey/sortDir はグリッドと一覧で共有。sortDir で昇降を切替。
-  const dirSign = sortDir.value === 'asc' ? 1 : -1
-  result.sort((a, b) => {
-    let cmp = 0
-    switch (sortKey.value) {
-      case 'name':
-        cmp = a.name.localeCompare(b.name, 'ja')
-        break
-      case 'updated':
-        cmp = a.date.localeCompare(b.date)
-        break
-      case 'applied':
-        cmp = a.applyCount - b.applyCount
-        break
-      case 'coverage':
-        cmp = a.includedRoles.length - b.includedRoles.length
-        break
-      case 'size':
-        cmp = (a.sizeBytes ?? 0) - (b.sizeBytes ?? 0)
-        break
-    }
-    return dirSign * cmp
+// インポートフロー (P08a L3: useLibraryImportFlow に集約)。
+const { importBusy, conflictDialog, importByPath, confirmConflictOverwrite, openImportDialog } =
+  useLibraryImportFlow({
+    reload: () => loadThemes(),
+    setError: (msg) => {
+      applyError.value = msg
+    },
+    notifyImported: (id) => {
+      const imported = themes.value.find((t) => t.id === id)
+      void notify({
+        title: 'EasyCursorSwap',
+        body: imported
+          ? t('library.notifyImported', { name: imported.name })
+          : t('library.notifyImportedFallback'),
+        level: 'success',
+      })
+    },
+    t,
   })
 
-  return result
-})
-
-const counts = computed(() => ({
-  all: themes.value.length,
-  favorites: themes.value.filter((tt) => tt.isFavorite).length,
-  recent: themes.value.filter((tt) => Boolean(tt.lastAppliedAt) || tt.applyCount > 0).length,
-}))
+// フィルタ・ソート (P08a L1: useLibraryFilterSort に集約)。
+const {
+  searchQuery,
+  filter,
+  sortKey,
+  sortDir,
+  filteredThemes,
+  counts,
+  sortLabel,
+  cycleSort,
+  sortBy,
+} = useLibraryFilterSort({ themes, t })
 
 // `useAppSettings` はグローバルシングルトン。Settings 画面で更新されると自動追従する。
 const appSettings = useAppSettings()
@@ -215,158 +180,6 @@ async function toggleFavorite(id: string) {
  * モーダルが共有されているのでプレビューマップは開いた瞬間にロードする。
  * `useThemePreviews` 側で IPC 結果がキャッシュされているので 2 回目以降は即時表示。
  */
-async function showDetails(id: string) {
-  const found = themes.value.find((tt) => tt.id === id)
-  if (!found) return
-  detailTheme.value = found
-  detailPreviewMap.value = null
-  detailPreviewDetails.value = null
-  // Windows システムスキームには ID が `windows:` プレフィックス付きでローカルテーマ
-  // のキャッシュキーと衝突しないので、そのまま渡す。実体取得が無い場合は null のまま。
-  // url 取得と詳細取得は同じキャッシュエントリを再利用する (in-flight 共有)。
-  try {
-    const [map, details] = await Promise.all([
-      themePreviewCache.getMap(id),
-      themePreviewCache.getDetails(id),
-    ])
-    detailPreviewMap.value = map
-    detailPreviewDetails.value = details
-  } catch (err) {
-    console.warn('[Library] preview load for detail failed:', err)
-  }
-}
-
-function closeDetails() {
-  detailTheme.value = null
-  detailPreviewMap.value = null
-  detailPreviewDetails.value = null
-}
-
-/** 詳細モーダルから「適用」を選んだとき。確認モーダル経由で apply を実行する。 */
-function applyFromDetail(id: string) {
-  closeDetails()
-  requestApply(id)
-}
-
-/**
- * 詳細モーダルからの「Creator で編集」。テーマを再パッケージして一時ファイル化し、
- * Creator の bulk import 経路で開く。一時ファイルは Rust 側 (tempdir) ではなく
- * OS の TEMP に書き出し、Nuxt から `parse_cursorpack_for_creator` で読み込む。
- */
-async function editInCreator(id: string) {
-  detailBusyAction.value = 'edit'
-  try {
-    const { tempDir, sep } = await import('@tauri-apps/api/path')
-    const dir = await tempDir()
-    const tempPath = `${dir}${sep()}_easycursorswap_edit_${Date.now()}.cursorpack`
-    await repackageThemeIpc(id, tempPath)
-    closeDetails()
-    // Creator ページに遷移し、ロード対象のパスをクエリで渡す。Creator 側で
-    // `editThemePath` クエリを拾って parse_cursorpack_for_creator を呼ぶ。
-    await navigateTo({ path: '/creator', query: { editPath: tempPath } })
-  } catch (err) {
-    applyError.value = t('library.errEditModeTransition', {
-      detail: err instanceof Error ? err.message : String(err),
-    })
-  } finally {
-    detailBusyAction.value = null
-  }
-}
-
-/** 詳細モーダルからの「複製」。`duplicate_theme` IPC で新 UUID を作りリロードする。 */
-async function duplicateTheme(id: string) {
-  detailBusyAction.value = 'duplicate'
-  try {
-    await duplicateThemeIpc(id)
-    closeDetails()
-    await loadThemes()
-    void notify({
-      title: 'EasyCursorSwap',
-      body: t('library.notifyDuplicated', {
-        name: themes.value.find((tt) => tt.id === id)?.name ?? t('library.fallbackThemeName'),
-      }),
-      level: 'success',
-    })
-  } catch (err) {
-    applyError.value = t('library.errDuplicate', {
-      detail: err instanceof Error ? err.message : String(err),
-    })
-  } finally {
-    detailBusyAction.value = null
-  }
-}
-
-/** 詳細モーダルからの「エクスポート」。`repackage_theme` で .cursorpack を保存する。 */
-async function exportTheme(id: string) {
-  try {
-    const target = themes.value.find((tt) => tt.id === id)
-    if (!target) return
-    const { save } = await import('@tauri-apps/plugin-dialog')
-    const safeName = target.name.replace(/[^\p{L}\p{N}_-]+/gu, '_').slice(0, 64) || 'theme'
-    const outputPath = await save({
-      defaultPath: `${safeName}.cursorpack`,
-      filters: [{ name: 'Cursor Pack', extensions: ['cursorpack'] }],
-    })
-    if (!outputPath) return
-    detailBusyAction.value = 'export'
-    let bytes: number | null = null
-    if (target.kind === 'system') {
-      // Windows レジストリスキームはローカルテーマディレクトリを持たないので
-      // 専用の export_windows_scheme_as_cursorpack を経由する。`%SystemRoot%`
-      // 配下の .cur / .ani をそのまま zip 化する設計。
-      bytes = await exportSchemeAsCursorpack(target.name, outputPath)
-    } else {
-      bytes = await repackageThemeIpc(id, outputPath)
-    }
-    void notify({
-      title: 'EasyCursorSwap',
-      body: t('library.notifyExported', {
-        name: target.name,
-        bytes: bytes ?? t('library.bytesUnknown'),
-      }),
-      level: 'success',
-    })
-  } catch (err) {
-    applyError.value = t('library.errExport', {
-      detail: err instanceof Error ? err.message : String(err),
-    })
-  } finally {
-    detailBusyAction.value = null
-  }
-}
-
-/** 詳細モーダルからの「削除」。確認ダイアログを挟んでから `delete_theme` を実行。 */
-async function deleteTheme(id: string) {
-  const target = themes.value.find((tt) => tt.id === id)
-  if (!target) return
-  // UI で削除ボタンを disabled にしているが、IPC 直叩きや競合状態 (削除直前に
-  // 別経路で apply されたケース) を防ぐため二重チェック。
-  if (target.isActive) {
-    applyError.value = t('library.errDeleteActive')
-    return
-  }
-  // ネイティブ confirm はテストしづらいが Tauri WebView では機能するので暫定使用。
-  // 将来的には専用の確認モーダルに置き換える。
-  const ok = window.confirm(t('library.confirmDeleteMsg', { name: target.name }))
-  if (!ok) return
-  detailBusyAction.value = 'delete'
-  try {
-    await deleteThemeIpc(id)
-    closeDetails()
-    await loadThemes()
-    void notify({
-      title: 'EasyCursorSwap',
-      body: t('library.notifyDeleted', { name: target.name }),
-      level: 'info',
-    })
-  } catch (err) {
-    applyError.value = t('library.errDelete', {
-      detail: err instanceof Error ? err.message : String(err),
-    })
-  } finally {
-    detailBusyAction.value = null
-  }
-}
 
 // Tauri v2 ウィンドウドラッグ&ドロップ (P08a: useTauriFileDrop に集約)。
 // `.cursorpack` のみ受理し、Explorer からの取込は既存 importByPath フローへ。
@@ -383,157 +196,6 @@ const {
     applyError.value = t('library.importNotPack')
   },
 })
-
-async function importByPath(path: string) {
-  importBusy.value = true
-  try {
-    // まず軽量検査して既存テーマと衝突するか確認
-    const inspection = await inspectCursorpackIpc(path)
-    if (inspection?.existing) {
-      conflictDialog.value = {
-        path,
-        info: {
-          id: inspection.id,
-          name: inspection.name,
-          version: inspection.version,
-          author: inspection.author,
-          roleCount: inspection.role_count,
-          existing: {
-            name: inspection.existing.name,
-            version: inspection.existing.version,
-            author: inspection.existing.author,
-            roleCount: inspection.existing.role_count,
-          },
-        },
-      }
-      return
-    }
-    await actuallyImport(path)
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    applyError.value = t('library.errImport', { detail: msg })
-    console.error('[Library] import failed:', err)
-  } finally {
-    importBusy.value = false
-  }
-}
-
-async function actuallyImport(path: string) {
-  const id = await importCursorpackIpc(path)
-  if (id) {
-    console.info('[Library] imported', id, 'from', path)
-    await loadThemes()
-    const imported = themes.value.find((t) => t.id === id)
-    void notify({
-      title: 'EasyCursorSwap',
-      body: imported
-        ? t('library.notifyImported', { name: imported.name })
-        : t('library.notifyImportedFallback'),
-      level: 'success',
-    })
-  }
-}
-
-async function confirmConflictOverwrite() {
-  const pending = conflictDialog.value
-  if (!pending) return
-  conflictDialog.value = null
-  importBusy.value = true
-  try {
-    await actuallyImport(pending.path)
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    applyError.value = t('library.errImport', { detail: msg })
-  } finally {
-    importBusy.value = false
-  }
-}
-
-async function openImportDialog() {
-  try {
-    const { open } = await import('@tauri-apps/plugin-dialog')
-    const selected = await open({
-      multiple: true,
-      filters: [{ name: 'Cursor Pack', extensions: ['cursorpack'] }],
-    })
-    if (!selected) return
-    const paths = Array.isArray(selected) ? selected : [selected]
-    for (const p of paths) await importByPath(p)
-  } catch (err) {
-    console.warn('[Library] dialog unavailable:', err)
-  }
-}
-
-const sortLabel = computed(() => {
-  const map: Record<SortKey, string> = {
-    name: t('library.sortName'),
-    updated: t('library.sortUpdated'),
-    applied: t('library.sortApplied'),
-    coverage: t('library.colCoverage'),
-    size: t('library.colSize'),
-  }
-  return map[sortKey.value]
-})
-
-/** グリッド側のソートボタン: 主要 3 キーを巡回。新キー (coverage/size) は
- *  一覧側の列ヘッダクリックでのみ立てる。グリッド表示中に列ヘッダで coverage 等を
- *  選んでも、ボタン押下で巡回するときは元の 3 キーに戻る挙動。 */
-function cycleSort() {
-  const order: SortKey[] = ['updated', 'name', 'applied']
-  const idx = order.indexOf(sortKey.value)
-  sortKey.value = order[(idx + 1) % order.length]!
-  sortDir.value = 'desc'
-}
-
-/** 一覧表示の列ヘッダクリック: 同じキーなら方向トグル、別キーなら desc から開始。 */
-function sortBy(key: SortKey) {
-  if (sortKey.value === key) {
-    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
-  } else {
-    sortKey.value = key
-    sortDir.value = 'desc'
-  }
-}
-
-/**
- * Windows レジストリのスキームを ThemeCardData に変換する。
- *
- * - id は `windows:<name>` のプレフィックスでローカルテーマと衝突を避ける
- * - kind: 'system' を立てて UI 側でバッジ・編集不可表示に切り替える
- * - included_roles は cursor_paths のキー (空でないもの) を使う
- * - active 判定は Rust 側の `paths_match_current_registry` の結果 (`is_active`)
- *   をそのまま採用する。フロントで再判定すると IPC 往復が増えるため。
- */
-function mapWindowsSchemeToCard(s: IpcWindowsScheme): ThemeCardData {
-  const includedRoles = Object.entries(s.cursor_paths)
-    .filter(([, path]) => path.length > 0)
-    .map(([role]) => role)
-  return {
-    id: `windows:${s.name}`,
-    name: s.name,
-    author: 'Windows',
-    version: '—',
-    date: '',
-    applyCount: 0,
-    isFavorite: false,
-    isActive: s.is_active === true,
-    includedRoles,
-    kind: 'system',
-    // Windows システムスキームに付随しない情報。一覧表示では tags = []、
-    // sizeBytes = undefined ('—' 表示)、signed = false として扱う。
-    // signed=false の理由: Marketplace の Ed25519 検証済テーマ (= "公式" バッジ) と
-    // OS 提供スキームは別概念。Windows のものは「信頼できる」が「公式インデックス由来」では
-    // ないため、ThemeDetailDrawer の「公式」ピルを点灯させない。
-    tags: [],
-    sizeBytes: undefined,
-    signed: false,
-    lastAppliedAt: null,
-    description: null,
-    schemaVersion: undefined,
-    license: null,
-    homepage: null,
-  }
-}
 
 /**
  * テーマ一覧をリロードする。
@@ -580,55 +242,17 @@ async function loadThemes(opts: { silent?: boolean } = {}) {
   }
 }
 
-// 外部カーソル変更検知 — Rust 側で SPI_SETCURSORS を購読し、変更があれば UI 更新
-let unlistenCursorChange: (() => void) | null = null
-async function setupCursorChangeListener() {
-  try {
-    const { listen } = await import('@tauri-apps/api/event')
-    unlistenCursorChange = await listen('cursor-changed', () => {
-      console.info('[Library] cursor-changed event received → reload')
-      // 元アクティブテーマは Creator overwrite + apply 経路で再生成された可能性が高い。
-      // useCreatorExport 側の invalidate を A 経路としつつ、外部 apply / panic restore
-      // など Creator を経由しない経路の取りこぼし対策として B 経路でも invalidate を打つ。
-      const previouslyActiveId = themes.value.find((t) => t.isActive)?.id
-      if (previouslyActiveId) themePreviewCache.invalidate(previouslyActiveId)
-      void loadThemes()
-    })
-  } catch (err) {
-    console.warn('[Library] cursor-changed listener unavailable:', err)
-  }
-}
-
-/**
- * 「テーマ状態が変わったかも」というシグナルを 3 経路から拾う。
- *
- * 1. `easycs:cursors-changed` (DOM CustomEvent): default.vue の PanicFlow done フック
- *    と同じウィンドウから dispatch される。Tauri の listen に依らない確実経路。
- * 2. `focus` (window): 別ウィンドウやコントロールパネルでカーソルを変更後に
- *    EasyCursorSwap へ戻ってきたタイミング。
- * 3. `visibilitychange` (document): タブ非表示 → 表示時。focus と相補。
- *
- * いずれもデバウンスせずそのまま `loadThemes` を呼ぶ。`get_themes` 自体が
- * in-flight 共有しているので連発しても安全。
- */
-function onExternalCursorsMaybeChanged() {
-  void loadThemes()
-}
-function onWindowFocus() {
-  void loadThemes()
-}
-function onVisibilityChange() {
-  if (typeof document === 'undefined') return
-  if (document.visibilityState === 'visible') void loadThemes()
-}
-
-// locale 切替時にカードタイトル / 説明を現在のロケールで再解決する。
-// `loadThemes()` は IPC fetch を含むが get_themes 自体がローカル FS 走査で
-// 軽量、かつ in-flight 共有もあるので silent モードで呼んで OK。
-watch(locale, () => {
-  void loadThemes({ silent: true })
+// 再読込シグナル購読 (P08a L6: useLibraryRefreshSignals に集約)。
+// プレビューキャッシュの invalidate は B 経路 (Creator を経由しない外部変更用)。
+const themePreviewCache = useThemePreviews()
+useLibraryRefreshSignals({
+  reload: (opts) => loadThemes(opts),
+  onBeforeReload: () => {
+    const previouslyActiveId = themes.value.find((t) => t.isActive)?.id
+    if (previouslyActiveId) themePreviewCache.invalidate(previouslyActiveId)
+  },
+  locale,
 })
-
 // Explorer から渡された .cursorpack を受け取り、既存の importByPath フローに流す。
 const cursorpackOpener = useCursorpackOpener((path) => {
   void importByPath(path)
@@ -637,14 +261,6 @@ const cursorpackOpener = useCursorpackOpener((path) => {
 onMounted(async () => {
   await loadThemes()
   await startFileDrop()
-  await setupCursorChangeListener()
-  if (typeof window !== 'undefined') {
-    window.addEventListener('easycs:cursors-changed', onExternalCursorsMaybeChanged)
-    window.addEventListener('focus', onWindowFocus)
-  }
-  if (typeof document !== 'undefined') {
-    document.addEventListener('visibilitychange', onVisibilityChange)
-  }
   // appSettings は本ページ起動時に常時必要 (active_theme_id 等)。初回ロードのみ取りに行く。
   // 既に Settings 画面などで取得済みならキャッシュが返る。
   await appSettings.load().catch(() => null)
@@ -655,17 +271,6 @@ onMounted(async () => {
 onUnmounted(() => {
   void cursorpackOpener.stop()
   stopFileDrop()
-  if (unlistenCursorChange) {
-    unlistenCursorChange()
-    unlistenCursorChange = null
-  }
-  if (typeof window !== 'undefined') {
-    window.removeEventListener('easycs:cursors-changed', onExternalCursorsMaybeChanged)
-    window.removeEventListener('focus', onWindowFocus)
-  }
-  if (typeof document !== 'undefined') {
-    document.removeEventListener('visibilitychange', onVisibilityChange)
-  }
 })
 </script>
 
@@ -749,59 +354,7 @@ onUnmounted(() => {
 
       <!-- テーマ一覧 (Phase 5-3 / design/library-list.jsx) -->
       <div v-else class="lib-table" role="table" :aria-label="t('library.title')">
-        <div class="lib-row lib-head" role="row">
-          <div class="lt-col lt-fav" role="columnheader" />
-          <div class="lt-col lt-preview" role="columnheader">{{ t('library.colPreview') }}</div>
-          <div
-            :class="['lt-col', 'lt-name', 'lt-sortable', { active: sortKey === 'name' }]"
-            role="columnheader"
-            :aria-sort="
-              sortKey === 'name' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'
-            "
-            tabindex="0"
-            @click="sortBy('name')"
-            @keydown.enter.prevent="sortBy('name')"
-            @keydown.space.prevent="sortBy('name')"
-          >
-            {{ t('library.colNameAuthor') }}
-            <span v-if="sortKey === 'name'" class="sort-dir">{{
-              sortDir === 'asc' ? '↑' : '↓'
-            }}</span>
-          </div>
-          <div class="lt-col lt-ver" role="columnheader">{{ t('library.colVersion') }}</div>
-          <div
-            :class="['lt-col', 'lt-date', 'lt-sortable', { active: sortKey === 'updated' }]"
-            role="columnheader"
-            :aria-sort="
-              sortKey === 'updated' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'
-            "
-            tabindex="0"
-            @click="sortBy('updated')"
-            @keydown.enter.prevent="sortBy('updated')"
-            @keydown.space.prevent="sortBy('updated')"
-          >
-            {{ t('library.colUpdated') }}
-            <span v-if="sortKey === 'updated'" class="sort-dir">{{
-              sortDir === 'asc' ? '↑' : '↓'
-            }}</span>
-          </div>
-          <div
-            :class="['lt-col', 'lt-size', 'lt-sortable', { active: sortKey === 'size' }]"
-            role="columnheader"
-            :aria-sort="
-              sortKey === 'size' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'
-            "
-            tabindex="0"
-            @click="sortBy('size')"
-            @keydown.enter.prevent="sortBy('size')"
-            @keydown.space.prevent="sortBy('size')"
-          >
-            {{ t('library.colSize') }}
-            <span v-if="sortKey === 'size'" class="sort-dir">{{
-              sortDir === 'asc' ? '↑' : '↓'
-            }}</span>
-          </div>
-        </div>
+        <LibraryListHeader :sort-key="sortKey" :sort-dir="sortDir" @sort="sortBy" />
 
         <ThemeRow
           v-for="theme in filteredThemes"
