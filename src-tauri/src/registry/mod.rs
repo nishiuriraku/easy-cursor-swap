@@ -32,7 +32,8 @@ use crate::config::ConfigManager; // list_windows_schemes のみ
 use crate::errors::{AppError, AppResult};
 #[cfg(windows)]
 use env::encode_utf16_with_nul; // register_scheme のみ
-use scheme::compute_apply_values; // apply_cursors (両 OS)
+#[cfg(windows)]
+use scheme::compute_apply_values; // apply_cursors (Windows のみ)
 #[cfg(windows)]
 use scheme::{build_scheme_value, parse_scheme_value, sanitize_scheme_name, scheme_is_app_managed};
 use std::collections::HashMap;
@@ -533,6 +534,7 @@ impl RegistryManager {
     }
 
     #[cfg(not(windows))]
+    #[allow(dead_code)] // 呼び出し元が Windows 限定のため Linux では未使用
     fn notify_cursor_change() -> AppResult<()> {
         Self::notify_cursor_change_pub()
     }

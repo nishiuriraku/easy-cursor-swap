@@ -161,6 +161,7 @@ fn read_cursor_base_size() -> u32 {
 /// `CursorSize=1 + CursorBaseSize=80` (アプリで 80px 設定後) のような並存ケースは
 /// **正常状態**であり、CursorBaseSize を信頼するのが正しい。v1 では slider=1 でも
 /// Accessibility 優先で 32px に戻っていたため、アプリ slider の round-trip が壊れていた。
+#[allow(dead_code)] // 呼び出し元が Windows 限定のため Linux ビルドでは未使用 (テストは使用)
 fn resolve_cursor_base_size(
     accessibility_slider: Option<u32>,
     cursor_base_size: Option<u32>,

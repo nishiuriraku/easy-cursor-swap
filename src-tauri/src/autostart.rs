@@ -22,9 +22,11 @@ use crate::errors::AppError;
 use crate::errors::AppResult;
 
 /// HKCU 配下の Run キー
+#[cfg(windows)]
 const RUN_KEY_PATH: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
 
 /// レジストリに登録する値名 (= アプリ表示名)
+#[cfg(windows)]
 const APP_VALUE_NAME: &str = "EasyCursorSwap";
 
 /// MSIX パッケージ環境で実行されているかを判定する。

@@ -83,6 +83,7 @@ pub struct TransactionSpec<'a> {
 
 /// transaction が必要とする原始操作。Windows 実装は `registry::WinRoleStore`、
 /// テストは `platform::memory::MemoryRoleStore`。
+#[allow(dead_code)] // Linux check ビルドでは本体呼び出し元が無くなる (memory テストは使用)
 pub(crate) trait RoleStore {
     fn read_roles(&self) -> AppResult<HashMap<String, String>>;
     /// 与えた値をそのまま書く。1 役割でも失敗したら即 Err (fail-fast; 旧 write_all_roles)。
@@ -94,6 +95,7 @@ pub(crate) trait RoleStore {
 }
 
 /// 未指定役割を空文字 (= OS 既定継承) で埋めて 17 役割全部のマップにする (旧 write_all_roles の埋め処理)。
+#[allow(dead_code)] // Linux check ビルドでは本体呼び出し元が無くなる (memory テストは使用)
 pub(crate) fn fill_all_roles(write_values: &HashMap<String, String>) -> HashMap<String, String> {
     let mut out = HashMap::with_capacity(17);
     for role in crate::registry::CursorRole::all() {
@@ -112,6 +114,7 @@ pub(crate) fn fill_all_roles(write_values: &HashMap<String, String>) -> HashMap<
 ///
 /// `pub(crate)` 止まりにする (`RoleStore` が `pub(crate)` のため。
 /// `private_interfaces` lint 対策。呼び出し側はすべて同一クレート内)。
+#[allow(dead_code)] // Linux check ビルドでは本体呼び出し元が無くなる (memory テストは使用)
 pub(crate) fn run_cursor_transaction(
     store: &dyn RoleStore,
     spec: &TransactionSpec<'_>,
@@ -123,6 +126,7 @@ pub(crate) fn run_cursor_transaction(
 }
 
 /// NormalTransactional: snapshot 保存 → mutation → notify → commit / rollback。
+#[allow(dead_code)] // Linux check ビルドでは本体呼び出し元が無くなる (memory テストは使用)
 fn run_normal_transactional(store: &dyn RoleStore, spec: &TransactionSpec<'_>) -> AppResult<()> {
     // 1. 現在のレジストリ値を snapshot として保存。
     let current_values = store.read_roles()?;
@@ -204,6 +208,7 @@ fn run_normal_transactional(store: &dyn RoleStore, spec: &TransactionSpec<'_>) -
 /// 「ユーザーが今すぐ確実に元に戻したい」が目的のため、snapshot 失敗を理由に
 /// mutation を止める = ユーザーが望む「即時リセット」を阻害する。緊急用途では
 /// 安全側 (= 続行) に倒す。
+#[allow(dead_code)] // Linux check ビルドでは本体呼び出し元が無くなる (memory テストは使用)
 fn run_emergency_best_effort(store: &dyn RoleStore, spec: &TransactionSpec<'_>) -> AppResult<()> {
     let mut snapshot_committed = false;
     if let Err(e) = RegistryManager::save_pending_snapshot(&HashMap::new(), spec.theme_id) {
