@@ -26,7 +26,7 @@ const CONFIG_TEMP_SUFFIX: &str = "json.tmp";
 ///
 /// 失敗時は temp ファイルを削除して元のパスを一切変更しない (呼び出し側が
 /// in-memory ロールバックを判断する)。
-pub(super) fn atomic_write(path: &Path, content: &str) -> AppResult<()> {
+pub(crate) fn atomic_write(path: &Path, content: &str) -> AppResult<()> {
     let parent = path.parent().ok_or_else(|| {
         AppError::Config(format!(
             "設定ファイルの親ディレクトリが取得できません: {}",

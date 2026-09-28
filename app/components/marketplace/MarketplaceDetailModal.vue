@@ -47,6 +47,18 @@ const coveragePct = computed(() => {
   return Math.round((n / 17) * 100)
 })
 
+/**
+ * プレビュー PNG が 1 枚も取れなかったときの文言表示条件 (P11)。
+ * `previewBaseUrl` があるのに取得結果が空 = オフライン等で `marketplace_fetch_preview`
+ * が全滅した場合のみ。`previewBaseUrl` 自体が無いエントリでは出さない。
+ */
+const previewUnavailable = computed(
+  () =>
+    !!props.entry?.previewBaseUrl &&
+    !previewLoading.value &&
+    (!previewMap.value || Object.keys(previewMap.value).length === 0),
+)
+
 const subtitle = computed(() => {
   if (!props.entry) return ''
   return `@${props.entry.author} · v${props.entry.version}`
@@ -109,6 +121,9 @@ function onInstall() {
           :limit="6"
           :cols="3"
         />
+        <p v-if="previewUnavailable" class="md-preview-unavailable">
+          {{ t('marketplace.previewUnavailable') }}
+        </p>
       </div>
 
       <div class="md-meta">
@@ -162,6 +177,9 @@ function onInstall() {
 .md-preview {
   @apply mb-4 grid place-items-center rounded-[10px] border border-line p-4;
   background: rgba(255, 255, 255, 0.02);
+}
+.md-preview-unavailable {
+  @apply m-0 mt-2 text-center text-[12px] text-fg-dim;
 }
 .md-meta {
   @apply flex flex-col gap-3;

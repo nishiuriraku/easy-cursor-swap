@@ -19,7 +19,9 @@
 use app_lib::config::patch::AppConfigPatch;
 use app_lib::config::{AppConfig, BackupInfo};
 use app_lib::errors::AppErrorDto;
-use app_lib::marketplace::{MarketplaceEntry, MarketplaceIndex, MarketplaceInstallRequest};
+use app_lib::marketplace::{
+    MarketplaceEntry, MarketplaceIndex, MarketplaceIndexResult, MarketplaceInstallRequest,
+};
 use ts_rs::{Config, TS};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -32,6 +34,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     MarketplaceInstallRequest::export_all(&config)?;
     MarketplaceEntry::export_all(&config)?;
     MarketplaceIndex::export_all(&config)?;
+    MarketplaceIndexResult::export_all(&config)?;
     AppErrorDto::export_all(&config)?;
     Ok(())
 }

@@ -54,6 +54,9 @@ const {
   entries,
   isLoading: marketplaceIsLoading,
   fetchError,
+  stale,
+  fetchedAt,
+  online,
   loadIndex,
   installEntry: marketplaceInstall,
 } = useMarketplace()
@@ -139,6 +142,14 @@ const filters = computed<Array<{ id: MarketplaceTag; label: string }>>(() => [
   { id: 'animated', label: t('marketplace.tagAnimated') },
   { id: 'dark', label: t('marketplace.tagDark') },
 ])
+
+// `stale` バナー用の取得時刻ラベル。キャッシュ由来の `fetchedAt` (RFC3339) を
+// 現 locale の日時表記に直す。未取得時は '—'。
+const staleDateLabel = computed(() =>
+  fetchedAt.value
+    ? new Date(fetchedAt.value).toLocaleString(locale.value === 'ja' ? 'ja-JP' : 'en-US')
+    : '—',
+)
 
 onMounted(async () => {
   // marketplace 由来テーマの alreadyInstalled 判定で stale state を踏まないよう、
@@ -229,10 +240,19 @@ onMounted(async () => {
         </div>
       </Transition>
 
-      <!-- 取得失敗 -->
-      <div v-if="fetchError" class="error-state">
+      <!-- オフライン時の stale バナー (P11)。entries はキャッシュ由来の一覧。 -->
+      <UiAlert v-if="stale" tone="warn" class="stale-banner">
+        <span>{{ t('marketplace.staleBanner', { date: staleDateLabel }) }}</span>
+        <button class="btn ghost stale-retry" :disabled="isLoading" @click="loadIndex()">
+          {{ t('marketplace.fetchRetry') }}
+        </button>
+      </UiAlert>
+
+      <!-- 取得失敗 (キャッシュも無い場合のみ。一覧があるときは stale バナーを出す) -->
+      <div v-if="fetchError && entries.length === 0" class="error-state">
         <UiIcon name="Alert" :size="32" />
         <p class="error-msg">{{ t('marketplace.fetchError') }}</p>
+        <p v-if="!online" class="error-sub">{{ t('marketplace.offlineHint') }}</p>
         <button class="btn primary" @click="loadIndex">
           {{ t('marketplace.fetchRetry') }}
         </button>
@@ -296,6 +316,15 @@ onMounted(async () => {
 }
 .error-state .error-msg {
   @apply m-0 text-[14px] text-fg;
+}
+.error-state .error-sub {
+  @apply m-0 text-[12.5px] text-fg-dim;
+}
+.stale-banner {
+  @apply mb-4;
+}
+.stale-banner .stale-retry {
+  @apply ml-2 shrink-0;
 }
 .empty-state h3 {
   @apply m-0 font-display text-[18px] font-semibold text-fg;

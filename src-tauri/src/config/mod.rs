@@ -36,6 +36,7 @@ pub use schema::{
 };
 pub use store::ConfigManager;
 
+pub(crate) use store::atomic_write;
 #[cfg(test)]
 pub(crate) use store::cursors_dir_override_lock;
 

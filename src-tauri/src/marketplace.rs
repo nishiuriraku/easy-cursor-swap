@@ -55,6 +55,43 @@ pub struct MarketplaceIndex {
     pub entries: Vec<MarketplaceEntry>,
 }
 
+/// `marketplace_fetch_index` IPC の戻り値 (P11)。
+///
+/// - `stale = false`: いま HTTPS で取得し、ディスクキャッシュも更新済み。
+/// - `stale = true`: ネットワーク取得に失敗し、前回成功時のキャッシュを返している。
+///   `error` に失敗理由 (ユーザー向け文字列)、`fetched_at` にキャッシュ取得時刻 (RFC3339)。
+///
+/// キャッシュは表示用メタデータに過ぎず、インストール時の SHA-256 / Ed25519 / 許可ホスト
+/// 検証 (`MarketplaceClient::install`) はキャッシュ由来でも同じ経路で行われる。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "typegen", derive(ts_rs::TS))]
+#[cfg_attr(feature = "typegen", ts(export, rename_all = "camelCase"))]
+pub struct MarketplaceIndexResult {
+    pub index: MarketplaceIndex,
+    pub stale: bool,
+    pub fetched_at: Option<String>,
+    pub error: Option<String>,
+}
+
+/// ディスク上のキャッシュファイル形式 (`~/.custom_cursors/_marketplace_index_cache.json`).
+///
+/// `raw` には取得時のレスポンスボディをそのまま保存する (`MarketplaceIndex` の
+/// serialize は camelCase だが deserialize は snake_case のため、パース済み型を
+/// 往復させると読めなくなる。生 JSON なら読み直しが確実)。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct CachedIndex {
+    /// 将来フォーマットを変えたときの判別用。現在 1。
+    cache_version: u32,
+    /// 取得成功時刻 (UTC, RFC3339)
+    fetched_at: String,
+    /// 取得時の index.json 生ボディ
+    raw: String,
+}
+
+const INDEX_CACHE_VERSION: u32 = 1;
+const INDEX_CACHE_FILE: &str = "_marketplace_index_cache.json";
+
 /// 個別テーマのメタデータ。
 ///
 /// `name` は後方互換のため `LocalizedString` で受ける。これにより既存の
@@ -151,6 +188,120 @@ impl MarketplaceClient {
         Self::fetch_index_from(INDEX_URL).await
     }
 
+    /// キャッシュファイルのパス (`ConfigManager::cursors_dir()` 配下)。
+    fn index_cache_path() -> AppResult<std::path::PathBuf> {
+        Ok(crate::config::ConfigManager::cursors_dir()?.join(INDEX_CACHE_FILE))
+    }
+
+    /// 公式インデックスを取得し、成功時はキャッシュを更新、失敗時はキャッシュを stale で返す。
+    pub async fn fetch_index_cached() -> AppResult<MarketplaceIndexResult> {
+        let cache = Self::index_cache_path()?;
+        Self::fetch_index_with_cache_from(INDEX_URL, &cache).await
+    }
+
+    /// テスト可能な本体。`url` は mockito、`cache_path` は tempdir を注入する。
+    pub(crate) async fn fetch_index_with_cache_from(
+        url: &str,
+        cache_path: &std::path::Path,
+    ) -> AppResult<MarketplaceIndexResult> {
+        match Self::fetch_index_body(url).await {
+            Ok(body) => {
+                let mut index: MarketplaceIndex = serde_json::from_str(&body)?;
+                for entry in &mut index.entries {
+                    entry.homepage = Self::sanitize_homepage(entry.homepage.take());
+                }
+                let fetched_at = chrono::Utc::now().to_rfc3339();
+                if let Err(e) = Self::write_index_cache(cache_path, &body, &fetched_at) {
+                    // キャッシュ書込失敗は表示を止めない (次回は再取得すればよい)
+                    tracing::warn!(
+                        "marketplace index cache write failed ({}): {}",
+                        crate::logging::redact_path(cache_path),
+                        e
+                    );
+                }
+                Ok(MarketplaceIndexResult {
+                    index,
+                    stale: false,
+                    fetched_at: Some(fetched_at),
+                    error: None,
+                })
+            }
+            Err(net_err) => match Self::read_index_cache(cache_path) {
+                Ok(Some(cached)) => {
+                    let index = match Self::parse_cached_index(&cached) {
+                        Ok(index) => index,
+                        Err(cache_err) => {
+                            tracing::warn!(
+                                "marketplace index cache unreadable, ignoring: {}",
+                                cache_err
+                            );
+                            return Err(net_err);
+                        }
+                    };
+                    tracing::warn!(
+                        "marketplace index fetch failed, serving cache from {}: {}",
+                        cached.fetched_at,
+                        net_err
+                    );
+                    Ok(MarketplaceIndexResult {
+                        index,
+                        stale: true,
+                        fetched_at: Some(cached.fetched_at),
+                        error: Some(net_err.to_string()),
+                    })
+                }
+                Ok(None) => Err(net_err),
+                Err(cache_err) => {
+                    tracing::warn!(
+                        "marketplace index cache unreadable, ignoring: {}",
+                        cache_err
+                    );
+                    Err(net_err)
+                }
+            },
+        }
+    }
+
+    fn write_index_cache(
+        path: &std::path::Path,
+        raw_body: &str,
+        fetched_at: &str,
+    ) -> AppResult<()> {
+        let payload = CachedIndex {
+            cache_version: INDEX_CACHE_VERSION,
+            fetched_at: fetched_at.to_string(),
+            raw: raw_body.to_string(),
+        };
+        let content = serde_json::to_string(&payload)?;
+        crate::config::atomic_write(path, &content)
+    }
+
+    /// `Ok(None)` = ファイル無し。`Err` = 破損 / 版不一致 (呼び出し側は無視してネットエラーを返す)。
+    fn read_index_cache(path: &std::path::Path) -> AppResult<Option<CachedIndex>> {
+        if !path.exists() {
+            return Ok(None);
+        }
+        let content = std::fs::read_to_string(path)?;
+        let cached: CachedIndex = serde_json::from_str(&content)?;
+        if cached.cache_version != INDEX_CACHE_VERSION {
+            return Err(AppError::Theme(format!(
+                "index cache version mismatch: {}",
+                cached.cache_version
+            )));
+        }
+        Ok(Some(cached))
+    }
+
+    /// キャッシュの生ボディをパースして返す (homepage 再健全化つき)。
+    fn parse_cached_index(cached: &CachedIndex) -> AppResult<MarketplaceIndex> {
+        let mut index: MarketplaceIndex = serde_json::from_str(&cached.raw)?;
+        // 読み込み時も homepage を再健全化 (キャッシュ改変への防御線)
+        for entry in &mut index.entries {
+            entry.homepage = Self::sanitize_homepage(entry.homepage.take());
+        }
+        Ok(index)
+    }
+
     /// 任意の URL からインデックスを取得する (テストでは mockito の URL を注入する)。
     ///
     /// `fetch_index` の本体実装をここに置き、本番経路は `INDEX_URL` を渡す薄い
@@ -158,6 +309,17 @@ impl MarketplaceClient {
     /// 可能にする。`pub(crate)` に閉じているので、フロントエンドに無用な公開
     /// 表面は増えない。
     pub(crate) async fn fetch_index_from(url: &str) -> AppResult<MarketplaceIndex> {
+        let body = Self::fetch_index_body(url).await?;
+        let mut index: MarketplaceIndex = serde_json::from_str(&body)?;
+        // F-17: 各エントリの homepage を健全化してからフロントへ返す。
+        for entry in &mut index.entries {
+            entry.homepage = Self::sanitize_homepage(entry.homepage.take());
+        }
+        Ok(index)
+    }
+
+    /// HTTP GET の生ボディを返す (キャッシュ保存用にパース前文字列が必要な経路向け)。
+    async fn fetch_index_body(url: &str) -> AppResult<String> {
         let client = Self::http()?;
         let body = client
             .get(url)
@@ -169,13 +331,7 @@ impl MarketplaceClient {
             .text()
             .await
             .map_err(|e| AppError::Theme(format!("レスポンス読み取り失敗: {}", e)))?;
-
-        let mut index: MarketplaceIndex = serde_json::from_str(&body)?;
-        // F-17: 各エントリの homepage を健全化してからフロントへ返す。
-        for entry in &mut index.entries {
-            entry.homepage = Self::sanitize_homepage(entry.homepage.take());
-        }
-        Ok(index)
+        Ok(body)
     }
 
     /// 著者の公開鍵レコードを取得する。
@@ -907,5 +1063,134 @@ mod tests {
         // serde_json::Error → AppError は `?` で実装されている経路。具体的な
         // variant は実装に依存するが、Ok ではないことが回帰防御として重要。
         let _ = err;
+    }
+
+    fn sample_index_json() -> String {
+        r#"{
+            "schema_version": 1,
+            "commit": "deadbeef",
+            "entries": [
+                {
+                    "id": "6d364941-c605-4def-801a-14ebb401936f",
+                    "name": "Mint",
+                    "author": "alice",
+                    "author_github": "alice",
+                    "author_pubkey_id": "abcd",
+                    "sha256": "00",
+                    "signature": "AA==",
+                    "download_url": "https://example.com/pack",
+                    "version": "1.0.0"
+                }
+            ]
+        }"#
+        .to_string()
+    }
+
+    #[tokio::test]
+    async fn cached_fetch_success_writes_cache_and_is_not_stale() {
+        let mut server = mockito::Server::new_async().await;
+        let _m = server
+            .mock("GET", "/index.json")
+            .with_status(200)
+            .with_body(sample_index_json())
+            .create_async()
+            .await;
+        let dir = tempfile::tempdir().unwrap();
+        let cache = dir.path().join("_marketplace_index_cache.json");
+        let r = MarketplaceClient::fetch_index_with_cache_from(
+            &format!("{}/index.json", server.url()),
+            &cache,
+        )
+        .await
+        .unwrap();
+        assert!(!r.stale && r.error.is_none() && r.fetched_at.is_some());
+        assert!(cache.exists());
+        assert_eq!(r.index.entries.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn cached_fetch_failure_serves_cache_as_stale() {
+        // 1 回目 200 でキャッシュを作り、2 回目 500 で stale=true になる
+        let mut server = mockito::Server::new_async().await;
+        let _m_ok = server
+            .mock("GET", "/index.json")
+            .with_status(200)
+            .with_body(sample_index_json())
+            .create_async()
+            .await;
+        let dir = tempfile::tempdir().unwrap();
+        let cache = dir.path().join("_marketplace_index_cache.json");
+        let url = format!("{}/index.json", server.url());
+        MarketplaceClient::fetch_index_with_cache_from(&url, &cache)
+            .await
+            .unwrap();
+        drop(_m_ok);
+        let _m_err = server
+            .mock("GET", "/index.json")
+            .with_status(500)
+            .with_body("oops")
+            .create_async()
+            .await;
+        let r = MarketplaceClient::fetch_index_with_cache_from(&url, &cache)
+            .await
+            .unwrap();
+        assert!(r.stale);
+        assert!(r.error.is_some());
+        assert_eq!(r.index.entries.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn cached_fetch_failure_without_cache_is_error() {
+        let mut server = mockito::Server::new_async().await;
+        let _m = server
+            .mock("GET", "/index.json")
+            .with_status(500)
+            .with_body("oops")
+            .create_async()
+            .await;
+        let dir = tempfile::tempdir().unwrap();
+        let cache = dir.path().join("_marketplace_index_cache.json");
+        let url = format!("{}/index.json", server.url());
+        assert!(MarketplaceClient::fetch_index_with_cache_from(&url, &cache)
+            .await
+            .is_err());
+    }
+
+    #[tokio::test]
+    async fn corrupt_cache_is_ignored_and_network_error_propagates() {
+        let mut server = mockito::Server::new_async().await;
+        let _m = server
+            .mock("GET", "/index.json")
+            .with_status(500)
+            .with_body("oops")
+            .create_async()
+            .await;
+        let dir = tempfile::tempdir().unwrap();
+        let cache = dir.path().join("_marketplace_index_cache.json");
+        std::fs::write(&cache, "{").unwrap();
+        let url = format!("{}/index.json", server.url());
+        assert!(MarketplaceClient::fetch_index_with_cache_from(&url, &cache)
+            .await
+            .is_err());
+    }
+
+    #[test]
+    fn read_index_cache_resanitizes_homepage() {
+        let dir = tempfile::tempdir().unwrap();
+        let cache = dir.path().join("_marketplace_index_cache.json");
+        // homepage に javascript: を含む生ボディ → 読込時に None へ健全化
+        let mut raw: serde_json::Value = serde_json::from_str(&sample_index_json()).unwrap();
+        raw["entries"][0]["homepage"] = serde_json::Value::String("javascript:x".to_string());
+        let payload = serde_json::json!({
+            "cache_version": 1,
+            "fetched_at": "2026-09-28T00:00:00Z",
+            "raw": serde_json::to_string(&raw).unwrap(),
+        });
+        std::fs::write(&cache, serde_json::to_string(&payload).unwrap()).unwrap();
+        let cached = MarketplaceClient::read_index_cache(&cache)
+            .unwrap()
+            .expect("cache readable");
+        let index = MarketplaceClient::parse_cached_index(&cached).unwrap();
+        assert_eq!(index.entries[0].homepage, None);
     }
 }
