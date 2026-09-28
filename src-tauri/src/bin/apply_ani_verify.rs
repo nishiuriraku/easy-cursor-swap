@@ -26,7 +26,7 @@ use app_lib::cursor::ani::parse_ani;
 #[cfg(windows)]
 use app_lib::cursor::ani_write::rewrite_ani_to_path;
 #[cfg(windows)]
-use app_lib::registry::RegistryManager;
+use app_lib::platform::{self, CursorBackend};
 
 /// Arrow の元値を保持し、Drop で必ず HKCU に書き戻すガード。
 #[cfg(windows)]
@@ -36,8 +36,9 @@ struct ArrowRestoreGuard {
 
 #[cfg(windows)]
 impl ArrowRestoreGuard {
-    fn snapshot() -> Result<Self, String> {
-        let map = RegistryManager::read_current_cursors()
+    fn snapshot(backend: &dyn CursorBackend) -> Result<Self, String> {
+        let map = backend
+            .read_current_cursors()
             .map_err(|e| format!("Arrow 値の読み取り失敗: {e:?}"))?;
         let original = map.get("Arrow").cloned().unwrap_or_default();
         Ok(Self { original })
@@ -48,7 +49,7 @@ impl ArrowRestoreGuard {
 impl Drop for ArrowRestoreGuard {
     fn drop(&mut self) {
         // 直接 HKCU\Control Panel\Cursors\Arrow を書き戻し、SPI_SETCURSORS で反映する。
-        // RegistryManager::apply_cursors を経由しないのは、ペンディングスナップショット
+        // backend の apply_cursors を経由しないのは、ペンディングスナップショット
         // の整合性を二重に取らないようにするため。
         use winreg::enums::*;
         use winreg::RegKey;
@@ -81,6 +82,7 @@ fn run(input: PathBuf) -> Result<serde_json::Value, String> {
     if !input.is_file() {
         return Err(format!(".ani が見つかりません: {}", input.display()));
     }
+    let backend = platform::default_backend();
 
     // 1. parse_ani でホットスポットを取得
     let bytes = std::fs::read(&input).map_err(|e| format!("読み込み失敗: {e}"))?;
@@ -123,17 +125,20 @@ fn run(input: PathBuf) -> Result<serde_json::Value, String> {
     }
 
     // 3. 現在の Arrow を退避 (Drop で必ず復元)
-    let guard = ArrowRestoreGuard::snapshot()?;
+    let guard = ArrowRestoreGuard::snapshot(backend.as_ref())?;
     eprintln!("[snapshot] original Arrow = '{}'", guard.original);
 
     // 4. Arrow のみ apply_cursors で書き換え
     use std::collections::HashMap;
     let mut paths: HashMap<String, PathBuf> = HashMap::new();
     paths.insert("Arrow".to_string(), dst.clone());
-    RegistryManager::apply_cursors(&paths).map_err(|e| format!("apply_cursors 失敗: {e:?}"))?;
+    backend
+        .apply_cursors(&paths)
+        .map_err(|e| format!("apply_cursors 失敗: {e:?}"))?;
 
     // 5. HKCU を読み戻して反映を確認
-    let after = RegistryManager::read_current_cursors()
+    let after = backend
+        .read_current_cursors()
         .map_err(|e| format!("適用後の Arrow 読込失敗: {e:?}"))?;
     let after_arrow = after.get("Arrow").cloned().unwrap_or_default();
     let dst_str = dst.to_string_lossy().to_string();
@@ -153,7 +158,8 @@ fn run(input: PathBuf) -> Result<serde_json::Value, String> {
     drop(guard); // 明示的に復元 (Drop でも走るが、JSON を出す前に走らせる)
 
     // 6. 復元後の値も確認
-    let restored = RegistryManager::read_current_cursors()
+    let restored = backend
+        .read_current_cursors()
         .map_err(|e| format!("復元後の Arrow 読込失敗: {e:?}"))?;
     let restored_arrow = restored.get("Arrow").cloned().unwrap_or_default();
     eprintln!("[verify] after restore Arrow = '{}'", restored_arrow);

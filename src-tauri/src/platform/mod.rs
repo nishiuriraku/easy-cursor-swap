@@ -19,12 +19,12 @@ use std::sync::Arc;
 
 pub use crate::registry::CursorRole;
 
-#[cfg(windows)]
-pub mod windows;
-#[cfg(not(windows))]
-pub mod noop;
 #[cfg(test)]
 pub mod memory;
+#[cfg(not(windows))]
+pub mod noop;
+#[cfg(windows)]
+pub mod windows;
 
 /// tauri `manage()` に登録する共有ハンドル。コマンドは `State<'_, SharedBackend>` で受ける。
 pub type SharedBackend = Arc<dyn CursorBackend>;
@@ -102,5 +102,187 @@ pub fn default_backend() -> SharedBackend {
     #[cfg(not(windows))]
     {
         Arc::new(noop::NoopCursorBackend)
+    }
+}
+
+/// 起動時 leftover snapshot の復旧判定と実行。`Valid` / `Unreadable` は区別せず
+/// **OS 既定へリセット** する (pre-apply 値への部分復元は混在状態を残すため行わない)。
+/// 戻り値はログ / テスト用の結果種別。
+#[derive(Debug, PartialEq, Eq)]
+pub enum StartupRecovery {
+    NotNeeded,
+    ResetToDefault,
+    ResetFailed(String),
+    InspectFailed(String),
+}
+
+pub fn recover_pending_snapshot_on_startup(backend: &dyn CursorBackend) -> StartupRecovery {
+    match backend.inspect_pending_snapshot() {
+        Ok(PendingSnapshotState::Valid(_snapshot)) => {
+            tracing::warn!(
+                "前回の適用処理が中断されていました。Windows 既定へリセットします (適用前への復元ではない)"
+            );
+            let result = match backend.reset_to_os_default() {
+                Ok(()) => {
+                    tracing::info!("クラッシュリカバリ完了 (Windows 既定へリセット)");
+                    StartupRecovery::ResetToDefault
+                }
+                Err(e) => {
+                    tracing::error!("クラッシュリカバリに失敗: {}", e);
+                    StartupRecovery::ResetFailed(e.to_string())
+                }
+            };
+            let _ = backend.remove_pending_snapshot();
+            result
+        }
+        Ok(PendingSnapshotState::Unreadable { reason }) => {
+            // 破損 / 中途書込 → ファイルの中身は無視し、安全側 (= Windows 既定
+            // リセット) に倒す。
+            tracing::warn!(
+                "pending スナップショットが破損しています ({}). Windows 既定へリセットします",
+                reason
+            );
+            let result = match backend.reset_to_os_default() {
+                Ok(()) => {
+                    tracing::info!(
+                        "クラッシュリカバリ完了 (Windows 既定へリセット; unreadable snapshot)"
+                    );
+                    StartupRecovery::ResetToDefault
+                }
+                Err(e) => {
+                    tracing::error!("クラッシュリカバリ (unreadable snapshot) に失敗: {}", e);
+                    StartupRecovery::ResetFailed(e.to_string())
+                }
+            };
+            let _ = backend.remove_pending_snapshot();
+            result
+        }
+        Ok(PendingSnapshotState::Absent) => {
+            tracing::debug!("pending スナップショットなし（正常）");
+            StartupRecovery::NotNeeded
+        }
+        Err(e) => {
+            tracing::warn!("pending スナップショットの確認に失敗: {}", e);
+            StartupRecovery::InspectFailed(e.to_string())
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::cursors_dir_override_lock;
+
+    /// snapshot 系ファイル I/O を tempdir に向ける (env はプロセス共有のため直列化)。
+    struct SnapshotDir {
+        _tmp: tempfile::TempDir,
+        _lock: std::sync::MutexGuard<'static, ()>,
+    }
+
+    impl SnapshotDir {
+        fn new() -> Self {
+            let tmp = tempfile::TempDir::new().unwrap();
+            let lock = cursors_dir_override_lock()
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            std::env::set_var("CUSTOM_CURSORS_DIR_OVERRIDE", tmp.path());
+            Self {
+                _tmp: tmp,
+                _lock: lock,
+            }
+        }
+    }
+
+    impl Drop for SnapshotDir {
+        fn drop(&mut self) {
+            std::env::remove_var("CUSTOM_CURSORS_DIR_OVERRIDE");
+        }
+    }
+
+    fn pending_path() -> std::path::PathBuf {
+        crate::config::ConfigManager::cursors_dir()
+            .unwrap()
+            .join("_pending_apply.snapshot")
+    }
+
+    #[test]
+    fn startup_recovery_absent_snapshot_is_noop() {
+        let _dir = SnapshotDir::new();
+        let backend = crate::platform::memory::MemoryCursorBackend::default();
+        backend
+            .store
+            .roles
+            .lock()
+            .unwrap()
+            .insert("Arrow".to_string(), "C:\\keep.cur".to_string());
+        assert_eq!(
+            recover_pending_snapshot_on_startup(&backend),
+            StartupRecovery::NotNeeded
+        );
+        assert_eq!(
+            backend
+                .store
+                .roles
+                .lock()
+                .unwrap()
+                .get("Arrow")
+                .map(String::as_str),
+            Some("C:\\keep.cur")
+        );
+    }
+
+    #[test]
+    fn startup_recovery_valid_snapshot_resets_to_default_not_pre_apply_values() {
+        let _dir = SnapshotDir::new();
+        let backend = crate::platform::memory::MemoryCursorBackend::default();
+        backend
+            .store
+            .roles
+            .lock()
+            .unwrap()
+            .insert("Arrow".to_string(), "C:\\current.cur".to_string());
+        // pending snapshot の original_values は使われない (経路 b の不変条件)。
+        let snap = crate::registry::snapshot::RegistrySnapshot {
+            schema_version: 1,
+            original_values: [("Arrow".to_string(), "C:\\pre.cur".to_string())]
+                .into_iter()
+                .collect(),
+            applied_at: "2026-01-01T00:00:00Z".to_string(),
+            target_theme_id: None,
+        };
+        let content = serde_json::to_string_pretty(&snap).unwrap();
+        std::fs::write(pending_path(), content).unwrap();
+        assert_eq!(
+            recover_pending_snapshot_on_startup(&backend),
+            StartupRecovery::ResetToDefault
+        );
+        // 全役割 "" (Windows 既定) であり、pre-apply 値ではない
+        let roles = backend.store.roles.lock().unwrap();
+        assert_eq!(roles.len(), 17);
+        assert!(roles.values().all(|v| v.is_empty()));
+        assert_ne!(roles.get("Arrow").map(String::as_str), Some("C:\\pre.cur"));
+        drop(roles);
+        assert!(matches!(
+            backend.inspect_pending_snapshot().unwrap(),
+            crate::registry::PendingSnapshotState::Absent
+        ));
+    }
+
+    #[test]
+    fn startup_recovery_unreadable_snapshot_also_resets_to_default() {
+        let _dir = SnapshotDir::new();
+        let backend = crate::platform::memory::MemoryCursorBackend::default();
+        std::fs::write(pending_path(), "{\"broken\"").unwrap();
+        assert_eq!(
+            recover_pending_snapshot_on_startup(&backend),
+            StartupRecovery::ResetToDefault
+        );
+        assert!(backend
+            .store
+            .roles
+            .lock()
+            .unwrap()
+            .values()
+            .all(|v| v.is_empty()));
     }
 }
