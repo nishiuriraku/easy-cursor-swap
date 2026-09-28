@@ -166,7 +166,9 @@ jobs:
           # SemVer 0.0.x の API 安定保証は依然 best-effort だが、GitHub Release の
           # Pre-release フラグは降ろし、Updater 経由でも通常版として配信する。
           prerelease: false
-          includeUpdaterJson: true
+          # tauri-action v1: 既存 release が draft でない場合は fail する (workflow_dispatch で
+          # publish 済みタグを再実行しない)。latest.json の url は GitHub API asset URL 形式。
+          uploadUpdaterJson: true
 
       # -----------------------------------------------------------
       # Authenticode 署名: 2026-07-25 方針で SignPath 経由は廃止。MSIX / Store 自動
