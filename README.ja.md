@@ -154,7 +154,7 @@ easy-cursor-swap/
 │   │   ├── main.rs             # エントリポイント: トレイ / ヘルスチェック
 │   │   ├── lib.rs              # モジュール宣言（23 モジュール）
 │   │   ├── commands/           # Tauri IPC コマンドハンドラー（9 サブモジュール / 53 エンドポイント）
-│   │   ├── config.rs           # 設定マネージャー（RwLock / スキーママイグレーション / バックアップ）
+│   │   ├── config/              # 設定マネージャー（schema / store: RwLock、atomic write、quarantine / migrate）
 │   │   ├── cursor/             # PNG → .cur / .ani パイプライン（6 サイズ / ホットスポット / ANI 入出力）
 │   │   ├── registry/           # HKCU レジストリ読み書き / Schemes / SPI_SETCURSORS
 │   │   ├── theme/              # テーママネージャー（.cursorpack 入出力 / sanitize）

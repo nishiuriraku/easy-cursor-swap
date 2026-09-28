@@ -155,7 +155,7 @@ easy-cursor-swap/
 │   │   ├── main.rs             # Entry point: tray, health check
 │   │   ├── lib.rs              # Module declarations (23 modules)
 │   │   ├── commands/           # Tauri IPC command handlers (53 endpoints across 9 sub-modules)
-│   │   ├── config.rs           # Config manager (RwLock, schema migration, backups)
+│   │   ├── config/              # Config manager (schema / store: RwLock, atomic write, quarantine / migrate)
 │   │   ├── cursor/             # PNG → .cur / .ani pipeline (6 sizes, hotspot, ANI read/write)
 │   │   ├── registry/           # HKCU registry read/write, Schemes, SPI_SETCURSORS
 │   │   ├── theme/              # Theme manager (.cursorpack import/export, sanitisation)

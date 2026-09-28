@@ -275,7 +275,7 @@ mod tests {
     }
 
     /// プロセス ID + ナノ秒 nonce で衝突回避する test tempdir ヘルパー。
-    /// 既存 `config.rs::tests::make_tempdir` と同方針 (グローバル env を触らない)。
+    /// 既存 `config/tests.rs::make_tempdir` と同方針 (グローバル env を触らない)。
     fn make_tempdir(label: &str) -> std::path::PathBuf {
         let pid = std::process::id();
         let nonce = std::time::SystemTime::now()

@@ -108,7 +108,7 @@ const SNAPSHOT_TEMP_SUFFIX: &str = "tmp";
 /// 失敗時は temp ファイルを削除して元のパスを一切変更しない (呼び出し側が
 /// in-memory ロールバックを判断する)。
 ///
-/// 設定ファイル向けの `config.rs::atomic_write` と同じパターンだが、
+/// 設定ファイル向けの `config/store.rs::atomic_write` と同じパターンだが、
 /// snapshot は「JSON パース失敗 = Windows 既定リセット」が安全側の挙動なので、
 /// 確実に「本ファイルは常に有効な JSON」状態を作りたいという意図は同じ。
 fn atomic_write(path: &Path, content: &str) -> AppResult<()> {

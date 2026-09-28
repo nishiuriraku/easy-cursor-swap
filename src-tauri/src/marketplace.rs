@@ -235,7 +235,7 @@ impl MarketplaceClient {
 
         let verifying_key = decode_verifying_key(pubkey_b64)?;
 
-        // 3. ZIP をダウンロード (サイズ上限つき。圧縮サイズ上限の SoT は config.rs)
+        // 3. ZIP をダウンロード (サイズ上限つき。圧縮サイズ上限の SoT は config/schema.rs)
         use crate::config::DEFAULT_MAX_PACK_COMPRESSED_SIZE;
         let bytes =
             Self::download_with_limit(&req.download_url, DEFAULT_MAX_PACK_COMPRESSED_SIZE).await?;

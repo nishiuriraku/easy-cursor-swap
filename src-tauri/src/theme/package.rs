@@ -149,7 +149,7 @@ impl ThemeManager {
         use crate::errors::AppError;
         use std::io::{Cursor, Read};
 
-        // サイズ上限 3 種はすべて config.rs の DEFAULT_* を SoT として参照する。
+        // サイズ上限 3 種はすべて config/schema.rs の DEFAULT_* を SoT として参照する。
         use crate::config::{
             DEFAULT_MAX_IMAGE_FILE_SIZE, DEFAULT_MAX_PACK_COMPRESSED_SIZE,
             DEFAULT_MAX_PACK_UNCOMPRESSED_SIZE,

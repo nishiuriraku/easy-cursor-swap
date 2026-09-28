@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - CI: `actions/setup-node` を v4 → v7 に更新 (Node 24 ランタイム、`ci.yml` / `release.yml`) (#14)。
 - `winreg` 依存を `[target.'cfg(windows)'.dependencies]` に限定し、`accessibility.rs` / `registry/{mod,transaction}.rs` / `bin/apply_ani_verify.rs` に `cfg(not(windows))` スタブを追加。非 Windows でも `cargo check` が通るようになった (アプリの Windows 動作は無変更)。CI に `rust-check-linux` ジョブ (ubuntu-latest, `cargo check` + `clippy -D warnings`, lib + bins) を追加。
+- `config.rs` を `config/{schema,store,migrate,tests}.rs` に分割 (公開 API / 挙動 / 生成 TS 不変)。
 
 ### Fixed
 

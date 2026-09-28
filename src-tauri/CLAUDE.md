@@ -19,7 +19,7 @@ Vue (UI) ──invoke()──▶ Tauri command (commands/) ──▶ Rust module
 | Concern         | Modules                                                                                                                                                                                                                                                                            |
 | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | IPC surface     | `commands/` (sub-modules: `theme` / `cursor_build/` / `cursor_io` / `keystore` / `marketplace` / `marketplace_submit` / `profile` / `system` / `windows_scheme`)                                                                                                                   |
-| Config / state  | `config.rs` (RwLock + schema_version v1 + `config.corrupt.*.json` quarantine, Source of Truth), `errors.rs`, `cancel_registry.rs` (shared cursorpack-build / bulk-import cancellation registry App state)                                                                          |
+| Config / state  | `config/` (`schema` 型 / `store` RwLock + atomic_write + `config.corrupt.*.json` quarantine / `migrate` schema_version / `v1` / `patch`, Source of Truth), `errors.rs`, `cancel_registry.rs` (shared cursorpack-build / bulk-import cancellation registry App state)                                                                          |
 | Cursor pipeline | `cursor/` (`image` / `cur_build` / `ico_cur` / `ani` / `ani_write`), `cursor_watcher.rs`                                                                                                                                                                                           |
 | Registry        | `registry/` (`mod` / `scheme` / `roles` / `env`)                                                                                                                                                                                                                                   |
 | Theme packages  | `theme/`, `bulk_import/`, `backup.rs` (`.cursorprofile`)                                                                                                                                                                                                                           |
@@ -35,7 +35,7 @@ Vue (UI) ──invoke()──▶ Tauri command (commands/) ──▶ Rust module
 - **Comments and doc strings: Japanese.**
 - Use `tracing::{info,warn,error,debug,trace}!` for logs; never `println!`. Always pass paths through `logging::redact_path` and hashes through `logging::short_hash` (12 chars).
 - Errors propagate as `AppError`; IPC commands return `Result<T, AppError>`.
-- Prefer `RwLock` over `Mutex` when read-heavy (e.g. `config.rs`).
+- Prefer `RwLock` over `Mutex` when read-heavy (e.g. `config/store.rs`).
 - Use `tokio::task::spawn_blocking` for blocking I/O in async contexts (ZIP extraction, large file scans).
 
 ## Commands
