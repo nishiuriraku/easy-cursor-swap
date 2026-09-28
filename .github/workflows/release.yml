@@ -115,6 +115,9 @@ jobs:
             Write-Warning "CHANGELOG section not found for $version - using placeholder"
             $section = "## $tag`n`n(CHANGELOG エントリ未登録)"
           }
+          # node が exit 1 の場合 $LASTEXITCODE が残り、後続 Out-File が成功しても
+          # ステップ全体が exit 1 扱いになる (dry-run v0.0.0-dryrun で実測)。明示 reset。
+          $LASTEXITCODE = 0
           # GITHUB_OUTPUT に複数行で書き出すためのヒアドキュメント形式
           "section<<__CHANGELOG_EOF__" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           $section                       | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
