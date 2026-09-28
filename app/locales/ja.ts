@@ -651,6 +651,13 @@ export default {
     // 起動時の自動アップデート告知トースト (useUpdaterBootstrap)
     toastUpdateAvailable: '新しいバージョン v{version} が利用可能です。設定 → 更新からダウンロードできます。',
   },
+  errorBoundary: {
+    title: 'この画面で問題が発生しました',
+    lead: 'アプリ本体は動作しています。報告時は下の詳細をコピーしてください。再起動するか、別の画面へ移動できます。',
+    copy: '詳細をコピー',
+    reload: 'アプリを再起動',
+    dismiss: '続行を試す',
+  },
   onboarding: {
     progress: 'ステップ {n} / {total}',
     skip: 'あとで見る',

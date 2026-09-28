@@ -655,6 +655,13 @@ export default {
     // Startup auto-update notification toast (useUpdaterBootstrap)
     toastUpdateAvailable: 'New version v{version} is available. Download it from Settings → Updates.',
   },
+  errorBoundary: {
+    title: 'Something went wrong on this screen',
+    lead: 'The rest of the app keeps running. Copy the details below when reporting the issue, then restart or go back.',
+    copy: 'Copy details',
+    reload: 'Restart app',
+    dismiss: 'Try to continue',
+  },
   onboarding: {
     progress: 'Step {n} of {total}',
     skip: 'Skip for now',

@@ -202,7 +202,7 @@ onUnmounted(() => {
         @panic="onPanic"
       />
       <main id="main-content" class="main" tabindex="-1">
-        <slot />
+        <AppErrorBoundary><slot /></AppErrorBoundary>
       </main>
     </div>
 
