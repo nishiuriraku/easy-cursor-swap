@@ -209,6 +209,12 @@ pub fn remove_pending_snapshot() -> AppResult<()> {
 
 /// 初回起動時のスナップショットを保存する
 pub fn save_initial_snapshot() -> AppResult<()> {
+    let values = RegistryManager::read_current_cursors()?;
+    save_initial_snapshot_with(values)
+}
+
+/// 初回起動時のスナップショットを与えられた値で保存する (テスト・backend 共用)。
+pub fn save_initial_snapshot_with(values: HashMap<String, String>) -> AppResult<()> {
     let path = initial_snapshot_path()?;
 
     // 既に存在する場合は上書きしない (本物の初回以降に上書きすると
@@ -219,7 +225,6 @@ pub fn save_initial_snapshot() -> AppResult<()> {
         return Ok(());
     }
 
-    let values = RegistryManager::read_current_cursors()?;
     let snapshot = RegistrySnapshot {
         schema_version: 1,
         original_values: values,

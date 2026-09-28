@@ -18,6 +18,7 @@ use app_lib::cursor_watcher;
 use app_lib::health::{RollbackTarget, StartupCheck};
 use app_lib::hotkey;
 use app_lib::logging;
+use app_lib::platform;
 use app_lib::registry::{PendingSnapshotState, RegistryManager};
 use app_lib::tray;
 
@@ -359,6 +360,7 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .manage(config_manager)
+        .manage(platform::default_backend())
         .manage(cancel_registry::CancelRegistry::default())
         .manage(PendingCursorpack::default())
         .manage(crate::commands::marketplace_submit::DeviceFlowState::default())
