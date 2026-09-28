@@ -23,7 +23,7 @@ This file is loaded automatically when working under `app/`. Root `../CLAUDE.md`
 Tailwind v4 utility classes are the default styling mechanism.
 
 - **Design tokens** live in `assets/css/tailwind.css` (`@theme` block), aliasing legacy `--*` tokens.
-- **Cross-cutting shared utilities** (`.btn`, `.card`, `.chip`, `.input`, `.tag`, `.toolbar`, `.tabs`, `.prop-section`, `.lib-row`, `.lt-*`, `.modal*`, `.content`, `.page-head`, `.grid`, etc.) are defined at the top level (unlayered) of `assets/css/tailwind.css`. **Do not** wrap them in `@layer components` — Tailwind preflight (e.g. `button { color: inherit }`) is emitted unlayered, so rules inside `@layer` lose the cascade.
+- **Cross-cutting shared utilities** (`.btn`, `.card`, `.chip`, `.input`, `.tag`, `.toolbar`, `.tabs`, `.prop-section`, `.lib-row`, `.lt-*`, `.modal*`, `.content`, `.page-head`, `.grid`, etc.) are defined at the top level (unlayered) of `assets/css/shared/{controls,cards,library-list,layout,modal,nav}.css`, imported from `assets/css/tailwind.css` in that order. **Do not** wrap them in `@layer components` — Tailwind preflight (e.g. `button { color: inherit }`) is emitted unlayered, so rules inside `@layer` lose the cascade.
 - **Component-specific styles** belong in each `.vue` file's `<style scoped>`. Declare `@reference '~/assets/css/tailwind.css';` at the top, then use `@apply`.
 - `assets/css/global.css` is **strictly limited** to `:root` tokens, CSS reset, scrollbar customisation, `:focus-visible`, `prefers-reduced-motion`, shared `@keyframes` (pulse / fade-in / slide-in-right / spin), and `html.light` token overrides. Do not add component-specific styles here (Phase 10-12 collapsed it from 3327 → 223 lines).
 

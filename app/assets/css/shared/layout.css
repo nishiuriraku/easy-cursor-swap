@@ -1,0 +1,125 @@
+/* shared/layout.css: .tabs / .toolbar / .bcrumb / .search / .prop-* / .page-head / .grid */
+/* P08a Step 5: tailwind.css からの分割。top-level (unlayered) のまま。
+ * カスケード順は tailwind.css の @import 順。`@layer components` 禁止。 */
+/* --- .tabs / .tab (Phase 12-A) ---
+ * Creator / Settings 共通のタブバー。
+ * 1px ボーダー上に乗るため margin-bottom: -1px で重ねている。 */
+.tabs {
+  @apply flex h-[38px] shrink-0 gap-1 border-b border-line px-6;
+  background: rgba(10, 11, 15, 0.4);
+}
+:where(html.light) .tabs {
+  /* ライトテーマでは半透明の白で背景を浮かせ、tab ボタンを灰色ベタに見せないようにする。 */
+  background: rgba(255, 255, 255, 0.55);
+}
+.tab {
+  @apply relative -mb-px flex cursor-pointer items-center gap-2 border-0 border-b-2 border-transparent bg-transparent px-3.5 text-[12.5px] text-fg-dim;
+}
+.tab:hover {
+  @apply text-fg;
+}
+.tab.active {
+  @apply border-accent font-semibold text-fg;
+}
+.tab .num {
+  @apply rounded-[3px] border border-line px-[5px] py-px font-mono text-[9.5px] text-fg-mute;
+  background: rgba(255, 255, 255, 0.04);
+}
+:where(html.light) .tab .num {
+  background: rgba(15, 20, 35, 0.04);
+}
+
+/* --- .toolbar / .bcrumb / .search / .kbd / .tb-actions (Phase 12-B) --- */
+.toolbar {
+  @apply grid h-14 shrink-0 items-center gap-4 border-b border-line px-5;
+  grid-template-columns: auto 1fr auto;
+  background: rgba(10, 11, 15, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+:where(html.light) .toolbar {
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.bcrumb {
+  @apply flex items-center gap-2 text-[13px];
+}
+.bcrumb .crumb {
+  @apply text-fg-dim;
+}
+.bcrumb .crumb.active {
+  @apply font-semibold text-fg;
+}
+.bcrumb .sep {
+  @apply text-fg-faint;
+}
+
+.search {
+  @apply flex h-8 w-full max-w-[360px] items-center gap-2 rounded-[7px] border border-line px-3;
+  background: rgba(255, 255, 255, 0.03);
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+.search:focus-within {
+  border-color: var(--accent-line);
+  background: rgba(124, 242, 212, 0.04);
+}
+:where(html.light) .search {
+  background: rgba(15, 20, 35, 0.025);
+}
+.search input {
+  @apply w-full border-0 bg-transparent font-body text-[12.5px] text-fg outline-none;
+}
+.search input::placeholder {
+  @apply text-fg-mute;
+}
+.search .kbd {
+  @apply rounded-[3px] border border-line px-[5px] py-px font-mono text-[10px] text-fg-mute;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.tb-actions {
+  @apply flex items-center gap-2;
+}
+
+/* --- .prop-section / .prop-head / .prop-body (Phase 12-C) ---
+ * Creator メタデータタブ + Settings の各セクションで使う基本パネル。 */
+.prop-section {
+  @apply mb-3.5 overflow-hidden rounded-[10px] border border-line;
+  background: rgba(255, 255, 255, 0.015);
+}
+.prop-head {
+  @apply flex items-center justify-between border-b border-line px-3.5 py-2.5 font-mono text-[10px] uppercase tracking-[0.12em] text-fg-mute;
+}
+.prop-body {
+  @apply flex flex-col gap-3 px-3.5 py-3;
+}
+
+/* --- Page layout (Phase 12-F) ---
+ * 各ページ (Library / Creator / Marketplace / Settings / Appearance) 共通の
+ * 大枠ラッパとヘッダー、グリッド。 */
+.content {
+  @apply relative flex flex-1 flex-col overflow-auto pb-8 pt-6;
+  padding-left: 28px;
+  padding-right: 28px;
+}
+.page-head {
+  @apply mb-[22px] flex items-end justify-between gap-4;
+}
+.page-head h1 {
+  @apply m-0 font-display text-[26px] font-semibold tracking-[-0.02em];
+}
+.page-head p {
+  @apply mx-0 mb-0 mt-1 text-[13px] text-fg-dim;
+}
+.page-head p code {
+  @apply font-mono text-[12px] text-accent;
+}
+.page-head .right {
+  @apply flex items-center gap-2;
+}
+.grid {
+  @apply grid gap-4;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+}
