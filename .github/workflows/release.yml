@@ -61,7 +61,7 @@ jobs:
           - target: aarch64-pc-windows-msvc
             arch_label: arm64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Rust toolchain
         uses: dtolnay/rust-toolchain@stable
