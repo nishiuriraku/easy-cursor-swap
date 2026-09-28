@@ -54,4 +54,15 @@ describe('LibraryDropOverlay', () => {
     await wrapper.setProps({ show: false })
     expect(wrapper.find('.drop').exists()).toBe(false)
   })
+
+  it('overrides title/sub/icon via props (P08a creator reuse)', () => {
+    const wrapper = mount(LibraryDropOverlay, {
+      props: { show: true, title: 'T', sub: 'S', icon: 'Import' },
+      global: { stubs },
+    })
+    const html = wrapper.html()
+    expect(html).toContain('T')
+    expect(html).toContain('S')
+    expect(html).not.toContain('.cursorpack')
+  })
 })

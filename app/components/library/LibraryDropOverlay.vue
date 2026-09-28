@@ -8,18 +8,24 @@
 
 const { t } = useI18n()
 
-defineProps<{
-  show: boolean
-}>()
+withDefaults(
+  defineProps<{
+    show: boolean
+    title?: string
+    sub?: string
+    icon?: string
+  }>(),
+  { title: undefined, sub: undefined, icon: 'Pkg' },
+)
 </script>
 
 <template>
   <Transition name="fade">
     <div v-if="show" class="drop">
       <div class="drop-inner">
-        <UiIcon name="Pkg" :size="56" class="ghost-icon" />
-        <h3>{{ t('library.drop') }}</h3>
-        <p>{{ t('library.dropSub') }}</p>
+        <UiIcon :name="icon" :size="56" class="ghost-icon" />
+        <h3>{{ title ?? t('library.drop') }}</h3>
+        <p>{{ sub ?? t('library.dropSub') }}</p>
       </div>
     </div>
   </Transition>

@@ -10,6 +10,7 @@
 
 use crate::config::ConfigManager;
 use crate::errors::AppError;
+use crate::platform::SharedBackend;
 use crate::theme::{CursorpackInspection, RolePreview, ThemeManager, ThemeSummary};
 use tauri::State;
 
@@ -20,14 +21,17 @@ use tauri::State;
 /// 該当テーマの `is_active` を **false** にして返し、`config` 側の
 /// `active_theme_id` もクリアする (Source of Truth はレジストリ)。
 #[tauri::command]
-pub fn get_themes(config: State<'_, ConfigManager>) -> Result<Vec<ThemeSummary>, AppError> {
+pub fn get_themes(
+    config: State<'_, ConfigManager>,
+    backend: State<'_, SharedBackend>,
+) -> Result<Vec<ThemeSummary>, AppError> {
     let cfg = config.get()?;
     let mut active_id = cfg.general.active_theme_id;
 
     // 実態と乖離していれば clear (例: ユーザーが Windows のマウスのプロパティで
     // 別スキームを選択 / 既定にリセットした直後)
     if let Some(id) = active_id {
-        if !ThemeManager::theme_active_in_registry(id) {
+        if !ThemeManager::theme_active_in_registry(backend.as_ref(), id) {
             tracing::info!(
                 "active_theme_id={} はレジストリ実態と一致しないためクリアします",
                 id
@@ -86,10 +90,14 @@ pub fn get_theme_role_previews(
 /// 失敗時は内部のスナップショットから自動ロールバックされる。
 /// 成功時は config の `active_theme_id` と `usage` を更新して永続化する。
 #[tauri::command]
-pub fn apply_theme(config: State<'_, ConfigManager>, theme_id: String) -> Result<(), AppError> {
+pub fn apply_theme(
+    config: State<'_, ConfigManager>,
+    backend: State<'_, SharedBackend>,
+    theme_id: String,
+) -> Result<(), AppError> {
     let id = uuid::Uuid::parse_str(&theme_id)
         .map_err(|e| AppError::Theme(format!("無効なテーマ ID: {}", e)))?;
-    ThemeManager::apply_theme(id)?;
+    ThemeManager::apply_theme(backend.as_ref(), id)?;
     // 適用成功 → アクティブテーマ ID + 利用統計を永続化
     let now = chrono::Utc::now().to_rfc3339();
     config.update(|c| {
@@ -151,19 +159,23 @@ pub fn import_cursorpack(path: String) -> Result<String, AppError> {
 /// # エラー
 /// レジストリで現在適用中のテーマを削除しようとした場合は `AppError::Theme` を返す。
 #[tauri::command]
-pub fn delete_theme(config: State<'_, ConfigManager>, theme_id: String) -> Result<(), AppError> {
+pub fn delete_theme(
+    config: State<'_, ConfigManager>,
+    backend: State<'_, SharedBackend>,
+    theme_id: String,
+) -> Result<(), AppError> {
     let id = uuid::Uuid::parse_str(&theme_id)
         .map_err(|e| AppError::Theme(format!("無効なテーマ ID: {}", e)))?;
     // 適用中のテーマは削除不可。UI 側でもボタンを disabled にしているが、
     // IPC 直叩き / 競合状態 / 別経路からの呼び出しに備えた IPC 層ガード。
     // Source of Truth はレジストリなので theme_active_in_registry を使う。
-    if ThemeManager::theme_active_in_registry(id) {
+    if ThemeManager::theme_active_in_registry(backend.as_ref(), id) {
         return Err(AppError::Theme(
             "適用中のテーマは削除できません。先に別のテーマを適用してから削除してください。"
                 .to_string(),
         ));
     }
-    ThemeManager::delete_theme(id)?;
+    ThemeManager::delete_theme(backend.as_ref(), id)?;
     // 削除されたテーマが (active_in_registry でなくても) config 側に残っていれば掃除
     if let Ok(c) = config.get() {
         if c.general.active_theme_id == Some(id) {
@@ -275,7 +287,7 @@ mod tests {
     }
 
     /// プロセス ID + ナノ秒 nonce で衝突回避する test tempdir ヘルパー。
-    /// 既存 `config.rs::tests::make_tempdir` と同方針 (グローバル env を触らない)。
+    /// 既存 `config/tests.rs::make_tempdir` と同方針 (グローバル env を触らない)。
     fn make_tempdir(label: &str) -> std::path::PathBuf {
         let pid = std::process::id();
         let nonce = std::time::SystemTime::now()

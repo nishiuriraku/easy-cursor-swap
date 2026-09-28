@@ -9,13 +9,13 @@ use crate::config::{AppConfig, BackupInfo, ConfigManager};
 use crate::environment::EnvironmentReport;
 use crate::errors::AppError;
 use crate::health::is_major_bump;
-use crate::registry::RegistryManager;
+use crate::platform::SharedBackend;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
 
 /// reset 系 IPC の共通後処理。
 ///
-/// レジストリ操作 (`RegistryManager::reset_to_windows_default` 等) を closure で
+/// レジストリ操作 (`CursorBackend::reset_to_os_default` 等) を closure で
 /// 受け、成功した場合のみ `active_theme_id` クリアと `cursor-changed` 発火を
 /// 走らせる。 `action_label` はログ出力時の prefix。
 ///
@@ -62,9 +62,13 @@ where
 ///  - config の `active_theme_id` を `None` にクリア
 ///  - `cursor-changed` イベントを発火
 #[tauri::command]
-pub fn reset_to_default(app: AppHandle, config: State<'_, ConfigManager>) -> Result<(), AppError> {
+pub fn reset_to_default(
+    app: AppHandle,
+    config: State<'_, ConfigManager>,
+    backend: State<'_, SharedBackend>,
+) -> Result<(), AppError> {
     reset_with_cleanup(app, config, "reset_to_default", || {
-        RegistryManager::reset_to_windows_default()
+        backend.reset_to_os_default()
     })
 }
 
@@ -72,9 +76,13 @@ pub fn reset_to_default(app: AppHandle, config: State<'_, ConfigManager>) -> Res
 ///
 /// `reset_to_default` と同じく `active_theme_id` クリア + `cursor-changed` 発火を行う。
 #[tauri::command]
-pub fn reset_to_initial(app: AppHandle, config: State<'_, ConfigManager>) -> Result<(), AppError> {
+pub fn reset_to_initial(
+    app: AppHandle,
+    config: State<'_, ConfigManager>,
+    backend: State<'_, SharedBackend>,
+) -> Result<(), AppError> {
     reset_with_cleanup(app, config, "reset_to_initial", || {
-        RegistryManager::restore_from_initial_snapshot()
+        backend.restore_from_initial_snapshot()
     })
 }
 
@@ -502,13 +510,13 @@ pub fn open_url(url: String) -> Result<(), AppError> {
     #[cfg(windows)]
     {
         shell_execute_w(Some("open"), &url)?;
+        Ok(())
     }
     #[cfg(not(windows))]
     {
         let _ = url;
-        return Err(AppError::Other("open_url は Windows 専用です".to_string()));
+        Err(AppError::UnsupportedPlatform("open_url".to_string()))
     }
-    Ok(())
 }
 
 /// アクセシビリティ機能との競合を検出する。
@@ -516,8 +524,8 @@ pub fn open_url(url: String) -> Result<(), AppError> {
 /// レジストリから MouseSonar / HighContrast / CursorBaseSize を読み取り、
 /// テーマ適用時にユーザーへ警告すべき状態かを返す。
 #[tauri::command]
-pub fn get_accessibility_conflicts() -> AccessibilityConflicts {
-    AccessibilityConflicts::detect()
+pub fn get_accessibility_conflicts(backend: State<'_, SharedBackend>) -> AccessibilityConflicts {
+    backend.accessibility_conflicts()
 }
 
 /// マウスポインターのサイズ (HKCU\Control Panel\Cursors\CursorBaseSize) を設定する。
@@ -535,9 +543,9 @@ pub fn get_accessibility_conflicts() -> AccessibilityConflicts {
 /// `32 + 16 * (slider - 1)` で DWORD に変換してから呼ぶ。実換算式は Rust 側
 /// (`registry::slider_position_to_base_size`) が single source of truth。
 #[tauri::command]
-pub fn set_cursor_base_size(size: u32) -> Result<u32, AppError> {
+pub fn set_cursor_base_size(size: u32, backend: State<'_, SharedBackend>) -> Result<u32, AppError> {
     tracing::info!("set_cursor_base_size 要求: size={}", size);
-    let written = RegistryManager::set_cursor_base_size(size)?;
+    let written = backend.set_cursor_base_size(size)?;
     // **注意**: ここで `cursor-changed` イベントを emit してはいけない。
     // `set_cursor_base_size` は CursorBaseSize DWORD と SetSystemCursor だけを触り、
     // 役割パス (Arrow / IBeam / ...) は **一切変更しない** ため、テーマ自体の
@@ -617,13 +625,11 @@ pub fn open_log_folder() -> Result<(), AppError> {
     #[cfg(windows)]
     {
         shell_execute_w(None, &dir.to_string_lossy())?;
+        Ok(())
     }
     #[cfg(not(windows))]
     {
         let _ = dir;
-        return Err(AppError::Other(
-            "open_log_folder は Windows 専用です".to_string(),
-        ));
+        Err(AppError::UnsupportedPlatform("open_log_folder".to_string()))
     }
-    Ok(())
 }

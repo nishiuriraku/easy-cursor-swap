@@ -29,6 +29,11 @@ interface OssEntry {
 
 const FRONTEND_DEPS: OssEntry[] = [
   { name: 'Vue.js', license: 'MIT', url: 'https://github.com/vuejs/core' },
+  {
+    name: 'Inter (bundled font)',
+    license: 'OFL-1.1',
+    url: 'https://github.com/rsms/inter',
+  },
   { name: 'Nuxt', license: 'MIT', url: 'https://github.com/nuxt/nuxt' },
   { name: 'Vue Router', license: 'MIT', url: 'https://github.com/vuejs/router' },
   { name: 'Tailwind CSS', license: 'MIT', url: 'https://github.com/tailwindlabs/tailwindcss' },

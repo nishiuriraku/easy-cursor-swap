@@ -27,16 +27,20 @@ pub use roles::CursorRole;
 pub use scheme::WindowsScheme;
 pub use snapshot::{PendingSnapshotState, RegistrySnapshot};
 
-use crate::config::ConfigManager;
+#[cfg(windows)]
+use crate::config::ConfigManager; // list_windows_schemes のみ
 use crate::errors::{AppError, AppResult};
-use env::encode_utf16_with_nul;
-use scheme::{
-    build_scheme_value, compute_apply_values, parse_scheme_value, sanitize_scheme_name,
-    scheme_is_app_managed,
-};
+#[cfg(windows)]
+use env::encode_utf16_with_nul; // register_scheme のみ
+#[cfg(windows)]
+use scheme::compute_apply_values; // apply_cursors (Windows のみ)
+#[cfg(windows)]
+use scheme::{build_scheme_value, parse_scheme_value, sanitize_scheme_name, scheme_is_app_managed};
 use std::collections::HashMap;
 use std::path::PathBuf;
+#[cfg(windows)]
 use winreg::enums::RegType;
+#[cfg(windows)]
 use winreg::RegValue;
 
 /// 所有 `Vec<u8>` から `winreg::RegValue` を構築する小さなヘルパー。
@@ -46,6 +50,7 @@ use winreg::RegValue;
 /// ライフタイムは `'static`。この変換ロジックを 1 箇所に閉じ込めることで、winreg
 /// 側の API 形状が将来また変わったときも修正点を限定できる。
 #[inline]
+#[cfg(windows)]
 fn to_reg_value(bytes: Vec<u8>, vtype: RegType) -> RegValue<'static> {
     RegValue {
         bytes: bytes.into(),
@@ -60,8 +65,68 @@ fn to_reg_value(bytes: Vec<u8>, vtype: RegType) -> RegValue<'static> {
 /// レジストリ操作を管理するマネージャー
 pub struct RegistryManager;
 
+/// transaction の Windows 実装 (`RoleStore` seam)。
+///
+/// `write_roles` は fail-fast (旧 `write_all_roles` 本体)、`restore_roles` は
+/// best-effort 収集 (旧 `restore_from_snapshot_pub` 本体)。意味論は P02 C2 で
+/// 機械的に移動したもので、1 bit も変えていない。
+#[cfg(windows)]
+pub(crate) struct WinRoleStore;
+
+#[cfg(windows)]
+impl transaction::RoleStore for WinRoleStore {
+    fn read_roles(&self) -> AppResult<HashMap<String, String>> {
+        RegistryManager::read_current_cursors()
+    }
+
+    fn write_roles(&self, values: &HashMap<String, String>) -> AppResult<()> {
+        use winreg::enums::*;
+        use winreg::RegKey;
+
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let cursors_key = hkcu
+            .open_subkey_with_flags("Control Panel\\Cursors", KEY_READ | KEY_WRITE)
+            .map_err(|e| AppError::Registry(format!("Cursors キーを開けません: {}", e)))?;
+
+        for (name, value) in values {
+            if let Err(e) = cursors_key.set_value(name, value) {
+                return Err(AppError::Registry(format!(
+                    "レジストリ書き込み失敗 ({}): {}",
+                    name, e
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    fn restore_roles(&self, values: &HashMap<String, String>) -> AppResult<()> {
+        RegistryManager::restore_from_snapshot_pub(values)
+    }
+
+    fn write_default_scheme_name(&self, name: &str) -> AppResult<()> {
+        use winreg::enums::*;
+        use winreg::RegKey;
+
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let cursors_key = hkcu
+            .open_subkey_with_flags("Control Panel\\Cursors", KEY_WRITE)
+            .map_err(|e| {
+                AppError::Registry(format!("Cursors キーを開けません (Default): {}", e))
+            })?;
+        cursors_key
+            .set_value("", &name)
+            .map_err(|e| AppError::Registry(format!("(Default) 値書込失敗: {}", e)))?;
+        Ok(())
+    }
+
+    fn notify(&self) -> AppResult<()> {
+        RegistryManager::notify_cursor_change_pub()
+    }
+}
+
 impl RegistryManager {
     /// 現在のカーソル設定をレジストリから読み取る
+    #[cfg(windows)]
     pub fn read_current_cursors() -> AppResult<HashMap<String, String>> {
         use winreg::enums::*;
         use winreg::RegKey;
@@ -146,6 +211,7 @@ impl RegistryManager {
     /// Wave 1C: 内部実装を [`crate::registry::transaction::run_cursor_transaction`]
     /// に委譲する。snapshot → mutation → notify → commit / rollback の契約は
     /// transaction モジュール側で一元管理される。
+    #[cfg(windows)]
     pub fn apply_cursors(cursor_paths: &HashMap<String, PathBuf>) -> AppResult<()> {
         let entries = compute_apply_values(cursor_paths);
         let write_values: HashMap<String, String> = entries
@@ -158,7 +224,12 @@ impl RegistryManager {
             write_values: &write_values,
             default_scheme_name: None,
         };
-        crate::registry::transaction::run_cursor_transaction(&spec)
+        crate::registry::transaction::run_cursor_transaction(&WinRoleStore, &spec)
+    }
+
+    #[cfg(not(windows))]
+    pub fn apply_cursors(_cursor_paths: &HashMap<String, PathBuf>) -> AppResult<()> {
+        Err(AppError::UnsupportedPlatform("apply_cursors".to_string()))
     }
 
     /// 適用したテーマを `Control Panel\Cursors\Schemes\<scheme_name>` に登録する。
@@ -170,6 +241,7 @@ impl RegistryManager {
     /// 値は `REG_EXPAND_SZ` で書き込み、17 役割を scheme_index 順にカンマ区切りする。
     /// 失敗してもユーザー体験への影響は限定的なので、tracing::warn で記録するのみで
     /// 上位層に伝播させる呼び出し元 / 静かに無視する呼び出し元を選べるよう Result を返す。
+    #[cfg(windows)]
     pub fn register_scheme(
         scheme_name: &str,
         cursor_paths: &HashMap<String, PathBuf>,
@@ -223,6 +295,7 @@ impl RegistryManager {
     ///
     /// 戻り値: 削除に成功した Schemes 値の数。Schemes キー自体が存在しない場合は
     /// `Ok(0)` (= 成功扱い: そもそも掃除する対象がない)。
+    #[cfg(windows)]
     pub fn unregister_schemes_for_theme(theme_dir: &std::path::Path) -> AppResult<usize> {
         use winreg::enums::*;
         use winreg::RegKey;
@@ -291,6 +364,7 @@ impl RegistryManager {
     /// モードは `EmergencyBestEffort` (= snapshot 失敗を警告のみで続行)
     /// を維持し、緊急リセットの目的ならば安全側 (= 続行) に倒す方針を変えない。
     /// `(Default)` 値 (= スキーム名表示用) には "Windows Default" を書く。
+    #[cfg(windows)]
     pub fn reset_to_windows_default() -> AppResult<()> {
         // 17 役割すべてを空文字列にする (= Windows 既定継承)。
         // Wave 2AB Task 8 レビュー反映: 空 HashMap を渡すと transaction::write_all_roles
@@ -306,9 +380,16 @@ impl RegistryManager {
             write_values: &write_values,
             default_scheme_name: Some("Windows Default"),
         };
-        crate::registry::transaction::run_cursor_transaction(&spec)?;
+        crate::registry::transaction::run_cursor_transaction(&WinRoleStore, &spec)?;
         tracing::info!("Windows 既定カーソルにリセットしました");
         Ok(())
+    }
+
+    #[cfg(not(windows))]
+    pub fn reset_to_windows_default() -> AppResult<()> {
+        Err(AppError::UnsupportedPlatform(
+            "reset_to_windows_default".to_string(),
+        ))
     }
 
     /// スナップショットからレジストリを復元する (private ラッパー)。
@@ -332,6 +413,7 @@ impl RegistryManager {
     /// 記録しつつ、最終的に 1 つの Err にまとめて伝播する。PII redaction は
     /// ロール名 (= 役割レジストリ名 = "Arrow" 等、PII ではない) のみ含むので
     /// redact 不要。
+    #[cfg(windows)]
     pub fn restore_from_snapshot_pub(values: &HashMap<String, String>) -> AppResult<()> {
         use winreg::enums::*;
         use winreg::RegKey;
@@ -452,6 +534,7 @@ impl RegistryManager {
     }
 
     #[cfg(not(windows))]
+    #[allow(dead_code)] // 呼び出し元が Windows 限定のため Linux では未使用
     fn notify_cursor_change() -> AppResult<()> {
         Self::notify_cursor_change_pub()
     }
@@ -461,6 +544,44 @@ impl RegistryManager {
         // Windows 以外ではスキップ
         tracing::warn!("Windows 以外の環境では SystemParametersInfoW は使用できません");
         Ok(())
+    }
+
+    // P01 で追加した非 Windows スタブ群。レジストリ I/O が無い環境では
+    // 変更系を Err で安全側に倒す (`AppError::UnsupportedPlatform`)。
+    #[cfg(not(windows))]
+    pub fn read_current_cursors() -> AppResult<HashMap<String, String>> {
+        Err(AppError::UnsupportedPlatform(
+            "read_current_cursors".to_string(),
+        ))
+    }
+
+    #[cfg(not(windows))]
+    pub fn register_scheme(
+        _scheme_name: &str,
+        _cursor_paths: &HashMap<String, PathBuf>,
+    ) -> AppResult<()> {
+        Err(AppError::UnsupportedPlatform("register_scheme".to_string()))
+    }
+
+    #[cfg(not(windows))]
+    pub fn unregister_schemes_for_theme(_theme_dir: &std::path::Path) -> AppResult<usize> {
+        Err(AppError::UnsupportedPlatform(
+            "unregister_schemes_for_theme".to_string(),
+        ))
+    }
+
+    #[cfg(not(windows))]
+    pub fn restore_from_snapshot_pub(_values: &HashMap<String, String>) -> AppResult<()> {
+        Err(AppError::UnsupportedPlatform(
+            "restore_from_snapshot_pub".to_string(),
+        ))
+    }
+
+    #[cfg(not(windows))]
+    pub fn list_windows_schemes() -> AppResult<Vec<WindowsScheme>> {
+        Err(AppError::UnsupportedPlatform(
+            "list_windows_schemes".to_string(),
+        ))
     }
 
     /// OS 標準ポインター影 (`SPI_SETCURSORSHADOW`) の ON/OFF を切り替える。
@@ -810,6 +931,7 @@ impl RegistryManager {
     /// なので snapshot 保護 (= NormalTransactional) を適用する。
     /// `active_theme_id` クリアと `cursor-changed` 発火は呼び出し側
     /// (`commands::system::reset_with_cleanup`) で行う。
+    #[cfg(windows)]
     pub fn restore_from_initial_snapshot() -> AppResult<()> {
         let snapshot = snapshot::load_initial_snapshot()?;
         let spec = crate::registry::transaction::TransactionSpec {
@@ -818,9 +940,16 @@ impl RegistryManager {
             write_values: &snapshot.original_values,
             default_scheme_name: None,
         };
-        crate::registry::transaction::run_cursor_transaction(&spec)?;
+        crate::registry::transaction::run_cursor_transaction(&WinRoleStore, &spec)?;
         tracing::info!("初回スナップショットからカーソル設定を復元しました");
         Ok(())
+    }
+
+    #[cfg(not(windows))]
+    pub fn restore_from_initial_snapshot() -> AppResult<()> {
+        Err(AppError::UnsupportedPlatform(
+            "restore_from_initial_snapshot".to_string(),
+        ))
     }
 
     /// `HKCU\Control Panel\Cursors\Schemes` に保存されたカーソルスキームを列挙する。
@@ -836,6 +965,7 @@ impl RegistryManager {
     /// 全スロット空のスキーム (= 何も上書きしない) は UI 表示する意味がないので除外する。
     /// Schemes キー自体が存在しない (一度もカスタムスキームを保存していない) 場合は
     /// 空配列を返す。
+    #[cfg(windows)]
     pub fn list_windows_schemes() -> AppResult<Vec<WindowsScheme>> {
         use winreg::enums::*;
         use winreg::RegKey;
@@ -907,6 +1037,7 @@ impl RegistryManager {
     /// transaction に分ける。17 役割書込が snapshot 保護込みで安全側に倒れた
     /// 後、`(Default)` 書込だけ別 transaction (NormalTransactional, default_scheme_name)
     /// で行う。
+    #[cfg(windows)]
     pub fn apply_windows_scheme(scheme: &WindowsScheme) -> AppResult<()> {
         let cursor_paths: HashMap<String, PathBuf> = scheme
             .cursor_paths
@@ -926,9 +1057,16 @@ impl RegistryManager {
             write_values: &empty,
             default_scheme_name: Some(&scheme.name),
         };
-        crate::registry::transaction::run_cursor_transaction(&spec)?;
+        crate::registry::transaction::run_cursor_transaction(&WinRoleStore, &spec)?;
         tracing::info!("Windows スキーム '{}' を適用しました", scheme.name);
         Ok(())
+    }
+
+    #[cfg(not(windows))]
+    pub fn apply_windows_scheme(_scheme: &WindowsScheme) -> AppResult<()> {
+        Err(AppError::UnsupportedPlatform(
+            "apply_windows_scheme".to_string(),
+        ))
     }
 }
 
@@ -1781,6 +1919,13 @@ mod tests {
     #[test]
     fn reset_to_windows_default_clears_all_17_roles() {
         let _apply_lock = apply_cursors_test_lock();
+        // reset は transaction 経由で pending snapshot ファイル I/O を行う。
+        // env var はプロセス共有のため、override を使う他テスト (snapshot round_trip 等)
+        // と直列化しないと互いの TempDir 上の `_pending_apply.snapshot` を汚染する
+        // (並列実行で `original_values` が空で読み戻される実発事例あり)。
+        let _override_lock = crate::config::cursors_dir_override_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
 
         // HKCU の 17 役割を退避 (Drop で確実に復元)。
         let _cleanup = CursorValuesCleanup::capture();

@@ -19,7 +19,11 @@ defineProps<{
   <div class="settings-row" :data-search-anchor="anchor">
     <div class="row-text">
       <div :class="['row-label', { mono }]">{{ label }}</div>
-      <div v-if="desc" class="row-desc">{{ desc }}</div>
+      <slot name="desc">
+        <div v-if="desc" class="row-desc">
+          {{ desc }}
+        </div>
+      </slot>
     </div>
     <div class="row-control">
       <slot />
@@ -41,6 +45,9 @@ defineProps<{
 }
 .row-label.mono {
   @apply font-mono;
+}
+.row-text {
+  min-width: 0;
 }
 .row-desc {
   @apply mt-[3px] text-[11.5px] leading-[1.5] text-fg-mute;

@@ -4,13 +4,15 @@
 //! 取得とインストールを担当する。HTTPS + rustls / SHA-256 / Ed25519 で検証。
 
 use crate::errors::AppError;
-use crate::marketplace::{MarketplaceClient, MarketplaceIndex, MarketplaceInstallRequest};
+use crate::marketplace::{MarketplaceClient, MarketplaceIndexResult, MarketplaceInstallRequest};
 
 /// 公式インデックス (Marketplace) のメタデータを取得する。
 /// `nishiuriraku/easy-cursor-swap-index` リポジトリの `index.json` を HTTPS + rustls で取得。
+/// ネットワーク失敗時は前回成功時のディスクキャッシュを `stale: true` で返す (P11)。
+/// キャッシュも無ければエラー。
 #[tauri::command]
-pub async fn marketplace_fetch_index() -> Result<MarketplaceIndex, AppError> {
-    MarketplaceClient::fetch_index().await
+pub async fn marketplace_fetch_index() -> Result<MarketplaceIndexResult, AppError> {
+    MarketplaceClient::fetch_index_cached().await
 }
 
 /// 公式インデックスから指定エントリをダウンロード→検証→展開する。

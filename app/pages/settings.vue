@@ -9,10 +9,9 @@
  *       重い状態を持たないため SFC 分割するメリットが薄い)。
  *       将来セクションが肥大化したら個別 SFC に切り出す。
  */
-import type { SettingsSearchEntry } from '~/composables/useSettingsSearch'
 import type { GithubAccount } from '~/types/githubAuth'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 
 type SectionId =
   | 'general'
@@ -42,519 +41,120 @@ const SECTIONS: SectionDef[] = [
 ]
 
 const section = ref<SectionId>('general')
-const searchQuery = ref('')
 
-const { config: appConfig, load: loadConfig, update: persistConfig } = useAppSettings()
-
-// バイト ⇄ GB / MB 変換ユーティリティ
-const BYTES_PER_GB = 1024 * 1024 * 1024
-const BYTES_PER_MB = 1024 * 1024
-
-// UI 用ローカル ref。`appConfig` (Rust 側) との双方向同期を watch で実現する。
-const general = ref({
-  language: 'ja' as 'ja' | 'en' | 'auto',
-  applyShadowControl: true,
-  showApplyToast: true,
-  hideMainOnLaunch: false,
-  crashReporting: false,
-})
-
-// マウスポインターのサイズ (1〜15 スライダー)。Windows 設定アプリ「マウスポインターとタッチ」
-// と同じ HKCU\Control Panel\Cursors\CursorBaseSize を更新するが、Accessibility\CursorSize は
-// 書かない invariant のため、Windows 設定 UI 側スライダー位置とは意図的に同期しない
-// (specs/2026-05-23-cursor-size-redesign-v2)。値は Rust 側が single source of truth で、
-// 本 UI は変更を即時 IPC で反映する (dirty/save フローには乗せない — テーマ適用とは
-// 独立した OS 全体設定のため)。
-//
-// スライダー位置 ↔ DWORD の換算式は `registry::slider_position_to_base_size` と
-// 1:1 で同期: `dword = 32 + 16 * (slider - 1)` (slider=1 → 32, slider=15 → 256)。
-const CURSOR_SIZE_MIN_DWORD = 32
-const CURSOR_SIZE_STEP_DWORD = 16
-const CURSOR_SIZE_MIN_SLIDER = 1
-const CURSOR_SIZE_MAX_SLIDER = 15
-
-const cursorSizeSlider = ref<number>(CURSOR_SIZE_MIN_SLIDER)
-const cursorSizeBusy = ref(false)
-const cursorSizeError = ref<string | null>(null)
-// Windows 側の生の Accessibility\CursorSize (slider 1-15)。`cursorSizeSlider` は
-// CursorBaseSize から算出された slider 位置だが、こちらは Accessibility key の直値。
-// eoa pipeline 状態 (== Windows Settings でサイズが拡大されている状態) の検出に使う。
-const cursorSizeSliderRaw = ref<number>(1)
-// Windows 側の生の Accessibility\CursorType (0=白, 1=黒, 2=反転, 3=白拡大時, 6=カスタム ...)。
-// gate 判定には使わないが UI メッセージのバリエーション切替に使う。
-const cursorTypeRaw = ref<number>(0)
-// eoa pipeline 起動中の判定: `cursorSizeSliderRaw != 1`。
-// 本アプリの slider はこのとき disabled にする (spec: case E + CursorSize gate)。
-const cursorAccessibilityActive = computed(() => cursorSizeSliderRaw.value !== 1)
-
-function dwordToSlider(dword: number): number {
-  const clamped = Math.max(
-    CURSOR_SIZE_MIN_DWORD,
-    Math.min(CURSOR_SIZE_MIN_DWORD + CURSOR_SIZE_STEP_DWORD * (CURSOR_SIZE_MAX_SLIDER - 1), dword),
-  )
-  // 四捨五入で最近接スライダー位置に snap
-  const offset = clamped - CURSOR_SIZE_MIN_DWORD
-  const zeroBased = Math.round(offset / CURSOR_SIZE_STEP_DWORD)
-  return CURSOR_SIZE_MIN_SLIDER + zeroBased
-}
-
-function sliderToDword(slider: number): number {
-  const clamped = Math.max(CURSOR_SIZE_MIN_SLIDER, Math.min(CURSOR_SIZE_MAX_SLIDER, slider))
-  return CURSOR_SIZE_MIN_DWORD + CURSOR_SIZE_STEP_DWORD * (clamped - 1)
-}
-
-/** スライダー確定時 (`@change`): DWORD に変換して即時 IPC 反映する。 */
-async function onCursorSizeCommit(next: number) {
-  cursorSizeBusy.value = true
-  cursorSizeError.value = null
-  try {
-    const written = await invokeTauri<number>('set_cursor_base_size', {
-      size: sliderToDword(next),
-    })
-    // Rust 側でクランプされた値を slider に反映 (snap)
-    cursorSizeSlider.value = dwordToSlider(written)
-  } catch (err) {
-    cursorSizeError.value = err instanceof Error ? err.message : String(err)
-    // 失敗時は OS 側を再取得してロールバック表示
-    await refreshCursorSizeFromOs()
-  } finally {
-    cursorSizeBusy.value = false
-  }
-}
-
-async function refreshCursorSizeFromOs() {
-  try {
-    const a11y = await useAccessibility().getAccessibilityConflicts()
-    cursorSizeSlider.value = dwordToSlider(a11y?.cursor_base_size ?? CURSOR_SIZE_MIN_DWORD)
-    cursorSizeSliderRaw.value = a11y?.cursor_size_slider ?? 1
-    cursorTypeRaw.value = a11y?.cursor_type ?? 0
-  } catch {
-    // 取得失敗時は既定 (slider=1, type=0) のまま
-    cursorSizeSlider.value = CURSOR_SIZE_MIN_SLIDER
-    cursorSizeSliderRaw.value = 1
-    cursorTypeRaw.value = 0
-  }
-}
-const startup = ref({
-  autoStart: true,
-  startMinimized: true,
-})
-const library = ref({
-  totalLimitWarnGb: 1,
-  storageWarnEnabled: true,
-})
-const security = ref({
-  requireSignedThemes: false,
-  warnUnsignedImport: true,
-})
-const {
-  info: keystoreInfo,
-  busy: keystoreBusy,
-  lastError: keystoreError,
-  refresh: refreshKeystore,
-  generate: generateKeystore,
-  remove: removeKeystore,
-  exportPrivate: exportPrivateKey,
-  importPrivate: importPrivateKey,
-} = useKeystore()
-
-const {
-  checking: updaterChecking,
-  downloading: updaterDownloading,
-  available: updaterAvailable,
-  error: updaterError,
-  progressBytes: updaterProgress,
-  totalBytes: updaterTotal,
-  check: checkForUpdate,
-  downloadAndInstall: downloadUpdate,
-  relaunch: relaunchApp,
-} = useUpdater()
-const updaterMessage = ref<string | null>(null)
+const { config: appConfig, load: loadConfig } = useAppSettings()
 
 /**
- * Updater のエラーをカテゴリ分類して i18n キー経由で表示文字列にする。
- * `error.value` には生 message を残しているので、ここで毎回 classify する。
+ * 設定フォーム (P08a S1: useSettingsForm に集約)。
  */
-const updaterErrorDisplay = computed(() => {
-  if (!updaterError.value) return null
-  const { key, message } = classifyUpdaterError(updaterError.value)
-  return t(key, { message })
-})
+const {
+  general,
+  startup,
+  library,
+  security,
+  logging,
+  updates,
+  githubAccount,
+  dirty,
+  saving,
+  saveError,
+  applyConfigToLocal,
+  save,
+  discardChanges,
+} = useSettingsForm()
+/**
+ * カーソルサイズ設定 (P08a S2: useCursorSizeSettings に集約)。
+ * OS 即時反映のため dirty/save フローには乗せない。
+ */
+const {
+  cursorSizeSlider,
+  cursorSizeBusy,
+  cursorSizeError,
+  cursorSizeSliderRaw,
+  cursorTypeRaw,
+  cursorAccessibilityActive,
+  CURSOR_SIZE_MIN_SLIDER,
+  CURSOR_SIZE_MAX_SLIDER,
+  sliderToDword,
+  onCursorSizeCommit,
+  onRefreshCursorSizeFromOs,
+  onOpenWindowsCursorSettings,
+} = useCursorSizeSettings()
+/**
+ * キーストア操作 (P08a S3: useKeystoreSettingsActions に集約)。
+ */
+const {
+  keystoreInfo,
+  keystoreBusy,
+  keystoreError,
+  keystoreMessage,
+  passphrasePrompt,
+  refreshKeystore,
+  onKeystoreGenerate,
+  onKeystoreRegenerate,
+  onKeystoreExport,
+  onKeystoreImport,
+  onKeystoreDelete,
+  onPassphraseConfirm,
+} = useKeystoreSettingsActions({ t })
 
-// Wave 2B / Task 5: localStorage キーとクールダウンは `useUpdaterBootstrap` と
-// 共有の `~/composables/updaterConstants` から取得する (3 箇所目の重複を待たない)。
-import { LAST_UPDATE_CHECK_KEY, UPDATE_CHECK_COOLDOWN_MS } from '~/composables/updaterConstants'
+/**
+ * アップデータ設定 (P08a S4: useUpdaterSettings に集約)。
+ */
+const {
+  updaterChecking,
+  updaterDownloading,
+  updaterAvailable,
+  updaterMessage,
+  updaterErrorDisplay,
+  updaterProgress,
+  updaterTotal,
+  autoCheckHint,
+  onForceRecheck,
+  onCheckUpdate,
+  onDownloadUpdate,
+} = useUpdaterSettings({ t })
 
-/** 次回自動チェック (= 起動時 bootstrap が走るタイミング) までの残り時間を文字列で返す。 */
-const autoCheckHint = computed(() => {
-  if (typeof localStorage === 'undefined') return t('settings.autoCheckHintReady')
-  const raw = Number(localStorage.getItem(LAST_UPDATE_CHECK_KEY) ?? '0')
-  if (!Number.isFinite(raw) || raw === 0) return t('settings.autoCheckHintReady')
-  const remainingMs = raw + UPDATE_CHECK_COOLDOWN_MS - Date.now()
-  if (remainingMs <= 0) return t('settings.autoCheckHintReady')
-  const hours = Math.max(1, Math.ceil(remainingMs / (60 * 60 * 1000)))
-  return t('settings.autoCheckHintHours', { hours })
-})
+// クラッシュレポート (LoggingSection 用、P08a S5: useCrashReportsState に集約)。
+// 件数は `list_crash_reports` の戻り長、メッセージは送信/クリア後の
+// ユーザー向けトースト相当の文字列。
+const {
+  count: crashReportsCount,
+  busy: crashBusy,
+  message: crashMessage,
+  load: loadCrashReports,
+  submit: onSubmitCrashReports,
+  clear: onClearCrashReports,
+} = useCrashReportsState({ t, isOptedIn: () => general.value.crashReporting })
 
-/** クールダウンを破って次回起動時に再チェックさせる。即時 check はしない (UX 上シンプル化)。 */
-function onForceRecheck() {
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(LAST_UPDATE_CHECK_KEY, '0')
-  }
-  updaterMessage.value = t('settings.autoCheckHintReady')
-}
-
-// 利用可能なアップデート情報 (メジャー跨ぎ判定に使用)
-const pendingUpdateVersion = ref<string | null>(null)
-
-async function onCheckUpdate() {
-  updaterMessage.value = null
-  pendingUpdateVersion.value = null
-  const info = await checkForUpdate()
-  if (info) {
-    pendingUpdateVersion.value = info.version
-    updaterMessage.value = t('settings.updateNewVersion', {
-      version: info.version,
-      current: info.currentVersion,
-    })
-  } else if (!updaterError.value) {
-    // check() は失敗時も null を返すため、エラーが立っているケースを除外しないと
-    // 「最新版」と「フェッチ失敗」が同時表示されてしまう。
-    updaterMessage.value = t('settings.updateUpToDate')
-  }
-}
-
-async function onDownloadUpdate() {
-  updaterMessage.value = null
-
-  // メジャーバージョン跨ぎ確認
-  if (pendingUpdateVersion.value) {
-    const appInfo = await useAppInfo().load()
-    // get_app_info が取れない場合 (通常 Tauri 起動中は発生しない) は、空バージョンで
-    // メジャー跨ぎを誤判定しないよう中断する。直接 invoke していた頃の throw→中断と
-    // 同じ「現在バージョン不明ならダウンロードへ進まない」挙動を維持する。
-    if (!appInfo) return
-    const isMajorJump = await invokeTauri<boolean>('check_update_is_major_jump', {
-      currentVersion: appInfo.version,
-      newVersion: pendingUpdateVersion.value,
-    })
-    if (isMajorJump) {
-      const { ask } = await import('@tauri-apps/plugin-dialog')
-      const proceed = await ask(
-        t('settings.updateMajorJumpWarning', {
-          version: pendingUpdateVersion.value,
-        }),
-        { title: t('settings.updateMajorJumpTitle'), kind: 'warning' },
-      )
-      if (!proceed) return
-    }
-  }
-
-  const ok = await downloadUpdate()
-  if (ok) {
-    updaterMessage.value = t('settings.updateDownloadComplete')
-    const { ask } = await import('@tauri-apps/plugin-dialog')
-    const restart = await ask(t('settings.updateRelaunchAsk'), {
-      title: t('settings.updateRelaunchTitle'),
-      kind: 'info',
-    })
-    if (restart) await relaunchApp()
-  }
-}
-
-// パスフレーズプロンプト制御
-const passphrasePrompt = ref<{ mode: 'export' | 'import'; open: boolean }>({
-  mode: 'export',
-  open: false,
-})
-const keystoreMessage = ref<string | null>(null)
-const githubAccount = ref<GithubAccount | null>(null)
-const logging = ref({
-  logLevel: 'INFO' as 'TRACE' | 'DEBUG' | 'INFO' | 'WARN' | 'ERROR',
-  retentionDays: 14,
-  maxSizeMb: 100,
-})
-const updates = ref({
-  autoUpdate: true,
-})
-
-// クラッシュレポート (LoggingSection 用)。件数は `list_crash_reports` の
-// 戻り長、メッセージは送信/クリア後のユーザー向けトースト相当の文字列。
-const crashReportsCount = ref(0)
-const crashBusy = ref(false)
-const { listCrashReports, submitCrashReports, clearCrashReports } = useCrashReports()
-const crashMessage = ref<string | null>(null)
-
-async function loadCrashReports() {
-  try {
-    const reports = await listCrashReports()
-    crashReportsCount.value = reports?.length ?? 0
-  } catch (err) {
-    crashMessage.value = t('settings.crashLoadFailed', {
-      error: err instanceof Error ? err.message : String(err),
-    })
-  }
-}
-
-async function onSubmitCrashReports() {
-  crashBusy.value = true
-  crashMessage.value = null
-  try {
-    const summary = await submitCrashReports()
-    if (summary.sent === 0 && summary.failed === 0 && summary.skipped === 0) {
-      // 全部 0 のときは「opt-in OFF」か「ビルド時 env 未設定」のどちらかだが、
-      // フロントからは区別できないため crash_reporting フラグで判定する。
-      crashMessage.value = general.value.crashReporting
-        ? t('settings.crashSubmitNoCredentials')
-        : t('settings.crashSubmitOptedOut')
-    } else {
-      crashMessage.value = t('settings.crashSubmitResult', {
-        sent: summary.sent,
-        failed: summary.failed,
-        skipped: summary.skipped,
-      })
-    }
-    await loadCrashReports()
-  } catch (err) {
-    crashMessage.value = err instanceof Error ? err.message : String(err)
-  } finally {
-    crashBusy.value = false
-  }
-}
-
-async function onClearCrashReports() {
-  crashBusy.value = true
-  crashMessage.value = null
-  try {
-    const removed = await clearCrashReports()
-    crashMessage.value = t('settings.crashClearedCount', { count: removed })
-    await loadCrashReports()
-  } catch (err) {
-    crashMessage.value = err instanceof Error ? err.message : String(err)
-  } finally {
-    crashBusy.value = false
-  }
-}
-
-const dirty = ref(false)
-const saving = ref(false)
-const saveError = ref<string | null>(null)
-
-// applyConfigToLocal 実行中は dirty watch の発火を抑制する
-let suppressDirty = false
-
-/** appConfig (Rust 側) → UI ローカル ref へ反映 */
-function applyConfigToLocal() {
-  const c = appConfig.value
-  if (!c) return
-  suppressDirty = true
-  general.value.language = (c.general.language as 'ja' | 'en' | 'auto') ?? 'auto'
-  general.value.crashReporting = c.general.crash_reporting
-  // Wave 1B-2: 適用トースト表示フラグを UI ローカル ref に反映。
-  // undefined (V1 等の旧データ) の場合は V2 既定値 true を採用。
-  general.value.showApplyToast = c.general.show_apply_toast ?? true
-  // Wave 1B-3: カーソル影 ON/OFF 制御フラグ。V2 既定 true。
-  general.value.applyShadowControl = c.general.apply_shadow_control ?? true
-  startup.value.autoStart = c.general.auto_start
-  // Wave 1B-4: --autostart 起動時のウィンドウ最小化。V2 既定 false。
-  startup.value.startMinimized = c.general.start_minimized ?? false
-  updates.value.autoUpdate = c.general.auto_update
-
-  library.value.totalLimitWarnGb = c.security.storage_warning_threshold / BYTES_PER_GB
-  // Wave 1B-6: ストレージ警告トースト表示フラグ。V2 既定 true。
-  library.value.storageWarnEnabled = c.general.show_storage_warning ?? true
-
-  // Wave 1B-5: 未署名インポート制御 2 フラグ。V2 既定 false / true。
-  security.value.requireSignedThemes = c.security.require_signed_themes ?? false
-  security.value.warnUnsignedImport = c.security.warn_unsigned_import ?? true
-
-  logging.value.logLevel = (c.logging.level as typeof logging.value.logLevel) ?? 'INFO'
-  logging.value.retentionDays = c.logging.retention_days
-  logging.value.maxSizeMb = c.logging.max_total_size / BYTES_PER_MB
-
-  githubAccount.value = c.github_account ?? null
-
-  dirty.value = false
-  // watch のマイクロタスク実行後にフラグを解除する
-  nextTick(() => {
-    suppressDirty = false
-  })
-}
-
-/** UI ローカル ref → appConfig 形状にコピー */
-function flushLocalToConfig() {
-  return persistConfig((draft) => {
-    draft.general.language = general.value.language
-    draft.general.crash_reporting = general.value.crashReporting
-    // Wave 1B-2: 適用トースト表示フラグを draft に書き戻し。
-    // (旧 V1 データで undefined の場合は V2 既定値 true を採用)
-    draft.general.show_apply_toast = general.value.showApplyToast ?? true
-    // Wave 1B-3: 影制御フラグを draft に書き戻し。V2 既定 true。
-    draft.general.apply_shadow_control = general.value.applyShadowControl ?? true
-    draft.general.auto_start = startup.value.autoStart
-    // Wave 1B-4: --autostart 起動時ウィンドウ最小化。V2 既定 false。
-    draft.general.start_minimized = startup.value.startMinimized ?? false
-    draft.general.auto_update = updates.value.autoUpdate
-
-    draft.security.storage_warning_threshold = Math.round(
-      library.value.totalLimitWarnGb * BYTES_PER_GB,
-    )
-    // Wave 1B-5: 未署名インポート制御 2 フラグ。V2 既定 false / true。
-    draft.security.require_signed_themes = security.value.requireSignedThemes ?? false
-    draft.security.warn_unsigned_import = security.value.warnUnsignedImport ?? true
-
-    // Wave 1B-6: ストレージ警告トースト表示フラグ。V2 既定 true。
-    draft.general.show_storage_warning = library.value.storageWarnEnabled ?? true
-
-    draft.logging.level = logging.value.logLevel
-    draft.logging.retention_days = logging.value.retentionDays
-    draft.logging.max_total_size = Math.round(logging.value.maxSizeMb * BYTES_PER_MB)
-  })
-}
-
-async function save() {
-  saving.value = true
-  saveError.value = null
-  try {
-    await flushLocalToConfig()
-    dirty.value = false
-  } catch (err) {
-    saveError.value = err instanceof Error ? err.message : String(err)
-  } finally {
-    saving.value = false
-  }
-}
-
-function discardChanges() {
-  applyConfigToLocal()
-}
-
-const { exportProfile: runExportProfile, importProfile: runImportProfile } = useProfileBackup()
-const profileBusy = ref(false)
-const profileMessage = ref<string | null>(null)
+const {
+  busy: profileBusy,
+  message: profileMessage,
+  exportWithDialog,
+  importWithDialog,
+} = useProfileBackupDialog({ t })
 
 async function exportProfile() {
-  profileBusy.value = true
-  profileMessage.value = null
-  try {
-    const { save } = await import('@tauri-apps/plugin-dialog')
-    const today = new Date().toISOString().slice(0, 10)
-    const target = await save({
-      defaultPath: `easycursorswap-${today}.cursorprofile`,
-      filters: [{ name: 'EasyCursorSwap Profile', extensions: ['cursorprofile'] }],
-    })
-    if (!target) return
-    await runExportProfile(target)
-    profileMessage.value = t('settings.profileExportSuccess', { target })
-  } catch (err) {
-    profileMessage.value = t('settings.profileExportFail', {
-      error: err instanceof Error ? err.message : String(err),
-    })
-  } finally {
-    profileBusy.value = false
-  }
+  await exportWithDialog()
 }
 
 async function importProfile() {
-  profileBusy.value = true
-  profileMessage.value = null
-  try {
-    const { open, ask } = await import('@tauri-apps/plugin-dialog')
-    const selected = await open({
-      multiple: false,
-      filters: [{ name: 'EasyCursorSwap Profile', extensions: ['cursorprofile'] }],
-    })
-    if (!selected || Array.isArray(selected)) return
-    const overwrite = await ask(t('settings.profileImportAskMsg'), {
-      title: t('settings.profileImportAskTitle'),
-      kind: 'warning',
-    })
-    await runImportProfile(selected, !overwrite)
-    profileMessage.value = t('settings.profileImportSuccess', {
-      target: selected,
-    })
+  const needReload = await importWithDialog()
+  if (needReload) {
     // 設定の再読み込み
     await loadConfig()
     applyConfigToLocal()
-  } catch (err) {
-    profileMessage.value = t('settings.profileImportFail', {
-      error: err instanceof Error ? err.message : String(err),
-    })
-  } finally {
-    profileBusy.value = false
   }
 }
 
-async function onKeystoreGenerate() {
-  keystoreMessage.value = null
-  await generateKeystore(false)
-}
-async function onKeystoreRegenerate() {
-  // 既存鍵を上書き再生成。ユーザーには事前に dialog::ask で確認。
-  const { ask } = await import('@tauri-apps/plugin-dialog')
-  const proceed = await ask(t('settings.askRegenerateMsg'), {
-    title: t('settings.askRegenerateTitle'),
-    kind: 'warning',
-  })
-  if (!proceed) return
-  keystoreMessage.value = null
-  await generateKeystore(true)
-}
-async function onPassphraseConfirm(passphrase: string) {
-  const mode = passphrasePrompt.value.mode
-  keystoreMessage.value = null
-  if (mode === 'export') {
-    const { save } = await import('@tauri-apps/plugin-dialog')
-    const today = new Date().toISOString().slice(0, 10)
-    const target = await save({
-      defaultPath: `easycursorswap-key-${today}.cfkey`,
-      filters: [{ name: 'EasyCursorSwap Key', extensions: ['cfkey'] }],
-    })
-    if (!target) return
-    const written = await exportPrivateKey(passphrase, target)
-    if (written !== null) {
-      keystoreMessage.value = t('settings.keyExportSuccess', {
-        size: written,
-        target,
-      })
-    }
-  } else {
-    const { open } = await import('@tauri-apps/plugin-dialog')
-    const selected = await open({
-      multiple: false,
-      filters: [{ name: 'EasyCursorSwap Key', extensions: ['cfkey'] }],
-    })
-    if (!selected || Array.isArray(selected)) return
-    const result = await importPrivateKey(passphrase, selected)
-    if (result) {
-      keystoreMessage.value = t('settings.keyImportSuccess', {
-        keyId: result.key_id ?? '?',
-      })
-    }
-  }
-}
-
-function onKeystoreExport() {
-  passphrasePrompt.value = { mode: 'export', open: true }
-}
-
-function onKeystoreImport() {
-  passphrasePrompt.value = { mode: 'import', open: true }
-}
-
-async function onKeystoreDelete() {
-  const { ask } = await import('@tauri-apps/plugin-dialog')
-  const proceed = await ask(t('settings.askDeleteMsg'), {
-    title: t('settings.askDeleteTitle'),
-    kind: 'warning',
-  })
-  if (!proceed) return
-  keystoreMessage.value = null
-  await removeKeystore()
-}
+// GitHub 連携解除 (Wave 3A / L1-5): 直 invoke 廃止 → useGithubAuth.revoke() 経由。
+const { revoke: revokeGithubLink } = useGithubAuth()
 
 async function onGithubUnlink() {
-  await invokeTauri<void>('revoke_github_link')
+  // useGithubAuth.revoke() は `revoke_github_link` IPC の薄いラッパー。
+  // 失敗時は throw されるので caller (このハンドラ) が後処理 (loadConfig 等) を
+  // 行うか判断できる。
+  await revokeGithubLink()
   // useAppSettings の load() は force=false 既定でキャッシュを返すため、
   // revoke 後にフロント ref に古い github_account が残ってしまう。force=true で再取得する。
   await loadConfig(true)
@@ -567,159 +167,24 @@ async function onConfigRestored() {
   applyConfigToLocal()
 }
 
-// 設定検索 composable (横断検索 → ジャンプ)
-// SettingsSearchDropdown は Teleport で body 直下に描画するため、トリガー要素の
-// 座標計算用に検索ラッパ div の ref を渡す。
-const searchAnchorRef = ref<HTMLElement | null>(null)
+const { replay: replayOnboarding } = useOnboarding()
+function onReplayOnboarding() {
+  void replayOnboarding()
+}
+
+// 設定検索コンテキスト (P08a V4: SettingsSearchBox に渡す)。
 const searchContext = computed(() => ({
   hasKeystore: keystoreInfo.value?.has_keypair ?? false,
 }))
-const {
-  open: searchOpen,
-  activeIndex: searchActiveIndex,
-  visibleResults: searchResults,
-  overflowCount: searchOverflow,
-  focus: openSearchDropdown,
-  close: closeSearchDropdown,
-  moveActive: moveSearchActive,
-  resetActive: resetSearchActive,
-  jumpTo: jumpToSearchResult,
-} = useSettingsSearch({
-  query: searchQuery,
-  locale,
-  context: searchContext,
-  sectionRef: section,
-})
-
-function onSearchInput() {
-  resetSearchActive()
-  searchOpen.value = searchQuery.value.trim().length > 0
-}
-
-function onSearchKeydown(ev: KeyboardEvent) {
-  if (!searchOpen.value) return
-  switch (ev.key) {
-    case 'ArrowDown':
-      ev.preventDefault()
-      moveSearchActive(1)
-      break
-    case 'ArrowUp':
-      ev.preventDefault()
-      moveSearchActive(-1)
-      break
-    case 'Enter': {
-      ev.preventDefault()
-      const r = searchResults.value[searchActiveIndex.value]
-      if (r) {
-        searchQuery.value = ''
-        closeSearchDropdown()
-        void jumpToSearchResult(r.entry)
-      }
-      break
-    }
-    case 'Escape':
-      ev.preventDefault()
-      closeSearchDropdown()
-      break
-  }
-}
-
-function onSearchSelect(entry: SettingsSearchEntry) {
-  searchQuery.value = ''
-  closeSearchDropdown()
-  void jumpToSearchResult(entry)
-}
-
-function onSearchHover(i: number) {
-  searchActiveIndex.value = i
-}
-
-function onSearchBlur() {
-  // mousedown 経由の select 後でも安全に閉じる (mousedown 内で .prevent 済)
-  setTimeout(() => closeSearchDropdown(), 0)
-}
-
-/**
- * GeneralSection の「OS から再取得」リンクから明示的に呼ばれる手動 refresh。
- */
-function onRefreshCursorSizeFromOs() {
-  void refreshCursorSizeFromOs()
-}
-
-/**
- * GeneralSection の「Windows 設定を開く」ボタンから呼ばれる。eoa pipeline 解除のために
- * Windows のアクセシビリティ設定 (マウスポインターとタッチ) へ deep-link する。
- */
-async function onOpenWindowsCursorSettings() {
-  try {
-    // **正しい URI** は `easeofaccess-mousepointer` (= マウスポインターとタッチ)。
-    // `easeofaccess-cursor` は **テキストカーソル (挿入点)** ページのため別ページに飛ぶ。
-    // Microsoft 公式: https://learn.microsoft.com/windows/apps/develop/launch/launch-settings
-    await useExternalUrl().openExternalUrl('ms-settings:easeofaccess-mousepointer')
-  } catch (err) {
-    console.warn('[Settings] open ms-settings:easeofaccess-mousepointer failed:', err)
-  }
-}
-
-/**
- * Windows 側 (アクセシビリティ「マウスポインターとタッチ」スライダー / コントロール
- * パネル / 他アプリ) でカーソルサイズが変更されたあと、本アプリへフォーカスが戻った
- * タイミングで OS 状態を再取得し、`cursorAccessibilityActive` を更新する。
- *
- * 2026-05-22 の case B+ 刷新で一度撤去したが、続く 2026-05-23 の case E 採用で
- * 撤去の元になっていた「徐々に大きくなる」現象は eoa pipeline 起因と判明したため、
- * 再導入しても再発しない:
- *  - eoa active 時は UI が disabled → ユーザーは slider 操作できない → ループ起点なし
- *  - eoa inactive 時は CursorSize==1 → 我々の write が標準 pipeline で完結 →
- *    Windows が auto-correct する経路がない
- *
- * Windows Settings 経由で CursorSize=1 に戻ったあと、focus 戻りで自動的に slider が
- * enabled に切替わる UX を提供するためにも必要。
- */
-function onWindowFocus() {
-  void refreshCursorSizeFromOs()
-}
-function onVisibilityChange() {
-  if (typeof document === 'undefined') return
-  if (document.visibilityState === 'visible') void refreshCursorSizeFromOs()
-}
 
 onMounted(async () => {
   await loadConfig()
   applyConfigToLocal()
   await refreshKeystore()
   await loadCrashReports()
-  await refreshCursorSizeFromOs()
-  // eoa pipeline 解除 (= Windows Settings で size=1) を検出するため、focus 戻り /
-  // visibilitychange を購読して自動再同期する。case E + CursorSize gate により、
-  // 過去発生した「徐々に大きくなる」ループは再発しない (詳細は onWindowFocus の docstring)。
-  if (typeof window !== 'undefined') {
-    window.addEventListener('focus', onWindowFocus)
-  }
-  if (typeof document !== 'undefined') {
-    document.addEventListener('visibilitychange', onVisibilityChange)
-  }
   // 起動時の同期完了を watch で検出してローカル参照に反映
   watch(appConfig, applyConfigToLocal)
 })
-
-onUnmounted(() => {
-  if (typeof window !== 'undefined') {
-    window.removeEventListener('focus', onWindowFocus)
-  }
-  if (typeof document !== 'undefined') {
-    document.removeEventListener('visibilitychange', onVisibilityChange)
-  }
-})
-
-// 任意のローカル変更を dirty フラグ化 (applyConfigToLocal 実行中は除外)
-watch(
-  [general, startup, library, security, logging, updates],
-  () => {
-    if (appConfig.value && !suppressDirty) dirty.value = true
-  },
-  { deep: true },
-)
 
 const currentSection = computed(() => SECTIONS.find((s) => s.id === section.value) ?? SECTIONS[0]!)
 
@@ -737,37 +202,7 @@ function selectSection(id: SectionId) {
         <span class="sep">/</span>
         <span class="crumb active">{{ t(currentSection.labelKey) }}</span>
       </div>
-      <div ref="searchAnchorRef" class="search" style="max-width: 280px; position: relative">
-        <UiIcon name="Search" :size="14" style="color: var(--fg-mute)" />
-        <input
-          v-model="searchQuery"
-          :placeholder="t('settings.searchPlaceholder')"
-          :aria-label="t('common.search')"
-          role="combobox"
-          :aria-expanded="searchOpen"
-          aria-controls="settings-search-listbox"
-          :aria-activedescendant="
-            searchOpen && searchResults.length > 0
-              ? `settings-search-opt-${searchActiveIndex}`
-              : undefined
-          "
-          @input="onSearchInput"
-          @focus="openSearchDropdown"
-          @keydown="onSearchKeydown"
-          @blur="onSearchBlur"
-        />
-        <SettingsSearchDropdown
-          v-if="searchOpen"
-          id="settings-search-listbox"
-          :anchor-el="searchAnchorRef"
-          :results="searchResults"
-          :overflow-count="searchOverflow"
-          :active-index="searchActiveIndex"
-          :query="searchQuery"
-          @select="onSearchSelect"
-          @hover="onSearchHover"
-        />
-      </div>
+      <SettingsSearchBox v-model:section="section" :context="searchContext" />
       <div class="tb-actions">
         <UiButton variant="ghost" :disabled="!dirty || saving" @click="discardChanges">
           {{ t('common.discard') }}
@@ -821,6 +256,7 @@ function selectSection(id: SectionId) {
           @update:cursor-size-slider="onCursorSizeCommit"
           @refresh-cursor-size-from-os="onRefreshCursorSizeFromOs"
           @open-windows-cursor-settings="onOpenWindowsCursorSettings"
+          @replay-onboarding="onReplayOnboarding"
           @config-restored="onConfigRestored"
         />
 
@@ -828,6 +264,7 @@ function selectSection(id: SectionId) {
           v-else-if="section === 'startup'"
           v-model:auto-start="startup.autoStart"
           v-model:start-minimized="startup.startMinimized"
+          :is-msix-packaged="isMsixPackaged"
         />
 
         <LibrarySection
@@ -886,6 +323,7 @@ function selectSection(id: SectionId) {
           :updater-error="updaterErrorDisplay"
           :updater-progress="updaterProgress"
           :updater-total="updaterTotal"
+          :is-msix-packaged="isMsixPackaged"
           @check-update="onCheckUpdate"
           @download-update="onDownloadUpdate"
           @force-recheck="onForceRecheck"
@@ -926,30 +364,6 @@ function selectSection(id: SectionId) {
 .settings-content {
   @apply overflow-y-auto px-7 pb-8 pt-6;
 }
-.section-head {
-  @apply mb-[22px];
-}
-.section-head h1 {
-  @apply m-0 font-display text-[22px] font-semibold tracking-[-0.02em];
-}
-.section-head p {
-  @apply mt-1 text-[13px] text-fg-dim;
-  margin-left: 0;
-  margin-right: 0;
-  margin-bottom: 0;
-}
-
-.head-hint {
-  @apply font-mono text-[10px] font-normal normal-case tracking-normal text-fg-mute;
-}
-
-.prop-body {
-  padding: 4px 16px !important;
-}
-
-.profile-msg {
-  @apply mt-3 break-all rounded-md border border-accent-line p-3 font-mono text-[11.5px] text-fg-dim;
-  padding: 10px 12px;
-  background: rgba(124, 242, 212, 0.06);
-}
+/* (P08a: .section-head/.head-hint/.prop-body/.profile-msg は各 Section
+ * コンポーネント側に同等スタイルがあるためページ側の複製を削除) */
 </style>

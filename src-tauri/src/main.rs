@@ -18,7 +18,7 @@ use app_lib::cursor_watcher;
 use app_lib::health::{RollbackTarget, StartupCheck};
 use app_lib::hotkey;
 use app_lib::logging;
-use app_lib::registry::{PendingSnapshotState, RegistryManager};
+use app_lib::platform;
 use app_lib::tray;
 
 /// 連続起動失敗 3 回検出時のロールバック案内ダイアログ。
@@ -51,6 +51,21 @@ fn show_rollback_dialog(target: &RollbackTarget) {
     };
     if result != IDYES {
         return;
+    }
+
+    // Wave 4B.4: MSIX 環境では NSIS インストーラ download をスキップして
+    // release ページの Web ブラウザ案内に退避する。
+    match appusermodel::decide_rollback_action() {
+        appusermodel::RollbackPolicy::ReleasePage => {
+            tracing::warn!(
+                "MSIX 環境のため自動ロールバック installer download はスキップ。release page に退避します"
+            );
+            open_release_page_in_browser(&target.releases_page_url);
+            return;
+        }
+        appusermodel::RollbackPolicy::InstallerDownload => {
+            // unpackaged 経路は従来通り installer を DL + 検証 + 起動
+        }
     }
 
     match auto_rollback_install(target) {
@@ -105,6 +120,7 @@ fn open_release_page_in_browser(url: &str) {
 }
 
 /// `https://.../EasyCursorSwap_0.1.0_x64-setup.exe` → `EasyCursorSwap_0.1.0_x64-setup.exe`
+#[cfg(windows)]
 fn installer_filename_from_url(url: &str) -> String {
     url.rsplit('/')
         .next()
@@ -242,14 +258,18 @@ fn main() {
         }
     }
 
+    // OS カーソル backend (起動処理で使ってから manage に move する)。
+    let backend: platform::SharedBackend = platform::default_backend();
+
     // 初回起動時のスナップショット保存
-    if let Err(e) = RegistryManager::save_initial_snapshot() {
+    if let Err(e) = backend.save_initial_snapshot() {
         tracing::warn!("初回スナップショットの保存に失敗: {}", e);
     }
 
     // 孤児カーソル復旧: ~/.custom_cursors/<UUID>/ が手動削除されていた場合、
     // config の参照をクリアし、active なら Windows 既定へ戻す
-    match app_lib::theme::ThemeManager::cleanup_orphan_references(&config_manager) {
+    match app_lib::theme::ThemeManager::cleanup_orphan_references(backend.as_ref(), &config_manager)
+    {
         Ok(true) => tracing::info!("孤児カーソル参照を復旧しました"),
         Ok(false) => tracing::debug!("孤児カーソル参照なし"),
         Err(e) => tracing::warn!("孤児カーソルチェックに失敗: {}", e),
@@ -264,46 +284,8 @@ fn main() {
     //      混在状態になり得る。適用前値の部分復元は不整合を残すため、Windows 既定へ
     //      リセットして安全側に倒す (意図的な設計。バグ修正ではない)。
     //
-    // `PendingSnapshotState` 3 状態のうち、`Valid` と `Unreadable` (= ファイルは
-    // 存在するが破損 / 中途書込) はどちらも「Windows 既定へリセット」する。
-    // metadata の parse 試行は診断用 (logging) のみで、リカバリ判定には
-    // **ファイル存在のみ** を反映する。これにより「unreadable だから何もしない」
-    // 事故を防ぐ。
-    match RegistryManager::inspect_pending_snapshot() {
-        Ok(PendingSnapshotState::Valid(_snapshot)) => {
-            tracing::warn!(
-                "前回の適用処理が中断されていました。Windows 既定へリセットします (適用前への復元ではない)"
-            );
-            if let Err(e) = RegistryManager::reset_to_windows_default() {
-                tracing::error!("クラッシュリカバリに失敗: {}", e);
-            } else {
-                tracing::info!("クラッシュリカバリ完了 (Windows 既定へリセット)");
-            }
-            let _ = RegistryManager::remove_pending_snapshot();
-        }
-        Ok(PendingSnapshotState::Unreadable { reason }) => {
-            // 破損 / 中途書込 → ファイルの中身は無視し、安全側 (= Windows 既定
-            // リセット) に倒す。
-            tracing::warn!(
-                "pending スナップショットが破損しています ({}). Windows 既定へリセットします",
-                reason
-            );
-            if let Err(e) = RegistryManager::reset_to_windows_default() {
-                tracing::error!("クラッシュリカバリ (unreadable snapshot) に失敗: {}", e);
-            } else {
-                tracing::info!(
-                    "クラッシュリカバリ完了 (Windows 既定へリセット; unreadable snapshot)"
-                );
-            }
-            let _ = RegistryManager::remove_pending_snapshot();
-        }
-        Ok(PendingSnapshotState::Absent) => {
-            tracing::debug!("pending スナップショットなし（正常）");
-        }
-        Err(e) => {
-            tracing::warn!("pending スナップショットの確認に失敗: {}", e);
-        }
-    }
+    // 詳細は `platform::recover_pending_snapshot_on_startup` (ログはあちら側)。
+    let _recovery = platform::recover_pending_snapshot_on_startup(backend.as_ref());
 
     // setup クロージャは config_manager が move された後に実行されるため、
     // ホットキー文字列はここで先に取り出して持ち回す
@@ -344,6 +326,7 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .manage(config_manager)
+        .manage(backend.clone())
         .manage(cancel_registry::CancelRegistry::default())
         .manage(PendingCursorpack::default())
         .manage(crate::commands::marketplace_submit::DeviceFlowState::default())
@@ -411,7 +394,8 @@ fn main() {
                     use tauri::Emitter;
                     if let Err(reason) = res {
                         tracing::warn!("パニックホットキー登録に失敗: {}", reason);
-                        let payload = serde_json::json!({ "spec": result_spec, "reason": reason });
+                        let payload =
+                            serde_json::json!({ "spec": result_spec, "reason": reason.to_string() });
                         if let Err(err) = result_handle.emit("hotkey-register-failed", payload) {
                             tracing::warn!("hotkey-register-failed emit 失敗: {}", err);
                         }

@@ -33,6 +33,9 @@ defineEmits<{
   (e: 'download-update'): void
   (e: 'force-recheck'): void
 }>()
+
+/** 更新内容モーダルの開閉。body 全文はモーダル内で pre-wrap 表示する。 */
+const showNotes = ref(false)
 </script>
 
 <template>
@@ -41,6 +44,10 @@ defineEmits<{
       <h1>{{ t('settings.sectionUpdates') }}</h1>
       <p>{{ t('settings.descUpdates') }}</p>
     </header>
+    <div v-if="isMsixPackaged" class="msix-banner">
+      <p>{{ t('settings.storeManaged') }}</p>
+      <a href="ms-settings:apps-features-app">{{ t('settings.storeManagedLink') }}</a>
+    </div>
     <div class="prop-section">
       <div class="prop-head">{{ t('settings.groupAutoUpdate') }}</div>
       <div class="prop-body">
@@ -49,7 +56,7 @@ defineEmits<{
           :label="t('settings.autoUpdateLabel')"
           :desc="t('settings.autoUpdateDesc')"
         >
-          <SettingsToggle v-model="autoUpdate" />
+          <SettingsToggle v-model="autoUpdate" :label="t('settings.autoUpdateLabel')" />
         </SettingsRow>
         <SettingsRow
           anchor="autoCheckStatus"
@@ -79,8 +86,12 @@ defineEmits<{
               version: updaterAvailable.version,
             })
           "
-          :desc="updaterAvailable.body ?? ''"
         >
+          <template v-if="updaterAvailable.body" #desc>
+            <button type="button" class="notes-link" @click="showNotes = true">
+              {{ updaterAvailable.body }}
+            </button>
+          </template>
           <UiButton
             variant="primary"
             :loading="updaterDownloading"
@@ -114,6 +125,19 @@ defineEmits<{
         </UiAlert>
       </div>
     </div>
+    <UiModal
+      v-if="updaterAvailable"
+      :open="showNotes"
+      :title="t('settings.updateNotesTitle', { version: updaterAvailable.version })"
+      icon="Import"
+      size="md"
+      @close="showNotes = false"
+    >
+      <UiMarkdown :source="updaterAvailable.body ?? ''" />
+      <template #actions>
+        <UiButton variant="ghost" @click="showNotes = false">{{ t('common.close') }}</UiButton>
+      </template>
+    </UiModal>
   </section>
 </template>
 
@@ -155,5 +179,29 @@ defineEmits<{
   @apply mt-2 rounded-[8px] border px-3 py-2 text-[12px];
   background: rgba(106, 213, 184, 0.06);
   border-color: rgba(106, 213, 184, 0.4);
+}
+/* 更新内容の1行省略リンク。クリックで全文モーダルを開く。 */
+.notes-link {
+  @apply mt-[3px] block w-full border-0 bg-transparent p-0 text-left text-[11.5px] leading-[1.5] text-fg-mute;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.notes-link:hover {
+  color: rgb(var(--accent));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.msix-banner {
+  @apply mb-3 rounded-[10px] border px-4 py-3 text-[13px];
+  background: rgba(255, 213, 79, 0.08);
+  border-color: rgba(255, 213, 79, 0.4);
+}
+.msix-banner p {
+  @apply m-0 mb-1;
+}
+.msix-banner a {
+  color: rgb(var(--accent));
 }
 </style>

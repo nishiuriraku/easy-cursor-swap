@@ -60,9 +60,10 @@ impl ThemeManager {
     /// レジストリを Windows 既定に戻し、`active_theme_id = None` に戻す。
     ///
     /// 何もする必要がなければ `Ok(false)` を返す。復旧した場合は `Ok(true)`。
-    pub fn cleanup_orphan_references(config: &crate::config::ConfigManager) -> AppResult<bool> {
-        use crate::registry::RegistryManager;
-
+    pub fn cleanup_orphan_references(
+        backend: &dyn crate::platform::CursorBackend,
+        config: &crate::config::ConfigManager,
+    ) -> AppResult<bool> {
         let cfg = config.get()?;
         let active_orphan = cfg
             .general
@@ -77,7 +78,7 @@ impl ThemeManager {
             "孤児カーソル検出: active_theme_id={:?} のディレクトリが消失 → Windows 既定へ復元",
             cfg.general.active_theme_id
         );
-        if let Err(e) = RegistryManager::reset_to_windows_default() {
+        if let Err(e) = backend.reset_to_os_default() {
             tracing::warn!("孤児復旧時の Windows 既定への戻し失敗: {}", e);
         }
 

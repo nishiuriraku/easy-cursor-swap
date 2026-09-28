@@ -1,0 +1,187 @@
+name: Build MSIX Artifacts
+
+# MSIX パッケージ (.msix) を生成し、x64 / arm64 両アーキの署名前/署名後 artifact を
+# upload する manual workflow (Wave 4C)。
+#
+# Authenticode 署名は Microsoft Store 経由の自動署名で賄う方針 (2026-07-25 確定)。
+# ローカル開発・CI 動作確認のため test self-signed cert を作成し、signtool で
+# test sign する。**本番証明書や Store アップロード (.msixupload) は本 workflow の対象外**。
+#
+# 必要 GitHub Secrets (任意、未設定なら skip):
+#   MSIX_PUBLISHER          : 任意。Publisher 文字列 (例: CN=EasyCursorSwap, O=EasyCursorSwap, C=JP)
+#                             未設定時は AppxManifest テンプレ既定の値を使用。
+#   MSIX_TEST_CERT_PASSWORD  : 任意。test self-signed 証明書のパスワード。
+#                             未設定時はランダム生成して workflow 内で使用。
+#
+# 動作確認:
+#   1. actions タブ → "Build MSIX Artifacts" → Run workflow
+#   2. x64 / arm64 両 .msix と validator レポートが artifacts に出る
+#   3. msix-smoke ジョブ (x64 のみ) で Add-AppxPackage / Remove-AppxPackage を
+#      try/finally で実行し、~/.custom_cursors/ sentinel の永続化を検証
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-msix-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # -----------------------------------------------------------
+  # MSIX パッケージ生成 (matrix: x64 / arm64)
+  #
+  # gen_msix_manifest_all.sh で両アーキの AppxManifest.xml を生成し、
+  # makeappx pack で .msix に固める。test self-signed cert で signtool sign。
+  # -----------------------------------------------------------
+  msix-build:
+    name: Build (${{ matrix.arch_label }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch_label: x64
+            target: x86_64-pc-windows-msvc
+            rust_target: x86_64-pc-windows-msvc
+          - arch_label: arm64
+            target: aarch64-pc-windows-msvc
+            rust_target: aarch64-pc-windows-msvc
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: ${{ matrix.rust_target }}
+
+      - name: Install npm dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Generate AppxManifest (x64 / arm64)
+        shell: pwsh
+        run: |
+          bash src-tauri/build-helpers/gen_msix_manifest_all.sh src-tauri/tauri.conf.json
+          Get-ChildItem distribution/msix/out
+
+      - name: Prepare MSIX payload dir
+        shell: pwsh
+        run: |
+          $arch = "${{ matrix.arch_label }}"
+          $payload = "msix-payload-$arch"
+          New-Item -ItemType Directory -Force -Path "$payload/Assets" | Out-Null
+          Copy-Item -Recurse -Force "distribution/msix/out/$arch/AppxManifest.xml" "$payload/"
+          # 画像アセット (存在する場合のみ)
+          if (Test-Path "distribution/msix/Assets") {
+            Copy-Item -Recurse -Force "distribution/msix/Assets/*" "$payload/Assets/"
+          }
+          $version = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
+          "version: $version, arch: $arch" | Out-Host
+
+      - name: Generate self-signed test certificate
+        shell: pwsh
+        env:
+          CERT_PASSWORD: ${{ secrets.MSIX_TEST_CERT_PASSWORD }}
+        run: |
+          # test 証明書を発行。Publisher と一致する CN を使うことで
+          # Add-AppxPackage の publisher 検証を通す。
+          $publisher = if ($env:MSIX_PUBLISHER) { $env:MSIX_PUBLISHER } else { "CN=EasyCursorSwap, O=EasyCursorSwap, C=JP" }
+          $cert = New-SelfSignedCertificate -Subject $publisher -CertStoreLocation "Cert:\CurrentUser\My" -KeyAlgorithm RSA -KeyLength 2048 -NotAfter (Get-Date).AddDays(30) -KeyUsage DigitalSignature -Type CodeSigningCert
+          $pwd = if ($env:CERT_PASSWORD) { ConvertTo-SecureString -String $env:CERT_PASSWORD -Force -AsPlainText } else { ConvertTo-SecureString -String ([guid]::NewGuid().ToString()) -Force -AsPlainText }
+          Export-PfxCertificate -Cert $cert -FilePath "msix-test-cert.pfx" -Password $pwd | Out-Null
+          "MSIX_TEST_CERT_PWD=$([System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($pwd)))" >> $env:GITHUB_ENV
+
+      - name: Pack with makeappx
+        shell: pwsh
+        run: |
+          $version = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
+          $arch = "${{ matrix.arch_label }}"
+          $out = "EasyCursorSwap_${version}_${arch}.msix"
+          & "C:/Program Files (x86)/Windows Kits/10/bin/10.0.22621.0/x64/makeappx.exe" pack /d "msix-payload-$arch" /p $out /o
+          if ($LASTEXITCODE -ne 0) { throw "makeappx failed" }
+          "Wrote: $out" | Out-Host
+
+      - name: Sign with signtool
+        shell: pwsh
+        run: |
+          $version = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
+          $arch = "${{ matrix.arch_label }}"
+          $msix = "EasyCursorSwap_${version}_${arch}.msix"
+          & "C:/Program Files (x86)/Windows Kits/10/bin/10.0.22621.0/x64/signtool.exe" sign /fd SHA256 /f "msix-test-cert.pfx" /p "$env:MSIX_TEST_CERT_PWD" $msix
+          if ($LASTEXITCODE -ne 0) { throw "signtool sign failed" }
+          & "C:/Program Files (x86)/Windows Kits/10/bin/10.0.22621.0/x64/signtool.exe" verify /v $msix
+          if ($LASTEXITCODE -ne 0) { throw "signtool verify failed" }
+
+      - name: Upload signed .msix
+        uses: actions/upload-artifact@v4
+        with:
+          name: msix-${{ matrix.arch_label }}
+          path: |
+            EasyCursorSwap_*_${{ matrix.arch_label }}.msix
+          if-no-files-found: error
+          retention-days: 14
+
+  # -----------------------------------------------------------
+  # x64 のみ: Add-AppxPackage smoke test
+  #
+  # test sign 済み .msix を Add-AppxPackage → Remove-AppxPackage を
+  # try/finally で実行。~/.custom_cursors/ sentinel の永続化 (uninstall 後も
+  # ファイルが残る) を検証する。
+  # -----------------------------------------------------------
+  msix-smoke:
+    name: Install/Remove smoke (x64)
+    runs-on: windows-latest
+    needs: msix-build
+    if: matrix.arch_label == 'x64'
+    steps:
+      - name: Download x64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: msix-x64
+          path: msix-artifacts-x64
+
+      - name: Create ~/.custom_cursors/ persistence sentinel
+        shell: pwsh
+        run: |
+          $sentinel = Join-Path $env:USERPROFILE ".custom_cursors/cursor_store_sentinel.txt"
+          New-Item -ItemType Directory -Force -Path (Split-Path $sentinel) | Out-Null
+          "pre-install sentinel" | Set-Content -Path $sentinel
+          "sentinel created: $sentinel" | Out-Host
+
+      - name: Add-AppxPackage + Remove-AppxPackage (try/finally)
+        shell: pwsh
+        run: |
+          $msix = Get-ChildItem "msix-artifacts-x64/*.msix" | Select-Object -First 1
+          if (-not $msix) { throw "msix artifact not found" }
+          $installed = $null
+          try {
+            Add-AppxPackage -Path $msix.FullName -ErrorAction Stop
+            $installed = Get-AppxPackage -AllUsers | Where-Object { $_.Name -like "*easycursorswap*" } | Select-Object -First 1
+            if (-not $installed) { throw "パッケージ一覧に easycursorswap が見つからない" }
+            "Installed: $($installed.PackageFullName)" | Out-Host
+          } finally {
+            if ($installed) {
+              try { Remove-AppxPackage -Package $installed.PackageFullName -AllUsers -ErrorAction Stop } catch { "Remove-AppxPackage エラー: $_" | Out-Host }
+            }
+            # sentinel が残っていれば MSIX uninstall 後も永続化されている
+            $sentinel = Join-Path $env:USERPROFILE ".custom_cursors/cursor_store_sentinel.txt"
+            if (Test-Path $sentinel) {
+              "OK: ~/.custom_cursors/cursor_store_sentinel.txt は uninstall 後も存続" | Out-Host
+            } else {
+              throw "sentinel が uninstall 後に消えた (永続化契約違反)"
+            }
+            Remove-Item $sentinel -ErrorAction SilentlyContinue
+          }

@@ -92,6 +92,7 @@ impl AppConfigV1 {
                 apply_shadow_control: v2_general_default.apply_shadow_control,
                 start_minimized: v2_general_default.start_minimized,
                 show_storage_warning: v2_general_default.show_storage_warning,
+                onboarding_version: v2_general_default.onboarding_version,
             },
             security: SecurityConfig {
                 // v1 から引き継ぐフィールド

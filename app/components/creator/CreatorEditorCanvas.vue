@@ -41,6 +41,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const { tp } = usePlatform()
 
 function centerHotspot() {
   emit('update:hotspot', { x: 0.5, y: 0.5 })
@@ -57,12 +58,12 @@ function centerHotspot() {
         </h2>
         <div class="desc">
           <template v-if="props.isRequiredRole">
-            {{ t('creator.requiredRoleNote').split('{required}')[0]
+            {{ tp('requiredRoleNote').split('{required}')[0]
             }}<b style="color: var(--accent)">{{ t('creator.requiredMark') }}</b
-            >{{ t('creator.requiredRoleNote').split('{required}')[1] }}
+            >{{ tp('requiredRoleNote').split('{required}')[1] }}
           </template>
           <template v-else>
-            {{ t('creator.optionalRoleNote', { en: props.activeRole.en }) }}
+            {{ tp('optionalRoleNote', { en: props.activeRole.en }) }}
           </template>
         </div>
       </div>

@@ -44,6 +44,19 @@ export function bootstrapUpdaterCheck(): void {
 }
 
 async function run(): Promise<void> {
+  // Wave 4B.5: MSIX 環境では Microsoft Store の自動更新に委譲するため
+  // Tauri Updater 経路を完全にスキップする。silent に return。
+  try {
+    const isMsix = await invokeTauri<boolean>('is_msix_packaged')
+    if (isMsix) {
+      console.info('[updater-bootstrap] MSIX 環境のため Tauri Updater をスキップ')
+      return
+    }
+  } catch (e) {
+    // IPC 失敗時は安全側で通常経路 (unpackaged 想定) にフォールバック。
+    console.warn('[updater-bootstrap] is_msix_packaged IPC 失敗、通常経路で続行:', e)
+  }
+
   const { load, config } = useAppSettings()
   await load()
   const c = config.value

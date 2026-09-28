@@ -5,6 +5,7 @@
  */
 
 import type { EventCallback, UnlistenFn } from '@tauri-apps/api/event'
+import { toAppError } from '~/utils/appError'
 
 let invokeFn: (<T>(cmd: string, args?: Record<string, unknown>) => Promise<T>) | null = null
 let warnedNoTauri = false
@@ -33,8 +34,14 @@ export async function invokeTauri<T = unknown>(
   try {
     return await fn<T>(cmd, args)
   } catch (err) {
-    console.error(`[Tauri] invoke '${cmd}' failed:`, err)
-    throw err
+    const normalized = toAppError(err)
+    console.error(
+      `[Tauri] invoke '${cmd}' failed:`,
+      normalized.code,
+      normalized.message,
+      normalized.raw,
+    )
+    throw normalized
   }
 }
 

@@ -10,6 +10,7 @@ import type { Ref } from 'vue'
 import ja from '~/locales/ja'
 import en from '~/locales/en'
 import type { Locale } from '~/composables/useI18n'
+import { platformKey } from '~/composables/usePlatform'
 
 export type SettingsSectionId =
   | 'general'
@@ -76,6 +77,12 @@ export const CATALOG: SettingsSearchEntry[] = [
   // ---- general ----
   {
     section: 'general',
+    anchor: 'onboardingReplay',
+    labelKey: 'settings.onboardingReplayLabel',
+    descKey: 'settings.onboardingReplayDesc',
+  },
+  {
+    section: 'general',
     anchor: 'language',
     labelKey: 'settings.languageLabel',
     descKey: 'settings.languageDesc',
@@ -84,7 +91,7 @@ export const CATALOG: SettingsSearchEntry[] = [
     section: 'general',
     anchor: 'showApplyToast',
     labelKey: 'settings.showApplyToastLabel',
-    descKey: 'settings.showApplyToastDesc',
+    descKey: platformKey('showApplyToastDesc', 'windows'),
   },
   {
     section: 'general',
@@ -222,7 +229,7 @@ export const CATALOG: SettingsSearchEntry[] = [
     section: 'logging',
     anchor: 'openLogFolder',
     labelKey: 'settings.openLogFolderLabel',
-    descKey: 'settings.openLogFolderDesc',
+    descKey: platformKey('openLogFolderDesc', 'windows'),
   },
   {
     section: 'logging',

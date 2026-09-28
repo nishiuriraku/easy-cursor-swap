@@ -2,9 +2,10 @@
 /**
  * Creator の左ペイン — 17 役割一覧 (リストボックス相当)。
  *
- * キーボード操作 (↑↓/jk/Home/End) は親側の `onRoleListKeydown` を keydown ハンドラとして
- * 受け取り、フォーカス移動を担う。アクティブな役割の判定や filled/partial/empty の
- * ステータス計算も親 (creator.vue) で行い、こちらは props を受けて表示するだけ。
+ * キーボード操作 (↑↓/jk/Home/End) は内部で処理し `select` を emit する
+ * (P08a C6: 親の onRoleListKeydown を移動)。アクティブな役割の判定や
+ * filled/partial/empty のステータス計算も親 (creator.vue) で行い、
+ * こちらは props を受けて表示するだけ。
  */
 import { CURSOR_ROLES, type CursorRoleDef } from '~/components/icons/CursorIcons'
 
@@ -12,16 +13,29 @@ type RoleStatus = 'filled' | 'empty'
 
 const { t } = useI18n()
 
-defineProps<{
+const props = defineProps<{
   filledCount: number
   activeRoleId: string
   statusOf: (id: string) => RoleStatus
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'select', id: string): void
-  (e: 'keydown', ev: KeyboardEvent): void
 }>()
+
+/** ロール一覧で ↑↓ Home End キー操作 — リストボックス相当のフォーカス移動。 */
+function onKeydown(e: KeyboardEvent) {
+  const idx = CURSOR_ROLES.findIndex((r) => r.id === props.activeRoleId)
+  if (idx === -1) return
+  let next = idx
+  if (e.key === 'ArrowDown' || e.key === 'j') next = Math.min(idx + 1, CURSOR_ROLES.length - 1)
+  else if (e.key === 'ArrowUp' || e.key === 'k') next = Math.max(idx - 1, 0)
+  else if (e.key === 'Home') next = 0
+  else if (e.key === 'End') next = CURSOR_ROLES.length - 1
+  else return
+  e.preventDefault()
+  emit('select', CURSOR_ROLES[next]!.id)
+}
 
 defineExpose({ CURSOR_ROLES })
 // 子テンプレートで使うために再公開
@@ -38,7 +52,7 @@ const cursorRoles: readonly CursorRoleDef[] = CURSOR_ROLES
       class="role-list"
       role="listbox"
       :aria-label="t('creator.rolesPaneTitle')"
-      @keydown="$emit('keydown', $event)"
+      @keydown="onKeydown"
     >
       <RoleListItem
         v-for="(role, i) in cursorRoles"

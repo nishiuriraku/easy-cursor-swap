@@ -89,7 +89,7 @@ export function useCreatorBulkImportFlow(deps: CreatorBulkImportFlowDeps) {
         sourceThemeId.value = null
       } catch (err) {
         importMessage.value = t('creator.bulkImportParseFailed', {
-          detail: err instanceof Error ? err.message : String(err),
+          detail: appErrorMessage(err),
         })
       }
       return
@@ -129,7 +129,7 @@ export function useCreatorBulkImportFlow(deps: CreatorBulkImportFlowDeps) {
         return
       }
       importMessage.value = t('creator.bulkImportFailed', {
-        detail: err instanceof Error ? err.message : String(err),
+        detail: appErrorMessage(err),
       })
     }
   }

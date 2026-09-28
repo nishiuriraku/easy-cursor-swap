@@ -16,6 +16,7 @@ export type {
   BackupInfo,
   MarketplaceEntry,
   MarketplaceIndex,
+  MarketplaceIndexResult,
   MarketplaceInstallRequest,
 } from './generated'
 

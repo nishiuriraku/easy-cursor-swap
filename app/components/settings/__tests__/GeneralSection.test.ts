@@ -10,6 +10,7 @@ import GeneralSection from '../GeneralSection.vue'
 
 const stubs = {
   UiIcon: { template: '<span></span>' },
+  UiButton: { template: '<button class="btn-stub"><slot /></button>' },
   SettingsRow: {
     props: ['label', 'desc'],
     template: '<div :data-label="label"><slot /></div>',
@@ -73,5 +74,15 @@ describe('GeneralSection', () => {
     const wrapper = mount(GeneralSection, { props: baseProps, global: { stubs } })
     await wrapper.find('.recovery-stub').trigger('click')
     expect(wrapper.emitted('config-restored')).toHaveLength(1)
+  })
+
+  it('emits replay-onboarding when guide button is clicked', async () => {
+    const wrapper = mount(GeneralSection, { props: baseProps, global: { stubs } })
+    const btn = wrapper
+      .findAll('.btn-stub')
+      .find((b) => b.text().includes('ガイドを表示') || b.text().includes('Show guide'))!
+    expect(btn.exists()).toBe(true)
+    await btn.trigger('click')
+    expect(wrapper.emitted('replay-onboarding')).toHaveLength(1)
   })
 })

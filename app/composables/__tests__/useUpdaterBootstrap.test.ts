@@ -139,7 +139,13 @@ describe('useUpdaterBootstrap', () => {
     configRef.value = mkConfig(true)
     localStorage.setItem(LAST_CHECK_KEY, String(Date.now() - 25 * 60 * 60 * 1000))
     checkMock.mockResolvedValue({ version: '2.0.0', currentVersion: '1.5.0' })
-    invokeTauriMock.mockResolvedValue(true) // major bump = true
+    // major bump = true (ただし Wave 4B.5 で is_msix_packaged 呼び出しが増えたため
+    // cmd 名で分岐する)
+    invokeTauriMock.mockImplementation(async (cmd: string) => {
+      if (cmd === 'is_msix_packaged') return false
+      if (cmd === 'check_update_is_major_jump') return true
+      return false
+    })
 
     bootstrapUpdaterCheck()
     await flush()
@@ -203,19 +209,20 @@ describe('useUpdaterBootstrap', () => {
 
   it('クールダウン境界: ちょうど 24h 経過した直後は skip せず check する', async () => {
     // 仕様: UPDATE_CHECK_COOLDOWN_MS (= 24h) 未満なら skip、それ以外は check。
-    // 「未満」と「以上」の境界を 1ms ずらして検証する。
+    // 実装は `Date.now()` を内部で取り直すため、テスト側の時刻と数 ms ずれる。
+    // 1ms 単位の厳密な境界検証はレースになるので、余裕 (±60s) を持って検証する。
     configRef.value = mkConfig(true)
     const cooldownMs = 24 * 60 * 60 * 1000
 
-    // 24h ぴったり (= 0 ms 差): 仕様上 >= なので check する
-    localStorage.setItem(LAST_CHECK_KEY, String(Date.now() - cooldownMs))
+    // 24h + 60s 経過: 仕様上 >= なので check する
+    localStorage.setItem(LAST_CHECK_KEY, String(Date.now() - cooldownMs - 60_000))
     bootstrapUpdaterCheck()
     await flush()
     expect(checkMock).toHaveBeenCalledTimes(1)
 
-    // 1ms だけ余裕 (= 23h59m59s): < cooldown なので skip される
+    // 24h - 60s 経過 (= 23h59m): < cooldown なので skip される
     localStorage.clear()
-    localStorage.setItem(LAST_CHECK_KEY, String(Date.now() - cooldownMs + 1))
+    localStorage.setItem(LAST_CHECK_KEY, String(Date.now() - cooldownMs + 60_000))
     checkMock.mockClear()
     bootstrapUpdaterCheck()
     await flush()

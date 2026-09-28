@@ -7,6 +7,7 @@
 import type { ThemeCardData } from '~/types/theme'
 
 const { t } = useI18n()
+const { tp } = usePlatform()
 
 const props = defineProps<{
   theme: ThemeCardData
@@ -50,9 +51,7 @@ const coveragePct = computed(() => Math.round((props.theme.includedRoles.length 
       <div v-if="theme.isActive" class="card-active-tag">
         <span class="pulse" aria-hidden="true" />{{ t('library.activeTag') }}
       </div>
-      <div v-if="isSystem" class="card-source-tag" :aria-label="t('library.sourceTagSchemeAria')">
-        SYSTEM
-      </div>
+      <div v-if="isSystem" class="card-source-tag" :aria-label="tp('systemSchemeAria')">SYSTEM</div>
       <div
         v-else-if="isMarketplace"
         class="card-source-tag marketplace"

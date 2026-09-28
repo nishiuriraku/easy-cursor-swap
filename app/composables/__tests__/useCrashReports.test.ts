@@ -9,7 +9,7 @@ vi.mock('../useTauri', () => ({
   invokeTauri: (...args: unknown[]) => invoke(...args),
 }))
 
-import { useCrashReports } from '../useCrashReports'
+import { useCrashReports, useCrashReportsState } from '../useCrashReports'
 
 describe('useCrashReports', () => {
   beforeEach(() => invoke.mockReset())
@@ -35,5 +35,27 @@ describe('useCrashReports', () => {
     const { clearCrashReports } = useCrashReports()
     expect(await clearCrashReports()).toBe(3)
     expect(invoke).toHaveBeenCalledWith('clear_crash_reports')
+  })
+})
+
+describe('useCrashReportsState (P08a S5)', () => {
+  const t = (key: string) => key
+
+  it('全 0 件 + opt-in で crashSubmitNoCredentials', async () => {
+    invoke.mockResolvedValueOnce({ sent: 0, failed: 0, skipped: 0 })
+    invoke.mockResolvedValueOnce([])
+    const s = useCrashReportsState({ t, isOptedIn: () => true })
+    await s.submit()
+    expect(s.message.value).toBe('settings.crashSubmitNoCredentials')
+    expect(s.count.value).toBe(0)
+    expect(s.busy.value).toBe(false)
+  })
+
+  it('全 0 件 + opt-out で crashSubmitOptedOut', async () => {
+    invoke.mockResolvedValueOnce({ sent: 0, failed: 0, skipped: 0 })
+    invoke.mockResolvedValueOnce([])
+    const s = useCrashReportsState({ t, isOptedIn: () => false })
+    await s.submit()
+    expect(s.message.value).toBe('settings.crashSubmitOptedOut')
   })
 })

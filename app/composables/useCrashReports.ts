@@ -21,3 +21,75 @@ export function useCrashReports() {
   }
   return { listCrashReports, submitCrashReports, clearCrashReports }
 }
+
+export interface CrashReportsStateDeps {
+  t: (key: string, params?: Record<string, string | number>) => string
+  isOptedIn: () => boolean
+}
+
+/**
+ * 設定画面のクラッシュレポート UI 状態 (P08a Step 3 / S5)。
+ *
+ * 件数は `list_crash_reports` の戻り長、メッセージは送信/クリア後の
+ * ユーザー向けトースト相当の文字列。
+ */
+export function useCrashReportsState(deps: CrashReportsStateDeps) {
+  const { t, isOptedIn } = deps
+  const { listCrashReports, submitCrashReports, clearCrashReports } = useCrashReports()
+  const count = ref(0)
+  const busy = ref(false)
+  const message = ref<string | null>(null)
+
+  async function load() {
+    try {
+      const reports = await listCrashReports()
+      count.value = reports?.length ?? 0
+    } catch (err) {
+      message.value = t('settings.crashLoadFailed', {
+        error: appErrorMessage(err),
+      })
+    }
+  }
+
+  async function submit() {
+    busy.value = true
+    message.value = null
+    try {
+      const summary = await submitCrashReports()
+      if (!summary || (summary.sent === 0 && summary.failed === 0 && summary.skipped === 0)) {
+        // 全部 0 のときは「opt-in OFF」か「ビルド時 env 未設定」のどちらかだが、
+        // フロントからは区別できないため crash_reporting フラグで判定する。
+        message.value = isOptedIn()
+          ? t('settings.crashSubmitNoCredentials')
+          : t('settings.crashSubmitOptedOut')
+      } else {
+        message.value = t('settings.crashSubmitResult', {
+          sent: summary.sent,
+          failed: summary.failed,
+          skipped: summary.skipped,
+        })
+      }
+      await load()
+    } catch (err) {
+      message.value = appErrorMessage(err)
+    } finally {
+      busy.value = false
+    }
+  }
+
+  async function clear() {
+    busy.value = true
+    message.value = null
+    try {
+      const removed = await clearCrashReports()
+      message.value = t('settings.crashClearedCount', { count: removed })
+      await load()
+    } catch (err) {
+      message.value = appErrorMessage(err)
+    } finally {
+      busy.value = false
+    }
+  }
+
+  return { count, busy, message, load, submit, clear }
+}

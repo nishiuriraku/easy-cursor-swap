@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.9] - 2026-09-28
+
+Microsoft Store (MSIX) 配布基盤の整備 (Wave 4A〜4C) と、設定・マーケットプレイス周辺の堅牢化が中心のリリース。更新内容モーダルの Markdown 描画化、描画エラーバウンダリ、公式インデックスのオフラインキャッシュ、Inter フォント同梱による Google Fonts 依存の廃止を含む。HKCU 限定 / 適用トランザクション性 / アーカイブ検閲 / PII レダクション / `v-html` 不採用 の 5 大不変条件はすべて維持。
+
+### Added
+
+- **Wave 4A: MSIX manifest + artifact 妥当性** — `distribution/msix/AppxManifest.xml` を `${VERSION}` / `${ARCH}` / `${PUBLISHER}` プレースホルダ化、x64 / arm64 両アーキを `gen_msix_manifest_all.sh` で生成。`rescap:unvirtualizedResources` + `desktop6:RegistryWriteVirtualization=disabled` + `desktop6:FileSystemWriteVirtualization=disabled` を同時宣言し、host HKCU への実書込みを有効化。`.cursorpack` ファイル関連付けを NSIS / MSI と並列に追加。
+- **Wave 4B: Store runtime 分岐 + activation policy 集約** — `appusermodel::PackageContext::current()` で autostart / updater / rollback / activation の 4 軸を一元決定。`GetCurrentPackageFullName` (Win32 API) → path fallback の 2 段戦略で MSIX 検出。`commands/app_metadata.rs` で `is_msix_packaged` / `package_policy_label` の 2 IPC を公開。`useUpdaterBootstrap` / `useUpdater.check` を MSIX で short-circuit、`useMsixPackaged` composable で UI 出し分け (Updates / Startup セクション)。`start_minimized` 設定と `--autostart` 起動を `decide_activation` で集約し `Window::hide` 配線。`auto_rollback_install` を `PackageContext.rollback` で gate。
+- **Wave 4C: CI install/remove/sentinel パイプライン** — `.github/workflows/build-msix-artifacts.yml` 新設 (workflow_dispatch のみ、matrix x64 / arm64、test self-signed cert + signtool + `Add-AppxPackage` smoke、`~/.custom_cursors/cursor_store_sentinel.txt` 永続化検証)。`.env.example` に `MSIX_PUBLISHER` / `MSIX_TEST_CERT_PASSWORD` (任意) を追記。
+- `AppError::UnsupportedPlatform` を追加。非 Windows ビルドの OS 機能スタブが返すエラー種別 (フロントの `errors.unsupported_platform` に対応)。
+- 初回起動時に 3 ステップのウェルカムガイド (スナップショット保存の案内 / パニックキーとトレイ / 最初の一歩) を表示。完了状態は Rust 設定 `general.onboarding_version` に保存され、設定 → 一般 から再表示できる。
+- 検証済みの公式インデックスを `~/.custom_cursors/_marketplace_index_cache.json` にディスクキャッシュし、ネットワーク取得失敗時は前回成功時の内容を `stale` 表示 (取得時刻付きバナー + 再試行) で返す。`marketplace_fetch_index` IPC の戻り型を `MarketplaceIndexResult { index, stale, fetchedAt, error }` に拡張 (IPC 名・数は不変)。インストール時の SHA-256 / Ed25519 / 許可ホスト検証はキャッシュ由来でも同じ経路で実行される。フロントは `online` / `offline` イベントで復帰時の自動再取得とオフライン補助表示を行う。
+- 描画エラーバウンダリ (`AppErrorBoundary` + `AppErrorFallback` + `errorBoundary.client` プラグイン + `app/error.vue`) を追加。ページ描画中の未捕捉例外をサイドバー/タイトルバーを生かしたままフォールバック表示 (詳細コピー / アプリ再起動 / 続行) に置き換える。
+- 設定 → アップデートの更新内容モーダルを Markdown 描画に変更。一覧は 1 行省略リンクのまま、クリックで開くモーダル内に共通 `UiMarkdown` で全文を描画する (`marked` は Lexer のみに使い自前 VNode レンダーで描画するため `v-html` 不使用の不変条件を維持。生 HTML はテキスト表示、リンクは `http(s)://` / `mailto:` のみ外部ブラウザで開く)。
+
+### Changed
+
+- CI: `actions/setup-node` を v4 → v7 に更新 (Node 24 ランタイム、`ci.yml` / `release.yml`) (#14)。
+- `winreg` 依存を `[target.'cfg(windows)'.dependencies]` に限定し、`accessibility.rs` / `registry/{mod,transaction}.rs` / `bin/apply_ani_verify.rs` に `cfg(not(windows))` スタブを追加。非 Windows でも `cargo check` が通るようになった (アプリの Windows 動作は無変更)。CI に `rust-check-linux` ジョブ (ubuntu-latest, `cargo check` + `clippy -D warnings`, lib + bins) を追加。
+- `config.rs` を `config/{schema,store,migrate,tests}.rs` に分割 (公開 API / 挙動 / 生成 TS 不変)。
+- レジストリ操作を `platform::CursorBackend` trait 境界の背後に移し、`Arc<dyn CursorBackend>` を Tauri State で注入。Windows 実装は従来の `RegistryManager` へ委譲し挙動は無変更。トランザクション契約 (snapshot → 書込 → commit / rollback) と起動時 leftover snapshot → Windows 既定リセットの不変条件をインメモリ backend で Linux 上でも単体テスト化。
+- IPC エラーを `{code, message, detail?}` の型付き DTO に変更 (`AppErrorCode` 16 種、ts-rs 生成)。フロントは `invokeTauri` で `AppInvokeError` に正規化し、`errors.<code>` (ja/en) でカテゴリ文言を表示。Rust 側の Display / ログ文言は無変更。
+- UI 文言のうち Windows 固有語 (レジストリパス / `%LOCALAPPDATA%` / トースト等 22 キー) を `platform.windows.*` i18n 名前空間に隔離し `usePlatform()` 経由で参照するよう整理 (表示文言は不変)。
+- Creator / 設定 / ライブラリ画面を責務単位の composable・コンポーネントに分割 (各ページ縮小、挙動不変)。共有 CSS を `assets/css/shared/*.css` に分割。
+- Inter (可変ウェイト latin / latin-ext、OFL-1.1) を `app/assets/fonts/` に同梱し、Google Fonts CDN (`fonts.googleapis.com` / `fonts.gstatic.com`) への接続と CSP 許可を廃止。日本語グリフは Windows 同梱フォント (Yu Gothic UI / Meiryo) にフォールバック。
+
+### Fixed
+
+- 設定画面の切替 (自動起動 / 自動更新 / クラッシュレポート / トースト表示など) が `language` 以外保存されない不具合を修正。差分 patch 生成が camelCase キーで実データ (snake_case) を読んでいたため常に空 patch になっていた (`app/composables/useAppSettings.ts`)。
+- `app/layouts/default.vue` の `marketplaceCount` 重複宣言を除去し、develop からのビルド (`nuxi generate` / `tauri build`) が失敗する不具合を修正。
+- README (en / ja) の ARM64 記述を実態に合わせて修正。v0.0.8 以降 `release.yml` は `aarch64-pc-windows-msvc` をネイティブビルドし `EasyCursorSwap_<ver>_arm64-setup.exe` / `_arm64_ja-JP.msi` を配布している (「planned / エミュレーション動作」は誤り)。インストール表に arm64 行とバージョン付きファイル名を追加。
+- `CHANGELOG.md` v0.0.8 の `### Security` から `### Fixed` と重複していた UI 修正 3 件 + 設計判断メモ 1 件を除去 (セキュリティ関連 5 件 AR-M1-3/5/6/7/8 のみ残す)。
+- `src-tauri/CLAUDE.md` の IPC 登録場所を `lib.rs` → `src/commands/mod.rs` (`get_command_handlers()` 内 `generate_handler![]`) に訂正。`docs/distribution.md` の latest.json 例と既知制約見出しを v0.0.8 に更新。
+
+### Internal
+
+- フロント: マーケットプレイス IPC (`marketplace_fetch_index` / `marketplace_install`) を singleton composable `useMarketplace` に集約し、`pages/marketplace.vue` と `layouts/default.vue` (サイドバーのバッジ) で index を共有、inflight dedupe で公式インデックス HTTP を 1 回に (Wave 3A / L1-1)。`useGithubAuth` に `revoke()` を追加し `pages/settings.vue` からの `revoke_github_link` 直 invoke を撤去 (L1-5)。
+- Rust 統合テスト (cursorpack/profile roundtrip, config migrate) をゲートに追加。
+- vitest-axe a11y テスト (ui コンポーネント + ページ相当セクション)。
+- Windows E2E smoke (tauri-driver + WebdriverIO、非ブロッキング)。
+
 ## [0.0.8] - 2026-07-28
 
 非同期処理中のローディングフィードバックをアプリ全体へ整備したリリース (v0.0.8)。Wave 2AB の coverage gate を 80% (brief 値) から **70% (measured baseline +10pt 余裕)** に下げました (brief deviation、合意済み)。backend measured 71.86% / frontend measured 69.52%。差分 10pt 分のテスト追加は次 wave で対応します。これまで読み込み中に空白・無反応に見えていた箇所 (テーマ/インデックスのグリッドとプレビュー、アップデートのダウンロード、一括取り込みの解決・解析、各種ボタン操作、Creator のエクスポート) に、共通のスケルトン / スピナー / 確定プログレスバー / ステージ表示を一貫した語彙で適用。HKCU 限定 / 適用トランザクション性 / アーカイブ検閲 / PII レダクション / `v-html` 不採用 の 5 大不変条件はすべて維持。
@@ -53,10 +94,6 @@ Wave 2AB では Rust / フロントエンド双方の型整合性・テスト基
 
 ### Security
 
-- 一括取り込み (フォルダ / ファイル) の解決・解析フェーズで進捗が一切表示されず無反応に見えていた不具合を修正。スタート画面からの取り込みでは進捗オーバーレイが `stage !== 'start'` の分岐内に置かれていたため描画されておらず、配置を分岐外へ移して解析中もステージ進捗とキャンセルが見えるようにしました。
-- Creator のエクスポート進捗バーが未定義の CSS トークン (`--bg-elev2` / `--bg-elev1` / `--mint` / `--border`) を参照しており、背景とバーが正しく描画されていなかった問題を、共通 `UiProgress` (設計トークン `--accent` / `--line` ベース) への移行で解消しました。ライト / ダーク両テーマで確実に視認できます。
-- primary (アクセント色塗り) ボタンのローディングスピナーが背景と同化して見えなかった不具合を修正。共通 `.spinner` の回転弧が `var(--accent)` で、primary ボタンの `bg-accent` と同色だったため不可視でした。塗り / 色付き背景のボタン (primary / danger) ではスピナーをボタンの文字色 (`currentColor`) で描き直し、確実にコントラストを出すようにしました (適用 / 保存 / 書き出し等の緑ボタン)。
-- 起動時クラッシュリカバリ (apply 途中の電源断などで `_pending_apply.snapshot` が残置された状態で再起動した場合) は Windows 既定への強制リセットを意図的に採用している旨を、コメント / ログ / `docs/` 側記述で統一。pre-apply exact restore ではなく Windows 既定化である理由を「クラッシュ後は最も安全な既定に倒す」設計判断として明文化 (`c100e85` / AR-M1-1)。
 - 自動ロールバック (Health::attempt_rollback) が installer URL を `_x64-setup.exe` 固定で取得していたため、ARM64 機では 3 連続起動失敗時に x64 ビルドをサイレント上書きインストールし、回復不能ループに陥る可能性があった問題を修正。`std::env::consts::ARCH` で URL を選択するようにし、minisign 検証も arch 不一致を弾けるようになりました (`6876cc2` / AR-M1-3)。
 - `.cursorpack` 取り込み経路 (bulk_import) で、zip 展開時の per-file / 累積サイズ上限が zip ヘッダの `entry.size()` (申告値) に依存しており、申告偽装 zip 爆弾への最終防衛線がなかった問題を修正。`entry.take(MAX)` で実ストリームバイト上限を課し、`io::copy` が実際に書き込んだバイト数を累積判定に使用。本流 (`theme/package.rs`) と同じ上限定数を共有して `bulk_import/cursorpack.rs` / `theme/package.rs` / `backup.rs` の 3 経路で対称化しました (`7824174` / AR-M1-5)。
 - マーケットプレイス詳細モーダルでテーマ作者の `homepage` URL が Rust / フロントどちらの検証も通らず `<a :href>` に直接バインドされていた問題を修正。`fetch_index` 返却前に `is_allowed_url_scheme` でスキーム (http/https のみ) を検証し、不正な値は `None` に正規化。`preview_base_url` だけでなく `download_url` の https 強制と GitHub username 文字種検証も同コミットで対応 (`23984fb` / AR-M1-6)。
@@ -269,7 +306,8 @@ v0.0.1 と同じく仮リリース系列 (provisional, SemVer 0.0.x で API 安�
   - `BulkImportPreviewModal.vue` (579 → 297 行 / -49%) から `useBulkImportPreviewState` を抽出。matches/unmatched の三方移動 state machine + props.open 連動の初期マッチ watch + Blob URL ライフサイクル + ApplyPayload 組立を composable に閉じ込め、SFC は presentation に専念 (audit C21-SIZE 部分)。`ApplyPayload` 型の output 場所も SFC から composable に移動 (`useCreatorBulkImportFlow` 側 import を更新)。
 - component 総数: 50 → 56 (library +3 / marketplace +2 / creator +1)。`docs/architecture.json` / `docs/ui_map.json` の `measured_counts.components_total` を再測定し、HTML viewer に再埋め込み。
 
-[Unreleased]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.8...HEAD
+[Unreleased]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.9...HEAD
+[0.0.9]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.8...v0.0.9
 [0.0.8]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.7...v0.0.8
 [0.0.7]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.6...v0.0.7
 [0.0.6]: https://github.com/nishiuriraku/easy-cursor-swap/compare/v0.0.5...v0.0.6

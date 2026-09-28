@@ -108,7 +108,7 @@ const SNAPSHOT_TEMP_SUFFIX: &str = "tmp";
 /// 失敗時は temp ファイルを削除して元のパスを一切変更しない (呼び出し側が
 /// in-memory ロールバックを判断する)。
 ///
-/// 設定ファイル向けの `config.rs::atomic_write` と同じパターンだが、
+/// 設定ファイル向けの `config/store.rs::atomic_write` と同じパターンだが、
 /// snapshot は「JSON パース失敗 = Windows 既定リセット」が安全側の挙動なので、
 /// 確実に「本ファイルは常に有効な JSON」状態を作りたいという意図は同じ。
 fn atomic_write(path: &Path, content: &str) -> AppResult<()> {
@@ -209,6 +209,12 @@ pub fn remove_pending_snapshot() -> AppResult<()> {
 
 /// 初回起動時のスナップショットを保存する
 pub fn save_initial_snapshot() -> AppResult<()> {
+    let values = RegistryManager::read_current_cursors()?;
+    save_initial_snapshot_with(values)
+}
+
+/// 初回起動時のスナップショットを与えられた値で保存する (テスト・backend 共用)。
+pub fn save_initial_snapshot_with(values: HashMap<String, String>) -> AppResult<()> {
     let path = initial_snapshot_path()?;
 
     // 既に存在する場合は上書きしない (本物の初回以降に上書きすると
@@ -219,7 +225,6 @@ pub fn save_initial_snapshot() -> AppResult<()> {
         return Ok(());
     }
 
-    let values = RegistryManager::read_current_cursors()?;
     let snapshot = RegistrySnapshot {
         schema_version: 1,
         original_values: values,
@@ -369,11 +374,14 @@ mod tests {
     }
 
     /// panic 時に env を必ず復元する RAII ガード (registry/mod.rs の同名パターンと同じ)。
+    /// 使用側テストが Windows 限定のため Linux では未構築になる。呼び出し元に合わせる。
+    #[cfg(windows)]
     struct EnvRestore {
         key: &'static str,
         prev: Option<String>,
     }
 
+    #[cfg(windows)]
     impl Drop for EnvRestore {
         fn drop(&mut self) {
             match &self.prev {

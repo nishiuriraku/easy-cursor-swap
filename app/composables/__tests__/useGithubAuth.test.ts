@@ -4,6 +4,10 @@ import { effectScope } from 'vue'
 const invokeMock = vi.fn()
 vi.mock('~/composables/useTauri', () => ({
   invokeTauri: (...args: unknown[]) => invokeMock(...args),
+  // revoke() 追加 (Wave 3A / L1-5) で useGithubAuth.ts が invokeTauriVoid を使うように
+  // なった。invokeTauriVoid は内部で invokeTauri を呼ぶ薄いラッパーなので、同じ mock を
+  // 共有させて呼び出し元の意図 (`void` 戻り値) を保ったまま invoke を観測できるようにする。
+  invokeTauriVoid: (...args: unknown[]) => invokeMock(...args),
 }))
 
 import { useGithubAuth } from '../useGithubAuth'
@@ -133,5 +137,23 @@ describe('useGithubAuth', () => {
     expect(invokeMock).toHaveBeenLastCalledWith('cancel_device_flow')
     expect(auth.status.value).toBe('idle')
     expect(auth.userCode.value).toBeNull()
+  })
+
+  // ── Wave 3A / L1-5: revoke_github_link 集約 ──
+  // `revoke` は void 戻り値の IPC で、useTauri の invokeTauriVoid 経由で呼んで
+  // 戻り値プロパティアクセスを型で防御する。失敗時は caller (settings.vue) が
+  // loadConfig 等を skip できるよう throw する点が cancel と異なる。
+
+  it('revoke() calls revoke_github_link IPC and returns void', async () => {
+    const auth = useGithubAuth()
+    invokeMock.mockResolvedValueOnce(undefined)
+    await expect(auth.revoke()).resolves.toBeUndefined()
+    expect(invokeMock).toHaveBeenLastCalledWith('revoke_github_link')
+  })
+
+  it('revoke() throws when revoke_github_link IPC rejects', async () => {
+    const auth = useGithubAuth()
+    invokeMock.mockRejectedValueOnce(new Error('keystore missing'))
+    await expect(auth.revoke()).rejects.toThrow('keystore missing')
   })
 })

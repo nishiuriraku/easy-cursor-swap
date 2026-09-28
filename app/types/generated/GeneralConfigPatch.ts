@@ -6,4 +6,4 @@
  * `favorites` / `usage` / `active_theme_id` / `panic_hotkey` はこの patch には
  * 含めない (Rust 側の実装で直接書き換えるか別 IPC で扱う)。
  */
-export type GeneralConfigPatch = { autoStart: boolean | null, autoUpdate: boolean | null, language: string | null, crashReporting: boolean | null, showApplyToast: boolean | null, applyShadowControl: boolean | null, startMinimized: boolean | null, showStorageWarning: boolean | null, };
+export type GeneralConfigPatch = { autoStart: boolean | null, autoUpdate: boolean | null, language: string | null, crashReporting: boolean | null, showApplyToast: boolean | null, applyShadowControl: boolean | null, startMinimized: boolean | null, showStorageWarning: boolean | null, onboardingVersion: number | null, };

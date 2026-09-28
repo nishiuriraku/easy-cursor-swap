@@ -1,0 +1,300 @@
+/* shared/controls.css: .selectable / .btn* / .chips / .chip / .input / .toggle / .ctl-* / .ui-radio* / .tag */
+/* P08a Step 5: tailwind.css からの分割。top-level (unlayered) のまま。
+ * カスケード順は tailwind.css の @import 順。`@layer components` 禁止。 */
+/* --- text selection opt-in (Y13) ---
+ * グローバルで `user-select: none` (global.css) にしているため、ユーザーがコピーしたい
+ * 要素 (エラー文 / ハッシュ / 公開鍵 / バージョン / ログ / ライセンス) に明示的に付与して
+ * 選択を許可する。子孫にも継承される。 */
+.selectable {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* --- .btn family (Phase 10-A) --- */
+.btn {
+  @apply inline-flex h-8 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-[7px] border border-line-hi bg-white/[0.04] px-3 font-body text-[12.5px] font-medium text-fg;
+  transition: all 0.12s;
+}
+.btn:hover:not(:disabled) {
+  @apply border-line-strong bg-white/[0.07];
+}
+.btn:disabled {
+  @apply cursor-not-allowed opacity-60;
+}
+.btn.ghost {
+  @apply border-transparent bg-transparent text-fg-dim;
+}
+.btn.ghost:hover:not(:disabled) {
+  @apply bg-white/[0.04] text-fg;
+}
+.btn.primary {
+  @apply border-accent bg-accent font-semibold text-[#0a0b0f];
+  box-shadow:
+    0 4px 14px -4px rgba(124, 242, 212, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+.btn.primary:hover:not(:disabled) {
+  @apply bg-accent-hi;
+  border-color: var(--accent-hi);
+}
+.btn.danger {
+  @apply text-rose;
+  border-color: rgba(255, 107, 138, 0.3);
+  background: rgba(255, 107, 138, 0.06);
+}
+.btn.danger:hover:not(:disabled) {
+  color: #ffb8c5;
+  background: rgba(255, 107, 138, 0.12);
+  border-color: rgba(255, 107, 138, 0.5);
+}
+.btn.icon {
+  @apply w-8 justify-center px-0;
+}
+.btn-group {
+  @apply flex;
+}
+.btn-group .btn {
+  border-radius: 0;
+  border-right-width: 0;
+}
+.btn-group .btn:first-child {
+  border-radius: 7px 0 0 7px;
+}
+.btn-group .btn:last-child {
+  border-radius: 0 7px 7px 0;
+  border-right-width: 1px;
+}
+.btn-group .btn.active {
+  @apply z-[1] border-accent-line text-accent;
+  background: rgba(124, 242, 212, 0.1);
+}
+:where(html.light) .btn {
+  background: rgba(15, 20, 35, 0.03);
+}
+:where(html.light) .btn:hover:not(:disabled) {
+  background: rgba(15, 20, 35, 0.06);
+}
+:where(html.light) .btn.primary {
+  color: #0a0b0f;
+  box-shadow:
+    0 4px 12px -4px rgba(15, 168, 133, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+:where(html.light) .btn.primary svg {
+  color: #0a0b0f;
+}
+
+/* --- .chip family (Phase 10-B) --- */
+.chips {
+  @apply flex flex-wrap gap-1.5;
+}
+.chip {
+  @apply inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-full border border-line bg-transparent px-[11px] text-[12px] font-medium text-fg-dim;
+  transition: all 0.12s;
+}
+.chip:hover {
+  @apply border-line-hi text-fg;
+}
+.chip.active {
+  @apply font-semibold;
+  background: var(--fg);
+  border-color: var(--fg);
+  color: #0a0b0f;
+}
+.chip .num {
+  @apply font-mono text-[10.5px] opacity-60;
+}
+:where(html.light) .chip.active {
+  color: #ffffff;
+  background: var(--fg);
+  border-color: var(--fg);
+}
+
+/* --- .input / .toggle / .tag (Phase 10-D) --- */
+.input {
+  @apply h-7 w-full rounded-md border border-line bg-white/[0.03] px-2.5 font-body text-[12px] text-fg outline-none;
+}
+.input.mono {
+  @apply font-mono text-[11px];
+}
+.input:focus {
+  @apply border-accent-line;
+  background: rgba(124, 242, 212, 0.04);
+}
+:where(html.light) .input {
+  background: rgba(15, 20, 35, 0.025);
+}
+
+.toggle {
+  @apply relative inline-flex h-[18px] w-8 shrink-0 cursor-pointer items-center rounded-full border border-line bg-white/[0.06];
+  transition: all 0.15s;
+}
+.toggle .knob {
+  @apply absolute left-0.5 top-0.5 size-3 rounded-full bg-fg-dim;
+  transition: all 0.15s;
+}
+.toggle.on {
+  @apply border-accent-line;
+  background: rgba(124, 242, 212, 0.2);
+}
+.toggle.on .knob {
+  @apply left-4 bg-accent;
+}
+.toggle:disabled {
+  @apply cursor-not-allowed opacity-50;
+}
+
+/* --- .ctl-row / .ctl-radio / .ctl-check (Variant A "Crisp") ---
+ * Claude Design "Save Dialog Controls" Variant A (推奨デフォルト) を
+ * tailwind shared utility 化したもの。原稿: project/styles-controls.css の
+ * .row-a / .radio-a / .check-a。design の `.win.light` スコープは本 repo の
+ * html.light に置換。
+ *
+ * 構造:
+ *   <label class="ctl-row">
+ *     <span class="ctl-radio" />       ← ラジオ (or .ctl-check + svg ティック)
+ *     <span><div class="label">…</div><div class="sub">…</div></span>
+ *     <span class="tail">…</span>      ← 任意の右側補助テキスト
+ *   </label>
+ *
+ * 採用理由: Win11 ネイティブ UI に最も近く、ヒット領域が広く、説明文 1 行を
+ * 添えられて Save ダイアログのレイアウトに合う。 */
+.ctl-row {
+  @apply grid cursor-pointer items-center gap-3 rounded-[8px] border border-transparent;
+  grid-template-columns: auto 1fr auto;
+  padding: 9px 10px;
+  transition: background 0.12s;
+}
+.ctl-row:hover {
+  background: rgba(255, 255, 255, 0.025);
+}
+:where(html.light) .ctl-row:hover {
+  background: rgba(15, 20, 35, 0.035);
+}
+.ctl-row:focus-within {
+  border-color: var(--accent-line);
+  background: var(--accent-dim);
+}
+.ctl-row .ctl-label {
+  @apply text-[13px] font-medium text-fg;
+}
+.ctl-row .ctl-sub {
+  @apply mt-0.5 text-[11.5px] text-fg-dim;
+}
+.ctl-row .ctl-tail {
+  @apply font-mono text-[10px] text-fg-mute;
+}
+.ctl-row input[type='radio'],
+.ctl-row input[type='checkbox'] {
+  @apply absolute size-0 opacity-0;
+}
+
+.ctl-radio {
+  @apply relative size-4 shrink-0 rounded-full border-[1.5px] border-line-strong;
+  background: rgba(255, 255, 255, 0.02);
+  transition:
+    border-color 0.12s,
+    background 0.12s,
+    box-shadow 0.12s;
+}
+:where(html.light) .ctl-radio {
+  background: rgba(15, 20, 35, 0.02);
+}
+.ctl-row:hover .ctl-radio {
+  @apply border-fg-dim;
+}
+.ctl-radio.on {
+  @apply border-accent;
+  background: var(--accent-dim);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+.ctl-radio.on::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-line);
+}
+.ctl-row input[type='radio']:focus-visible + .ctl-radio {
+  box-shadow: 0 0 0 3px rgba(124, 242, 212, 0.3);
+}
+
+.ctl-check {
+  @apply relative grid size-4 shrink-0 place-items-center rounded-[4px] border-[1.5px] border-line-strong;
+  background: rgba(255, 255, 255, 0.02);
+  color: transparent;
+  transition: all 0.12s;
+}
+:where(html.light) .ctl-check {
+  background: rgba(15, 20, 35, 0.02);
+}
+.ctl-row:hover .ctl-check {
+  @apply border-fg-dim;
+}
+.ctl-check.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0a0b0f;
+  box-shadow:
+    0 0 0 3px var(--accent-dim),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+:where(html.light) .ctl-check.on {
+  color: #ffffff;
+}
+.ctl-check svg {
+  @apply size-[11px];
+  stroke-width: 2.5;
+}
+.ctl-row input[type='checkbox']:focus-visible + .ctl-check {
+  box-shadow: 0 0 0 3px rgba(124, 242, 212, 0.3);
+}
+
+/* --- .ui-radio (card-row 形式の共有ラジオ) --- */
+.ui-radio {
+  @apply mt-1.5 flex cursor-pointer items-center gap-2.5 rounded-md border border-line bg-white/[0.02] px-2.5 py-2 text-[12.5px] text-fg;
+  transition:
+    background 0.12s,
+    border-color 0.12s;
+}
+.ui-radio:hover {
+  @apply border-line-hi bg-white/[0.05];
+}
+.ui-radio.is-checked {
+  @apply border-accent-line;
+  background: var(--accent-dim);
+}
+.ui-radio input[type='radio'] {
+  @apply absolute size-0 opacity-0;
+}
+.ui-radio-mark {
+  @apply relative grid size-[15px] shrink-0 place-items-center rounded-full border border-line-strong bg-bg-0;
+  transition:
+    border-color 0.12s,
+    background 0.12s;
+}
+.ui-radio-mark::after {
+  content: '';
+  @apply size-[7px] scale-0 rounded-full bg-accent;
+  transition: transform 0.12s ease-out;
+}
+.ui-radio.is-checked .ui-radio-mark {
+  @apply border-accent;
+}
+.ui-radio.is-checked .ui-radio-mark::after {
+  @apply scale-100;
+}
+.ui-radio input[type='radio']:focus-visible + .ui-radio-mark {
+  box-shadow: 0 0 0 2px var(--accent-line);
+}
+.ui-radio-label {
+  @apply leading-[1.35];
+}
+
+.tag {
+  @apply inline-flex items-center gap-1.5 rounded-[4px] border border-line bg-white/[0.02] px-2 py-[3px] font-mono text-[10px] tracking-[0.04em] text-fg-dim;
+}
+.tag.ok {
+  @apply border-accent-line bg-accent-dim text-accent;
+}

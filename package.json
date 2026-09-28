@@ -1,7 +1,7 @@
 {
   "name": "easy-cursor-swap",
   "description": "Windows 用マウスカーソルテーマ管理ツール",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "type": "module",
   "private": true,
   "license": "MIT",
@@ -27,8 +27,10 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
-    "format": "prettier --write app/ scripts/ *.md",
-    "format:check": "prettier --check app/ scripts/ *.md",
+    "fonts:sync": "node scripts/sync-fonts.mjs",
+    "e2e": "wdio run e2e/wdio.conf.ts",
+    "format": "prettier --write app/ scripts/ e2e/ *.md",
+    "format:check": "prettier --check app/ scripts/ e2e/ *.md",
     "lint": "eslint .",
     "lint:check": "eslint . --max-warnings=0"
   },
@@ -38,11 +40,13 @@
     "@tauri-apps/plugin-notification": "^2.3.3",
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-updater": "^2.10.1",
+    "marked": "^18.0.14",
     "nuxt": "^4.4.6",
     "vue": "^3.5.34",
     "vue-router": "^5.2.0"
   },
   "devDependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
     "@nuxt/eslint": "^1.16.0",
     "@resvg/resvg-js": "^2.6.2",
     "@tailwindcss/vite": "^4.3.3",
@@ -51,6 +55,11 @@
     "@vitest/coverage-v8": "^4.1.10",
     "@vitest/ui": "^4.1.6",
     "@vue/test-utils": "^2.4.10",
+    "@wdio/cli": "^9.32.0",
+    "@wdio/local-runner": "^9.32.0",
+    "@wdio/mocha-framework": "^9.32.0",
+    "@wdio/spec-reporter": "^9.32.0",
+    "axe-core": "^4.13.0",
     "eslint": "^9.39.5",
     "eslint-plugin-vue": "^10.10.0",
     "happy-dom": "^20.14.5",
@@ -59,6 +68,7 @@
     "typescript": "^5.9.3",
     "unplugin-vue-components": "^32.0.0",
     "vitest": "^4.1.6",
+    "vitest-axe": "^0.1.0",
     "vue-tsc": "^2.2.12"
   },
   "overrides": {

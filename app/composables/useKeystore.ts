@@ -25,7 +25,7 @@ async function refresh(): Promise<KeystoreInfo> {
     if (result) info.value = result
     return info.value
   } catch (err) {
-    lastError.value = err instanceof Error ? err.message : String(err)
+    lastError.value = appErrorMessage(err)
     return info.value
   } finally {
     busy.value = false
@@ -40,7 +40,7 @@ async function generate(force = false): Promise<KeystoreInfo | null> {
     if (result) info.value = result
     return info.value
   } catch (err) {
-    lastError.value = err instanceof Error ? err.message : String(err)
+    lastError.value = appErrorMessage(err)
     return null
   } finally {
     busy.value = false
@@ -53,7 +53,7 @@ async function exportPrivate(passphrase: string, outputPath: string): Promise<nu
   try {
     return await invokeTauri<number>('keystore_export', { passphrase, outputPath })
   } catch (err) {
-    lastError.value = err instanceof Error ? err.message : String(err)
+    lastError.value = appErrorMessage(err)
     return null
   } finally {
     busy.value = false
@@ -68,7 +68,7 @@ async function importPrivate(passphrase: string, inputPath: string): Promise<Key
     if (result) info.value = result
     return result
   } catch (err) {
-    lastError.value = err instanceof Error ? err.message : String(err)
+    lastError.value = appErrorMessage(err)
     return null
   } finally {
     busy.value = false
@@ -83,7 +83,7 @@ async function remove(): Promise<boolean> {
     info.value = { has_keypair: false, key_id: null, public_key_b64: null }
     return true
   } catch (err) {
-    lastError.value = err instanceof Error ? err.message : String(err)
+    lastError.value = appErrorMessage(err)
     return false
   } finally {
     busy.value = false

@@ -40,6 +40,7 @@ pub struct WindowsScheme {
 ///
 /// 比較は ASCII 小文字化した接頭辞で行う。Windows のパスは大文字小文字を
 /// 区別しないため、`%USERPROFILE%` 展開後のパスケース揺れに対応する。
+#[allow(dead_code)] // 本体呼び出し元が Windows 限定のため Linux ビルドでは未使用 (テストは使用)
 pub(crate) fn scheme_is_app_managed(scheme: &WindowsScheme, app_prefix_lower: &str) -> bool {
     let non_empty: Vec<&String> = scheme
         .cursor_paths
@@ -60,6 +61,7 @@ pub(crate) fn scheme_is_app_managed(scheme: &WindowsScheme, app_prefix_lower: &s
 /// 空文字列で埋める (古い OS や手書きの不完全なエントリへの耐性)。
 /// パス自体は `path` を改変せずそのまま保持する (`%SystemRoot%` 等は呼び出し側が
 /// 既に展開済みの想定)。
+#[allow(dead_code)] // 本体呼び出し元が Windows 限定のため Linux ビルドでは未使用 (テストは使用)
 pub(crate) fn parse_scheme_value(name: &str, value: &str) -> WindowsScheme {
     let parts: Vec<&str> = value.split(',').collect();
     let mut roles: Vec<&CursorRole> = CursorRole::all().iter().collect();
@@ -96,6 +98,7 @@ pub(crate) fn parse_scheme_value(name: &str, value: &str) -> WindowsScheme {
 /// 空文字列は Windows のレジストリにおいて「既定カーソルへフォールバック」を意味する。
 ///
 /// `apply_cursors` から切り出した純粋関数。レジストリに依存しないので単体テスト可能。
+#[allow(dead_code)] // 本体呼び出し元が Windows 限定のため Linux ビルドでは未使用 (テストは使用)
 pub(crate) fn compute_apply_values(
     cursor_paths: &HashMap<String, PathBuf>,
 ) -> Vec<(&'static str, String)> {
@@ -121,6 +124,7 @@ pub(crate) fn compute_apply_values(
 ///
 /// 戻り値の文字列は `REG_EXPAND_SZ` で書き込むことを前提とし、
 /// `%SystemRoot%` 等の環境変数展開を許容する。
+#[allow(dead_code)] // 本体呼び出し元が Windows 限定のため Linux ビルドでは未使用 (テストは使用)
 pub(crate) fn build_scheme_value(cursor_paths: &HashMap<String, PathBuf>) -> String {
     let mut roles: Vec<&CursorRole> = CursorRole::all().iter().collect();
     roles.sort_by_key(|r| r.scheme_index());
@@ -140,6 +144,7 @@ pub(crate) fn build_scheme_value(cursor_paths: &HashMap<String, PathBuf>) -> Str
 ///
 /// レジストリ値名は最大 16383 文字だが、UI 整合のため 255 字までに切る。
 /// 制御文字 / バックスラッシュ / スラッシュは除去 (キーパス区切りとの混同回避)。
+#[allow(dead_code)] // 本体呼び出し元が Windows 限定のため Linux ビルドでは未使用 (テストは使用)
 pub(crate) fn sanitize_scheme_name(name: &str) -> String {
     name.chars()
         .filter(|c| !c.is_control() && *c != '\\' && *c != '/')

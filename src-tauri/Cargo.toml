@@ -1,6 +1,6 @@
 [package]
 name = "easy-cursor-swap"
-version = "0.0.8"
+version = "0.0.9"
 description = "Windows 用マウスカーソルテーマ管理ツール"
 authors = ["nishiuriraku"]
 license = "MIT"
@@ -64,27 +64,6 @@ tracing-appender = "0.2"
 # --- 画像処理 ---
 image = { version = "0.25", features = ["png", "ico"] }
 
-# --- Windows API ---
-winreg = "0.56"
-
-[target.'cfg(windows)'.dependencies]
-# windows >= 0.62 では `WNDCLASSW` / `RegisterClassW` が `Win32_Graphics_Gdi` feature
-# (WNDCLASSW.hbrBackground が HBRUSH を持つため) の背後に gating されている。
-# `cursor_watcher.rs` / `hotkey.rs` がメッセージ専用 HWND_MESSAGE ウィンドウを
-# 作成するために WNDCLASSW を使用しているので、Gdi feature を有効化する。
-windows = { version = "0.62", features = [
-  "Win32_UI_WindowsAndMessaging",
-  "Win32_System_SystemInformation",
-  "Win32_System_Threading",
-  "Win32_Foundation",
-  "Win32_UI_Shell",
-  "Win32_Security_Cryptography",
-  "Win32_UI_Input_KeyboardAndMouse",
-  "Win32_System_Environment",
-  "Win32_Graphics_Gdi",
-  "Wdk_System_SystemServices",
-] }
-
 # --- ユーティリティ ---
 uuid = { version = "1", features = ["v4", "serde"] }
 zip = "5"
@@ -111,6 +90,30 @@ chacha20poly1305 = "0.10"
 # 使っており、Tauri Updater と完全に互換な signature 検証を行えるため自前で
 # ed25519-dalek + base64 をハンドルする実装より安全。
 minisign-verify = "0.2"
+
+# --- Windows API (target限定) ---
+# winreg 0.56 は非 Windows で compile_error! を出すため、windows crate と同じく
+# target 限定にする。非 Windows では registry/ 配下の関数が cfg(not(windows)) スタブ
+# (AppError::Registry を返す) にフォールバックする。
+[target.'cfg(windows)'.dependencies]
+winreg = "0.56"
+# windows >= 0.62 では `WNDCLASSW` / `RegisterClassW` が `Win32_Graphics_Gdi` feature
+# (WNDCLASSW.hbrBackground が HBRUSH を持つため) の背後に gating されている。
+# `cursor_watcher.rs` / `hotkey.rs` がメッセージ専用 HWND_MESSAGE ウィンドウを
+# 作成するために WNDCLASSW を使用しているので、Gdi feature を有効化する。
+windows = { version = "0.62", features = [
+  "Win32_UI_WindowsAndMessaging",
+  "Win32_System_SystemInformation",
+  "Win32_System_Threading",
+  "Win32_Foundation",
+  "Win32_UI_Shell",
+  "Win32_Security_Cryptography",
+  "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_System_Environment",
+  "Win32_Graphics_Gdi",
+  "Win32_Storage_Packaging_Appx",
+  "Wdk_System_SystemServices",
+] }
 
 [dev-dependencies]
 criterion = { version = "0.7", default-features = false, features = ["html_reports"] }

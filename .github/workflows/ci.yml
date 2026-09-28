@@ -48,6 +48,10 @@ jobs:
         working-directory: src-tauri
         run: cargo test --lib
 
+      - name: cargo test (integration)
+        working-directory: src-tauri
+        run: cargo test --test '*'
+
       - name: Install cargo-llvm-cov
         run: cargo install cargo-llvm-cov --locked --quiet
 
@@ -86,13 +90,12 @@ jobs:
       - name: Nuxt prepare (型生成)
         run: npx nuxi prepare
 
-      - name: Vue type check
-        # 2026-07-28: package.json に vue-tsc ^2.2.12 / typescript ^5.9.3 を
-        # 明示追加して lockfile 経由で固定。`npx vue-tsc` は node_modules に
-        # インストール済みの固定版を起動するため typescript/lib/tsc の
-        # exports エラーは出ない (CI runner の node_modules/.bin は PATH に
-        # 含まれないため直接呼び出しは不可)。
-        run: npx vue-tsc --noEmit
+      - name: Vue type check (app project; non-blocking until P09)
+        # P00: root tsconfig.json は files: [] + references のみで `vue-tsc --noEmit`
+        # が 0 ファイル検査の no-op になるため、実プロジェクトを直接指定して検査する。
+        # 既存エラー約 129 件のため non-blocking (件数だけログ出し)。P09 でゲート化。
+        continue-on-error: true
+        run: npx vue-tsc --noEmit -p .nuxt/tsconfig.app.json 2>&1 | tee vue-tsc.log; grep -c "error TS" vue-tsc.log || true
 
       - name: Prettier --check
         run: npm run format:check
@@ -120,6 +123,87 @@ jobs:
       - run: npm ci --legacy-peer-deps
       - name: Compare ja/en keys
         run: node scripts/check-i18n.mjs
+
+  # -------------------------------------------------------------
+  # Rust 側 (Linux): クロスプラットフォームのコンパイルゲート。
+  # winreg / windows crate が target 限定であること、非 Windows スタブが
+  # -D warnings 下で通ることだけを見る。テスト実行・カバレッジは windows ジョブの責務。
+  # -------------------------------------------------------------
+  rust-check-linux:
+    name: Rust check (ubuntu-latest, compile gate)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Linux system deps (Tauri v2 prerequisites)
+        # webkit2gtk-4.1 / gtk3 / ayatana-appindicator / rsvg は tauri crate の build script、
+        # libdbus-1 は libdbus-sys、libxdo / libssl は tauri の推移依存が要求する。
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
+            librsvg2-dev libxdo-dev libssl-dev libdbus-1-dev patchelf
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cargo cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: cargo check (lib + bins)
+        working-directory: src-tauri
+        run: cargo check --lib --bins
+
+      - name: cargo clippy (lib + bins, no tests)
+        working-directory: src-tauri
+        run: cargo clippy --lib --bins --no-deps -- -D warnings
+
+      - name: cargo test (platform memory backend only)
+        # transaction 契約を Linux 上で検証する。対象モジュール限定のため
+        # registry tests の Windows 限定ヘルパー問題に当たらない。
+        working-directory: src-tauri
+        run: cargo test --lib platform::memory
+
+  # -------------------------------------------------------------
+  # Rust 側 (macOS): Linux と同じく非 Windows スタブのコンパイルゲート。
+  # macOS ランナーに Tauri 追加の system dep は不要 (Xcode CLT 済み)。
+  # テスト実行・カバレッジは windows ジョブの責務。
+  # -------------------------------------------------------------
+  rust-check-macos:
+    name: Rust check (macos-latest, compile gate)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cargo cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: cargo check (lib + bins)
+        working-directory: src-tauri
+        run: cargo check --lib --bins
+
+      - name: cargo clippy (lib + bins, no tests)
+        working-directory: src-tauri
+        run: cargo clippy --lib --bins --no-deps -- -D warnings
+
+      - name: cargo test (platform memory backend only)
+        # transaction 契約を macOS 上で検証する。対象モジュール限定のため
+        # registry tests の Windows 限定ヘルパー問題に当たらない。
+        working-directory: src-tauri
+        run: cargo test --lib platform::memory
 
   # -------------------------------------------------------------
   # 依存監査: cargo audit (脆弱性のみ fail / unmaintained 警告は無視)

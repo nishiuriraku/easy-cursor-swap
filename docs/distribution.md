@@ -87,13 +87,19 @@ signtool sign /a /v /fd SHA256 /f cert.pfx /p "<password>" EasyCursorSwap.msix
 詳細は [`authenticode_signing.md`](authenticode_signing.md) を参照。サマリ:
 
 1. Microsoft Partner Center で individual developer 登録 (Identity Validation)
-2. `build-msix-artifacts.yml` (別 workflow、Wave 4A) で `makeappx` + test 自己署名
-   (`CN=EasyCursorSwap-Dev`) で MSIX をビルドし、CI runner で `Add-AppxPackage`
-   → sentinel HKCU write → cleanup のスモーク
-3. AppxManifest は `distribution/msix/AppxManifest.xml` を参照 (`rescap:unvirtualizedResources`
-   + `rescap6:RegistryWriteVirtualization=disabled` 設定済)
-4. Partner Center 経由で本番 MSIX を提出 (Microsoft が自動署名)
-5. **2026-07-25 時点では方針確定のみ**。実装は Wave 4A〜4C の範囲
+2. `build-msix-artifacts.yml` (Wave 4C) で `makeappx` + test 自己署名
+   (`CN=EasyCursorSwap, O=EasyCursorSwap, C=JP`) で MSIX をビルドし、CI runner で
+   `Add-AppxPackage` → `~/.custom_cursors/cursor_store_sentinel.txt` 永続化検証 →
+   `Remove-AppxPackage` を try/finally で実行するスモーク。`workflow_dispatch` のみで
+   PR には必須チェックインを強制しない。
+3. AppxManifest は `distribution/msix/AppxManifest.xml` (Wave 4A でテンプレ化) を参照。
+   `${VERSION}` / `${ARCH}` / `${PUBLISHER}` を `gen_msix_manifest_all.sh` で置換して
+   x64 / arm64 両アーキの manifest を生成。`rescap:unvirtualizedResources` +
+   `desktop6:RegistryWriteVirtualization=disabled` + `desktop6:FileSystemWriteVirtualization=disabled`
+   を同時宣言し、host HKCU への実書込みを有効化。
+4. Partner Center 経由で本番 MSIX を提出 (Microsoft が自動署名)。
+5. **未着手 (別フェーズ)**: Store 提出、`.msixupload` 生成、ARM64 実機検証、Partner Center
+   Identity Validation 完了後の `MSIX_PUBLISHER` env 注入。
 
 ## SmartScreen レピュテーション獲得
 
@@ -120,25 +126,27 @@ GitHub Releases の `latest.json` フォーマット:
 
 ```json
 {
-  "version": "0.0.7",
+  "version": "0.0.8",
   "notes": "リリースノート",
-  "pub_date": "2026-06-09T00:00:00Z",
+  "pub_date": "2026-07-28T10:08:11Z",
   "platforms": {
     "windows-x86_64": {
       "signature": "...Tauri-signer 署名...",
-      "url": "https://github.com/nishiuriraku/easy-cursor-swap/releases/download/v0.0.7/EasyCursorSwap_0.0.7_x64-setup.nsis.zip"
+      "url": "https://github.com/nishiuriraku/easy-cursor-swap/releases/download/v0.0.8/EasyCursorSwap_0.0.8_x64-setup.nsis.zip"
     },
     "windows-aarch64": {
       "signature": "...Tauri-signer 署名...",
-      "url": "https://github.com/nishiuriraku/easy-cursor-swap/releases/download/v0.0.7/EasyCursorSwap_0.0.7_arm64-setup.nsis.zip"
+      "url": "https://github.com/nishiuriraku/easy-cursor-swap/releases/download/v0.0.8/EasyCursorSwap_0.0.8_arm64-setup.nsis.zip"
     }
   }
 }
 ```
 
+> **tauri-action v1 以降** (P06 で移行予定) は `platforms.*.url` が `https://api.github.com/repos/nishiuriraku/easy-cursor-swap/releases/assets/<asset_id>` 形式になる。`tauri-plugin-updater` 2.x は `Accept: application/octet-stream` を付けてこの URL を解釈するため、クライアント側の対応は不要。
+
 公開鍵は `tauri signer generate` で発行し、`tauri.conf.json` の `plugins.updater.pubkey` に投入。
 
-## 既知制約 (v0.0.7 / README 明記)
+## 既知制約 (v0.0.8 / README 明記)
 
 - Windows 10 22H2 以降 / Windows 11 のみサポート (Win10 21H2 以前は非対象)
 - RDP / Citrix / RemoteApp は動作対象外 (起動時バナーで警告)

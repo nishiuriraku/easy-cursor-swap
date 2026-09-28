@@ -13,6 +13,7 @@
  */
 
 const { t } = useI18n()
+const { tp } = usePlatform()
 
 const logLevel = defineModel<string>('logLevel', { required: true })
 const retentionDays = defineModel<number>('retentionDays', { required: true })
@@ -44,7 +45,7 @@ async function openLogFolder() {
   <section>
     <header class="section-head">
       <h1>{{ t('settings.sectionLogging') }}</h1>
-      <p>{{ t('settings.descLogging') }}</p>
+      <p>{{ tp('descLogging') }}</p>
     </header>
     <div class="prop-section">
       <div class="prop-head">{{ t('settings.groupLogOutput') }}</div>
@@ -97,7 +98,7 @@ async function openLogFolder() {
         <SettingsRow
           anchor="openLogFolder"
           :label="t('settings.openLogFolderLabel')"
-          :desc="t('settings.openLogFolderDesc')"
+          :desc="tp('openLogFolderDesc')"
         >
           <button class="btn" @click="openLogFolder">
             <UiIcon name="Globe" :size="13" />{{ t('settings.btnOpen') }}
@@ -109,7 +110,7 @@ async function openLogFolder() {
     <div class="prop-section" style="margin-top: 12px">
       <div class="prop-head">
         {{ t('settings.groupCrashReports') }}
-        <span class="head-hint">{{ t('settings.crashReportsHint') }}</span>
+        <span class="head-hint">{{ tp('crashReportsHint') }}</span>
       </div>
       <div class="prop-body">
         <SettingsRow
@@ -117,7 +118,7 @@ async function openLogFolder() {
           :label="t('settings.crashReportingLabel')"
           :desc="t('settings.crashReportingDesc')"
         >
-          <SettingsToggle v-model="crashReporting" />
+          <SettingsToggle v-model="crashReporting" :label="t('settings.crashReportingLabel')" />
         </SettingsRow>
         <SettingsRow
           anchor="crashCount"

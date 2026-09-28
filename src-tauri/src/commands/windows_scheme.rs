@@ -5,13 +5,16 @@
 //! スキームは編集対象外 — read-only として扱う (export とコピー適用のみ)。
 
 use crate::errors::AppError;
-use crate::registry::{RegistryManager, WindowsScheme};
+use crate::platform::{CursorBackend, SharedBackend};
+use crate::registry::WindowsScheme;
 use crate::theme::{RolePreview, ThemeManager};
 use serde::Serialize;
+use tauri::State;
 
 /// 指定名のスキームを `HKCU\...\Cursors\Schemes` から検索。未登録ならエラー。
-fn lookup_scheme(name: &str) -> Result<WindowsScheme, AppError> {
-    RegistryManager::list_windows_schemes()?
+fn lookup_scheme(backend: &dyn CursorBackend, name: &str) -> Result<WindowsScheme, AppError> {
+    backend
+        .list_os_schemes()?
         .into_iter()
         .find(|s| s.name == name)
         .ok_or_else(|| AppError::Registry(format!("スキーム '{}' が見つかりません", name)))
@@ -24,9 +27,10 @@ fn lookup_scheme(name: &str) -> Result<WindowsScheme, AppError> {
 /// ファイルが見つからないロールはスキップ (1 つの欠損で全体表示を諦めない)。
 #[tauri::command]
 pub fn get_windows_scheme_role_previews(
+    backend: State<'_, SharedBackend>,
     name: String,
 ) -> Result<std::collections::HashMap<String, RolePreview>, AppError> {
-    let scheme = lookup_scheme(&name)?;
+    let scheme = lookup_scheme(backend.as_ref(), &name)?;
     Ok(ThemeManager::render_paths_as_previews_with_hotspots(
         &scheme.cursor_paths,
     ))
@@ -45,10 +49,11 @@ pub struct ExportSchemeResult {
 
 #[tauri::command]
 pub fn export_windows_scheme_as_cursorpack(
+    backend: State<'_, SharedBackend>,
     name: String,
     output_path: String,
 ) -> Result<ExportSchemeResult, AppError> {
-    let scheme = lookup_scheme(&name)?;
+    let scheme = lookup_scheme(backend.as_ref(), &name)?;
     let path = std::path::PathBuf::from(&output_path);
     let (id, size) =
         ThemeManager::export_scheme_as_cursorpack(&scheme.name, &scheme.cursor_paths, &path, None)?;
@@ -64,8 +69,10 @@ pub fn export_windows_scheme_as_cursorpack(
 /// マージ表示するために使う。EasyCursorSwap で適用済みのテーマも同じキー配下に
 /// 入っているが、それらは `get_themes` 側で重複除去すべき (UI 層で判断)。
 #[tauri::command]
-pub fn list_windows_schemes() -> Result<Vec<WindowsScheme>, AppError> {
-    RegistryManager::list_windows_schemes()
+pub fn list_windows_schemes(
+    backend: State<'_, SharedBackend>,
+) -> Result<Vec<WindowsScheme>, AppError> {
+    backend.list_os_schemes()
 }
 
 /// 指定された Windows スキームをシステムに適用する。
@@ -73,9 +80,12 @@ pub fn list_windows_schemes() -> Result<Vec<WindowsScheme>, AppError> {
 /// `apply_theme` (`.cursorpack` 形式の独自テーマ) と区別するため別コマンドにしている。
 /// スキームは編集・エクスポート・署名検証の対象外で、適用のみが許される。
 #[tauri::command]
-pub fn apply_windows_scheme(name: String) -> Result<(), AppError> {
-    let scheme = lookup_scheme(&name)?;
-    RegistryManager::apply_windows_scheme(&scheme)
+pub fn apply_windows_scheme(
+    backend: State<'_, SharedBackend>,
+    name: String,
+) -> Result<(), AppError> {
+    let scheme = lookup_scheme(backend.as_ref(), &name)?;
+    backend.apply_os_scheme(&scheme)
 }
 
 #[cfg(test)]
@@ -96,7 +106,10 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn lookup_scheme_returns_registry_error_when_not_found() {
-        let result = lookup_scheme("__definitely_not_a_real_scheme_xyz__");
+        let result = lookup_scheme(
+            &crate::platform::windows::WindowsCursorBackend,
+            "__definitely_not_a_real_scheme_xyz__",
+        );
         match result {
             Err(AppError::Registry(msg)) => {
                 assert!(
@@ -120,7 +133,7 @@ mod tests {
     #[test]
     fn lookup_scheme_rejects_empty_string_and_special_chars() {
         for name in ["", " ", "\0", "../foo", "with\nnewline"] {
-            match lookup_scheme(name) {
+            match lookup_scheme(&crate::platform::windows::WindowsCursorBackend, name) {
                 Err(AppError::Registry(msg)) => {
                     // 空文字も Registry Err の中に含まれている
                     assert!(
@@ -133,6 +146,18 @@ mod tests {
                 ),
                 Err(other) => panic!("expected AppError::Registry for {name:?}, got {other:?}"),
             }
+        }
+    }
+
+    /// 空の memory backend では同じ not-found が同じ Err 経路で返る (Linux 可)。
+    #[test]
+    fn lookup_scheme_not_found_on_memory_backend() {
+        let backend = crate::platform::memory::MemoryCursorBackend::default();
+        match lookup_scheme(&backend, "nope") {
+            Err(AppError::Registry(msg)) => {
+                assert!(msg.contains("nope"), "got: {}", msg);
+            }
+            other => panic!("expected AppError::Registry, got {:?}", other),
         }
     }
 }

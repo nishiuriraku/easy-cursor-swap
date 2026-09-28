@@ -69,4 +69,12 @@ start_minimized: boolean,
  * (Wave 1A で追加、default true)。
  * 消費側: Library 画面のストレージ警告 UI。
  */
-show_storage_warning: boolean, };
+show_storage_warning: boolean, 
+/**
+ * 初回起動オンボーディングの完了バージョン (P10)。0 = 未表示 / 再表示要求。
+ * `ONBOARDING_CURRENT_VERSION` 未満なら UI がガイドを表示する。
+ * 旧 JSON には存在しないため `serde(default)` で 0 フォールバック
+ * (schema_version は上げない — v1→v2 の 6 フィールド追加と同じ透過方式)。
+ * 消費側: `layouts/default.vue` → `useOnboarding.evaluate()`。
+ */
+onboarding_version: number, };

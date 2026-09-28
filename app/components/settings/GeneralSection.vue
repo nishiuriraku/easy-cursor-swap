@@ -12,6 +12,7 @@
  */
 
 const { t } = useI18n()
+const { tp } = usePlatform()
 
 const language = defineModel<string>('language', { required: true })
 const showApplyToast = defineModel<boolean>('showApplyToast', { required: true })
@@ -43,6 +44,8 @@ const emit = defineEmits<{
   (e: 'refresh-cursor-size-from-os'): void
   /** ユーザーが「Windows 設定を開く」を押したとき。親が ms-settings:easeofaccess-mousepointer (マウスポインターとタッチ) を起動する。 */
   (e: 'open-windows-cursor-settings'): void
+  /** ユーザーが「ガイドを表示」を押したとき。親がオンボーディングを再表示する。 */
+  (e: 'replay-onboarding'): void
 }>()
 
 // ドラッグ中の視覚フィードバック用にローカル ref を持つ。親側の値が変わったら同期する。
@@ -65,13 +68,13 @@ const localPxPreview = computed(() => {
 // CursorSize > 1 (= サイズ拡大が原因) と CursorType != 0 (= スタイルが原因) を区別する。
 const eoaMessage = computed(() => {
   if (props.cursorCurrentWindowsSlider > 1) {
-    return t('settings.cursorSizeEoaSizeMessage', {
+    return tp('cursorSizeEoaSizeMessage', {
       currentSlider: props.cursorCurrentWindowsSlider,
     })
   }
   // CursorSize == 1 だが eoa active のケース (本仕様 gate では発火しないが将来 known
   // limitation 緩和時に有効化)。
-  return t('settings.cursorSizeEoaStyleMessage', {
+  return tp('cursorSizeEoaStyleMessage', {
     type: props.cursorCurrentWindowsType,
   })
 })
@@ -130,13 +133,13 @@ function onSliderChange(ev: Event) {
             class="cursor-size-open-windows-settings"
             @click="$emit('open-windows-cursor-settings')"
           >
-            {{ t('settings.cursorSizeOpenWindowsSettings') }}
+            {{ tp('cursorSizeOpenOsSettings') }}
           </button>
         </UiAlert>
         <SettingsRow
           anchor="cursorSize"
           :label="t('settings.cursorSizeLabel')"
-          :desc="t('settings.cursorSizeDesc')"
+          :desc="tp('cursorSizeDesc')"
         >
           <div class="cursor-size-control">
             <input
@@ -176,21 +179,39 @@ function onSliderChange(ev: Event) {
     </div>
 
     <div class="prop-section">
+      <div class="prop-head">{{ t('settings.groupOnboarding') }}</div>
+      <div class="prop-body">
+        <SettingsRow
+          anchor="onboardingReplay"
+          :label="t('settings.onboardingReplayLabel')"
+          :desc="t('settings.onboardingReplayDesc')"
+        >
+          <UiButton variant="ghost" icon-left="Logo" @click="$emit('replay-onboarding')">{{
+            t('settings.onboardingReplayBtn')
+          }}</UiButton>
+        </SettingsRow>
+      </div>
+    </div>
+
+    <div class="prop-section">
       <div class="prop-head">{{ t('settings.groupNotifications') }}</div>
       <div class="prop-body">
         <SettingsRow
           anchor="showApplyToast"
           :label="t('settings.showApplyToastLabel')"
-          :desc="t('settings.showApplyToastDesc')"
+          :desc="tp('showApplyToastDesc')"
         >
-          <SettingsToggle v-model="showApplyToast" />
+          <SettingsToggle v-model="showApplyToast" :label="t('settings.showApplyToastLabel')" />
         </SettingsRow>
         <SettingsRow
           anchor="applyShadowControl"
           :label="t('settings.applyShadowControlLabel')"
           :desc="t('settings.applyShadowControlDesc')"
         >
-          <SettingsToggle v-model="applyShadowControl" />
+          <SettingsToggle
+            v-model="applyShadowControl"
+            :label="t('settings.applyShadowControlLabel')"
+          />
         </SettingsRow>
       </div>
     </div>

@@ -375,4 +375,28 @@ mod tests {
             }
         }
     }
+
+    // ── Wave 3D: G2 (commands/system.rs IPC テスト) の補完 ─────────────
+    //
+    // 既存テスト (`is_major_bump_*` 7 件) で `check_update_is_major_jump` IPC の
+    // 下流ロジックは恒久固定されている。`is_major_bump` 自体は `major_of` の
+    // 動作 = 「`.` split の最初セグメントを u64 parse」 が spec 暗黙の前提。
+    // テスト初見殺し (= semver の major = 0.x.y の x ではなく 0.x.y の 0) を
+    // 防ぎたいので、ここでは「semver major 跨ぎ ≠ 最初の `.` 跨ぎ」という
+    // ニュアンスを 1 つのテストで明示する。
+
+    /// `major_of` は最初の `.` 前のセグメントを major とする (= 0.1.0 と 0.2.0 は
+    /// major 同値)。`is_major_bump` もこのため semver の "major version bump" と
+    /// 一致しない (= 0.x → 1.x で初めて true)。
+    #[test]
+    fn is_major_bump_uses_first_dot_segment_as_major() {
+        // 0.x.y → 0.x.y' は major 同値 (0)
+        assert!(!is_major_bump("0.0.8", "0.1.0"));
+        assert!(!is_major_bump("0.1.0", "0.2.0"));
+        // 0.x.y → 1.x.y で初めて major 跨ぎ
+        assert!(is_major_bump("0.9.9", "1.0.0"));
+        assert!(is_major_bump("0.0.8", "1.0.0"));
+        // 1.x.y → 2.x.y
+        assert!(is_major_bump("1.2.3", "2.0.0"));
+    }
 }

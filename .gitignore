@@ -25,6 +25,8 @@ Thumbs.db
 
 # Logs
 *.log
+# Git Bash core dump (Windows only)
+*.stackdump
 
 # Environment
 .env

@@ -88,11 +88,12 @@ fn handle_tray_menu_event(app: &AppHandle, menu_id: &str) {
             // レジストリ操作 + active_theme_id クリア + cursor-changed 発火を一手に行い、
             // SoT (config) と UI 通知を直叩き経路でも迂回させない。
             let config = app.state::<crate::config::ConfigManager>();
+            let backend = app.state::<crate::platform::SharedBackend>();
             if let Err(e) = crate::commands::system::reset_with_cleanup(
                 app.clone(),
                 config,
                 "tray_panic_default",
-                crate::registry::RegistryManager::reset_to_windows_default,
+                || backend.reset_to_os_default(),
             ) {
                 tracing::error!("復旧に失敗: {}", e);
             }
@@ -101,11 +102,12 @@ fn handle_tray_menu_event(app: &AppHandle, menu_id: &str) {
             tracing::info!("パニックボタン: インストール前の状態に戻す");
             // IPC 版 (commands::system::reset_to_initial) と同一の後処理に統一する。
             let config = app.state::<crate::config::ConfigManager>();
+            let backend = app.state::<crate::platform::SharedBackend>();
             if let Err(e) = crate::commands::system::reset_with_cleanup(
                 app.clone(),
                 config,
                 "tray_panic_initial",
-                crate::registry::RegistryManager::restore_from_initial_snapshot,
+                || backend.restore_from_initial_snapshot(),
             ) {
                 tracing::error!("復旧に失敗: {}", e);
             }

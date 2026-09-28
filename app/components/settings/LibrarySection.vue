@@ -53,7 +53,10 @@ defineEmits<{
           :label="t('settings.storageWarnEnabledLabel')"
           :desc="t('settings.storageWarnEnabledDesc')"
         >
-          <SettingsToggle v-model="storageWarnEnabled" />
+          <SettingsToggle
+            v-model="storageWarnEnabled"
+            :label="t('settings.storageWarnEnabledLabel')"
+          />
         </SettingsRow>
       </div>
     </div>

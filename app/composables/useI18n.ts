@@ -85,5 +85,12 @@ export function useI18n() {
     locale.value = detectFromBrowser()
     initialized = true
   }
-  return { locale, t, setLocale, syncFromConfig }
+  return { locale, t, te, setLocale, syncFromConfig }
+}
+
+/** キーが現在 locale または ja に存在するか (フォールバック無し判定用)。 */
+function te(key: string): boolean {
+  return (
+    resolveKey(messages.value, key) !== undefined || resolveKey(RESOURCES.ja, key) !== undefined
+  )
 }

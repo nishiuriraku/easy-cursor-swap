@@ -28,6 +28,7 @@ pub mod hotkey;
 pub mod keystore;
 pub mod logging;
 pub mod marketplace;
+pub mod platform;
 pub mod registry;
 pub mod rollback;
 pub mod theme;

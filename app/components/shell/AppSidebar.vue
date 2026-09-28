@@ -9,6 +9,7 @@
 // UiIcon は Nuxt の自動インポートで解決される
 
 const { t } = useI18n()
+const { tp } = usePlatform()
 const { info, load: loadAppInfo } = useAppInfo()
 
 onMounted(() => {
@@ -63,7 +64,7 @@ function navigate(id: string) {
       <div class="brand-name">
         {{ t('app.name') }}
         <small
-          >{{ t('app.edition').toUpperCase()
+          >{{ tp('edition').toUpperCase()
           }}<span v-if="versionLabel"> · {{ versionLabel }}</span></small
         >
       </div>
@@ -76,6 +77,7 @@ function navigate(id: string) {
         :key="it.id"
         :class="['nav-item', { active: active === it.id }]"
         :aria-current="active === it.id ? 'page' : undefined"
+        :data-testid="`nav-${it.id}`"
         @click="navigate(it.id)"
       >
         <UiIcon :name="it.icon" aria-hidden="true" />
@@ -96,6 +98,7 @@ function navigate(id: string) {
         :key="it.id"
         :class="['nav-item', { active: active === it.id }]"
         :aria-current="active === it.id ? 'page' : undefined"
+        :data-testid="`nav-${it.id}`"
         @click="navigate(it.id)"
       >
         <UiIcon :name="it.icon" aria-hidden="true" />
@@ -108,6 +111,7 @@ function navigate(id: string) {
         class="panic"
         :aria-label="t('common.panic') + ' (Ctrl+Alt+Shift+R)'"
         title="Ctrl+Alt+Shift+R"
+        data-testid="panic-open"
         @click="emit('panic')"
       >
         <UiIcon name="Refresh" :size="14" aria-hidden="true" />

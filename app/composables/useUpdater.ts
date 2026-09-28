@@ -10,6 +10,8 @@
  * `dialog: false` で標準ダイアログを抑制し、UI 側で進捗表示する。
  */
 
+import { invokeTauri } from './useTauri'
+
 export interface UpdateInfo {
   version: string
   currentVersion: string
@@ -23,7 +25,7 @@ export interface UpdateInfo {
  * 同じ生メッセージから 2 回呼び出しても同じ key/message を返す純粋関数。
  */
 export function classifyUpdaterError(err: unknown): { key: string; message: string } {
-  const msg = err instanceof Error ? err.message : String(err)
+  const msg = appErrorMessage(err)
   // reqwest::Error は canonical に "error sending request for url (...)" を投げる
   // ため "sending request" / "tcp connect" / "dns" を network カテゴリに含める
   if (
@@ -61,6 +63,19 @@ async function getUpdaterApi() {
 
 /** 手動で更新を確認する。 */
 async function check(): Promise<UpdateInfo | null> {
+  // Wave 4B.5: MSIX 環境では Tauri Updater を抑止して Store 経路に委譲。
+  // store 経由の自動更新は OS 側で行うため、ここでは silent に null を返す。
+  try {
+    const isMsix = await invokeTauri<boolean>('is_msix_packaged')
+    if (isMsix) {
+      console.info('[useUpdater] MSIX 環境のため Tauri Updater check をスキップ')
+      return null
+    }
+  } catch (e) {
+    // IPC 失敗時は unpackaged 想定で続行
+    console.warn('[useUpdater] is_msix_packaged IPC 失敗、通常経路で続行:', e)
+  }
+
   const api = await getUpdaterApi()
   if (!api) return null
   checking.value = true
@@ -83,7 +98,7 @@ async function check(): Promise<UpdateInfo | null> {
     available.value = null
     return null
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err)
+    error.value = appErrorMessage(err)
     return null
   } finally {
     checking.value = false
@@ -92,6 +107,18 @@ async function check(): Promise<UpdateInfo | null> {
 
 /** 利用可能な更新をダウンロード + インストール。完了後の再起動はユーザー判断に委ねる。 */
 async function downloadAndInstall(): Promise<boolean> {
+  // Wave 4B.5: MSIX 環境では Store 経路に委譲するため、Tauri Updater の
+  // check/download/install を完全にスキップする。
+  try {
+    const isMsix = await invokeTauri<boolean>('is_msix_packaged')
+    if (isMsix) {
+      console.info('[useUpdater] MSIX 環境のため Tauri Updater download をスキップ')
+      return false
+    }
+  } catch (e) {
+    console.warn('[useUpdater] is_msix_packaged IPC 失敗、通常経路で続行:', e)
+  }
+
   const api = await getUpdaterApi()
   if (!api) return false
   downloading.value = true
@@ -117,7 +144,7 @@ async function downloadAndInstall(): Promise<boolean> {
     })
     return true
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err)
+    error.value = appErrorMessage(err)
     return false
   } finally {
     downloading.value = false

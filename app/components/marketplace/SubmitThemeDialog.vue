@@ -232,12 +232,20 @@ onMounted(async () => {
         style="border: none; background: transparent; padding: 0; height: auto"
         role="tablist"
       >
-        <button type="button" :class="['tab', { active: tab === 'auto' }]" @click="tab = 'auto'">
+        <button
+          type="button"
+          :class="['tab', { active: tab === 'auto' }]"
+          role="tab"
+          :aria-selected="tab === 'auto'"
+          @click="tab = 'auto'"
+        >
           {{ t('marketplace.submitModeAuto') }}
         </button>
         <button
           type="button"
           :class="['tab', { active: tab === 'manual' }]"
+          role="tab"
+          :aria-selected="tab === 'manual'"
           @click="tab = 'manual'"
         >
           {{ t('marketplace.submitModeManual') }}

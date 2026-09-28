@@ -4,7 +4,6 @@
 export default {
   app: {
     name: 'EasyCursorSwap',
-    edition: 'Win-Exclusive',
   },
   nav: {
     library: 'ライブラリ',
@@ -60,7 +59,6 @@ export default {
     favRemove: 'お気に入りから削除',
     favAdd: 'お気に入りに追加',
     filterGroupAria: 'フィルター',
-    sourceTagSchemeAria: 'Windows システムスキーム',
     sourceTagMarketplaceAria: '公式インデックス由来',
     coverageAria: 'カバレッジ {filled}/17',
     detailAria: '{name} の詳細を開く',
@@ -90,13 +88,10 @@ export default {
     bytesUnknown: '?',
   },
   themeDetail: {
-    systemSchemeDesc:
-      'Windows のマウスのプロパティに保存された配色スキームです。EasyCursorSwap では適用のみ可能で、編集・エクスポート・署名検証は行いません。',
     applyCountSuffix: '回適用',
     usageActive: '現在適用中',
     usageInactive: '未適用',
     usageNever: '一度も適用なし',
-    sourceOsRegistry: 'Windows のマウス設定',
     editAria: '{name} を Creator で編集',
     editLabel: 'Creator で編集',
     exportAria: '{name} をエクスポート',
@@ -118,7 +113,6 @@ export default {
   },
   apply: {
     title: '「{name}」をシステムに適用',
-    description: '17 種類のカーソル × 6 解像度を Windows に書き込みます。失敗時は自動で元に戻します。',
     signedNotice: '公式インデックス由来 · 発行者ID {keyId}',
     unsignedNotice: 'ローカルから取り込んだテーマです。信頼できる発行元か確認してください。',
     confirm: '適用する',
@@ -167,8 +161,6 @@ export default {
     metaArrowRequired: 'Arrow ロール (必須)',
     metaAssigned: '割り当て済み',
     metaUnassigned: '未割り当て',
-    requiredRoleNote: 'Windows のメイン操作カーソル。{required}。解像度ごとに独立した画像を割り当て可能。',
-    optionalRoleNote: '{en}。任意。未指定時は Windows 既定を継承します。',
     requiredMark: '必須',
     hotspotHint: 'クリック または ドラッグでホットスポットを移動',
     clearAria: 'クリアして初期画面に戻る',
@@ -179,7 +171,6 @@ export default {
     exportStepPackage: 'パッケージ',
     exportStepSign: '署名',
     exportFailPrefix: 'エクスポート失敗',
-    appDescription: 'Windows 用カーソルテーマを 17 役割 × 6 解像度で作成しエクスポートする',
     bulkSourceEditing: '📦 編集中',
     // 一括インポート進捗オーバーレイ (LD5)
     bulkImporting: '一括インポート中…',
@@ -230,11 +221,9 @@ export default {
   panic: {
     title: 'リセットを実行',
     description: '現在のカーソル設定を破棄し、選択した状態へ強制復元します。',
-    stage1Title: 'Windows 既定に戻す',
     stage1Desc: 'OS 出荷時のシステムスキームへ強制リセット。最終救済として常にアクセス可能。',
     stage2Title: 'インストール前の状態に戻す',
     stage2Desc: '初回起動時に保存した「インストール前の状態」へ戻します。CursorFX 等の旧設定も復元されます。',
-    stage1Label: 'Windows 既定',
     stage2Label: 'スナップショット',
     badgeStage1: 'Stage 1',
     badgeStage2: 'Stage 2',
@@ -281,24 +270,20 @@ export default {
     groupDisplayLanguage: '表示言語',
     groupCursorSize: 'カーソルサイズ',
     cursorSizeLabel: 'マウスポインターのサイズ',
-    cursorSizeDesc: 'Windows 全体のマウスポインターサイズを変更します。Windows アクセシビリティ側でサイズが拡大されているときはアプリからは変更できません。',
     cursorSizeReadout: '{px} px',
     cursorSizeError: 'サイズ変更に失敗しました: {error}',
-    cursorSizeRefreshFromOs: 'OS から再取得',
-    cursorSizeEoaSizeMessage:
-      'Windows でマウスポインターのサイズが拡大 (現在: {currentSlider}) されているため、本アプリでの調整は利用できません。Windows の設定でサイズを 1 に戻すと、本アプリでの調整が再度有効になります。',
-    cursorSizeEoaStyleMessage:
-      'Windows のマウスポインタースタイル (type={type}) によって本アプリでの調整が制限されています。スタイルを「白 / 黒 / 反転」に変更してください。',
-    cursorSizeOpenWindowsSettings: 'Windows の設定を開く',
+    cursorSizeRefreshFromOs: 'Sync from OS',
+    groupOnboarding: 'はじめに',
+    onboardingReplayLabel: 'ウェルカムガイドをもう一度見る',
+    onboardingReplayDesc: '初回起動時の 3 ステップガイド (パニックキー / トレイ / スナップショット) を再表示',
+    onboardingReplayBtn: 'ガイドを表示',
     groupNotifications: '通知',
     showApplyToastLabel: '適用結果のトースト表示',
-    showApplyToastDesc: 'Windows トースト通知で適用結果を告知',
     applyShadowControlLabel: 'OS 標準ポインター影を制御',
     applyShadowControlDesc: 'テーマの requires_os_shadow に従い SPI_SETCURSORSHADOW を呼び出す',
     // 起動・常駐
     descStartup: 'OS 起動時の自動実行とトレイ常駐の挙動。',
     groupAutoStart: '自動起動',
-    autoStartHint: 'HKCU\\…\\Run',
     autoStartLabel: 'OS 起動時にサイレントで起動',
     autoStartDesc: 'メイン画面は出さず、トレイのみで常駐',
     startMinimizedLabel: 'メイン画面を最小化で起動',
@@ -355,7 +340,6 @@ export default {
     keyExportSuccess: '秘密鍵をエクスポートしました ({size} bytes) → {target}',
     keyImportSuccess: '秘密鍵をインポートしました key_id={keyId}',
     // ログ
-    descLogging: '%LOCALAPPDATA%\\EasyCursorSwap\\logs\\ に保存されるログの保持と粒度。',
     groupLogOutput: 'ログ出力',
     logLevelLabel: 'ログレベル',
     logLevelDesc: 'リリース版は INFO 推奨。トラブル時は DEBUG へ',
@@ -364,11 +348,9 @@ export default {
     maxSizeLabel: '合計上限サイズ (MB)',
     maxSizeDesc: '超過時は古いものから削除',
     openLogFolderLabel: '現在のログフォルダーを開く',
-    openLogFolderDesc: 'エクスプローラーで `%LOCALAPPDATA%\\EasyCursorSwap\\logs\\` を開く',
     btnOpen: '開く',
     // クラッシュレポート (ログ・診断セクション内)
     groupCrashReports: 'クラッシュレポート',
-    crashReportsHint: '%LOCALAPPDATA%\\EasyCursorSwap\\crash\\',
     crashReportingLabel: 'クラッシュレポートの送信',
     crashReportingDesc:
       'panic 情報 (ホームパスを ~ に伏字化済み) を匿名サーバへ送信。OFF の場合は端末内にのみ保存 (オプトイン)',
@@ -394,6 +376,9 @@ export default {
     groupAutoUpdate: '自動アップデート',
     autoUpdateLabel: 'バックグラウンド更新を有効化',
     autoUpdateDesc: '署名検証付きの差分更新を取得',
+    // Wave 4B.6: MSIX 環境案内 (updates)
+    storeManaged: 'この設定は Microsoft Store 配布版では利用できません。更新は Store が自動管理します。',
+    storeManagedLink: 'Windows の設定 → アプリと機能 で詳細を確認',
     checkNowLabel: '今すぐ確認',
     btnChecking: '確認中...',
     btnCheckUpdate: '更新を確認',
@@ -405,6 +390,7 @@ export default {
     updateRelaunchTitle: 'アップデート完了',
     updateRelaunchAsk: 'アプリを再起動して新バージョンを適用しますか？',
     updateAvailableLabel: 'v{version} へ更新',
+    updateNotesTitle: 'v{version} の更新内容',
     updateMajorJumpTitle: 'メジャーバージョンアップ',
     updateMajorJumpWarning: 'v{version} はメジャーバージョンアップです。互換性のない変更が含まれる場合があります。続行しますか？',
     updaterErrNetwork: 'ネットワーク接続を確認してください ({message})',
@@ -483,6 +469,9 @@ export default {
     submitOpenGithub: 'GitHub で申請ページを開く',
     fetchError: 'インデックスの取得に失敗しました',
     fetchRetry: '再試行',
+    staleBanner: '{date} に取得したキャッシュを表示しています (オフラインまたは取得失敗)。',
+    offlineHint: 'オフラインのようです。接続が戻ると自動で再取得します。',
+    previewUnavailable: 'オフラインのためプレビューを表示できません',
     installedToast: '{name} をライブラリに取り込みました',
     installFailedToast: '{name} のインポートに失敗: {error}',
     featuredNew: '新着',
@@ -644,7 +633,6 @@ export default {
     overwriteDuplicate: '複製として保存',
     overwriteDuplicateSub: '別テーマとして新しく追加します (元テーマも残ります)。',
     sign: 'このテーマに署名する',
-    signSub: 'あなたの秘密鍵で署名します (Windows により安全に保管中)',
     signDisabled: '署名鍵がありません (設定 → 署名鍵 で生成)',
     nameLabel: 'テーマ名',
     namePlaceholder: 'Untitled ({date})',
@@ -663,5 +651,98 @@ export default {
   updater: {
     // 起動時の自動アップデート告知トースト (useUpdaterBootstrap)
     toastUpdateAvailable: '新しいバージョン v{version} が利用可能です。設定 → 更新からダウンロードできます。',
+  },
+  errorBoundary: {
+    title: 'この画面で問題が発生しました',
+    lead: 'アプリ本体は動作しています。報告時は下の詳細をコピーしてください。再起動するか、別の画面へ移動できます。',
+    copy: '詳細をコピー',
+    reload: 'アプリを再起動',
+    dismiss: '続行を試す',
+  },
+  onboarding: {
+    progress: 'ステップ {n} / {total}',
+    skip: 'あとで見る',
+    next: '次へ',
+    finish: 'はじめる',
+    welcome: {
+      title: 'EasyCursorSwap へようこそ',
+      lead: 'カスタムマウスカーソルのテーマを取り込み・作成し、17 種類をまとめて適用できます。',
+      featureLibrary: 'ライブラリ — .cursorpack を取り込んでワンクリック適用',
+      featureIndex: '公式インデックス — Ed25519 検証済みのコミュニティテーマを閲覧',
+      featureCreator: 'クリエイター — PNG / SVG から自分のテーマを作成',
+      snapshot: '現在のカーソル設定はスナップショットとして保存済みです: {path}',
+      snapshotFile: '_initial_snapshot.json',
+    },
+    safety: {
+      title: 'いつでも戻せる 2 つの手段',
+      hotkeyLead: '他のアプリを使っている最中でもパニックキーが効きます:',
+      hotkeyStage1: 'Stage 1 は OS 既定のカーソルに戻します。',
+      hotkeyStage2: 'Stage 2 は初回起動時のスナップショットに戻します。',
+      trayLead: 'ウィンドウを閉じてもトレイに常駐します。トレイメニューからも同じ 2 つの復元を実行できます。',
+    },
+    start: {
+      title: 'どこから始めますか?',
+      importTitle: '.cursorpack を取り込む',
+      importDesc: '手元のテーマファイルを選ぶ',
+      indexTitle: '公式インデックスを見る',
+      indexDesc: '検証済みのコミュニティテーマをインストール',
+      creatorTitle: 'クリエイターを開く',
+      creatorDesc: '自分の画像からテーマを作る',
+    },
+  },
+  errors: {
+    // Rust AppError の code → 表示文言。{message} は Rust 側 Display (当面日本語)、
+    // {path} / {size} / {reason} は detail (構造体 variant のみ)。
+    config: '設定の読み書きに失敗しました ({message})',
+    registry: 'カーソル設定 (レジストリ) の操作に失敗しました ({message})',
+    image_processing: '画像処理に失敗しました ({message})',
+    theme: 'テーマの操作に失敗しました ({message})',
+    io: 'ファイルの読み書きに失敗しました ({message})',
+    json: '設定データの解析に失敗しました ({message})',
+    zip: 'アーカイブの処理に失敗しました ({message})',
+    invalid_input: '入力が不正です ({message})',
+    other: '{message}',
+    bulk_import_cancelled: '一括インポートを中断しました',
+    no_supported_files: '対応ファイルが見つかりません: {path}',
+    oversize_file: 'ファイルサイズが上限を超えています: {path} ({size} bytes)',
+    invalid_cursorpack: '.cursorpack を解析できません: {reason}',
+    crypto: '鍵 / 署名処理に失敗しました ({message})',
+    github: 'GitHub との通信に失敗しました ({message})',
+    unsupported_platform: 'この操作はこのプラットフォームでは利用できません',
+  },
+
+  /**
+   * OS 固有の文言。参照は `usePlatform().tp('<key>')` 経由 (`platform.<os>.<key>`)。
+   * 新しい OS を足すときは同じキー集合でサブオブジェクトを増やす (check-i18n は
+   * leaf key 集合の ja/en 一致だけを見るので、両 locale に同じ構造を足すこと)。
+   */
+  platform: {
+    windows: {
+      edition: 'Win-Exclusive',
+      systemSchemeAria: 'Windows システムスキーム',
+      systemSchemeDesc:
+        'Windows のマウスのプロパティに保存された配色スキームです。EasyCursorSwap では適用のみ可能で、編集・エクスポート・署名検証は行いません。',
+      systemSchemeSource: 'Windows のマウス設定',
+      systemSchemeStorePath: 'HKCU\\Cursors\\Schemes',
+      systemSchemeAuthor: 'Windows',
+      applyDescription: '17 種類のカーソル × 6 解像度を Windows に書き込みます。失敗時は自動で元に戻します。',
+      requiredRoleNote: 'Windows のメイン操作カーソル。{required}。解像度ごとに独立した画像を割り当て可能。',
+      optionalRoleNote: '{en}。任意。未指定時は Windows 既定を継承します。',
+      creatorAppDescription: 'Windows 用カーソルテーマを 17 役割 × 6 解像度で作成しエクスポートする',
+      panicStage1Title: 'Windows 既定に戻す',
+      panicStage1Label: 'Windows 既定',
+      cursorSizeDesc: 'Windows 全体のマウスポインターサイズを変更します。Windows アクセシビリティ側でサイズが拡大されているときはアプリからは変更できません。',
+      cursorSizeEoaSizeMessage:
+        'Windows でマウスポインターのサイズが拡大 (現在: {currentSlider}) されているため、本アプリでの調整は利用できません。Windows の設定でサイズを 1 に戻すと、本アプリでの調整が再度有効になります。',
+      cursorSizeEoaStyleMessage:
+        'Windows のマウスポインタースタイル (type={type}) によって本アプリでの調整が制限されています。スタイルを「白 / 黒 / 反転」に変更してください。',
+      cursorSizeOpenOsSettings: 'Windows の設定を開く',
+      showApplyToastDesc: 'Windows トースト通知で適用結果を告知',
+      autoStartHint: 'HKCU\\…\\Run',
+      descLogging: '%LOCALAPPDATA%\\EasyCursorSwap\\logs\\ に保存されるログの保持と粒度。',
+      openLogFolderDesc: 'エクスプローラーで `%LOCALAPPDATA%\\EasyCursorSwap\\logs\\` を開く',
+      crashReportsHint: '%LOCALAPPDATA%\\EasyCursorSwap\\crash\\',
+      signSub: 'あなたの秘密鍵で署名します (Windows により安全に保管中)',
+    },
   },
 } as const

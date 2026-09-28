@@ -4,8 +4,9 @@ This file is loaded automatically when working under `app/`. Root `../CLAUDE.md`
 
 ## Layout
 
-- `pages/` — `index.vue` (Library), `creator.vue`, `marketplace.vue`, `settings.vue` (4 pages; helpers in `index.helpers.ts` / `marketplace.helpers.ts`).
+- `pages/` — `index.vue` (Library), `creator.vue`, `marketplace.vue`, `settings.vue` (4 pages; helpers in `index.helpers.ts` / `marketplace.helpers.ts`). `error.vue` (`app/` 直下) handles fatal Nuxt errors with the same fallback.
 - `components/{shell,library,creator,marketplace,settings,preview,panic,icons,ui}/` — domain-grouped SFCs. `nuxt.config.ts` sets `pathPrefix: false`, so reference components by file name (`<ThemeCard>`, not `<LibraryThemeCard>`). **Filenames in `components/` must stay globally unique.**
+- `plugins/errorBoundary.client.ts` + `components/shell/AppErrorBoundary.vue` + `components/shell/AppErrorFallback.vue` — render-error containment (P11). Wrap page content in `<AppErrorBoundary>`; copy/restart/dismiss emits only, no `v-html`.
 - `composables/` — IPC wrapper (`useTauri`), domain state (themes / settings / keystore / updater / notify / ui-theme), Creator helpers, marketplace helpers, UI utilities. Vitest specs in `composables/__tests__/`. **Full list with descriptions: Obsidian vault `develop/easy-cursor-swap/reference/frontend-overview.md` (composable/component インベントリ) and `reference/file_inventory.md` section 2-3.**
 - `locales/{ja,en}.ts` — keys typed `as const`; **must stay in parity** (CI gate via `scripts/check-i18n.mjs`).
 - `types/` — IPC payload types (`config.ts`, `theme.ts`, `marketplace.ts`, `githubAuth.ts`). Must mirror `serde`-derived Rust structs in `src-tauri/src/commands/`.
@@ -17,15 +18,18 @@ This file is loaded automatically when working under `app/`. Root `../CLAUDE.md`
 - Prefer extending an existing composable over introducing duplicate code. Add a Vitest spec for any non-trivial logic.
 - **No `v-html` anywhere** — SVG icons go through render functions in `UiIcon.vue` / `CursorIcon.vue`.
 - **i18n parity is a CI gate.** Adding a key to one locale without the other fails `scripts/check-i18n.mjs`.
+- OS 固有の文言 (`Windows` / `HKCU` / `%LOCALAPPDATA%` 等) は `locales/*.ts` の `platform.<os>.*` に置き、`usePlatform().tp()` で参照する。`settings.*` 等に直接書かない。
+- **Error display**: `invokeTauri` always throws `AppInvokeError` (`app/utils/appError.ts`). Display via `appErrorMessage(err)` (resolves `errors.<code>` i18n). Do not use `String(err)` / `.message` directly.
 
 ## CSS (Tailwind v4)
 
 Tailwind v4 utility classes are the default styling mechanism.
 
 - **Design tokens** live in `assets/css/tailwind.css` (`@theme` block), aliasing legacy `--*` tokens.
-- **Cross-cutting shared utilities** (`.btn`, `.card`, `.chip`, `.input`, `.tag`, `.toolbar`, `.tabs`, `.prop-section`, `.lib-row`, `.lt-*`, `.modal*`, `.content`, `.page-head`, `.grid`, etc.) are defined at the top level (unlayered) of `assets/css/tailwind.css`. **Do not** wrap them in `@layer components` — Tailwind preflight (e.g. `button { color: inherit }`) is emitted unlayered, so rules inside `@layer` lose the cascade.
+- **Cross-cutting shared utilities** (`.btn`, `.card`, `.chip`, `.input`, `.tag`, `.toolbar`, `.tabs`, `.prop-section`, `.lib-row`, `.lt-*`, `.modal*`, `.content`, `.page-head`, `.grid`, etc.) are defined at the top level (unlayered) of `assets/css/shared/{controls,cards,library-list,layout,modal,nav}.css`, imported from `assets/css/tailwind.css` in that order. **Do not** wrap them in `@layer components` — Tailwind preflight (e.g. `button { color: inherit }`) is emitted unlayered, so rules inside `@layer` lose the cascade.
 - **Component-specific styles** belong in each `.vue` file's `<style scoped>`. Declare `@reference '~/assets/css/tailwind.css';` at the top, then use `@apply`.
 - `assets/css/global.css` is **strictly limited** to `:root` tokens, CSS reset, scrollbar customisation, `:focus-visible`, `prefers-reduced-motion`, shared `@keyframes` (pulse / fade-in / slide-in-right / spin), and `html.light` token overrides. Do not add component-specific styles here (Phase 10-12 collapsed it from 3327 → 223 lines).
+- Bundled fonts live in `assets/fonts/` (Inter variable woff2 latin/latin-ext, OFL-1.1) with `@font-face` only in `assets/css/fonts.css` (loaded first in `nuxt.config.ts` `css:`). **No CDN font references.** Refresh via `npm run fonts:sync` (`scripts/sync-fonts.mjs`). Japanese glyphs fall back to Windows-bundled `Yu Gothic UI` / `Meiryo` in the `--font-display` / `--font-body` stacks.
 
 ## Nuxt-specific pitfalls
 
@@ -51,3 +55,7 @@ npx vitest run app/path/to/file.test.ts # single file
 npx vue-tsc --noEmit                    # type check
 node scripts/check-i18n.mjs             # i18n parity (CI gate)
 ```
+
+## Testing
+
+- a11y: `vitest-axe` (`app/test-setup/axe.ts`). happy-dom has no layout/computed styles, so visual rules (`color-contrast` etc.) and page-landmark rules are disabled; component-level checks only.

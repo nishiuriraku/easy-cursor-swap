@@ -1,5 +1,5 @@
 /**
- * Rust 側の `AppConfig` (src-tauri/src/config.rs) と対応する型定義。
+ * Rust 側の `AppConfig` (src-tauri/src/config/schema.rs) と対応する型定義。
  *
  * Rust 構造体は `ts-rs` で `app/types/generated/` に自動生成される
  * (`cargo run --manifest-path src-tauri/Cargo.toml --features typegen --bin gen_types`)。

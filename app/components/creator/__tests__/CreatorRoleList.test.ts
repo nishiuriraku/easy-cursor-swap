@@ -59,14 +59,26 @@ describe('CreatorRoleList', () => {
     expect(wrapper.emitted('select')).toEqual([['Hand']])
   })
 
-  it('emits keydown event from listbox container', async () => {
+  it('moves selection with ArrowDown/ArrowUp/Home/End/j/k (P08a C6)', async () => {
     const wrapper = mount(CreatorRoleList, { props: baseProps, global: { stubs } })
     const list = wrapper.find('.role-list')
     await list.trigger('keydown', { key: 'ArrowDown' })
-    expect(wrapper.emitted('keydown')).toBeTruthy()
-    expect(wrapper.emitted('keydown')!.length).toBe(1)
-    const ev = wrapper.emitted('keydown')![0]![0] as KeyboardEvent
-    expect(ev.key).toBe('ArrowDown')
+    expect(wrapper.emitted('select')).toEqual([['Help']])
+    await list.trigger('keydown', { key: 'End' })
+    expect(wrapper.emitted('select')![1]).toEqual(['Person'])
+    await list.trigger('keydown', { key: 'Home' })
+    expect(wrapper.emitted('select')![2]).toEqual(['Arrow'])
+    await list.trigger('keydown', { key: 'j' })
+    expect(wrapper.emitted('select')![3]).toEqual(['Help'])
+    await list.trigger('keydown', { key: 'k' })
+    // Arrow (index 0) で k → 先頭に留まる
+    expect(wrapper.emitted('select')![4]).toEqual(['Arrow'])
+  })
+
+  it('ignores unrelated keys', async () => {
+    const wrapper = mount(CreatorRoleList, { props: baseProps, global: { stubs } })
+    await wrapper.find('.role-list').trigger('keydown', { key: 'x' })
+    expect(wrapper.emitted('select')).toBeFalsy()
   })
 
   it('marks listbox container with role=listbox', () => {

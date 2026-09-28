@@ -1,0 +1,162 @@
+/* shared/cards.css: .card* / .star / .meta-row / .coverage / .spinner / .skeleton */
+/* P08a Step 5: tailwind.css からの分割。top-level (unlayered) のまま。
+ * カスケード順は tailwind.css の @import 順。`@layer components` 禁止。 */
+/* --- .card family (Phase 10-C) --- */
+.card {
+  @apply relative flex flex-col overflow-hidden rounded-lg border border-line bg-bg-glass backdrop-blur-xl;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s,
+    box-shadow 0.18s;
+}
+.card:hover {
+  @apply border-line-hi;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-2);
+}
+.card.interactive {
+  @apply cursor-pointer;
+}
+.card.interactive:hover {
+  @apply border-accent-line;
+  box-shadow:
+    0 0 0 1px var(--accent-line),
+    0 18px 36px -18px rgba(124, 242, 212, 0.28);
+}
+.card.interactive:focus-visible {
+  @apply border-accent outline-none;
+  box-shadow:
+    0 0 0 2px var(--accent),
+    0 18px 36px -18px rgba(124, 242, 212, 0.35);
+}
+.card.active {
+  @apply border-accent-line;
+  box-shadow:
+    0 0 0 1px var(--accent-line),
+    0 12px 32px -16px rgba(124, 242, 212, 0.4);
+}
+.card.active::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(600px 200px at 50% 0%, rgba(124, 242, 212, 0.06), transparent 70%);
+  pointer-events: none;
+}
+.card-preview {
+  @apply relative min-h-[132px] border-b border-line p-3.5;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent),
+    radial-gradient(120% 100% at 0% 0%, rgba(124, 242, 212, 0.04), transparent 50%);
+}
+:where(html.light) .card-preview {
+  background:
+    linear-gradient(180deg, rgba(15, 20, 35, 0.015), transparent),
+    radial-gradient(120% 100% at 0% 0%, rgba(15, 168, 133, 0.05), transparent 50%);
+}
+.card-active-tag {
+  @apply absolute right-2.5 top-2.5 inline-flex items-center gap-1.5 rounded-full border border-accent-line font-mono text-[9.5px] uppercase tracking-[0.12em] text-accent backdrop-blur-md;
+  padding: 3px 8px 3px 7px;
+  background: rgba(124, 242, 212, 0.12);
+}
+.card-active-tag .pulse {
+  @apply size-[5px] rounded-full bg-accent;
+  box-shadow: 0 0 8px var(--accent);
+  animation: pulse 1.6s infinite;
+}
+:where(html.light) .card-active-tag .pulse {
+  box-shadow: 0 0 8px rgba(15, 168, 133, 0.5);
+}
+.card-source-tag {
+  @apply pointer-events-none absolute left-2.5 top-2.5 rounded font-mono text-[9px] uppercase tracking-[0.16em] text-violet backdrop-blur-md;
+  padding: 2px 7px;
+  background: rgba(139, 125, 255, 0.12);
+  border: 1px solid rgba(139, 125, 255, 0.32);
+}
+.card-body {
+  @apply flex flex-col gap-2.5 p-3.5;
+}
+.card-row {
+  @apply flex items-start justify-between gap-2.5;
+}
+.card-name {
+  @apply font-display text-[15px] font-semibold leading-[1.25] tracking-[-0.01em] text-fg;
+}
+.card-author {
+  @apply mt-0.5 text-[11.5px] text-fg-dim;
+}
+
+/* --- 個別 utility: .star / .meta-row / .coverage / .spinner (Phase 10-E) --- */
+.star {
+  @apply grid size-[26px] shrink-0 cursor-pointer place-items-center rounded-md border border-transparent bg-transparent text-fg-faint;
+  transition: all 0.12s;
+}
+.star:hover {
+  color: var(--amber);
+  background: rgba(245, 194, 107, 0.06);
+}
+.star.on {
+  color: var(--amber);
+  background: rgba(245, 194, 107, 0.1);
+  border-color: rgba(245, 194, 107, 0.25);
+}
+
+.meta-row {
+  @apply flex items-center gap-0 font-mono text-[10.5px] tracking-[0.04em] text-fg-mute;
+}
+.meta-row .m {
+  @apply px-2;
+}
+.meta-row .m:first-child {
+  @apply pl-0;
+}
+.meta-row .m + .m {
+  @apply border-l border-line;
+}
+.meta-row b {
+  @apply font-medium text-fg-dim;
+}
+
+.coverage {
+  @apply flex items-center gap-2;
+}
+.coverage .bar {
+  @apply h-1 flex-1 overflow-hidden rounded-[2px] bg-white/[0.05];
+}
+.coverage .bar > i {
+  @apply block h-full rounded-[2px];
+  background: linear-gradient(90deg, var(--accent), #5dd9bd);
+}
+.coverage .num {
+  @apply min-w-[42px] text-right font-mono text-[10.5px] text-fg-dim;
+}
+
+.spinner {
+  @apply size-5 rounded-full border-2 border-line;
+  border-top-color: var(--accent);
+  animation: spin 0.6s linear infinite;
+}
+
+/* --- skeleton: 共有シマープレースホルダ (Phase LD / 2026-06-09) ---
+ * Library / Marketplace のグリッドカード、CursorMatrix のプレビューセル、
+ * marketplace 詳細プレビュー列など、読込中ブランクを埋める汎用シマー。
+ * `@keyframes shimmer` は global.css の共有 keyframes。
+ * UiSkeleton.vue / UiSkeletonCard.vue が薄くラップする。 */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.02) 0%,
+    rgba(255, 255, 255, 0.04) 50%,
+    rgba(255, 255, 255, 0.02) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+:where(html.light) .skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(15, 20, 35, 0.03) 0%,
+    rgba(15, 20, 35, 0.06) 50%,
+    rgba(15, 20, 35, 0.03) 100%
+  );
+  background-size: 200% 100%;
+}

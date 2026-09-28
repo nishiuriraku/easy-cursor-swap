@@ -11,7 +11,7 @@ Domain-specific guidance lives in nested files (auto-loaded when working under t
 
 EasyCursorSwap (`package.json` name: `easy-cursor-swap`) — a Windows-only desktop app for managing custom mouse cursor themes. Tauri v2 + Nuxt 4 + Rust hybrid. The project lives at the repo root (no `easy-cursor-swap/` subdirectory).
 
-- **Target:** Windows 10 22H2+ / Windows 11, x64 (ARM64 planned)
+- **Target:** Windows 10 22H2+ / Windows 11, x64 + ARM64 (`aarch64-pc-windows-msvc` cross-built in `release.yml`; ARM64 not yet hand-tested on a device)
 - **Distribution:** NSIS / MSI installers (Authenticode signing pending — GitHub Releases path is unsigned for the foreseeable future; Microsoft Store MSIX is the canonical Authenticode path going forward per 2026-07-25 policy change, with SignPath reapplication explicitly declined. See [docs/authenticode_signing.md](docs/authenticode_signing.md)); Tauri Updater with Ed25519-signed releases (active)
 
 ## Documentation map
@@ -35,13 +35,13 @@ When documents disagree, the **Layer1 markdown** is canonical; `reference/index.
 These apply regardless of which side you're working on. Full list (including module-specific ones) is in the Obsidian vault `develop/easy-cursor-swap/shared/invariants.md` (Layer1 canonical home; `invariants:` frontmatter lists all ids).
 
 - **HKCU only.** Never touch HKLM or anything that triggers UAC.
-- **Apply is transactional (2 recovery paths).** `registry/mod.rs` writes a snapshot to `~/.custom_cursors/_pending_apply.snapshot` before mutating, deletes it on success. (a) **In-process write failure** → `restore_from_snapshot` rolls the registry back to the **pre-apply values** (exact restore). (b) **Leftover snapshot on startup** → means a previous apply was interrupted (likely a crash); since the registry may be in a mixed/partial state, `reset_to_windows_default` resets to **Windows default — NOT the pre-apply values** (intentional safety choice to avoid a mixed state, not a bug). `_initial_snapshot.json` (first-run) is restored by the panic button (`Ctrl+Alt+Shift+R`).
+- **Apply is transactional (2 recovery paths).** `registry/mod.rs` writes a snapshot to `~/.custom_cursors/_pending_apply.snapshot` before mutating, deletes it on success. (a) **In-process write failure** → `restore_from_snapshot` rolls the registry back to the **pre-apply values** (exact restore). (b) **Leftover snapshot on startup** → means a previous apply was interrupted (likely a crash); since the registry may be in a mixed/partial state, `platform::recover_pending_snapshot_on_startup` resets to **Windows default — NOT the pre-apply values** (intentional safety choice to avoid a mixed state, not a bug). `_initial_snapshot.json` (first-run) is restored by the panic button (`Ctrl+Alt+Shift+R`).
 - **Cursor files live in `~/.custom_cursors/`** so they survive uninstall.
 - **PII redaction in logs.** Raw paths via `logging::redact_path`, hashes via `logging::short_hash` (12 chars). No raw registry values, no full SHA-256.
 - **Archive sanitisation.** Any code unzipping `.cursorpack` / `.cursorprofile` must go through `theme::sanitize_archive_path` and the size limits (50 MB compressed / 200 MB expanded / 10 MB per image / 1 GB total user storage).
 - **No `v-html`** anywhere in Vue. SVG icons go through render functions in `UiIcon.vue` / `CursorIcon.vue`.
 - **Rust is the single source of truth.** Frontend state must be synced via IPC; never persist app state only on the Vue side.
-- **IPC payload types** in `app/types/` must mirror `serde`-derived Rust structs in `src-tauri/src/commands/`.
+- **IPC payload types** in `app/types/` must mirror `serde`-derived Rust structs in `src-tauri/src/commands/` (e.g. `AppErrorDto`).
 
 ## Commands
 
@@ -55,6 +55,7 @@ npm test                # Vitest run (frontend)
 npx vue-tsc --noEmit    # Frontend type check
 node scripts/check-i18n.mjs    # i18n parity (ja.ts vs en.ts) — CI gate
 cargo test --manifest-path src-tauri/Cargo.toml --lib
+cargo test --manifest-path src-tauri/Cargo.toml --test '*'   # integration tests (src-tauri/tests/)
 ```
 
 ### Verification gate (canonical — run before every commit)
@@ -119,7 +120,7 @@ One feature = one commit. Run `bash scripts/verify-gate.sh` and confirm green be
 
 ## CI workflows
 
-- `.github/workflows/ci.yml` — `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test --lib`, `vue-tsc --noEmit`, i18n parity.
+- `.github/workflows/ci.yml` — `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test --lib`, `vue-tsc --noEmit`, i18n parity, `rust-check-linux` (ubuntu-latest: `cargo check` / clippy lib+bins, テストなし).
 - `.github/workflows/performance.yml` — Criterion benches (`benches/cursor_build.rs`, `benches/startup.rs`); regression detection on PRs.
 - `.github/workflows/release.yml` — signed installer builds.
 

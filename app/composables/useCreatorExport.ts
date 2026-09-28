@@ -217,7 +217,7 @@ export function useCreatorExport(deps: CreatorExportDeps) {
     } catch (err) {
       exportMessage.value = t('saveModal.toastExportFailed').replace(
         '{error}',
-        err instanceof Error ? err.message : String(err),
+        appErrorMessage(err),
       )
       status = 'failed'
     } finally {
@@ -243,10 +243,7 @@ export function useCreatorExport(deps: CreatorExportDeps) {
       await useThemes().applyTheme(themeId)
       exportMessage.value = t('saveModal.toastSavedAndApplied')
     } catch (err) {
-      exportMessage.value = t('saveModal.toastRetryFailed').replace(
-        '{error}',
-        err instanceof Error ? err.message : String(err),
-      )
+      exportMessage.value = t('saveModal.toastRetryFailed').replace('{error}', appErrorMessage(err))
       failedApplyThemeId.value = themeId // 再再試行のため復元
     }
   }

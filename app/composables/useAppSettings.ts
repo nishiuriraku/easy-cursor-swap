@@ -7,8 +7,13 @@
  * `github_account` / セキュリティ閾値 / 履歴系フィールドはそもそも
  * `AppConfigPatch` に存在しないため、フロントから上書きできない。
  */
-import type { AppConfig } from '~/types/config'
-import type { AppConfigPatch } from '~/types/generated'
+import type { AppConfig, GeneralConfig, LoggingConfig, SecurityConfig } from '~/types/config'
+import type {
+  AppConfigPatch,
+  GeneralConfigPatch,
+  LoggingConfigPatch,
+  SecurityConfigPatch,
+} from '~/types/generated'
 
 const config = ref<AppConfig | null>(null)
 const loading = ref(false)
@@ -28,7 +33,7 @@ async function load(force = false): Promise<AppConfig | null> {
       config.value = result ?? null
       return config.value
     } catch (err) {
-      error.value = err instanceof Error ? err.message : String(err)
+      error.value = appErrorMessage(err)
       console.warn('[useAppSettings] get_config failed:', err)
       return null
     } finally {
@@ -59,41 +64,42 @@ function stripUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> |
 }
 
 function diffGeneral(
-  prev: AppConfig['general'] | null,
-  next: AppConfig['general'] | null,
-): AppConfigPatch['general'] | undefined {
+  prev: GeneralConfig | null,
+  next: GeneralConfig | null,
+): GeneralConfigPatch | undefined {
   if (!prev || !next) return undefined
   return stripUndefined({
-    autoStart: diff(prev.autoStart, next.autoStart),
-    autoUpdate: diff(prev.autoUpdate, next.autoUpdate),
+    autoStart: diff(prev.auto_start, next.auto_start),
+    autoUpdate: diff(prev.auto_update, next.auto_update),
     language: diff(prev.language, next.language),
-    crashReporting: diff(prev.crashReporting, next.crashReporting),
-    showApplyToast: diff(prev.showApplyToast, next.showApplyToast),
-    applyShadowControl: diff(prev.applyShadowControl, next.applyShadowControl),
-    startMinimized: diff(prev.startMinimized, next.startMinimized),
-    showStorageWarning: diff(prev.showStorageWarning, next.showStorageWarning),
-  }) as AppConfigPatch['general']
+    crashReporting: diff(prev.crash_reporting, next.crash_reporting),
+    showApplyToast: diff(prev.show_apply_toast, next.show_apply_toast),
+    applyShadowControl: diff(prev.apply_shadow_control, next.apply_shadow_control),
+    startMinimized: diff(prev.start_minimized, next.start_minimized),
+    showStorageWarning: diff(prev.show_storage_warning, next.show_storage_warning),
+    onboardingVersion: diff(prev.onboarding_version, next.onboarding_version),
+  }) as GeneralConfigPatch
 }
 
 function diffSecurity(
-  prev: AppConfig['security'] | null,
-  next: AppConfig['security'] | null,
-): AppConfigPatch['security'] | undefined {
+  prev: SecurityConfig | null,
+  next: SecurityConfig | null,
+): SecurityConfigPatch | undefined {
   if (!prev || !next) return undefined
   return stripUndefined({
-    requireSignedThemes: diff(prev.requireSignedThemes, next.requireSignedThemes),
-    warnUnsignedImport: diff(prev.warnUnsignedImport, next.warnUnsignedImport),
-  }) as AppConfigPatch['security']
+    requireSignedThemes: diff(prev.require_signed_themes, next.require_signed_themes),
+    warnUnsignedImport: diff(prev.warn_unsigned_import, next.warn_unsigned_import),
+  }) as SecurityConfigPatch
 }
 
 function diffLogging(
-  prev: AppConfig['logging'] | null,
-  next: AppConfig['logging'] | null,
-): AppConfigPatch['logging'] | undefined {
+  prev: LoggingConfig | null,
+  next: LoggingConfig | null,
+): LoggingConfigPatch | undefined {
   if (!prev || !next) return undefined
   return stripUndefined({
     level: diff(prev.level, next.level),
-  }) as AppConfigPatch['logging']
+  }) as LoggingConfigPatch
 }
 
 /**
@@ -128,7 +134,7 @@ async function update(mutator: (c: AppConfig) => void): Promise<AppConfig | null
     if (updated) config.value = updated
     return updated
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err)
+    error.value = appErrorMessage(err)
     console.error('[useAppSettings] update_config failed:', err)
     return null
   }

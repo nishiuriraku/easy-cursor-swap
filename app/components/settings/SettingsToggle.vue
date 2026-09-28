@@ -7,8 +7,12 @@ const props = withDefaults(
   defineProps<{
     modelValue: boolean
     disabled?: boolean
+    /** スクリーンリーダー用のラベル。未指定時は親の SettingsRow label で説明される想定。 */
+    label?: string
+    /** E2E 用アンカー (`toggle-<anchor>` data-testid になる)。 */
+    anchor?: string
   }>(),
-  { disabled: false },
+  { disabled: false, label: undefined, anchor: undefined },
 )
 
 const emit = defineEmits<{
@@ -26,6 +30,8 @@ function toggle() {
     type="button"
     :class="['toggle', { on: modelValue }]"
     :aria-pressed="modelValue"
+    :aria-label="label ?? undefined"
+    :data-testid="anchor ? `toggle-${anchor}` : undefined"
     :disabled="disabled"
     @click="toggle"
   >

@@ -13,14 +13,10 @@ name: Performance Benchmarks
 #  3. release exe サイズ + Rust 側起動時の peak working set
 
 on:
+  # main マージ時のみ発火 (PR では実行しない)。計測に 30 分超かかるため
+  # PR ブロックにはせず、main の履歴で性能推移を追う運用。
   push:
     branches: [main]
-  pull_request:
-    paths:
-      - 'src-tauri/**'
-      - 'app/**'
-      - 'package.json'
-      - '.github/workflows/performance.yml'
 
 jobs:
   bench:

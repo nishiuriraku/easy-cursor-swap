@@ -15,6 +15,7 @@
 import { CURSOR_ROLES } from '~/components/icons/CursorIcons'
 
 const { t } = useI18n()
+const { tp } = usePlatform()
 
 interface LogEntry {
   /** 経過時間 (ms 文字列) */
@@ -39,7 +40,7 @@ const logs = ref<LogEntry[]>([])
 const startedAt = ref(0)
 
 const stageLabel = computed(() =>
-  stage.value === 1 ? t('panic.stage1Label') : t('panic.stage2Label'),
+  stage.value === 1 ? tp('panicStage1Label') : t('panic.stage2Label'),
 )
 const progressPct = computed(() => Math.round((completedRoles.value / CURSOR_ROLES.length) * 100))
 const remainingMs = computed(() => {
@@ -100,7 +101,7 @@ async function execute() {
     logs.value[0]!.status = 'pending'
     logs.value.push({
       status: 'pending',
-      text: t('panic.recoveryFailed', { reason: String(err) }),
+      text: t('panic.recoveryFailed', { reason: appErrorMessage(err) }),
       t: String(elapsed),
     })
     phase.value = 'error'
@@ -157,19 +158,21 @@ function logMark(s: LogEntry['status']): string {
           <button
             type="button"
             :class="['stage-card', { selected: stage === 1 }]"
+            data-testid="panic-stage-1"
             @click="selectStage(1)"
           >
             <div class="stage-meta">
               <span class="step">{{ t('panic.step01') }}</span>
               <span class="badge danger">{{ t('panic.badgeStage1') }}</span>
             </div>
-            <h3>{{ t('panic.stage1Title') }}</h3>
+            <h3>{{ tp('panicStage1Title') }}</h3>
             <p>{{ t('panic.stage1Desc') }}</p>
           </button>
 
           <button
             type="button"
             :class="['stage-card', { selected: stage === 2 }]"
+            data-testid="panic-stage-2"
             @click="selectStage(2)"
           >
             <div class="stage-meta">

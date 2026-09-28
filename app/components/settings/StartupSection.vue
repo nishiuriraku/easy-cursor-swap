@@ -5,9 +5,14 @@
  */
 
 const { t } = useI18n()
+const { tp } = usePlatform()
 
 const autoStart = defineModel<boolean>('autoStart', { required: true })
 const startMinimized = defineModel<boolean>('startMinimized', { required: true })
+
+defineProps<{
+  isMsixPackaged: boolean
+}>()
 </script>
 
 <template>
@@ -16,10 +21,14 @@ const startMinimized = defineModel<boolean>('startMinimized', { required: true }
       <h1>{{ t('settings.sectionStartup') }}</h1>
       <p>{{ t('settings.descStartup') }}</p>
     </header>
+    <div v-if="isMsixPackaged" class="msix-banner">
+      <p>{{ t('settings.storeManaged') }}</p>
+      <a href="ms-settings:startupapps">{{ t('settings.storeManagedLink') }}</a>
+    </div>
     <div class="prop-section">
       <div class="prop-head">
         {{ t('settings.groupAutoStart') }}
-        <span class="head-hint">{{ t('settings.autoStartHint') }}</span>
+        <span class="head-hint">{{ tp('autoStartHint') }}</span>
       </div>
       <div class="prop-body">
         <SettingsRow
@@ -27,14 +36,22 @@ const startMinimized = defineModel<boolean>('startMinimized', { required: true }
           :label="t('settings.autoStartLabel')"
           :desc="t('settings.autoStartDesc')"
         >
-          <SettingsToggle v-model="autoStart" />
+          <SettingsToggle
+            v-model="autoStart"
+            :label="t('settings.autoStartLabel')"
+            anchor="autoStart"
+          />
         </SettingsRow>
         <SettingsRow
           anchor="startMinimized"
           :label="t('settings.startMinimizedLabel')"
           :desc="t('settings.startMinimizedDesc')"
         >
-          <SettingsToggle v-model="startMinimized" />
+          <SettingsToggle
+            v-model="startMinimized"
+            :label="t('settings.startMinimizedLabel')"
+            anchor="startMinimized"
+          />
         </SettingsRow>
       </div>
     </div>
@@ -73,5 +90,16 @@ const startMinimized = defineModel<boolean>('startMinimized', { required: true }
 }
 .prop-body {
   padding: 4px 16px;
+}
+.msix-banner {
+  @apply mb-3 rounded-[10px] border px-4 py-3 text-[13px];
+  background: rgba(255, 213, 79, 0.08);
+  border-color: rgba(255, 213, 79, 0.4);
+}
+.msix-banner p {
+  @apply m-0 mb-1;
+}
+.msix-banner a {
+  color: rgb(var(--accent));
 }
 </style>

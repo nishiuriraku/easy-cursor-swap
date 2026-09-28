@@ -25,13 +25,15 @@ for all 17 Windows cursor roles, 6 DPI sizes, and Ed25519-signed theme distribut
 - **Tray resident** — Runs silently in the system tray; optional silent launch on OS startup
 - **Security hardened** — Ed25519 signatures, ZIP bomb protection, magic byte validation, path traversal prevention, SVG sanitisation, PNG metadata stripping
 - **Auto-update** — Background update delivery via signed Tauri Updater; major-version jumps require manual confirmation
+- **First-launch guide** — A 3-step welcome dialog explains the pre-install snapshot, the panic key, and the tray, then offers import / index / Creator as starting points. Re-openable from Settings → General.
+- **Offline-ready** — Fonts are bundled (no CDN), the official index is cached on disk and shown as stale when offline, and UI errors are contained with a copy-and-restart fallback.
 
 ## System Requirements
 
 | Requirement  | Minimum                                                                  |
 | ------------ | ------------------------------------------------------------------------ |
 | OS           | Windows 10 22H2 (build 19045) or Windows 11                              |
-| Architecture | x64 (ARM64 planned)                                                      |
+| Architecture | x64 / ARM64 (native `aarch64` build; ARM64 is CI cross-built and not yet hand-tested on a device) |
 | WebView2     | Evergreen runtime (built-in on Windows 11; auto-installed on Windows 10) |
 | Disk space   | ~30 MB for the installer; ~100 MB typical for a theme library            |
 
@@ -43,10 +45,16 @@ for all 17 Windows cursor roles, 6 DPI sizes, and Ed25519-signed theme distribut
 Download the latest installer from the
 [Releases page](https://github.com/nishiuriraku/easy-cursor-swap/releases):
 
-| File                           | Description                                                  |
-| ------------------------------ | ----------------------------------------------------------- |
-| `EasyCursorSwap_x64-setup.exe` | NSIS installer (per-user, no admin; English/Japanese setup) |
-| `EasyCursorSwap_x64_ja-JP.msi` | MSI installer (for silent / GPO deployment)                 |
+| File                                    | Description                                                     |
+| --------------------------------------- | --------------------------------------------------------------- |
+| `EasyCursorSwap_<ver>_x64-setup.exe`    | NSIS installer, x64 (per-user, no admin; English/Japanese setup) |
+| `EasyCursorSwap_<ver>_arm64-setup.exe`  | NSIS installer, ARM64 (Snapdragon / Surface Pro X etc.)          |
+| `EasyCursorSwap_<ver>_x64_ja-JP.msi`    | MSI installer, x64 (for silent / GPO deployment)                 |
+| `EasyCursorSwap_<ver>_arm64_ja-JP.msi`  | MSI installer, ARM64                                             |
+
+> `<ver>` is the release version, e.g. `EasyCursorSwap_0.0.8_x64-setup.exe`. Each installer ships with a
+> matching `.sig` (minisign) file used by the built-in updater. Pick the ARM64 file on Windows on ARM —
+> the x64 build also runs there via emulation but is slower.
 
 > The NSIS installer is recommended for most users — it lets you pick English or
 > Japanese during setup. The MSI ships with a Japanese setup UI and is provided
@@ -108,6 +116,7 @@ npm run tauri:dev
 
 # Type-check Rust only
 cargo check --manifest-path src-tauri/Cargo.toml
+# (Linux / macOS でも型検査は通る。実行・テストは Windows のみ)
 
 # Run Rust tests
 cargo test --manifest-path src-tauri/Cargo.toml
@@ -148,7 +157,7 @@ easy-cursor-swap/
 │   │   ├── main.rs             # Entry point: tray, health check
 │   │   ├── lib.rs              # Module declarations (23 modules)
 │   │   ├── commands/           # Tauri IPC command handlers (53 endpoints across 9 sub-modules)
-│   │   ├── config.rs           # Config manager (RwLock, schema migration, backups)
+│   │   ├── config/              # Config manager (schema / store: RwLock, atomic write, quarantine / migrate)
 │   │   ├── cursor/             # PNG → .cur / .ani pipeline (6 sizes, hotspot, ANI read/write)
 │   │   ├── registry/           # HKCU registry read/write, Schemes, SPI_SETCURSORS
 │   │   ├── theme/              # Theme manager (.cursorpack import/export, sanitisation)
@@ -190,7 +199,7 @@ Detailed module / IPC documentation is maintained in the maintainer's knowledge 
 | Download safety     | SHA-256 hash check + 50 MB / 200 MB / 10 MB three-stage size limits     |
 | Archive safety      | Path traversal prevention, symlink rejection, ZIP bomb detection        |
 | Image safety        | PNG metadata stripping (eXIf, iTXt, zTXt), SVG sanitisation             |
-| Transport           | rustls-tls (no OS TLS stack dependency)                                 |
+| Transport           | rustls-tls (no OS TLS stack dependency). External traffic is limited to the official index / updater / (opt-in) crash reports — no font CDN traffic |
 
 The table above is the complete security model.
 
@@ -217,7 +226,7 @@ See [docs/key_rotation.md](docs/key_rotation.md) if you need to rotate your sign
 | Lock screen / sign-in screen   | Shows Windows built-in cursors                                   |
 | Multi-user sessions            | Each Windows user account has independent cursor settings        |
 | Remote Desktop (RDP)           | Not supported; cursor rendering is controlled by the RDP host    |
-| ARM64                          | Not yet tested; x64 binary runs via emulation on ARM64 Windows   |
+| ARM64                          | Native build ships since v0.0.8, but is CI cross-built only (no hand test on a device yet) |
 
 ## Contributing
 

@@ -94,7 +94,7 @@ async function refresh(): Promise<ThemeCardData[]> {
       themesRaw.value = list ?? []
       return themes.value
     } catch (err) {
-      lastError.value = err instanceof Error ? err.message : String(err)
+      lastError.value = appErrorMessage(err)
       console.warn('[useThemes] get_themes failed:', err)
       return themes.value
     } finally {

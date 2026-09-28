@@ -46,6 +46,7 @@ pub fn expand_env_vars(input: &str) -> String {
 
 /// 文字列を NUL 終端付き UTF-16 LE バイト列にエンコードする。
 /// REG_EXPAND_SZ / REG_SZ の生バイト書き込み用。
+#[allow(dead_code)] // 本体呼び出し元が Windows 限定のため Linux ビルドでは未使用 (テストは使用)
 pub(crate) fn encode_utf16_with_nul(s: &str) -> Vec<u8> {
     let utf16: Vec<u16> = s.encode_utf16().chain(std::iter::once(0u16)).collect();
     let mut bytes = Vec::with_capacity(utf16.len() * 2);
