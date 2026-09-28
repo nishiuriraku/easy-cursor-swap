@@ -5,7 +5,7 @@
  * bypass と保存後遷移スケジュールを検証する。
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 
 type Guard = (_to: unknown, _from: unknown, next: (proceed?: boolean) => void) => void
 
@@ -26,8 +26,10 @@ beforeEach(() => {
 
 function setup() {
   const stage = ref<'start' | 'editing'>('editing')
-  const assignedRoleCount = ref(0)
-  const isMetaDirty = ref(false)
+  const assignedRoleCountValue = ref(0)
+  const assignedRoleCount = computed(() => assignedRoleCountValue.value)
+  const isMetaDirtyValue = ref(false)
+  const isMetaDirty = computed(() => isMetaDirtyValue.value)
   const onReset = vi.fn()
   const navigate = vi.fn()
   const guard = useCreatorDiscardGuard({
@@ -37,7 +39,7 @@ function setup() {
     onReset,
     navigate,
   })
-  return { stage, assignedRoleCount, isMetaDirty, onReset, navigate, guard }
+  return { stage, assignedRoleCountValue, isMetaDirtyValue, onReset, navigate, guard }
 }
 
 describe('useCreatorDiscardGuard', () => {
@@ -55,16 +57,16 @@ describe('useCreatorDiscardGuard', () => {
   })
 
   it('requestReset opens dialog in clear mode when edits exist', () => {
-    const { assignedRoleCount, guard } = setup()
-    assignedRoleCount.value = 2
+    const { assignedRoleCountValue, guard } = setup()
+    assignedRoleCountValue.value = 2
     guard.requestReset()
     expect(guard.discardDialogOpen.value).toBe(true)
     expect(guard.discardDialogMode.value).toBe('clear')
   })
 
   it('route guard holds navigation and confirm proceeds', () => {
-    const { assignedRoleCount, onReset, guard } = setup()
-    assignedRoleCount.value = 1
+    const { assignedRoleCountValue, onReset, guard } = setup()
+    assignedRoleCountValue.value = 1
     const next = vi.fn()
     capturedGuard!({}, {}, next)
     expect(next).not.toHaveBeenCalled()
@@ -75,8 +77,8 @@ describe('useCreatorDiscardGuard', () => {
   })
 
   it('route guard cancel calls next(false)', () => {
-    const { isMetaDirty, guard } = setup()
-    isMetaDirty.value = true
+    const { isMetaDirtyValue, guard } = setup()
+    isMetaDirtyValue.value = true
     const next = vi.fn()
     capturedGuard!({}, {}, next)
     guard.onDiscardCancel()
@@ -84,8 +86,8 @@ describe('useCreatorDiscardGuard', () => {
   })
 
   it('bypassUnsavedGuard passes navigation through immediately', () => {
-    const { assignedRoleCount, guard } = setup()
-    assignedRoleCount.value = 3
+    const { assignedRoleCountValue, guard } = setup()
+    assignedRoleCountValue.value = 3
     guard.bypassUnsavedGuard.value = true
     const next = vi.fn()
     capturedGuard!({}, {}, next)

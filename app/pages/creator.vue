@@ -190,18 +190,19 @@ const {
   writeActiveHotspot,
   enableSizedOverride,
   centerHotspot,
+} = useCreatorHotspotState({ creatorAssets, activeRoleId, activeSize, perSizeHotspot })
 /**
- * プレビュー Blob URL 派生状態 (P08a C3: useCreatorPreviewUrls に集約)。
+ * プレビュー Blob URL 派生状態 (P08a C3: useCreatorPreviewUrls に集約).
  */
-const { filledSizes, activePreviewUrl, activePreviewAsset, sizePreviewMap } =
-  useCreatorPreviewUrls({
+const { filledSizes, activePreviewUrl, activePreviewAsset, sizePreviewMap } = useCreatorPreviewUrls(
+  {
     creatorAssets,
     activeRoleId,
     activeSize,
     activeRole,
     activeAniFrames,
-  })
-
+  },
+)
 
 onUnmounted(() => {
   stopFileDrop()
@@ -214,7 +215,6 @@ onUnmounted(() => {
 function selectSize(s: number) {
   activeSize.value = s
 }
-
 
 function isRequired(id: string): boolean {
   return id === 'Arrow'

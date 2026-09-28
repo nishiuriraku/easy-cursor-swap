@@ -52,7 +52,8 @@ describe('useCreatorImport handleFileInput', () => {
     const svg = new TextEncoder().encode('<svg></svg>')
     await imp.handleFileInput(fileEvent('a.svg', svg))
     expect(rasterizeSvgToPng).toHaveBeenCalledTimes(1)
-    expect(rasterizeSvgToPng.mock.calls[0]![1]).toBe(256)
+    const firstCall = rasterizeSvgToPng.mock.calls[0] as unknown[]
+    expect(firstCall[1]).toBe(256)
     expect(creatorAssets.assigned.value.Arrow?.primary).toEqual(new Uint8Array([9, 9, 9]))
   })
 

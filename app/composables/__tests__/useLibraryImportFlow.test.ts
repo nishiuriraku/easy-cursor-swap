@@ -38,9 +38,7 @@ const inspection = (existing: boolean) => ({
   version: '1',
   author: null,
   role_count: 3,
-  existing: existing
-    ? { name: 'X', version: '1', author: null, role_count: 3 }
-    : null,
+  existing: existing ? { name: 'X', version: '1', author: null, role_count: 3 } : null,
 })
 
 beforeEach(() => {

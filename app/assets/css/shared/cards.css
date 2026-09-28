@@ -85,7 +85,6 @@
   @apply mt-0.5 text-[11.5px] text-fg-dim;
 }
 
-
 /* --- 個別 utility: .star / .meta-row / .coverage / .spinner (Phase 10-E) --- */
 .star {
   @apply grid size-[26px] shrink-0 cursor-pointer place-items-center rounded-md border border-transparent bg-transparent text-fg-faint;

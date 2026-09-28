@@ -110,7 +110,6 @@
   border-color: var(--fg);
 }
 
-
 /* --- .input / .toggle / .tag (Phase 10-D) --- */
 .input {
   @apply h-7 w-full rounded-md border border-line bg-white/[0.03] px-2.5 font-body text-[12px] text-fg outline-none;

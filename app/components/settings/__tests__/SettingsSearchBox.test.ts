@@ -39,7 +39,7 @@ const stubs = {
 
 function mountBox() {
   return mount(SettingsSearchBox, {
-    props: { context: ref({ hasKeystore: false }), section: 'general' },
+    props: { context: { hasKeystore: false }, section: 'general' },
     global: { stubs },
   })
 }

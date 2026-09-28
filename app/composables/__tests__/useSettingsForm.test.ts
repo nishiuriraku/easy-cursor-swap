@@ -6,6 +6,7 @@
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { nextTick } from 'vue'
+import type { AppConfig } from '~/types/generated'
 
 const appConfig = { value: null as unknown }
 const updateMock = vi.fn()
@@ -75,8 +76,8 @@ describe('useSettingsForm', () => {
     form.general.value.language = 'ja'
     await form.save()
     expect(updateMock).toHaveBeenCalledTimes(1)
-    const mutator = updateMock.mock.calls[0]![0] as (draft: never) => void
-    const draft = JSON.parse(JSON.stringify(snakeConfig()))
+    const mutator = updateMock.mock.calls[0]![0] as (draft: AppConfig) => void
+    const draft = JSON.parse(JSON.stringify(snakeConfig())) as AppConfig
     mutator(draft)
     expect(draft.general.language).toBe('ja')
     expect(draft.general.crash_reporting).toBe(true)

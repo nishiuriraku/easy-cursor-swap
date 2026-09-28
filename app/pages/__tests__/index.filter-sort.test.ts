@@ -6,12 +6,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import type { ThemeCardData } from '~/types/theme'
-import {
-  countThemes,
-  filterThemes,
-  mapWindowsSchemeToCard,
-  sortThemes,
-} from '../index.helpers'
+import { countThemes, filterThemes, mapWindowsSchemeToCard, sortThemes } from '../index.helpers'
 
 function card(partial: Partial<ThemeCardData> & { id: string; name: string }): ThemeCardData {
   return {
@@ -62,7 +57,9 @@ describe('filterThemes', () => {
     ])
     // applyCount > 0 も recent 扱いのため両方
     expect(
-      filterThemes([A(), B()], { query: '', filter: 'recent' }).map((t) => t.id).sort(),
+      filterThemes([A(), B()], { query: '', filter: 'recent' })
+        .map((t) => t.id)
+        .sort(),
     ).toEqual(['a', 'b'])
   })
 })

@@ -5,7 +5,6 @@
  * `settings.vue` のツールバー内検索 UI (input + dropdown) を `section` の
  * v-model とともに切り出したもの。検索ロジックは `useSettingsSearch`。
  */
-import type { Ref } from 'vue'
 import type {
   SearchContext,
   SettingsSectionId,
@@ -14,7 +13,7 @@ import type {
 import { useSettingsSearch } from '~/composables/useSettingsSearch'
 
 const props = defineProps<{
-  context: Ref<SearchContext>
+  context: SearchContext
 }>()
 
 const section = defineModel<SettingsSectionId>('section', { required: true })
@@ -25,6 +24,8 @@ const searchQuery = ref('')
 // 設定検索 composable (横断検索 → ジャンプ)
 // SettingsSearchDropdown は Teleport で body 直下に描画するため、トリガー要素の
 // 座標計算用に検索ラッパ div の ref を渡す。
+// テンプレ側の ref アンラップに対応するため toRef で包み直す。
+const contextRef = toRef(props, 'context')
 const searchAnchorRef = ref<HTMLElement | null>(null)
 const {
   open: searchOpen,
@@ -39,7 +40,7 @@ const {
 } = useSettingsSearch({
   query: searchQuery,
   locale,
-  context: props.context,
+  context: contextRef,
   sectionRef: section,
 })
 

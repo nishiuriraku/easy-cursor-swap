@@ -147,6 +147,9 @@ async function importProfile() {
   }
 }
 
+// GitHub 連携解除 (Wave 3A / L1-5): 直 invoke 廃止 → useGithubAuth.revoke() 経由。
+const { revoke: revokeGithubLink } = useGithubAuth()
+
 async function onGithubUnlink() {
   // useGithubAuth.revoke() は `revoke_github_link` IPC の薄いラッパー。
   // 失敗時は throw されるので caller (このハンドラ) が後処理 (loadConfig 等) を

@@ -181,7 +181,6 @@
   @apply px-2.5 text-[11.5px];
 }
 
-
 /* Narrow viewport (Phase 13-A 後): coverage 列廃止済み、preview は単一 Arrow セル。
  * 6 列 → 5 列で .lt-size を hide してパス情報優先。
  * (旧 7 列構成では末尾に署名列があったが、2026-05-13 で撤去済み) */

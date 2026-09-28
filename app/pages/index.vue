@@ -11,33 +11,20 @@
  */
 import type { ThemeCardData } from '~/types/theme'
 import { mapLocalSummaryToCard, type IpcThemeSummary } from '~/pages/index.helpers'
+import { mapWindowsSchemeToCard } from '~/pages/index.helpers'
 import type { IpcWindowsScheme } from '~/composables/useWindowsSchemes'
 
 const { t, locale } = useI18n()
 // UiIcon / ThemeCard / ApplyModal は Nuxt の自動インポートで解決される。
 
-import type { FilterChip, SortDir, SortKey } from './index.helpers'
-
 const themes = ref<ThemeCardData[]>([])
-const searchQuery = ref('')
-const filter = ref<FilterChip>('all')
-const sortKey = ref<SortKey>('updated')
-/** ソート方向。一覧の列ヘッダクリックでトグル、グリッドの cycleSort では `desc` 固定。 */
-const sortDir = ref<SortDir>('desc')
 const viewMode = ref<'grid' | 'list'>('grid')
 const isLoading = ref(true)
-const showDrop = ref(false)
 
 // 適用確認モーダル制御
 const pendingTheme = ref<ThemeCardData | null>(null)
 const applyBusy = ref(false)
-// .cursorpack インポート (検査 + 取込) 実行中フラグ (LD8)。ファイルダイアログ自体は
-// ネイティブのため busy にせず、選択後の inspect/actuallyImport の間だけ true にする。
-const importBusy = ref(false)
 const applyError = ref<string | null>(null)
-// 詳細モーダルの二次アクション (edit/export/duplicate/delete) 実行中フラグ (LD8)。
-// 該当ボタンにスピナーを出し、実行中はグループを無効化する。
-const detailBusyAction = ref<'edit' | 'export' | 'duplicate' | 'delete' | null>(null)
 
 // 詳細モーダル操作 (P08a L2: useThemeDetailActions に集約)。
 const {
@@ -231,7 +218,7 @@ async function loadThemes(opts: { silent?: boolean } = {}) {
     const localNames = new Set(local.map((l) => l.name))
     const system: ThemeCardData[] = (schemes ?? [])
       .filter((s) => !localNames.has(s.name))
-      .map(mapWindowsSchemeToCard)
+      .map((s) => mapWindowsSchemeToCard(s, 'Windows'))
 
     themes.value = [...local, ...system]
   } catch (err) {
