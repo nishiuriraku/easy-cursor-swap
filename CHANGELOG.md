@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Wave 4C: CI install/remove/sentinel パイプライン** — `.github/workflows/build-msix-artifacts.yml` 新設 (workflow_dispatch のみ、matrix x64 / arm64、test self-signed cert + signtool + `Add-AppxPackage` smoke、`~/.custom_cursors/cursor_store_sentinel.txt` 永続化検証)。`.env.example` に `MSIX_PUBLISHER` / `MSIX_TEST_CERT_PASSWORD` (任意) を追記。
 - `AppError::UnsupportedPlatform` を追加。非 Windows ビルドの OS 機能スタブが返すエラー種別 (フロントの `errors.unsupported_platform` に対応)。
 - 初回起動時に 3 ステップのウェルカムガイド (スナップショット保存の案内 / パニックキーとトレイ / 最初の一歩) を表示。完了状態は Rust 設定 `general.onboarding_version` に保存され、設定 → 一般 から再表示できる。
+- 検証済みの公式インデックスを `~/.custom_cursors/_marketplace_index_cache.json` にディスクキャッシュし、ネットワーク取得失敗時は前回成功時の内容を `stale` 表示 (取得時刻付きバナー + 再試行) で返す。`marketplace_fetch_index` IPC の戻り型を `MarketplaceIndexResult { index, stale, fetchedAt, error }` に拡張 (IPC 名・数は不変)。インストール時の SHA-256 / Ed25519 / 許可ホスト検証はキャッシュ由来でも同じ経路で実行される。フロントは `online` / `offline` イベントで復帰時の自動再取得とオフライン補助表示を行う。
+- 描画エラーバウンダリ (`AppErrorBoundary` + `AppErrorFallback` + `errorBoundary.client` プラグイン + `app/error.vue`) を追加。ページ描画中の未捕捉例外をサイドバー/タイトルバーを生かしたままフォールバック表示 (詳細コピー / アプリ再起動 / 続行) に置き換える。
 
 ### Changed
 
@@ -24,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - IPC エラーを `{code, message, detail?}` の型付き DTO に変更 (`AppErrorCode` 16 種、ts-rs 生成)。フロントは `invokeTauri` で `AppInvokeError` に正規化し、`errors.<code>` (ja/en) でカテゴリ文言を表示。Rust 側の Display / ログ文言は無変更。
 - UI 文言のうち Windows 固有語 (レジストリパス / `%LOCALAPPDATA%` / トースト等 22 キー) を `platform.windows.*` i18n 名前空間に隔離し `usePlatform()` 経由で参照するよう整理 (表示文言は不変)。
 - Creator / 設定 / ライブラリ画面を責務単位の composable・コンポーネントに分割 (各ページ縮小、挙動不変)。共有 CSS を `assets/css/shared/*.css` に分割。
+- Inter (可変ウェイト latin / latin-ext、OFL-1.1) を `app/assets/fonts/` に同梱し、Google Fonts CDN (`fonts.googleapis.com` / `fonts.gstatic.com`) への接続と CSP 許可を廃止。日本語グリフは Windows 同梱フォント (Yu Gothic UI / Meiryo) にフォールバック。
 
 ### Fixed
 

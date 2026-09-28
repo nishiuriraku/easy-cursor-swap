@@ -26,6 +26,7 @@ for all 17 Windows cursor roles, 6 DPI sizes, and Ed25519-signed theme distribut
 - **Security hardened** — Ed25519 signatures, ZIP bomb protection, magic byte validation, path traversal prevention, SVG sanitisation, PNG metadata stripping
 - **Auto-update** — Background update delivery via signed Tauri Updater; major-version jumps require manual confirmation
 - **First-launch guide** — A 3-step welcome dialog explains the pre-install snapshot, the panic key, and the tray, then offers import / index / Creator as starting points. Re-openable from Settings → General.
+- **Offline-ready** — Fonts are bundled (no CDN), the official index is cached on disk and shown as stale when offline, and UI errors are contained with a copy-and-restart fallback.
 
 ## System Requirements
 
@@ -198,7 +199,7 @@ Detailed module / IPC documentation is maintained in the maintainer's knowledge 
 | Download safety     | SHA-256 hash check + 50 MB / 200 MB / 10 MB three-stage size limits     |
 | Archive safety      | Path traversal prevention, symlink rejection, ZIP bomb detection        |
 | Image safety        | PNG metadata stripping (eXIf, iTXt, zTXt), SVG sanitisation             |
-| Transport           | rustls-tls (no OS TLS stack dependency)                                 |
+| Transport           | rustls-tls (no OS TLS stack dependency). External traffic is limited to the official index / updater / (opt-in) crash reports — no font CDN traffic |
 
 The table above is the complete security model.
 
