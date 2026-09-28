@@ -48,6 +48,10 @@ jobs:
         working-directory: src-tauri
         run: cargo test --lib
 
+      - name: cargo test (integration)
+        working-directory: src-tauri
+        run: cargo test --test '*'
+
       - name: Install cargo-llvm-cov
         run: cargo install cargo-llvm-cov --locked --quiet
 

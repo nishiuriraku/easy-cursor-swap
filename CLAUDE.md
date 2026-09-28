@@ -55,6 +55,7 @@ npm test                # Vitest run (frontend)
 npx vue-tsc --noEmit    # Frontend type check
 node scripts/check-i18n.mjs    # i18n parity (ja.ts vs en.ts) — CI gate
 cargo test --manifest-path src-tauri/Cargo.toml --lib
+cargo test --manifest-path src-tauri/Cargo.toml --test '*'   # integration tests (src-tauri/tests/)
 ```
 
 ### Verification gate (canonical — run before every commit)

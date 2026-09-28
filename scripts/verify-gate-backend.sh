@@ -7,6 +7,8 @@ echo "=== cargo clippy ==="
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 echo "=== cargo test --lib ==="
 cargo test --manifest-path src-tauri/Cargo.toml --lib --quiet
+echo "=== cargo test --test '*' (integration) ==="
+cargo test --manifest-path src-tauri/Cargo.toml --test '*' --quiet
 echo "=== cargo llvm-cov (>= 70% lines) ==="
 # Wave 2AB のゲート条件。--fail-under-lines は単に < 70% で exit 1 になるため、
 # この値を上げる/下げる場合は brief 側で合意済みである必要あり。
