@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `config.rs` を `config/{schema,store,migrate,tests}.rs` に分割 (公開 API / 挙動 / 生成 TS 不変)。
 - レジストリ操作を `platform::CursorBackend` trait 境界の背後に移し、`Arc<dyn CursorBackend>` を Tauri State で注入。Windows 実装は従来の `RegistryManager` へ委譲し挙動は無変更。トランザクション契約 (snapshot → 書込 → commit / rollback) と起動時 leftover snapshot → Windows 既定リセットの不変条件をインメモリ backend で Linux 上でも単体テスト化。
 - IPC エラーを `{code, message, detail?}` の型付き DTO に変更 (`AppErrorCode` 16 種、ts-rs 生成)。フロントは `invokeTauri` で `AppInvokeError` に正規化し、`errors.<code>` (ja/en) でカテゴリ文言を表示。Rust 側の Display / ログ文言は無変更。
+- UI 文言のうち Windows 固有語 (レジストリパス / `%LOCALAPPDATA%` / トースト等 22 キー) を `platform.windows.*` i18n 名前空間に隔離し `usePlatform()` 経由で参照するよう整理 (表示文言は不変)。
 - Creator / 設定 / ライブラリ画面を責務単位の composable・コンポーネントに分割 (各ページ縮小、挙動不変)。共有 CSS を `assets/css/shared/*.css` に分割。
 
 ### Fixed

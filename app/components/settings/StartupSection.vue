@@ -5,6 +5,7 @@
  */
 
 const { t } = useI18n()
+const { tp } = usePlatform()
 
 const autoStart = defineModel<boolean>('autoStart', { required: true })
 const startMinimized = defineModel<boolean>('startMinimized', { required: true })
@@ -27,7 +28,7 @@ defineProps<{
     <div class="prop-section">
       <div class="prop-head">
         {{ t('settings.groupAutoStart') }}
-        <span class="head-hint">{{ t('settings.autoStartHint') }}</span>
+        <span class="head-hint">{{ tp('autoStartHint') }}</span>
       </div>
       <div class="prop-body">
         <SettingsRow

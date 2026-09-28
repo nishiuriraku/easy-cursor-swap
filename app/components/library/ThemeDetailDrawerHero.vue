@@ -14,6 +14,7 @@ import type { RolePreviewDetail } from '~/composables/useThemePreviews'
 import type { CursorPreviewAsset } from '~/components/preview/CursorPreview.vue'
 
 const { t } = useI18n()
+const { tp } = usePlatform()
 
 const props = defineProps<{
   theme: ThemeCardData
@@ -69,7 +70,7 @@ function selectRole(id: string) {
 
 const descriptionText = computed<string | null>(() => {
   if (props.theme.description) return props.theme.description
-  if (isSystem.value) return t('themeDetail.systemSchemeDesc')
+  if (isSystem.value) return tp('systemSchemeDesc')
   return null
 })
 

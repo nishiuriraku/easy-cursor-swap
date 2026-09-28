@@ -18,9 +18,7 @@ export default defineNuxtConfig({
 
   // ディレクトリ名のプレフィックスを付けず、`<UiIcon>` や `<ThemeCard>` のように
   // ファイル名そのままで参照できるようにする (デザイン仕様の命名規則と整合)
-  components: [
-    { path: '~/components', pathPrefix: false },
-  ],
+  components: [{ path: '~/components', pathPrefix: false }],
 
   devServer: {
     // Tauri が使用するポートを固定
@@ -49,7 +47,7 @@ export default defineNuxtConfig({
       meta: [
         { charset: 'utf-8' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-        { name: 'description', content: 'Windows用次世代マウスカーソル管理ツール' },
+        { name: 'description', content: 'EasyCursorSwap — mouse cursor theme manager' },
       ],
       link: [
         {

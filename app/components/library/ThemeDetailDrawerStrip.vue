@@ -8,6 +8,7 @@
 import type { ThemeCardData } from '~/types/theme'
 
 const { t } = useI18n()
+const { tp } = usePlatform()
 
 const props = defineProps<{
   theme: ThemeCardData
@@ -88,10 +89,10 @@ async function openHomepage() {
           :size="11"
           :style="`color: var(${isSystem ? '--violet' : '--accent'}); margin-right: 6px`"
         />
-        {{ isSystem ? 'HKCU\\Cursors\\Schemes' : `@${theme.author ?? 'unknown'}` }}
+        {{ isSystem ? tp('systemSchemeStorePath') : `@${theme.author ?? 'unknown'}` }}
       </div>
       <div class="td-cell-sub">
-        <span>{{ isSystem ? t('themeDetail.sourceOsRegistry') : `v${theme.version}` }}</span>
+        <span>{{ isSystem ? tp('systemSchemeSource') : `v${theme.version}` }}</span>
         <template v-if="!isSystem && theme.license">
           <span class="td-dot">·</span>
           <span>{{ theme.license }}</span>

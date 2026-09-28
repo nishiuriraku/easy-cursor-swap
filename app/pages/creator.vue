@@ -17,6 +17,7 @@ import type { Hotspot } from '~/composables/useCreatorAssets'
 import type { CursorPreviewAsset } from '~/components/preview/CursorPreview.vue'
 
 const { t } = useI18n()
+const { tp } = usePlatform()
 
 const { info: keystoreInfo, refresh: refreshKeystore } = useKeystore()
 const hasKeystoreSigning = computed(() => keystoreInfo.value.has_keypair)
@@ -57,7 +58,7 @@ const showAdvancedResolutions = ref(false)
 // title / description / ogImage を定義しておく。
 useSeoMeta({
   title: 'EasyCursorSwap — Creator',
-  description: t('creator.appDescription'),
+  description: tp('creatorAppDescription'),
   ogImage: '/icon.png',
 })
 

@@ -5,7 +5,6 @@
 export default {
   app: {
     name: 'EasyCursorSwap',
-    edition: 'Win-Exclusive',
   },
   nav: {
     library: 'Library',
@@ -61,7 +60,6 @@ export default {
     favRemove: 'Remove from favorites',
     favAdd: 'Add to favorites',
     filterGroupAria: 'Filter',
-    sourceTagSchemeAria: 'Windows system scheme',
     sourceTagMarketplaceAria: 'From official index',
     coverageAria: 'Coverage {filled}/17',
     detailAria: 'Open details for {name}',
@@ -91,13 +89,10 @@ export default {
     bytesUnknown: '?',
   },
   themeDetail: {
-    systemSchemeDesc:
-      'A scheme stored in Windows Mouse Properties. EasyCursorSwap can only apply it — editing, exporting, and signature verification are not supported.',
     applyCountSuffix: 'applies',
     usageActive: 'Currently applied',
     usageInactive: 'Inactive',
     usageNever: 'Never applied',
-    sourceOsRegistry: 'Windows Mouse settings',
     editAria: 'Edit {name} in Creator',
     editLabel: 'Edit in Creator',
     exportAria: 'Export {name}',
@@ -119,7 +114,6 @@ export default {
   },
   apply: {
     title: 'Apply "{name}" to system',
-    description: 'Writes 17 cursor types × 6 resolutions into Windows. Auto-reverts on failure.',
     signedNotice: 'From official index · Author ID {keyId}',
     unsignedNotice: 'Imported from local file. Verify the source is trusted.',
     confirm: 'Apply',
@@ -168,8 +162,6 @@ export default {
     metaArrowRequired: 'Arrow role (required)',
     metaAssigned: 'Assigned',
     metaUnassigned: 'Unassigned',
-    requiredRoleNote: 'Main Windows cursor. {required}. Each resolution can have its own image.',
-    optionalRoleNote: '{en}. Optional. Inherits Windows default when unset.',
     requiredMark: 'Required',
     hotspotHint: 'Click or drag to move the hotspot',
     clearAria: 'Clear and return to start screen',
@@ -180,7 +172,6 @@ export default {
     exportStepPackage: 'Package',
     exportStepSign: 'Sign',
     exportFailPrefix: 'Export failed',
-    appDescription: 'Author Windows cursor themes with 17 roles × 6 resolutions and export them',
     bulkSourceEditing: '📦 Editing',
     // Bulk import progress overlay (LD5)
     bulkImporting: 'Importing…',
@@ -231,11 +222,9 @@ export default {
   panic: {
     title: 'Run Reset',
     description: 'Discard current cursor configuration and restore the selected state.',
-    stage1Title: 'Reset to Windows default',
     stage1Desc: 'Force reset to the factory system scheme. Always available as a last resort.',
     stage2Title: 'Restore pre-install state',
     stage2Desc: 'Restore to the "pre-install state" saved on first launch. Pre-existing CursorFX settings are also restored.',
-    stage1Label: 'Windows default',
     stage2Label: 'Snapshot',
     badgeStage1: 'Stage 1',
     badgeStage2: 'Stage 2',
@@ -282,24 +271,16 @@ export default {
     groupDisplayLanguage: 'Display language',
     groupCursorSize: 'Cursor size',
     cursorSizeLabel: 'Mouse pointer size',
-    cursorSizeDesc: 'Resize the mouse pointer system-wide. Disabled while Windows accessibility has enlarged the cursor.',
     cursorSizeReadout: '{px} px',
     cursorSizeError: 'Failed to change size: {error}',
-    cursorSizeRefreshFromOs: 'Sync from Windows',
-    cursorSizeEoaSizeMessage:
-      'Mouse pointer size is enlarged in Windows (currently {currentSlider}). The in-app slider is disabled. Reset Windows size to 1 to re-enable this slider.',
-    cursorSizeEoaStyleMessage:
-      'Mouse pointer style (type={type}) limits in-app size adjustment. Switch the style to White / Black / Inverted.',
-    cursorSizeOpenWindowsSettings: 'Open Windows settings',
+    cursorSizeRefreshFromOs: 'Sync from OS',
     groupNotifications: 'Notifications',
     showApplyToastLabel: 'Toast on apply result',
-    showApplyToastDesc: 'Show a Windows toast with apply result',
     applyShadowControlLabel: 'Control OS pointer shadow',
     applyShadowControlDesc: 'Call SPI_SETCURSORSHADOW based on the theme requires_os_shadow',
     // Startup
     descStartup: 'Auto-launch on OS startup and tray-resident behavior.',
     groupAutoStart: 'Auto-start',
-    autoStartHint: 'HKCU\\…\\Run',
     autoStartLabel: 'Silent launch on OS startup',
     autoStartDesc: 'Skip main window, only tray',
     startMinimizedLabel: 'Start with main window minimized',
@@ -356,7 +337,6 @@ export default {
     keyExportSuccess: 'Private key exported ({size} bytes) → {target}',
     keyImportSuccess: 'Private key imported key_id={keyId}',
     // Logging
-    descLogging: 'Retention and verbosity for logs in %LOCALAPPDATA%\\EasyCursorSwap\\logs\\.',
     groupLogOutput: 'Log output',
     logLevelLabel: 'Log level',
     logLevelDesc: 'INFO recommended for release. Bump to DEBUG when troubleshooting',
@@ -365,11 +345,9 @@ export default {
     maxSizeLabel: 'Total size limit (MB)',
     maxSizeDesc: 'Oldest files are deleted when over limit',
     openLogFolderLabel: 'Open current log folder',
-    openLogFolderDesc: 'Open `%LOCALAPPDATA%\\EasyCursorSwap\\logs\\` in Explorer',
     btnOpen: 'Open',
     // Crash reports (inside Logging section)
     groupCrashReports: 'Crash reports',
-    crashReportsHint: '%LOCALAPPDATA%\\EasyCursorSwap\\crash\\',
     crashReportingLabel: 'Send crash reports',
     crashReportingDesc:
       'POST panic info (home path redacted to ~) to an anonymous Worker. When OFF, reports stay local only (opt-in)',
@@ -651,7 +629,6 @@ export default {
     overwriteDuplicate: 'Save as duplicate',
     overwriteDuplicateSub: 'Save as a new theme (the original is kept).',
     sign: 'Sign this theme',
-    signSub: 'Signs the theme with your private key (kept safe by Windows).',
     signDisabled: 'No signing key (Settings → Signing key)',
     nameLabel: 'Theme name',
     namePlaceholder: 'Untitled ({date})',
@@ -688,5 +665,40 @@ export default {
     crypto: 'Key / signature operation failed ({message})',
     github: 'GitHub communication failed ({message})',
     unsupported_platform: 'This operation is not available on this platform',
+  },
+
+  /**
+   * OS 固有の文言。参照は `usePlatform().tp('<key>')` 経由 (`platform.<os>.<key>`)。
+   * 新しい OS を足すときは同じキー集合でサブオブジェクトを増やす (check-i18n は
+   * leaf key 集合の ja/en 一致だけを見るので、両 locale に同じ構造を足すこと)。
+   */
+  platform: {
+    windows: {
+      edition: 'Win-Exclusive',
+      systemSchemeAria: 'Windows system scheme',
+      systemSchemeDesc:
+        'A scheme stored in Windows Mouse Properties. EasyCursorSwap can only apply it — editing, exporting, and signature verification are not supported.',
+      systemSchemeSource: 'Windows Mouse settings',
+      systemSchemeStorePath: 'HKCU\\Cursors\\Schemes',
+      systemSchemeAuthor: 'Windows',
+      applyDescription: 'Writes 17 cursor types × 6 resolutions into Windows. Auto-reverts on failure.',
+      requiredRoleNote: 'Main Windows cursor. {required}. Each resolution can have its own image.',
+      optionalRoleNote: '{en}. Optional. Inherits Windows default when unset.',
+      creatorAppDescription: 'Author Windows cursor themes with 17 roles × 6 resolutions and export them',
+      panicStage1Title: 'Reset to Windows default',
+      panicStage1Label: 'Windows default',
+      cursorSizeDesc: 'Resize the mouse pointer system-wide. Disabled while Windows accessibility has enlarged the cursor.',
+      cursorSizeEoaSizeMessage:
+        'Mouse pointer size is enlarged in Windows (currently {currentSlider}). The in-app slider is disabled. Reset Windows size to 1 to re-enable this slider.',
+      cursorSizeEoaStyleMessage:
+        'Mouse pointer style (type={type}) limits in-app size adjustment. Switch the style to White / Black / Inverted.',
+      cursorSizeOpenOsSettings: 'Open Windows settings',
+      showApplyToastDesc: 'Show a Windows toast with apply result',
+      autoStartHint: 'HKCU\\…\\Run',
+      descLogging: 'Retention and verbosity for logs in %LOCALAPPDATA%\\EasyCursorSwap\\logs\\.',
+      openLogFolderDesc: 'Open `%LOCALAPPDATA%\\EasyCursorSwap\\logs\\` in Explorer',
+      crashReportsHint: '%LOCALAPPDATA%\\EasyCursorSwap\\crash\\',
+      signSub: 'Signs the theme with your private key (kept safe by Windows).',
+    },
   },
 } as const

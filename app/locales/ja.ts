@@ -4,7 +4,6 @@
 export default {
   app: {
     name: 'EasyCursorSwap',
-    edition: 'Win-Exclusive',
   },
   nav: {
     library: 'ライブラリ',
@@ -60,7 +59,6 @@ export default {
     favRemove: 'お気に入りから削除',
     favAdd: 'お気に入りに追加',
     filterGroupAria: 'フィルター',
-    sourceTagSchemeAria: 'Windows システムスキーム',
     sourceTagMarketplaceAria: '公式インデックス由来',
     coverageAria: 'カバレッジ {filled}/17',
     detailAria: '{name} の詳細を開く',
@@ -90,13 +88,10 @@ export default {
     bytesUnknown: '?',
   },
   themeDetail: {
-    systemSchemeDesc:
-      'Windows のマウスのプロパティに保存された配色スキームです。EasyCursorSwap では適用のみ可能で、編集・エクスポート・署名検証は行いません。',
     applyCountSuffix: '回適用',
     usageActive: '現在適用中',
     usageInactive: '未適用',
     usageNever: '一度も適用なし',
-    sourceOsRegistry: 'Windows のマウス設定',
     editAria: '{name} を Creator で編集',
     editLabel: 'Creator で編集',
     exportAria: '{name} をエクスポート',
@@ -118,7 +113,6 @@ export default {
   },
   apply: {
     title: '「{name}」をシステムに適用',
-    description: '17 種類のカーソル × 6 解像度を Windows に書き込みます。失敗時は自動で元に戻します。',
     signedNotice: '公式インデックス由来 · 発行者ID {keyId}',
     unsignedNotice: 'ローカルから取り込んだテーマです。信頼できる発行元か確認してください。',
     confirm: '適用する',
@@ -167,8 +161,6 @@ export default {
     metaArrowRequired: 'Arrow ロール (必須)',
     metaAssigned: '割り当て済み',
     metaUnassigned: '未割り当て',
-    requiredRoleNote: 'Windows のメイン操作カーソル。{required}。解像度ごとに独立した画像を割り当て可能。',
-    optionalRoleNote: '{en}。任意。未指定時は Windows 既定を継承します。',
     requiredMark: '必須',
     hotspotHint: 'クリック または ドラッグでホットスポットを移動',
     clearAria: 'クリアして初期画面に戻る',
@@ -179,7 +171,6 @@ export default {
     exportStepPackage: 'パッケージ',
     exportStepSign: '署名',
     exportFailPrefix: 'エクスポート失敗',
-    appDescription: 'Windows 用カーソルテーマを 17 役割 × 6 解像度で作成しエクスポートする',
     bulkSourceEditing: '📦 編集中',
     // 一括インポート進捗オーバーレイ (LD5)
     bulkImporting: '一括インポート中…',
@@ -230,11 +221,9 @@ export default {
   panic: {
     title: 'リセットを実行',
     description: '現在のカーソル設定を破棄し、選択した状態へ強制復元します。',
-    stage1Title: 'Windows 既定に戻す',
     stage1Desc: 'OS 出荷時のシステムスキームへ強制リセット。最終救済として常にアクセス可能。',
     stage2Title: 'インストール前の状態に戻す',
     stage2Desc: '初回起動時に保存した「インストール前の状態」へ戻します。CursorFX 等の旧設定も復元されます。',
-    stage1Label: 'Windows 既定',
     stage2Label: 'スナップショット',
     badgeStage1: 'Stage 1',
     badgeStage2: 'Stage 2',
@@ -281,24 +270,16 @@ export default {
     groupDisplayLanguage: '表示言語',
     groupCursorSize: 'カーソルサイズ',
     cursorSizeLabel: 'マウスポインターのサイズ',
-    cursorSizeDesc: 'Windows 全体のマウスポインターサイズを変更します。Windows アクセシビリティ側でサイズが拡大されているときはアプリからは変更できません。',
     cursorSizeReadout: '{px} px',
     cursorSizeError: 'サイズ変更に失敗しました: {error}',
-    cursorSizeRefreshFromOs: 'OS から再取得',
-    cursorSizeEoaSizeMessage:
-      'Windows でマウスポインターのサイズが拡大 (現在: {currentSlider}) されているため、本アプリでの調整は利用できません。Windows の設定でサイズを 1 に戻すと、本アプリでの調整が再度有効になります。',
-    cursorSizeEoaStyleMessage:
-      'Windows のマウスポインタースタイル (type={type}) によって本アプリでの調整が制限されています。スタイルを「白 / 黒 / 反転」に変更してください。',
-    cursorSizeOpenWindowsSettings: 'Windows の設定を開く',
+    cursorSizeRefreshFromOs: 'Sync from OS',
     groupNotifications: '通知',
     showApplyToastLabel: '適用結果のトースト表示',
-    showApplyToastDesc: 'Windows トースト通知で適用結果を告知',
     applyShadowControlLabel: 'OS 標準ポインター影を制御',
     applyShadowControlDesc: 'テーマの requires_os_shadow に従い SPI_SETCURSORSHADOW を呼び出す',
     // 起動・常駐
     descStartup: 'OS 起動時の自動実行とトレイ常駐の挙動。',
     groupAutoStart: '自動起動',
-    autoStartHint: 'HKCU\\…\\Run',
     autoStartLabel: 'OS 起動時にサイレントで起動',
     autoStartDesc: 'メイン画面は出さず、トレイのみで常駐',
     startMinimizedLabel: 'メイン画面を最小化で起動',
@@ -355,7 +336,6 @@ export default {
     keyExportSuccess: '秘密鍵をエクスポートしました ({size} bytes) → {target}',
     keyImportSuccess: '秘密鍵をインポートしました key_id={keyId}',
     // ログ
-    descLogging: '%LOCALAPPDATA%\\EasyCursorSwap\\logs\\ に保存されるログの保持と粒度。',
     groupLogOutput: 'ログ出力',
     logLevelLabel: 'ログレベル',
     logLevelDesc: 'リリース版は INFO 推奨。トラブル時は DEBUG へ',
@@ -364,11 +344,9 @@ export default {
     maxSizeLabel: '合計上限サイズ (MB)',
     maxSizeDesc: '超過時は古いものから削除',
     openLogFolderLabel: '現在のログフォルダーを開く',
-    openLogFolderDesc: 'エクスプローラーで `%LOCALAPPDATA%\\EasyCursorSwap\\logs\\` を開く',
     btnOpen: '開く',
     // クラッシュレポート (ログ・診断セクション内)
     groupCrashReports: 'クラッシュレポート',
-    crashReportsHint: '%LOCALAPPDATA%\\EasyCursorSwap\\crash\\',
     crashReportingLabel: 'クラッシュレポートの送信',
     crashReportingDesc:
       'panic 情報 (ホームパスを ~ に伏字化済み) を匿名サーバへ送信。OFF の場合は端末内にのみ保存 (オプトイン)',
@@ -647,7 +625,6 @@ export default {
     overwriteDuplicate: '複製として保存',
     overwriteDuplicateSub: '別テーマとして新しく追加します (元テーマも残ります)。',
     sign: 'このテーマに署名する',
-    signSub: 'あなたの秘密鍵で署名します (Windows により安全に保管中)',
     signDisabled: '署名鍵がありません (設定 → 署名鍵 で生成)',
     nameLabel: 'テーマ名',
     namePlaceholder: 'Untitled ({date})',
@@ -686,5 +663,40 @@ export default {
     crypto: '鍵 / 署名処理に失敗しました ({message})',
     github: 'GitHub との通信に失敗しました ({message})',
     unsupported_platform: 'この操作はこのプラットフォームでは利用できません',
+  },
+
+  /**
+   * OS 固有の文言。参照は `usePlatform().tp('<key>')` 経由 (`platform.<os>.<key>`)。
+   * 新しい OS を足すときは同じキー集合でサブオブジェクトを増やす (check-i18n は
+   * leaf key 集合の ja/en 一致だけを見るので、両 locale に同じ構造を足すこと)。
+   */
+  platform: {
+    windows: {
+      edition: 'Win-Exclusive',
+      systemSchemeAria: 'Windows システムスキーム',
+      systemSchemeDesc:
+        'Windows のマウスのプロパティに保存された配色スキームです。EasyCursorSwap では適用のみ可能で、編集・エクスポート・署名検証は行いません。',
+      systemSchemeSource: 'Windows のマウス設定',
+      systemSchemeStorePath: 'HKCU\\Cursors\\Schemes',
+      systemSchemeAuthor: 'Windows',
+      applyDescription: '17 種類のカーソル × 6 解像度を Windows に書き込みます。失敗時は自動で元に戻します。',
+      requiredRoleNote: 'Windows のメイン操作カーソル。{required}。解像度ごとに独立した画像を割り当て可能。',
+      optionalRoleNote: '{en}。任意。未指定時は Windows 既定を継承します。',
+      creatorAppDescription: 'Windows 用カーソルテーマを 17 役割 × 6 解像度で作成しエクスポートする',
+      panicStage1Title: 'Windows 既定に戻す',
+      panicStage1Label: 'Windows 既定',
+      cursorSizeDesc: 'Windows 全体のマウスポインターサイズを変更します。Windows アクセシビリティ側でサイズが拡大されているときはアプリからは変更できません。',
+      cursorSizeEoaSizeMessage:
+        'Windows でマウスポインターのサイズが拡大 (現在: {currentSlider}) されているため、本アプリでの調整は利用できません。Windows の設定でサイズを 1 に戻すと、本アプリでの調整が再度有効になります。',
+      cursorSizeEoaStyleMessage:
+        'Windows のマウスポインタースタイル (type={type}) によって本アプリでの調整が制限されています。スタイルを「白 / 黒 / 反転」に変更してください。',
+      cursorSizeOpenOsSettings: 'Windows の設定を開く',
+      showApplyToastDesc: 'Windows トースト通知で適用結果を告知',
+      autoStartHint: 'HKCU\\…\\Run',
+      descLogging: '%LOCALAPPDATA%\\EasyCursorSwap\\logs\\ に保存されるログの保持と粒度。',
+      openLogFolderDesc: 'エクスプローラーで `%LOCALAPPDATA%\\EasyCursorSwap\\logs\\` を開く',
+      crashReportsHint: '%LOCALAPPDATA%\\EasyCursorSwap\\crash\\',
+      signSub: 'あなたの秘密鍵で署名します (Windows により安全に保管中)',
+    },
   },
 } as const

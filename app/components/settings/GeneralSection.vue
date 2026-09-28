@@ -12,6 +12,7 @@
  */
 
 const { t } = useI18n()
+const { tp } = usePlatform()
 
 const language = defineModel<string>('language', { required: true })
 const showApplyToast = defineModel<boolean>('showApplyToast', { required: true })
@@ -65,13 +66,13 @@ const localPxPreview = computed(() => {
 // CursorSize > 1 (= サイズ拡大が原因) と CursorType != 0 (= スタイルが原因) を区別する。
 const eoaMessage = computed(() => {
   if (props.cursorCurrentWindowsSlider > 1) {
-    return t('settings.cursorSizeEoaSizeMessage', {
+    return tp('cursorSizeEoaSizeMessage', {
       currentSlider: props.cursorCurrentWindowsSlider,
     })
   }
   // CursorSize == 1 だが eoa active のケース (本仕様 gate では発火しないが将来 known
   // limitation 緩和時に有効化)。
-  return t('settings.cursorSizeEoaStyleMessage', {
+  return tp('cursorSizeEoaStyleMessage', {
     type: props.cursorCurrentWindowsType,
   })
 })
@@ -130,13 +131,13 @@ function onSliderChange(ev: Event) {
             class="cursor-size-open-windows-settings"
             @click="$emit('open-windows-cursor-settings')"
           >
-            {{ t('settings.cursorSizeOpenWindowsSettings') }}
+            {{ tp('cursorSizeOpenOsSettings') }}
           </button>
         </UiAlert>
         <SettingsRow
           anchor="cursorSize"
           :label="t('settings.cursorSizeLabel')"
-          :desc="t('settings.cursorSizeDesc')"
+          :desc="tp('cursorSizeDesc')"
         >
           <div class="cursor-size-control">
             <input
@@ -181,7 +182,7 @@ function onSliderChange(ev: Event) {
         <SettingsRow
           anchor="showApplyToast"
           :label="t('settings.showApplyToastLabel')"
-          :desc="t('settings.showApplyToastDesc')"
+          :desc="tp('showApplyToastDesc')"
         >
           <SettingsToggle v-model="showApplyToast" />
         </SettingsRow>

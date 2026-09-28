@@ -157,5 +157,10 @@ describe('useI18n', () => {
       expect(te('errors.registry')).toBe(true)
       expect(te('no.such.key')).toBe(false)
     })
+
+    it('resolves 3-level nested platform keys', () => {
+      const { t } = useI18n()
+      expect(t('platform.windows.systemSchemeStorePath')).toBe('HKCU\\Cursors\\Schemes')
+    })
   })
 })

@@ -11,6 +11,7 @@
  */
 
 const { t } = useI18n()
+const { tp } = usePlatform()
 
 interface Props {
   open: boolean
@@ -192,7 +193,7 @@ async function onSubmit() {
         <span>
           <div class="ctl-label">{{ t('saveModal.sign') }}</div>
           <div class="ctl-sub">
-            {{ hasKeystoreSigning ? t('saveModal.signSub') : t('saveModal.signDisabled') }}
+            {{ hasKeystoreSigning ? tp('signSub') : t('saveModal.signDisabled') }}
           </div>
         </span>
       </label>

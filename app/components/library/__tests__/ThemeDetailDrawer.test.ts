@@ -133,6 +133,13 @@ describe('ThemeDetailDrawer — 静的要素の整理', () => {
     expect(pkg.find('.td-cell-sub').text()).toContain('schema v1')
   })
 
+  it('SOURCE セルに system テーマの store path を表示 (P04)', () => {
+    const w = mountDrawer(makeTheme({ kind: 'system' }))
+    const cells = w.findAll('.td-cell')
+    const source = cells[cells.length - 1]!
+    expect(source.find('.td-cell-v').text()).toContain('HKCU\\Cursors\\Schemes')
+  })
+
   it('lastAppliedAt があれば USAGE サブに「lastAppliedPrefix YYYY-MM-DD」を出す', () => {
     const w = mountDrawer(makeTheme({ applyCount: 5, lastAppliedAt: '2026-05-10T12:00:00Z' }))
     const usage = w.findAll('.td-cell')[1]!

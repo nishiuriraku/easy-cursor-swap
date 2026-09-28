@@ -9,6 +9,7 @@
 // UiIcon は Nuxt の自動インポートで解決される
 
 const { t } = useI18n()
+const { tp } = usePlatform()
 const { info, load: loadAppInfo } = useAppInfo()
 
 onMounted(() => {
@@ -63,7 +64,7 @@ function navigate(id: string) {
       <div class="brand-name">
         {{ t('app.name') }}
         <small
-          >{{ t('app.edition').toUpperCase()
+          >{{ tp('edition').toUpperCase()
           }}<span v-if="versionLabel"> · {{ versionLabel }}</span></small
         >
       </div>

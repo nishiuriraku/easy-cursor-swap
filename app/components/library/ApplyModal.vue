@@ -15,6 +15,7 @@ import { CURSOR_ROLES } from '~/components/icons/CursorIcons'
 import type { AccessibilityConflicts } from '~/composables/useAccessibility'
 
 const { t } = useI18n()
+const { tp } = usePlatform()
 
 const { getAccessibilityConflicts } = useAccessibility()
 const conflicts = ref<AccessibilityConflicts | null>(null)
@@ -67,7 +68,7 @@ const inheritPct = computed(() => 100 - overridesPct.value)
   <UiModal
     :open="true"
     :title="t('apply.title', { name: theme.name })"
-    :description="t('apply.description')"
+    :description="tp('applyDescription')"
     icon="Pkg"
     size="md"
     :busy="busy"

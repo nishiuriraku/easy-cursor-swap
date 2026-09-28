@@ -15,6 +15,7 @@ import { mapWindowsSchemeToCard } from '~/pages/index.helpers'
 import type { IpcWindowsScheme } from '~/composables/useWindowsSchemes'
 
 const { t, locale } = useI18n()
+const { tp } = usePlatform()
 // UiIcon / ThemeCard / ApplyModal は Nuxt の自動インポートで解決される。
 
 const themes = ref<ThemeCardData[]>([])
@@ -218,7 +219,7 @@ async function loadThemes(opts: { silent?: boolean } = {}) {
     const localNames = new Set(local.map((l) => l.name))
     const system: ThemeCardData[] = (schemes ?? [])
       .filter((s) => !localNames.has(s.name))
-      .map((s) => mapWindowsSchemeToCard(s, 'Windows'))
+      .map((s) => mapWindowsSchemeToCard(s, tp('systemSchemeAuthor')))
 
     themes.value = [...local, ...system]
   } catch (err) {
