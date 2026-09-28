@@ -9,7 +9,13 @@ vi.mock('../useTauri', () => ({
   invokeTauri: (...args: unknown[]) => invoke(...args),
 }))
 
-import { useProfileBackup } from '../useProfileBackup'
+vi.mock('@tauri-apps/plugin-dialog', () => ({
+  save: vi.fn(),
+  open: vi.fn(),
+  ask: vi.fn(),
+}))
+
+import { useProfileBackup, useProfileBackupDialog } from '../useProfileBackup'
 
 describe('useProfileBackup', () => {
   beforeEach(() => invoke.mockReset())
@@ -31,5 +37,35 @@ describe('useProfileBackup', () => {
       merge: true,
     })
     expect(r).toEqual(env)
+  })
+})
+
+describe('useProfileBackupDialog (P08a S6)', () => {
+  const t = (key: string) => key
+
+  beforeEach(() => {
+    invoke.mockReset()
+    vi.clearAllMocks()
+  })
+
+  it('save が null で何もしない', async () => {
+    const { save, open, ask } = await import('@tauri-apps/plugin-dialog')
+    vi.mocked(save).mockResolvedValueOnce(null)
+    const s = useProfileBackupDialog({ t })
+    await s.exportWithDialog()
+    expect(invoke).not.toHaveBeenCalledWith('export_profile', expect.anything())
+    expect(s.message.value).toBeNull()
+    expect(s.busy.value).toBe(false)
+    void open
+    void ask
+  })
+
+  it('成功で profileExportSuccess 文言', async () => {
+    const { save } = await import('@tauri-apps/plugin-dialog')
+    vi.mocked(save).mockResolvedValueOnce('/tmp/x.cursorprofile')
+    invoke.mockResolvedValueOnce(null)
+    const s = useProfileBackupDialog({ t })
+    await s.exportWithDialog()
+    expect(s.message.value).toBe('settings.profileExportSuccess')
   })
 })
