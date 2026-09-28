@@ -61,7 +61,7 @@ jobs:
           - target: aarch64-pc-windows-msvc
             arch_label: arm64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -85,13 +85,17 @@ jobs:
           key: ${{ matrix.target }}
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
 
-      - name: npm ci
-        run: npm ci
+      - name: npm ci (legacy-peer-deps)
+        # 2026-07-28: @nuxt/kit@4.5.1 (transitive of @nuxt/eslint) の peer dep
+        # `oxc-parser@>=0.140.0` に対し lockfile の oxc-parser は `^0.131.0` で
+        # ズレている。npm 10 系は peer dep 厳密評価のため EUSAGE で倒れる。
+        # ci.yml と同じ理由で --legacy-peer-deps を付与。
+        run: npm ci --legacy-peer-deps
 
       # -----------------------------------------------------------
       # CHANGELOG.md の該当バージョンのセクションを抜き出して
@@ -117,7 +121,7 @@ jobs:
           "__CHANGELOG_EOF__"            | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       - name: Tauri build (MSI + NSIS, Updater 署名付き)
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -162,7 +166,9 @@ jobs:
           # SemVer 0.0.x の API 安定保証は依然 best-effort だが、GitHub Release の
           # Pre-release フラグは降ろし、Updater 経由でも通常版として配信する。
           prerelease: false
-          includeUpdaterJson: true
+          # tauri-action v1: 既存 release が draft でない場合は fail する (workflow_dispatch で
+          # publish 済みタグを再実行しない)。latest.json の url は GitHub API asset URL 形式。
+          uploadUpdaterJson: true
 
       # -----------------------------------------------------------
       # Authenticode 署名: 2026-07-25 方針で SignPath 経由は廃止。MSIX / Store 自動
