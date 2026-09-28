@@ -126,25 +126,27 @@ GitHub Releases の `latest.json` フォーマット:
 
 ```json
 {
-  "version": "0.0.7",
+  "version": "0.0.8",
   "notes": "リリースノート",
-  "pub_date": "2026-06-09T00:00:00Z",
+  "pub_date": "2026-07-28T10:08:11Z",
   "platforms": {
     "windows-x86_64": {
       "signature": "...Tauri-signer 署名...",
-      "url": "https://github.com/nishiuriraku/easy-cursor-swap/releases/download/v0.0.7/EasyCursorSwap_0.0.7_x64-setup.nsis.zip"
+      "url": "https://github.com/nishiuriraku/easy-cursor-swap/releases/download/v0.0.8/EasyCursorSwap_0.0.8_x64-setup.nsis.zip"
     },
     "windows-aarch64": {
       "signature": "...Tauri-signer 署名...",
-      "url": "https://github.com/nishiuriraku/easy-cursor-swap/releases/download/v0.0.7/EasyCursorSwap_0.0.7_arm64-setup.nsis.zip"
+      "url": "https://github.com/nishiuriraku/easy-cursor-swap/releases/download/v0.0.8/EasyCursorSwap_0.0.8_arm64-setup.nsis.zip"
     }
   }
 }
 ```
 
+> **tauri-action v1 以降** (P06 で移行予定) は `platforms.*.url` が `https://api.github.com/repos/nishiuriraku/easy-cursor-swap/releases/assets/<asset_id>` 形式になる。`tauri-plugin-updater` 2.x は `Accept: application/octet-stream` を付けてこの URL を解釈するため、クライアント側の対応は不要。
+
 公開鍵は `tauri signer generate` で発行し、`tauri.conf.json` の `plugins.updater.pubkey` に投入。
 
-## 既知制約 (v0.0.7 / README 明記)
+## 既知制約 (v0.0.8 / README 明記)
 
 - Windows 10 22H2 以降 / Windows 11 のみサポート (Win10 21H2 以前は非対象)
 - RDP / Citrix / RemoteApp は動作対象外 (起動時バナーで警告)

@@ -31,7 +31,7 @@ for all 17 Windows cursor roles, 6 DPI sizes, and Ed25519-signed theme distribut
 | Requirement  | Minimum                                                                  |
 | ------------ | ------------------------------------------------------------------------ |
 | OS           | Windows 10 22H2 (build 19045) or Windows 11                              |
-| Architecture | x64 (ARM64 planned)                                                      |
+| Architecture | x64 / ARM64 (native `aarch64` build; ARM64 is CI cross-built and not yet hand-tested on a device) |
 | WebView2     | Evergreen runtime (built-in on Windows 11; auto-installed on Windows 10) |
 | Disk space   | ~30 MB for the installer; ~100 MB typical for a theme library            |
 
@@ -43,10 +43,16 @@ for all 17 Windows cursor roles, 6 DPI sizes, and Ed25519-signed theme distribut
 Download the latest installer from the
 [Releases page](https://github.com/nishiuriraku/easy-cursor-swap/releases):
 
-| File                           | Description                                                  |
-| ------------------------------ | ----------------------------------------------------------- |
-| `EasyCursorSwap_x64-setup.exe` | NSIS installer (per-user, no admin; English/Japanese setup) |
-| `EasyCursorSwap_x64_ja-JP.msi` | MSI installer (for silent / GPO deployment)                 |
+| File                                    | Description                                                     |
+| --------------------------------------- | --------------------------------------------------------------- |
+| `EasyCursorSwap_<ver>_x64-setup.exe`    | NSIS installer, x64 (per-user, no admin; English/Japanese setup) |
+| `EasyCursorSwap_<ver>_arm64-setup.exe`  | NSIS installer, ARM64 (Snapdragon / Surface Pro X etc.)          |
+| `EasyCursorSwap_<ver>_x64_ja-JP.msi`    | MSI installer, x64 (for silent / GPO deployment)                 |
+| `EasyCursorSwap_<ver>_arm64_ja-JP.msi`  | MSI installer, ARM64                                             |
+
+> `<ver>` is the release version, e.g. `EasyCursorSwap_0.0.8_x64-setup.exe`. Each installer ships with a
+> matching `.sig` (minisign) file used by the built-in updater. Pick the ARM64 file on Windows on ARM —
+> the x64 build also runs there via emulation but is slower.
 
 > The NSIS installer is recommended for most users — it lets you pick English or
 > Japanese during setup. The MSI ships with a Japanese setup UI and is provided
@@ -217,7 +223,7 @@ See [docs/key_rotation.md](docs/key_rotation.md) if you need to rotate your sign
 | Lock screen / sign-in screen   | Shows Windows built-in cursors                                   |
 | Multi-user sessions            | Each Windows user account has independent cursor settings        |
 | Remote Desktop (RDP)           | Not supported; cursor rendering is controlled by the RDP host    |
-| ARM64                          | Not yet tested; x64 binary runs via emulation on ARM64 Windows   |
+| ARM64                          | Native build ships since v0.0.8, but is CI cross-built only (no hand test on a device yet) |
 
 ## Contributing
 

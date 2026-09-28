@@ -14,7 +14,7 @@ Vue (UI) ──invoke()──▶ Tauri command (commands/) ──▶ Rust module
 
 ## Layout
 
-`src/` modules are registered in `lib.rs`. Grouped by responsibility:
+`src/` modules are declared (`pub mod`) in `lib.rs`; IPC commands are registered in `src/commands/mod.rs` (`get_command_handlers()` → `tauri::generate_handler![]`), which `main.rs` passes to `invoke_handler`. Grouped by responsibility:
 
 | Concern         | Modules                                                                                                                                                                                                                                                                            |
 | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -54,7 +54,7 @@ cargo bench                                       # criterion benches in benches
 ## Adding a `#[tauri::command]`
 
 1. Implement the function in `src/commands/<sub-module>.rs`. Use snake_case in Rust; the mirroring TS payload type in `app/types/` uses camelCase (serde rename if needed).
-2. Register it in the `invoke_handler` list in `lib.rs`.
+2. Register it in the `tauri::generate_handler![]` list inside `get_command_handlers()` in `src/commands/mod.rs` (the only place `main.rs` reads it from; `lib.rs` holds no handler list).
 3. Add the matching payload type in `app/types/`.
 4. Add a `tracing::info!` log on entry; redact any PII.
 5. Update the owning `specs/<NN-slug>/<NN-slug>.md` `ipc:` frontmatter + `reference/ipc-catalog.md` table + `reference/file_inventory.md`, then run `node scripts/gen-architecture.mjs` to regenerate `reference/index.json`. `verify-gate.sh` runs `gen-architecture.mjs --check` and goes red if registered IPC (from `generate_handler![]`) drifts from the frontmatter ownership maps.

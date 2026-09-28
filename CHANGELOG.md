@@ -13,10 +13,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Wave 4B: Store runtime 分岐 + activation policy 集約** — `appusermodel::PackageContext::current()` で autostart / updater / rollback / activation の 4 軸を一元決定。`GetCurrentPackageFullName` (Win32 API) → path fallback の 2 段戦略で MSIX 検出。`commands/app_metadata.rs` で `is_msix_packaged` / `package_policy_label` の 2 IPC を公開。`useUpdaterBootstrap` / `useUpdater.check` を MSIX で short-circuit、`useMsixPackaged` composable で UI 出し分け (Updates / Startup セクション)。`start_minimized` 設定と `--autostart` 起動を `decide_activation` で集約し `Window::hide` 配線。`auto_rollback_install` を `PackageContext.rollback` で gate。
 - **Wave 4C: CI install/remove/sentinel パイプライン** — `.github/workflows/build-msix-artifacts.yml` 新設 (workflow_dispatch のみ、matrix x64 / arm64、test self-signed cert + signtool + `Add-AppxPackage` smoke、`~/.custom_cursors/cursor_store_sentinel.txt` 永続化検証)。`.env.example` に `MSIX_PUBLISHER` / `MSIX_TEST_CERT_PASSWORD` (任意) を追記。
 
+### Changed
+
+- CI: `actions/setup-node` を v4 → v7 に更新 (Node 24 ランタイム、`ci.yml` / `release.yml`) (#14)。
+
 ### Fixed
 
 - 設定画面の切替 (自動起動 / 自動更新 / クラッシュレポート / トースト表示など) が `language` 以外保存されない不具合を修正。差分 patch 生成が camelCase キーで実データ (snake_case) を読んでいたため常に空 patch になっていた (`app/composables/useAppSettings.ts`)。
 - `app/layouts/default.vue` の `marketplaceCount` 重複宣言を除去し、develop からのビルド (`nuxi generate` / `tauri build`) が失敗する不具合を修正。
+- README (en / ja) の ARM64 記述を実態に合わせて修正。v0.0.8 以降 `release.yml` は `aarch64-pc-windows-msvc` をネイティブビルドし `EasyCursorSwap_<ver>_arm64-setup.exe` / `_arm64_ja-JP.msi` を配布している (「planned / エミュレーション動作」は誤り)。インストール表に arm64 行とバージョン付きファイル名を追加。
+- `CHANGELOG.md` v0.0.8 の `### Security` から `### Fixed` と重複していた UI 修正 3 件 + 設計判断メモ 1 件を除去 (セキュリティ関連 5 件 AR-M1-3/5/6/7/8 のみ残す)。
+- `src-tauri/CLAUDE.md` の IPC 登録場所を `lib.rs` → `src/commands/mod.rs` (`get_command_handlers()` 内 `generate_handler![]`) に訂正。`docs/distribution.md` の latest.json 例と既知制約見出しを v0.0.8 に更新。
+
+### Internal
+
+- フロント: マーケットプレイス IPC (`marketplace_fetch_index` / `marketplace_install`) を singleton composable `useMarketplace` に集約し、`pages/marketplace.vue` と `layouts/default.vue` (サイドバーのバッジ) で index を共有、inflight dedupe で公式インデックス HTTP を 1 回に (Wave 3A / L1-1)。`useGithubAuth` に `revoke()` を追加し `pages/settings.vue` からの `revoke_github_link` 直 invoke を撤去 (L1-5)。
 
 ## [0.0.8] - 2026-07-28
 
@@ -64,10 +75,6 @@ Wave 2AB では Rust / フロントエンド双方の型整合性・テスト基
 
 ### Security
 
-- 一括取り込み (フォルダ / ファイル) の解決・解析フェーズで進捗が一切表示されず無反応に見えていた不具合を修正。スタート画面からの取り込みでは進捗オーバーレイが `stage !== 'start'` の分岐内に置かれていたため描画されておらず、配置を分岐外へ移して解析中もステージ進捗とキャンセルが見えるようにしました。
-- Creator のエクスポート進捗バーが未定義の CSS トークン (`--bg-elev2` / `--bg-elev1` / `--mint` / `--border`) を参照しており、背景とバーが正しく描画されていなかった問題を、共通 `UiProgress` (設計トークン `--accent` / `--line` ベース) への移行で解消しました。ライト / ダーク両テーマで確実に視認できます。
-- primary (アクセント色塗り) ボタンのローディングスピナーが背景と同化して見えなかった不具合を修正。共通 `.spinner` の回転弧が `var(--accent)` で、primary ボタンの `bg-accent` と同色だったため不可視でした。塗り / 色付き背景のボタン (primary / danger) ではスピナーをボタンの文字色 (`currentColor`) で描き直し、確実にコントラストを出すようにしました (適用 / 保存 / 書き出し等の緑ボタン)。
-- 起動時クラッシュリカバリ (apply 途中の電源断などで `_pending_apply.snapshot` が残置された状態で再起動した場合) は Windows 既定への強制リセットを意図的に採用している旨を、コメント / ログ / `docs/` 側記述で統一。pre-apply exact restore ではなく Windows 既定化である理由を「クラッシュ後は最も安全な既定に倒す」設計判断として明文化 (`c100e85` / AR-M1-1)。
 - 自動ロールバック (Health::attempt_rollback) が installer URL を `_x64-setup.exe` 固定で取得していたため、ARM64 機では 3 連続起動失敗時に x64 ビルドをサイレント上書きインストールし、回復不能ループに陥る可能性があった問題を修正。`std::env::consts::ARCH` で URL を選択するようにし、minisign 検証も arch 不一致を弾けるようになりました (`6876cc2` / AR-M1-3)。
 - `.cursorpack` 取り込み経路 (bulk_import) で、zip 展開時の per-file / 累積サイズ上限が zip ヘッダの `entry.size()` (申告値) に依存しており、申告偽装 zip 爆弾への最終防衛線がなかった問題を修正。`entry.take(MAX)` で実ストリームバイト上限を課し、`io::copy` が実際に書き込んだバイト数を累積判定に使用。本流 (`theme/package.rs`) と同じ上限定数を共有して `bulk_import/cursorpack.rs` / `theme/package.rs` / `backup.rs` の 3 経路で対称化しました (`7824174` / AR-M1-5)。
 - マーケットプレイス詳細モーダルでテーマ作者の `homepage` URL が Rust / フロントどちらの検証も通らず `<a :href>` に直接バインドされていた問題を修正。`fetch_index` 返却前に `is_allowed_url_scheme` でスキーム (http/https のみ) を検証し、不正な値は `None` に正規化。`preview_base_url` だけでなく `download_url` の https 強制と GitHub username 文字種検証も同コミットで対応 (`23984fb` / AR-M1-6)。
