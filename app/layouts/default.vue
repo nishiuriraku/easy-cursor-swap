@@ -17,7 +17,6 @@ const router = useRouter()
 const panicOpen = ref(false)
 
 /** サイドバー Marketplace バッジ用: 公式インデックスのテーマ数。 */
-const marketplaceCount = ref(0)
 const themeCount = computed(() => themes.value.length)
 
 /**
