@@ -52,7 +52,7 @@
     "@tailwindcss/vite": "^4.3.3",
     "@tauri-apps/cli": "^2.11.2",
     "@vitejs/plugin-vue": "^6.0.9",
-    "@vitest/coverage-v8": "^4.1.10",
+    "@vitest/coverage-v8": "^5.0.2",
     "@vitest/ui": "^4.1.6",
     "@vue/test-utils": "^2.4.10",
     "@wdio/cli": "^9.32.0",
