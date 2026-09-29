@@ -66,7 +66,7 @@ image = { version = "0.25", features = ["png", "ico"] }
 
 # --- ユーティリティ ---
 uuid = { version = "1", features = ["v4", "serde"] }
-zip = "5"
+zip = "8"
 
 # --- 型生成 (feature-gated; 通常ビルドには含まれない) ---
 # Rust 構造体から TS 型を生成する `gen_types` バイナリ用。
