@@ -134,7 +134,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Linux system deps (Tauri v2 prerequisites)
         # webkit2gtk-4.1 / gtk3 / ayatana-appindicator / rsvg は tauri crate の build script、
