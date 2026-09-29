@@ -69,7 +69,7 @@
     "unplugin-vue-components": "^32.0.0",
     "vitest": "^4.1.6",
     "vitest-axe": "^0.1.0",
-    "vue-tsc": "^2.2.12"
+    "vue-tsc": "^3.3.11"
   },
   "overrides": {
     "js-cookie": ">=3.0.7",
